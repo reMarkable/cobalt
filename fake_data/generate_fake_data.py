@@ -22,12 +22,13 @@ OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir,
     'out'))
 
 # The names of the csv files to write.
+USAGE_BY_USERID_CSV_FILE_NAME = 'usage_by_userid.csv'
 USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
 USAGE_BY_CITY_CSV_FILE_NAME = 'usage_and_rating_by_city.csv'
 USAGE_BY_HOUR_CSV_FILE_NAME = 'usage_by_hour.csv'
 
-# This defines a new type Entry as tuple with four named fields.
-Entry = collections.namedtuple('Entry',['name', 'city', 'hour', 'rating'])
+# This defines a new type Entry as tuple with five named fields.
+Entry = collections.namedtuple('Entry',['id', 'name', 'city', 'hour', 'rating'])
 
 # A pair consisting of a usage and a rating.
 class UsageAndRating:
@@ -73,7 +74,8 @@ def generateRandomEntries(num_entries):
   	name = GIRLS_NAMES[name_index]
   	hour = int(random.triangular(0,23))
   	rating = random.randint(0, 10)
-  	entries.append(Entry(name, city, hour, rating))
+        userid = normalRandomInt(num_entries-1, 0.035, skew=0.25)
+  	entries.append(Entry(userid, name, city, hour, rating))
   return entries
 
 class Accumulator:
@@ -82,12 +84,15 @@ class Accumulator:
   def  __init__(self):
     # A map from city name to UsageAnRating
   	self.usage_and_rating_by_city={}
+    # A counter used to count occurrences of each user using the module.
+  	self.usage_by_userid=collections.Counter()
     # A counter used to count occurrences of each module seen.
   	self.usage_by_module=collections.Counter()
     # A list of 24 singleton lists of usage counts.
   	self.usage_by_hour=[[0] for i in xrange(24)]
 
   def addEntry(self, entry):
+  	self.usage_by_userid[entry.id] +=1
   	self.usage_by_module[entry.name] +=1
   	self.usage_by_hour[entry.hour][0] += 1
   	if entry.city in self.usage_and_rating_by_city:
@@ -109,6 +114,11 @@ def main():
   	accumulator.addEntry(entry)
 
   # Write the csv files.
+  with open(os.path.join(OUT_DIR, USAGE_BY_USERID_CSV_FILE_NAME), 'w+b') as f:
+    writer = csv.writer(f)
+    for id in accumulator.usage_by_userid:
+      writer.writerow([id, accumulator.usage_by_userid[id]])
+
   with open(os.path.join(OUT_DIR, USAGE_BY_HOUR_CSV_FILE_NAME), 'w+b') as f:
     writer = csv.writer(f)
     writer.writerows(accumulator.usage_by_hour)
