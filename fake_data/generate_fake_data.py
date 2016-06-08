@@ -16,19 +16,20 @@ import random
 from girls_names import GIRLS_NAMES
 # We will use cities from a list of cities found on the internet.
 from us_cities import US_CITIES
+# Total number of users
+NUM_USERS = 1000
 
 THIS_DIR = os.path.dirname(__file__)
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir,
     'out'))
 
 # The names of the csv files to write.
-USAGE_BY_USERID_CSV_FILE_NAME = 'usage_by_userid.csv'
 USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
 USAGE_BY_CITY_CSV_FILE_NAME = 'usage_and_rating_by_city.csv'
 USAGE_BY_HOUR_CSV_FILE_NAME = 'usage_by_hour.csv'
 
 # This defines a new type Entry as tuple with five named fields.
-Entry = collections.namedtuple('Entry',['id', 'name', 'city', 'hour', 'rating'])
+Entry = collections.namedtuple('Entry',['user_id', 'name', 'city', 'hour', 'rating'])
 
 # A pair consisting of a usage and a rating.
 class UsageAndRating:
@@ -68,14 +69,14 @@ def generateRandomEntries(num_entries):
   for i in xrange(num_entries):
     # The spread and skew parameters used below were obtained by
     # experimentation. They yield output files that look somewhat natural.
-  	city_index = normalRandomInt(len(US_CITIES)-1, 0.035, skew=0.25)
-  	city = US_CITIES[city_index]
-  	name_index = normalRandomInt(len(GIRLS_NAMES)-1, 0.001)
-  	name = GIRLS_NAMES[name_index]
-  	hour = int(random.triangular(0,23))
-  	rating = random.randint(0, 10)
-        userid = normalRandomInt(num_entries-1, 0.035, skew=0.25)
-  	entries.append(Entry(userid, name, city, hour, rating))
+    city_index = normalRandomInt(len(US_CITIES)-1, 0.035, skew=0.25)
+    city = US_CITIES[city_index]
+    name_index = normalRandomInt(len(GIRLS_NAMES)-1, 0.001)
+    name = GIRLS_NAMES[name_index]
+    hour = int(random.triangular(0,23))
+    rating = random.randint(0, 10)
+    user_id = random.randint(1, NUM_USERS + 1)
+    entries.append(Entry(user_id, name, city, hour, rating))
   return entries
 
 class Accumulator:
@@ -84,15 +85,12 @@ class Accumulator:
   def  __init__(self):
     # A map from city name to UsageAnRating
   	self.usage_and_rating_by_city={}
-    # A counter used to count occurrences of each user using the module.
-  	self.usage_by_userid=collections.Counter()
     # A counter used to count occurrences of each module seen.
   	self.usage_by_module=collections.Counter()
     # A list of 24 singleton lists of usage counts.
   	self.usage_by_hour=[[0] for i in xrange(24)]
 
   def addEntry(self, entry):
-  	self.usage_by_userid[entry.id] +=1
   	self.usage_by_module[entry.name] +=1
   	self.usage_by_hour[entry.hour][0] += 1
   	if entry.city in self.usage_and_rating_by_city:
@@ -113,12 +111,6 @@ def main():
   for entry in entries:
   	accumulator.addEntry(entry)
 
-  # Write the csv files.
-  with open(os.path.join(OUT_DIR, USAGE_BY_USERID_CSV_FILE_NAME), 'w+b') as f:
-    writer = csv.writer(f)
-    for id in accumulator.usage_by_userid:
-      writer.writerow([id, accumulator.usage_by_userid[id]])
-
   with open(os.path.join(OUT_DIR, USAGE_BY_HOUR_CSV_FILE_NAME), 'w+b') as f:
     writer = csv.writer(f)
     writer.writerows(accumulator.usage_by_hour)
@@ -138,4 +130,3 @@ def main():
 
 if __name__ == '__main__':
   main()
-
