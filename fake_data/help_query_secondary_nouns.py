@@ -1,0 +1,22 @@
+HELP_QUERY_SECONDARY_NOUNS = [
+'flower',
+'game',
+'hill',
+'home',
+'juice',
+'kite',
+'lake',
+'meal',
+'moon',
+'nest',
+'pen',
+'pencil',
+'plant',
+'rain',
+'river',
+'road',
+'rock',
+'room',
+'rose',
+'soda'
+]

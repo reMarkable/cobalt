@@ -1,0 +1,22 @@
+HELP_QUERY_VERBS = [
+'is',
+'in',
+'has'
+'want',
+'use',
+'work',
+'call',
+'take',
+'ask',
+'need',
+'find',
+'help',
+'play',
+'move',
+'watch',
+'follow',
+'stop',
+'create',
+'open',
+'walk'
+]

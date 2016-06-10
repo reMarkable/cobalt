@@ -1,0 +1,22 @@
+HELP_QUERY_PRIMARY_NOUNS = [
+'Apple',
+'Cat',
+'Banana',
+'Bike',
+'Bird',
+'Book',
+'Hillary\'s',
+'Donald.Trump',
+'Class',
+'Clover',
+'Club',
+'Duck',
+'Crayon',
+'Larry',
+'Crown',
+'Crowd',
+'Crib',
+'Desk',
+'Steve\'s',
+'Google'
+]

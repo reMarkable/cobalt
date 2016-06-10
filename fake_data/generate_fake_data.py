@@ -16,6 +16,14 @@ import random
 from girls_names import GIRLS_NAMES
 # We will use cities from a list of cities found on the internet.
 from us_cities import US_CITIES
+# We will use proper nouns from a sample list constructed with few special
+# characters such as capital letters, single quotes and a period.
+from help_query_primary_nouns import HELP_QUERY_PRIMARY_NOUNS
+# We will use verbs from a predefined list of commonly used verbs.
+from help_query_verbs import HELP_QUERY_VERBS
+# We will use predefined set of secondary nouns commonly used in speaking.
+from help_query_secondary_nouns import HELP_QUERY_SECONDARY_NOUNS
+
 # Total number of users
 NUM_USERS = 1000
 
@@ -33,16 +41,17 @@ GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
 USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
 USAGE_BY_CITY_CSV_FILE_NAME = 'usage_and_rating_by_city.csv'
 USAGE_BY_HOUR_CSV_FILE_NAME = 'usage_by_hour.csv'
+POPULAR_HELP_QUERIES_CSV_FILE_NAME = 'popular_help_queries.csv'
 
-# This defines a new type |Entry| as a tuple with five named fields.
+# This defines a new type |Entry| as a tuple with six named fields.
 Entry = collections.namedtuple('Entry',['user_id', 'name', 'city', 'hour',
-  'rating'])
+    'rating', 'help_query'])
 
 # A pair consisting of a usage and a rating.
 class UsageAndRating:
   def  __init__(self, rating):
-  	self.num_uses = 1
-  	self.total_rating = rating
+    self.num_uses = 1
+    self.total_rating = rating
 
 def powerRandomInt(max_val):
   """Returns a random integer from the interval [0, max_val],
@@ -108,6 +117,24 @@ def normalRandomInt(max_val, spread, skew=0):
   # Ensure the value is in the range [0, max_val]
   return max(0, min(x, max_val))
 
+def generateRandomHelpQuery():
+  """Generates a random help query string of the form <noun verb noun> from a
+  predefined set of words for noun and verb category.
+
+  Returns:
+    {string} A random help query string containing three words separated with a
+             space.
+  """
+
+  help_query = ""
+  index = powerRandomInt(len(HELP_QUERY_PRIMARY_NOUNS)-1)
+  help_query += HELP_QUERY_PRIMARY_NOUNS[index] + " "
+  index = random.randint(0, len(HELP_QUERY_VERBS) - 1)
+  help_query += HELP_QUERY_VERBS[index] + " "
+  index = random.randint(0, len(HELP_QUERY_SECONDARY_NOUNS) - 1)
+  help_query += HELP_QUERY_SECONDARY_NOUNS[index]
+  return help_query
+
 def generateRandomEntries(num_entries):
   """Generates a random list of Entries.
 
@@ -125,7 +152,10 @@ def generateRandomEntries(num_entries):
     hour = int(random.triangular(0,23))
     rating = random.randint(0, 10)
     user_id = random.randint(1, NUM_USERS + 1)
-    entries.append(Entry(user_id, name, city, hour, rating))
+    # Generate free form help queries from a list of primary nouns, verbs and
+    # secondary nouns.
+    help_query = generateRandomHelpQuery()
+    entries.append(Entry(user_id, name, city, hour, rating, help_query))
   return entries
 
 def writeEntries(entries, file_name):
@@ -152,16 +182,19 @@ class Accumulator:
   	self.usage_by_module=collections.Counter()
     # A list of 24 singleton lists of usage counts.
   	self.usage_by_hour=[[0] for i in xrange(24)]
+    # A counter used to count occurences of each help query.
+  	self.popular_help_query=collections.Counter()
 
   def addEntry(self, entry):
-  	self.usage_by_module[entry.name] +=1
-  	self.usage_by_hour[entry.hour][0] += 1
-  	if entry.city in self.usage_and_rating_by_city:
-  	  self.usage_and_rating_by_city[entry.city].num_uses = (
-          self.usage_and_rating_by_city[entry.city].num_uses + 1)
-  	  self.usage_and_rating_by_city[entry.city].total_rating +=entry.rating
-  	else:
-  	  self.usage_and_rating_by_city[entry.city] = UsageAndRating(entry.rating)
+    self.usage_by_module[entry.name] +=1
+    self.usage_by_hour[entry.hour][0] += 1
+    if entry.city in self.usage_and_rating_by_city:
+      self.usage_and_rating_by_city[entry.city].num_uses = (
+      self.usage_and_rating_by_city[entry.city].num_uses + 1)
+      self.usage_and_rating_by_city[entry.city].total_rating +=entry.rating
+    else:
+      self.usage_and_rating_by_city[entry.city] = UsageAndRating(entry.rating)
+    self.popular_help_query[entry.help_query] +=1
 
 def main():
   # Create the out directory.
@@ -190,6 +223,11 @@ def main():
     writer = csv.writer(f)
     for name in accumulator.usage_by_module:
       writer.writerow([name, accumulator.usage_by_module[name]])
+
+  with open(os.path.join(OUT_DIR, POPULAR_HELP_QUERIES_CSV_FILE_NAME), 'w+b') \
+       as f:
+    writer = csv.writer(f)
+    writer.writerows(accumulator.popular_help_query.most_common(10))
 
   with open(os.path.join(OUT_DIR, USAGE_BY_CITY_CSV_FILE_NAME), 'w+b') as f:
     writer = csv.writer(f)
