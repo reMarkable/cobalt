@@ -23,13 +23,20 @@ THIS_DIR = os.path.dirname(__file__)
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir,
     'out'))
 
-# The names of the csv files to write.
+# The name of the file we write containing the synthetic, random input data.
+# This will be the input to both the straight counting pipeline and the
+# Cobalt prototype pipeline.
+GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
+
+# The names of the csv files that constitute the output from the straight
+# counting pipeline.
 USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
 USAGE_BY_CITY_CSV_FILE_NAME = 'usage_and_rating_by_city.csv'
 USAGE_BY_HOUR_CSV_FILE_NAME = 'usage_by_hour.csv'
 
-# This defines a new type Entry as tuple with five named fields.
-Entry = collections.namedtuple('Entry',['user_id', 'name', 'city', 'hour', 'rating'])
+# This defines a new type |Entry| as a tuple with five named fields.
+Entry = collections.namedtuple('Entry',['user_id', 'name', 'city', 'hour',
+  'rating'])
 
 # A pair consisting of a usage and a rating.
 class UsageAndRating:
@@ -79,6 +86,20 @@ def generateRandomEntries(num_entries):
     entries.append(Entry(user_id, name, city, hour, rating))
   return entries
 
+def writeEntries(entries, file_name):
+  """ Writes a csv file containing the given entries.
+
+  Args:
+    entries {list of Entry}: A list of Entries to be written.
+    file_name {string}: The csv file to generate.
+  """
+  with open(os.path.join(OUT_DIR, file_name), 'w+b') as f:
+    writer = csv.writer(f)
+    for entry in entries:
+      writer.writerow([entry.user_id, entry.name, entry.city, entry.hour,
+                       entry.rating])
+
+
 class Accumulator:
   """Accumulates the randomly produced entries and aggregates stats about them.
   """
@@ -105,8 +126,16 @@ def main():
   if not os.path.exists(OUT_DIR):
     os.makedirs(OUT_DIR)
 
-  # Generate 10 thousand random entries and add them to the Accumulator.
+  # Generate the synthetic input data.
   entries = generateRandomEntries(10000)
+
+  # Write the synthetic input data to a file for consumption by the
+  # Cobalt prototype.
+  writeEntries(entries, GENERATED_INPUT_DATA_FILE_NAME)
+
+  # Start the straight counting pipeline. We don't bother reading the input
+  # file that we just wrote since we already have it in memory.
+  # We just use data that is already in memory in |entries|.
   accumulator = Accumulator()
   for entry in entries:
   	accumulator.addEntry(entry)
