@@ -44,6 +44,50 @@ class UsageAndRating:
   	self.num_uses = 1
   	self.total_rating = rating
 
+def powerRandomInt(max_val):
+  """Returns a random integer from the interval [0, max_val],
+  using a power-law distribution.
+
+  The underlying probability distribution is given by:
+  P(X >= n) = (c/(n+c))^4, for n>=0 an integer, and where we use c=20.
+
+  But if X > max_val is generated then max_val is returned.
+
+  Assuming max_val is sufficiently large the distribution should look
+  approximately like the following. We display all values of n for
+  which P(n) >= 1%
+
+  P(0)  = 0.177
+  P(1)  = 0.139
+  P(2)  = 0.111
+  P(3)  = 0.089
+  P(4)  = 0.072
+  P(5)  = 0.059
+  P(6)  = 0.049
+  P(7)  = 0.040
+  P(8)  = 0.034
+  P(9)  = 0.028
+  P(10) = 0.024
+  P(11) = 0.020
+  P(12) = 0.017
+  P(13) = 0.015
+  P(14) = 0.013
+  P(15) = 0.011
+  P(16) = 0.009
+
+  The mean is approximately 6 and the variance is approximaley 4.4.
+
+  Args:
+    max_val {number} A positive number. All returned values will be less than
+      this.
+
+  Returns:
+    {int} A random integer in the range [0, max_val].
+  """
+  x  = int(20*random.paretovariate(4) - 20)
+  # Ensure the value is in the range [0, max_val]
+  return max(0, min(x, max_val))
+
 def normalRandomInt(max_val, spread, skew=0):
   """Returns a random integer from a normal distribution whose parameters may be
   tweaked by setting max_val, spread and skew. The value is clipped to
@@ -74,11 +118,9 @@ def generateRandomEntries(num_entries):
   """
   entries = []
   for i in xrange(num_entries):
-    # The spread and skew parameters used below were obtained by
-    # experimentation. They yield output files that look somewhat natural.
-    city_index = normalRandomInt(len(US_CITIES)-1, 0.035, skew=0.25)
+    city_index = powerRandomInt(len(US_CITIES)-1)
     city = US_CITIES[city_index]
-    name_index = normalRandomInt(len(GIRLS_NAMES)-1, 0.001)
+    name_index = powerRandomInt(len(GIRLS_NAMES)-1)
     name = GIRLS_NAMES[name_index]
     hour = int(random.triangular(0,23))
     rating = random.randint(0, 10)
