@@ -1,7 +1,5 @@
 """Forculus Library.
 
-author: pseudorandom@google.com
-
 Code to apply threshold crypto to secure messages while deriving utility on
 popular messages.
 """
@@ -16,6 +14,9 @@ import sys
 from Crypto.Cipher import AES
 from Crypto.Hash import HMAC
 from Crypto.Hash import SHA256
+
+from struct import pack
+from struct import unpack
 
 
 def _log(string):
@@ -88,15 +89,31 @@ def _DE_enc(key, msg):
   iv = _ro_hmac("0"+msg)[:16]
   # AES in CBC mode with IV = HMACSHA256(0,m)
   obj = AES.new(key, AES.MODE_CBC, iv)
-  ciphertext = obj.encrypt(msg)
+  ciphertext = obj.encrypt(_CBC_pad_msg(msg))
   return iv, ciphertext
 
 
-# Simple function to decrypt message given key, iv, and ciphertext
+# Implements simple padding to multiple of 16 bytes.
+def _CBC_pad_msg(msg):
+  length = len(msg) + 1  # +1 for last padding length byte
+  if length % 16 == 0:
+    return msg + '\x01'
+  plength = 16 - (length % 16) + 1  # +1 for last padding length byte
+  padding = '\x00' * (plength - 1) + pack('b', plength)
+  return msg + padding
+
+
+# Removes simple padding.
+def _CBC_remove_padding(msg):
+  plength = unpack('b', msg[-1])[0]  # unpack returns a tuple
+  return msg[:-plength]
+
+
+# Simple function to decrypt message given key, iv, and ciphertext.
 def _DE_dec(key, iv, ciphertext):
   obj = AES.new(key, AES.MODE_CBC, iv)
   msg = obj.decrypt(ciphertext)
-  return msg
+  return _CBC_remove_padding(msg)
 
 
 def _egcd(b, n):
@@ -238,8 +255,7 @@ class Forculus(object):
     _log("Key, i.e., c0: %d" % c[0])
     _log("Rest of coefficients: " + ", ".join(["%d"] * (self.threshold-1)) %
          tuple(c[1:]))
-    iv, ctxt = _DE_enc(_pack_into_bytes(c[0])[:16],
-                       ptxt + "0" *(16 - len(ptxt)))
+    iv, ctxt = _DE_enc(_pack_into_bytes(c[0])[:16], ptxt)
     eval_point = random.randrange((self.threshold**2) * (2 ** 80))
     eval_point = _unpack_bytes(_ro_hmac(str(eval_point))) % self.q
     _log("Eval point: %d" % eval_point)
