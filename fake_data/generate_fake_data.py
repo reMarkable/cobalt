@@ -3,13 +3,24 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-""" This script creates several csv files containing fake data to be visualized.
+""" This script is the first step in the Cobalt prototype. It
+generates synthetic data, writes this data to a file called
+input_data.csv, then runs the straight counting pipeline on the
+data which emits several csv files to the out directory.
 """
 
 import collections
 import csv
 import os
 import random
+import sys
+
+THIS_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
+sys.path.insert(0, ROOT_DIR)
+
+import utils.file_util as file_util
+import utils.data as data
 
 # For the names of the modules in our fake data we will use names from a
 # list of "girl's names" found on the internet.
@@ -26,26 +37,6 @@ from help_query_secondary_nouns import HELP_QUERY_SECONDARY_NOUNS
 
 # Total number of users
 NUM_USERS = 1000
-
-THIS_DIR = os.path.dirname(__file__)
-OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir,
-    'out'))
-
-# The name of the file we write containing the synthetic, random input data.
-# This will be the input to both the straight counting pipeline and the
-# Cobalt prototype pipeline.
-GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
-
-# The names of the csv files that constitute the output from the straight
-# counting pipeline.
-USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
-USAGE_BY_CITY_CSV_FILE_NAME = 'usage_and_rating_by_city.csv'
-USAGE_BY_HOUR_CSV_FILE_NAME = 'usage_by_hour.csv'
-POPULAR_HELP_QUERIES_CSV_FILE_NAME = 'popular_help_queries.csv'
-
-# This defines a new type |Entry| as a tuple with six named fields.
-Entry = collections.namedtuple('Entry',['user_id', 'name', 'city', 'hour',
-    'rating', 'help_query'])
 
 # A pair consisting of a usage and a rating.
 class UsageAndRating:
@@ -123,7 +114,7 @@ def generateRandomHelpQuery():
 
   Returns:
     {string} A random help query string containing three words separated with a
-             space.
+    space.
   """
 
   help_query = ""
@@ -152,61 +143,43 @@ def generateRandomEntries(num_entries):
     hour = int(random.triangular(0,23))
     rating = random.randint(0, 10)
     user_id = random.randint(1, NUM_USERS + 1)
-    # Generate free form help queries from a list of primary nouns, verbs and
+    # Generate free-form help queries from a list of primary nouns, verbs and
     # secondary nouns.
     help_query = generateRandomHelpQuery()
-    entries.append(Entry(user_id, name, city, hour, rating, help_query))
+    entries.append(data.Entry(user_id, name, city, hour, rating, help_query))
   return entries
-
-def writeEntries(entries, file_name):
-  """ Writes a csv file containing the given entries.
-
-  Args:
-    entries {list of Entry}: A list of Entries to be written.
-    file_name {string}: The csv file to generate.
-  """
-  with open(os.path.join(OUT_DIR, file_name), 'w+b') as f:
-    writer = csv.writer(f)
-    for entry in entries:
-      writer.writerow([entry.user_id, entry.name, entry.city, entry.hour,
-                       entry.rating])
-
 
 class Accumulator:
   """Accumulates the randomly produced entries and aggregates stats about them.
   """
   def  __init__(self):
     # A map from city name to UsageAnRating
-  	self.usage_and_rating_by_city={}
+    self.usage_and_rating_by_city={}
     # A counter used to count occurrences of each module seen.
-  	self.usage_by_module=collections.Counter()
+    self.usage_by_module=collections.Counter()
     # A list of 24 singleton lists of usage counts.
-  	self.usage_by_hour=[[0] for i in xrange(24)]
+    self.usage_by_hour=[[0] for i in xrange(24)]
     # A counter used to count occurences of each help query.
-  	self.popular_help_query=collections.Counter()
+    self.popular_help_query=collections.Counter()
 
   def addEntry(self, entry):
     self.usage_by_module[entry.name] +=1
     self.usage_by_hour[entry.hour][0] += 1
     if entry.city in self.usage_and_rating_by_city:
       self.usage_and_rating_by_city[entry.city].num_uses = (
-      self.usage_and_rating_by_city[entry.city].num_uses + 1)
+        self.usage_and_rating_by_city[entry.city].num_uses + 1)
       self.usage_and_rating_by_city[entry.city].total_rating +=entry.rating
     else:
       self.usage_and_rating_by_city[entry.city] = UsageAndRating(entry.rating)
-    self.popular_help_query[entry.help_query] +=1
+      self.popular_help_query[entry.help_query] +=1
 
 def main():
-  # Create the out directory.
-  if not os.path.exists(OUT_DIR):
-    os.makedirs(OUT_DIR)
-
   # Generate the synthetic input data.
   entries = generateRandomEntries(10000)
 
   # Write the synthetic input data to a file for consumption by the
   # Cobalt prototype.
-  writeEntries(entries, GENERATED_INPUT_DATA_FILE_NAME)
+  data.writeEntries(entries, file_util.GENERATED_INPUT_DATA_FILE_NAME)
 
   # Start the straight counting pipeline. We don't bother reading the input
   # file that we just wrote since we already have it in memory.
@@ -215,21 +188,21 @@ def main():
   for entry in entries:
   	accumulator.addEntry(entry)
 
-  with open(os.path.join(OUT_DIR, USAGE_BY_HOUR_CSV_FILE_NAME), 'w+b') as f:
+  with file_util.openForWriting(file_util.USAGE_BY_HOUR_CSV_FILE_NAME) as f:
     writer = csv.writer(f)
     writer.writerows(accumulator.usage_by_hour)
 
-  with open(os.path.join(OUT_DIR, USAGE_BY_MODULE_CSV_FILE_NAME), 'w+b') as f:
+  with file_util.openForWriting(file_util.USAGE_BY_MODULE_CSV_FILE_NAME) as f:
     writer = csv.writer(f)
     for name in accumulator.usage_by_module:
       writer.writerow([name, accumulator.usage_by_module[name]])
 
-  with open(os.path.join(OUT_DIR, POPULAR_HELP_QUERIES_CSV_FILE_NAME), 'w+b') \
-       as f:
+  with file_util.openForWriting(
+      file_util.POPULAR_HELP_QUERIES_CSV_FILE_NAME) as f:
     writer = csv.writer(f)
     writer.writerows(accumulator.popular_help_query.most_common(10))
 
-  with open(os.path.join(OUT_DIR, USAGE_BY_CITY_CSV_FILE_NAME), 'w+b') as f:
+  with file_util.openForWriting(file_util.USAGE_BY_CITY_CSV_FILE_NAME) as f:
     writer = csv.writer(f)
     for city in accumulator.usage_and_rating_by_city:
       num_uses = accumulator.usage_and_rating_by_city[city].num_uses
