@@ -5,7 +5,7 @@ HELP_QUERY_PRIMARY_NOUNS = [
 'Bike',
 'Bird',
 'Book',
-'Hillary\'s',
+'Hillary',
 'Donald.Trump',
 'Class',
 'Clover',
@@ -17,6 +17,6 @@ HELP_QUERY_PRIMARY_NOUNS = [
 'Crowd',
 'Crib',
 'Desk',
-'Steve\'s',
+'Steve',
 'Google'
 ]

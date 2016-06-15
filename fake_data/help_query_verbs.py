@@ -1,7 +1,7 @@
 HELP_QUERY_VERBS = [
 'is',
 'in',
-'has'
+'has',
 'want',
 'use',
 'work',

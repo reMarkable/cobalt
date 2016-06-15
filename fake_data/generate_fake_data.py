@@ -118,11 +118,18 @@ def generateRandomHelpQuery():
   """
 
   help_query = ""
-  index = powerRandomInt(len(HELP_QUERY_PRIMARY_NOUNS)-1)
+  # The |spread| arguments used below were arrived at by experiminetation.
+  # The goal was to get the distribution to be as spread out as possible
+  # while still having the property that one could see the histogram drop below
+  # 20 at about n = 45. This means that when capturing the top 50 queries we
+  # will capture all of the queries that occur at least 20 times. If you
+  # examine the file popular_help_queries.csv you should see 50 entries
+  # and all but the bottom few should have an occurrence >= 20.
+  index = normalRandomInt(len(HELP_QUERY_PRIMARY_NOUNS)-1, 0.038)
   help_query += HELP_QUERY_PRIMARY_NOUNS[index] + " "
-  index = random.randint(0, len(HELP_QUERY_VERBS) - 1)
+  index = normalRandomInt(len(HELP_QUERY_VERBS) - 1, 0.04)
   help_query += HELP_QUERY_VERBS[index] + " "
-  index = random.randint(0, len(HELP_QUERY_SECONDARY_NOUNS) - 1)
+  index = normalRandomInt(len(HELP_QUERY_SECONDARY_NOUNS)-1, 0.035)
   help_query += HELP_QUERY_SECONDARY_NOUNS[index]
   return help_query
 
@@ -165,13 +172,13 @@ class Accumulator:
   def addEntry(self, entry):
     self.usage_by_module[entry.name] +=1
     self.usage_by_hour[entry.hour][0] += 1
+    self.popular_help_query[entry.help_query] +=1
     if entry.city in self.usage_and_rating_by_city:
       self.usage_and_rating_by_city[entry.city].num_uses = (
         self.usage_and_rating_by_city[entry.city].num_uses + 1)
       self.usage_and_rating_by_city[entry.city].total_rating +=entry.rating
     else:
       self.usage_and_rating_by_city[entry.city] = UsageAndRating(entry.rating)
-      self.popular_help_query[entry.help_query] +=1
 
 def main():
   # Generate the synthetic input data.
@@ -200,7 +207,7 @@ def main():
   with file_util.openForWriting(
       file_util.POPULAR_HELP_QUERIES_CSV_FILE_NAME) as f:
     writer = csv.writer(f)
-    writer.writerows(accumulator.popular_help_query.most_common(10))
+    writer.writerows(accumulator.popular_help_query.most_common(50))
 
   with file_util.openForWriting(file_util.USAGE_BY_CITY_CSV_FILE_NAME) as f:
     writer = csv.writer(f)
