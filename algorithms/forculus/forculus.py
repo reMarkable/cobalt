@@ -20,7 +20,7 @@ from struct import unpack
 
 
 def _log(string):
-  logging_flag = True  # set to True for logging, False otherwise
+  logging_flag = False  # set to True for logging, False otherwise
   if logging_flag:
     if isinstance(string, dict):
       print >> sys.stderr, "[" + str(datetime.datetime.now()) + "]"
@@ -184,9 +184,11 @@ def _compute_c0_lagrange(tuples, threshold, q):
   _log("temp_sum 0x%x" % temp_sum)
   return (prod_xi * temp_sum) % q
 
-
-class Forculus(object):
-  """Forculus class with relevant helper functions."""
+class _Forculus(object):
+  """Private Forculus class with relevant helper functions.
+  The public API is exposed through the subclasses ForculusInserter
+  and ForculusEvaluator.
+  """
 
   def __init__(self, threshold):
     # Parameters
@@ -205,44 +207,6 @@ class Forculus(object):
     # self.Fq = GF(self.q)  # Field
     self.eparam = 1  # TODO(pseudorandom): eparam must be fetched from file
     random.seed()
-
-  def Create(self, e_db, r_db):
-    edb_writer = csv.writer(e_db)
-    rdb_writer = csv.writer(r_db)
-    edb_writer.writerow(["iv", "ctxt", "eval_point", "eval_data",
-                         "DEBUG_msg", "DEBUG_key"])
-    rdb_writer.writerow(["results"])
-
-  def Add(self, e_db, ptxt):
-    edb_writer = csv.writer(e_db)
-    iv, ctxt, eval_point, eval_value, key = self._Encrypt(ptxt)
-    edb_writer.writerow([base64.b64encode(iv),
-                         base64.b64encode(ctxt), eval_point, eval_value,
-                         "DEBUG:" + ptxt, "DEBUG:" + ("%d" % key)])
-
-  def ComputeAndWriteResults(self, e_db, r_db):
-    dictionary = {}
-    edb_reader = csv.reader(e_db)
-    for i, row in enumerate(edb_reader):
-      if i == 0:
-        continue  # skip first row
-      (iv, ctxt, eval_point, eval_data, _, _) = row
-      key = iv + " " + ctxt
-      if key in dictionary:
-        dictionary[key].append([eval_point, eval_data])
-      else:
-        dictionary[key] = [[eval_point, eval_data]]
-    _log("Dict")
-    _log(dictionary)
-    # For each element in dict with >= self.threshold points, do
-    # Lagrange interpolation to retrieve key
-    rdb_writer = csv.writer(r_db)
-    for keys in dictionary:
-      if len(dictionary[keys]) >= self.threshold:
-        # Recover iv and ctxt first
-        [iv, ctxt] = map(base64.b64decode, keys.strip().split(" "))
-        ptxt = self._Decrypt(iv, ctxt, dictionary[keys])
-        rdb_writer.writerow([ptxt])
 
   #
   # INTERNAL FUNCTIONS
@@ -275,8 +239,95 @@ class Forculus(object):
 
   def _Decrypt(self, iv, ctxt, dict_vals):
     # Use first self.threshold values to do Lagrange interpolation
+    # TODO(pseudorandom, rudominer): Ensure that first self.threshold values
+    # have unique interpolation points (otherwise the interpolation will fail
+    # ungracefully).
     c0 = _compute_c0_lagrange(dict_vals, self.threshold, self.q)
     _log("c0: 0x%x" % c0)
     ptxt = _DE_dec(_pack_into_bytes(int(c0))[:16], iv, ctxt)
     _log("ptxt: %s" % ptxt)
     return ptxt
+
+class ForculusInserter(_Forculus):
+  """ A ForculusInserter is used to insert entries into a Forculus-encrypted
+  database.
+  """
+  def __init__(self, threshold, e_db):
+    """ Constructs a new ForculusInserter with the given threshold and the
+    given database.
+
+    Args:
+      threshold {int}: A positive integer that will be the threshold used
+      for threshold encryption.
+
+      e_db {writer}: The database into which encrypted entries will be written.
+      Any object with a write() method. If e_db is a file object
+      it must have been opened for writing with the 'b' flag.
+    """
+    super(ForculusInserter, self).__init__(threshold)
+    self.edb_writer = csv.writer(e_db)
+
+  def Insert(self, ptxt):
+    """ Insert an encrypted version of the given plaintext into the database.
+
+    Args:
+      ptxt {string}: The plaintext to insert.
+    """
+    iv, ctxt, eval_point, eval_value, key = self._Encrypt(ptxt)
+    self.edb_writer.writerow([base64.b64encode(iv),
+        base64.b64encode(ctxt), eval_point, eval_value])
+
+class ForculusEvaluator(_Forculus):
+  """ A ForculusEvaluator is used to evaluate a Forculus-encrypted database
+  that was created with a ForculusInserter.
+  """
+  def __init__(self, threshold, e_db):
+    """ Constructs a new ForculusEvaluator with the given threshold and
+    the given database. The database must have been generated using
+    a ForculusInserter and it is essential that the same value of |threshold|
+    be passed as was used to create the database. Failure to do this will
+    result in the decryption failing.
+
+    Args:
+      threshold {int}: A positive integer that was the threshold used
+      for threshold encryption when the database was created.
+
+      e_db {iterator}: The database from which encrypted entries will be read.
+      Any object which supports the iterator protocol and returns a string each
+      time its next() method is called. If e_db is a file object
+      it must have been opened for reading with the 'b' flag.
+    """
+    super(ForculusEvaluator, self).__init__(threshold)
+    self.edb_reader = csv.reader(e_db)
+
+  def ComputeAndWriteResults(self, r_db):
+    """ Reads the entries from the encrypted database and decrypts any
+    entries that occur at least |threshold| times. The dycrpted plaintexts
+    are written to the result database along with there counts.
+
+    Args:
+      r_db {writer}: The database into which decrypted results will be written.
+      Any object with a write() method. If r_db is a file object
+      it must have been opened for writing with the 'b' flag.
+    """
+    dictionary = {}
+    for i, row in enumerate(self.edb_reader):
+      if i == 0:
+        continue  # skip first row
+      (iv, ctxt, eval_point, eval_data) = row
+      key = iv + " " + ctxt
+      if key in dictionary:
+        dictionary[key].append([eval_point, eval_data])
+      else:
+        dictionary[key] = [[eval_point, eval_data]]
+    _log("Dict")
+    _log(dictionary)
+    rdb_writer = csv.writer(r_db)
+    # For each element in dict with >= self.threshold points, do
+    # Lagrange interpolation to retrieve key
+    for keys in dictionary:
+      if len(dictionary[keys]) >= self.threshold:
+        # Recover iv and ctxt first
+        [iv, ctxt] = map(base64.b64decode, keys.strip().split(" "))
+        ptxt = self._Decrypt(iv, ctxt, dictionary[keys])
+        rdb_writer.writerow([ptxt, len(dictionary[keys])])
