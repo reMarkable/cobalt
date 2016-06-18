@@ -5,6 +5,7 @@ popular messages.
 """
 
 import base64
+import binascii
 import csv
 import datetime
 import pprint
@@ -30,7 +31,8 @@ def _log(string):
       print >> sys.stderr, "[" + str(datetime.datetime.now()) + "]\t" + string
 
 
-def _ro_hmac(msg):
+ZERO_HMAC = HMAC.new("0"*160, digestmod=SHA256)
+def _ro_hmac(msg, h=None):
   """Implements random oracle H as HMAC-SHA256 with the all-zero key.
 
   Input is message string and output is a 32-byte sequence containing the HMAC
@@ -38,21 +40,22 @@ def _ro_hmac(msg):
 
   Args:
     msg: Input message string.
+    h: An optional instance of HMAC to use. If None a new zeroed-out instance
+       will be used.
 
   Returns:
     bytes: Random Oracle output (32 bytes).
   """
-  h = HMAC.new("0"*160, digestmod=SHA256)
+  if h is None:
+    h = ZERO_HMAC.copy()
   h.update(msg)
   return h.digest()
 
 
 # Simple function to unpack bytes from a byte sequence string into an int
 def _unpack_bytes(string):
-  integer = 0
-  for i in xrange(0, len(string)):
-    integer += (256**i) * ord(string[i])
-  return integer
+  b = bytearray(string)
+  return int(binascii.hexlify(b), 16)
 
 
 # Simple function to pack integer into byte string (base 256 effectively)
@@ -86,7 +89,7 @@ def _DE_enc(key, msg):
     iv: Initialization vector
     ciphertext: Rest of the ciphertext
   """
-  iv = _ro_hmac("0"+msg)[:16]
+  iv = _ro_hmac("0"+msg, h)[:16]
   # AES in CBC mode with IV = HMACSHA256(0,m)
   obj = AES.new(key, AES.MODE_CBC, iv)
   ciphertext = obj.encrypt(_CBC_pad_msg(msg))
@@ -207,21 +210,40 @@ class _Forculus(object):
     # self.Fq = GF(self.q)  # Field
     self.eparam = 1  # TODO(pseudorandom): eparam must be fetched from file
     random.seed()
+    # For performance reasons we cache the coefficients, iv, and ciphertext
+    # corresponding to to a plaintext so we don't have to recompute them. The
+    # keys to the dictionary are plaintext and the values are a tuple consisting
+    # of the coeeficient list, the iv, and the ciphertext
+    self.cache = {}
 
   #
   # INTERNAL FUNCTIONS
   #
   def _Encrypt(self, ptxt):
-    c = [0] * self.threshold
-    for i in xrange(0, self.threshold):
-      ro_inp = str(i) + str(self.eparam) + ptxt
-      c[i] = _unpack_bytes(_ro_hmac(ro_inp)) % self.q
+    # For performance reasons we create a single instance of HMAC and re-use
+    # it for each of the coefficients.
+    h = ZERO_HMAC.copy()
+    if ptxt in self.cache:
+      c, iv, ctxt = self.cache[ptxt]
+    else:
+      c = [0] * self.threshold
+      # Notice we do a double round of HMAC here. First we create a key
+      # by using the ZERO_HMAC to hash the plain text.
+      ckey = _ro_hmac(str(1) + str(self.eparam) + ptxt, h)
+      # Then we create a new HMAC object using this key.
+      # This single HMAC object is used to generate each of the coefficients.
+      h = HMAC.new(ckey, digestmod=SHA256)
+      for i in xrange(0, self.threshold):
+        c[i] = _unpack_bytes(_ro_hmac(str(i), h)) % self.q
+      iv, ctxt = _DE_enc(_pack_into_bytes(c[0])[:16], ptxt)
+      self.cache[ptxt] = (c, iv, ctxt)
+
     _log("Key, i.e., c0: %d" % c[0])
     _log("Rest of coefficients: " + ", ".join(["%d"] * (self.threshold-1)) %
          tuple(c[1:]))
-    iv, ctxt = _DE_enc(_pack_into_bytes(c[0])[:16], ptxt)
+
     eval_point = random.randrange((self.threshold**2) * (2 ** 80))
-    eval_point = _unpack_bytes(_ro_hmac(str(eval_point))) % self.q
+    eval_point = _unpack_bytes(_ro_hmac(str(eval_point), h)) % self.q
     _log("Eval point: %d" % eval_point)
 
     # Horner polynomial eval
