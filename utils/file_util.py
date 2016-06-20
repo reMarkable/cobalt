@@ -18,11 +18,15 @@ THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 OUT_DIR = os.path.abspath(os.path.join(ROOT_DIR,'out'))
 R_TO_S_DIR = os.path.abspath(os.path.join(OUT_DIR,'r_to_s'))
+S_TO_A_DIR = os.path.abspath(os.path.join(OUT_DIR,'s_to_a'))
 
 # The name of the file we write containing the synthetic, random input data.
 # This will be the input to both the straight counting pipeline and the
 # Cobalt prototype pipeline.
 GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
+
+# The names of the shuffler output files
+SHUFFLER_OUTPUT_FILE_NAME = "shuffler_out.csv"
 
 # The names of the randomizer output files
 HELP_QUERY_RANDOMIZER_OUTPUT_FILE_NAME = 'help_query_randomizer_out.csv'
@@ -52,7 +56,13 @@ def openForWriting(name):
   return open(os.path.join(OUT_DIR, name), 'w+b')
 
 def openForRandomizerWriting(name):
-  # Create the out directory.
+  # Create the randomizer out directory.
   if not os.path.exists(R_TO_S_DIR):
     os.makedirs(R_TO_S_DIR)
   return open(os.path.join(R_TO_S_DIR, name), 'w+b')
+
+def openForShufflerWriting(name):
+  # Create the shuffler out directory.
+  if not os.path.exists(S_TO_A_DIR):
+    os.makedirs(S_TO_A_DIR)
+  return open(os.path.join(S_TO_A_DIR, name), 'w+b')
