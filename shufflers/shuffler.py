@@ -114,6 +114,7 @@ def runAllShufflers():
   shufflers each of which will read a file from the 'r_to_s' directory
   and write a file into the 's_to_a' output directory.
   """
+  print "Running the help-query shuffler..."
   hq_shuffler = help_query_shuffler.HelpQueryShuffler()
   hq_shuffler.shuffle()
 

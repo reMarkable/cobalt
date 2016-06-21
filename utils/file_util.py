@@ -19,6 +19,8 @@ ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 OUT_DIR = os.path.abspath(os.path.join(ROOT_DIR,'out'))
 R_TO_S_DIR = os.path.abspath(os.path.join(OUT_DIR,'r_to_s'))
 S_TO_A_DIR = os.path.abspath(os.path.join(OUT_DIR,'s_to_a'))
+VISUALIZATION_DIR = os.path.abspath(os.path.join(ROOT_DIR, 'visualization'))
+VISUALIZATION_FILE = os.path.join(VISUALIZATION_DIR, 'visualization.html')
 
 # The name of the file we write containing the synthetic, random input data.
 # This will be the input to both the straight counting pipeline and the

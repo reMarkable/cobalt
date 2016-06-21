@@ -27,6 +27,7 @@ def runAllAnalyzers():
   """
 
   # Run the help query analyzer
+  print "Running the help-query analyzer..."
   hq_analyzer = help_query_analyzer.HelpQueryAnalyzer()
   hq_analyzer.analyze()
 

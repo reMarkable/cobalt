@@ -31,6 +31,7 @@ def runAllRandomizers(entries):
   """
 
   # Run the help query randomizer
+  print "Running the help-query randomizer..."
   hq_randomizer = help_query_randomizer.HelpQueryRandomizer()
   hq_randomizer.randomize(entries)
 

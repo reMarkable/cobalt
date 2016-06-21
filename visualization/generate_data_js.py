@@ -127,6 +127,8 @@ def buildUsageByHourJs():
       columns_order=("hour", "usage"))
 
 def main():
+  print "Generating visualization..."
+
   # Read the input file and build the JavaScript strings to write.
   usage_by_module_js = buildUsageByModuleJs()
   usage_by_city_js = buildUsageByCityJs()
@@ -139,6 +141,9 @@ def main():
     f.write("%s\n\n" % usage_by_module_js)
     f.write("%s\n\n" % usage_by_city_js)
     f.write("%s\n\n" % usage_by_hour_js)
+
+  print "View this file in your browser:"
+  print "file://%s" % file_util.VISUALIZATION_FILE
 
 if __name__ == '__main__':
   main()

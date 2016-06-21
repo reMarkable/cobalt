@@ -36,6 +36,7 @@ from help_query_verbs import HELP_QUERY_VERBS
 from help_query_secondary_nouns import HELP_QUERY_SECONDARY_NOUNS
 
 # Total number of users
+# TODO(rudominer) Move to a config file.
 NUM_USERS = 1000
 
 # A pair consisting of a usage and a rating.
@@ -182,6 +183,8 @@ class Accumulator:
 
 def main():
   # Generate the synthetic input data.
+  # TODO(rudominer) Move '10000' to a config file.
+  print "Generating 10,000 random entries..."
   entries = generateRandomEntries(10000)
 
   # Write the synthetic input data to a file for consumption by the
@@ -191,6 +194,7 @@ def main():
   # Start the straight counting pipeline. We don't bother reading the input
   # file that we just wrote since we already have it in memory.
   # We just use data that is already in memory in |entries|.
+  print "Running the straight-counting pipeline..."
   accumulator = Accumulator()
   for entry in entries:
   	accumulator.addEntry(entry)
