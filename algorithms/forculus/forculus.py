@@ -89,7 +89,7 @@ def _DE_enc(key, msg):
     iv: Initialization vector
     ciphertext: Rest of the ciphertext
   """
-  iv = _ro_hmac("0"+msg, h)[:16]
+  iv = _ro_hmac("0"+msg)[:16]
   # AES in CBC mode with IV = HMACSHA256(0,m)
   obj = AES.new(key, AES.MODE_CBC, iv)
   ciphertext = obj.encrypt(_CBC_pad_msg(msg))

@@ -11,12 +11,11 @@ import csv
 import os
 import sys
 
-import help_query_randomizer
-
 THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 sys.path.insert(0, ROOT_DIR)
 
+import help_query_randomizer
 import utils.data as data
 import utils.file_util as file_util
 

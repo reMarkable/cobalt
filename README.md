@@ -20,7 +20,15 @@ code.
 * Run `./randomizers/randomizer.py`
   * This reads `input_data.csv` and runs all randomizers on that data. This
   constitutes the first stage of the Cobalt prototype pipeline. A randomizer
-  emits its data to a csv file in the `r_to_a` subdirectory below `out`.
+  emits its data to a csv file in the `r_to_s` subdirectory below `out`.
+
+* Run `./shufflers/shuffler.py`
+  * This runs all shufflers. A shuffler reads randomizer output from
+  the `r_to_s` directory and writes data in the `s_to_a` directory.
+
+* Run `./analyzers/analyzer.py`
+  * This runs all analyzers. An analyzer reads shuffler output from
+  the `s_to_a` directory and writes final output into the `out` directory.
 
 * Run `./visualization/generate_data_js.py`
   * This reads the files output by the straight counting pipeline and the
