@@ -26,6 +26,8 @@ ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 sys.path.insert(0, ROOT_DIR)
 
 import help_query_randomizer
+import city_randomizer
+
 import utils.data as data
 import utils.file_util as file_util
 
@@ -44,6 +46,13 @@ def runAllRandomizers(entries):
   print "Running the help-query randomizer..."
   hq_randomizer = help_query_randomizer.HelpQueryRandomizer()
   hq_randomizer.randomize(entries)
+  print "...done."
+
+  # Run the city randomizer
+  print "Running the city randomizer..."
+  c_randomizer = city_randomizer.CityRandomizer()
+  c_randomizer.randomize(entries)
+  print "...done."
 
 def main():
   entries = data.readEntries(file_util.GENERATED_INPUT_DATA_FILE_NAME)

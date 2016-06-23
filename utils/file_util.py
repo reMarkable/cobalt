@@ -37,8 +37,17 @@ VISUALIZATION_FILE = os.path.join(VISUALIZATION_DIR, 'visualization.html')
 # Cobalt prototype pipeline.
 GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
 
+CONFIG_DIRECTORY = 'config_files'
+# The names of config files for RAPPOR
+# Each config file should comprise two lines
+# Line 1: k,h,m,p,q,f
+# Line 2: RAPPOR params (# bloom bits, # hashes, # cohorts, and noise
+# probabilities p, q, and f.)
+RAPPOR_CITY_NAME_CONFIG = 'rappor_city_name_config.csv'
+
 # The names of the randomizer output files
 HELP_QUERY_RANDOMIZER_OUTPUT_FILE_NAME = 'help_query_randomizer_out.csv'
+CITY_RANDOMIZER_OUTPUT_FILE_NAME = 'city_randomizer_out.csv'
 
 # The names of the shuffler output files
 HELP_QUERY_SHUFFLER_OUTPUT_FILE_NAME = "help_query_shuffler_out.csv"
