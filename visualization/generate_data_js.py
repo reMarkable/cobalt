@@ -34,6 +34,7 @@ import third_party.google_visualization.gviz_api as gviz_api
 USAGE_BY_MODULE_JS_VAR_NAME = 'usage_by_module_data'
 USAGE_BY_CITY_JS_VAR_NAME = 'usage_by_city_data'
 USAGE_BY_HOUR_JS_VAR_NAME = 'usage_by_hour_data'
+POPULAR_HELP_QUERIES_JS_VAR_NAME = 'popular_help_queries_data'
 
 # The outut JavaScript file to be created.
 OUTPUT_JS_FILE_NAME = 'data.js'
@@ -136,6 +137,28 @@ def buildUsageByHourJs():
                      "usage": ("number", "Usage")},
       columns_order=("hour", "usage"))
 
+def buildPopularHelpQueriesJs():
+  """Reads a CSV file containing the popular help queries data and uses it
+  to build a JavaScript string defining a DataTable containing the data.
+
+  Returns:
+    {string} of the form <var_name>=<json>, where |var_name| is
+    POPULAR_HELP_QUERIES_JS_VAR_NAME and |json| is a json string defining
+    a data table.
+  """
+  # Read the data from the csv file and put it into a dictionary.
+  with file_util.openForReading(
+      file_util.POPULAR_HELP_QUERIES_CSV_FILE_NAME) as csvfile:
+    reader = csv.reader(csvfile)
+    data = [{"help_query" : row[0], "count": int(row[1])} for row in reader]
+  return buildDataTableJs(
+      data=data,
+      var_name=POPULAR_HELP_QUERIES_JS_VAR_NAME,
+      description={"help_query": ("string", "Help queries"),
+                   "count": ("number", "Count")},
+      columns_order=("help_query", "count"),
+      order_by=("count", "desc"))
+
 def main():
   print "Generating visualization..."
 
@@ -143,6 +166,7 @@ def main():
   usage_by_module_js = buildUsageByModuleJs()
   usage_by_city_js = buildUsageByCityJs()
   usage_by_hour_js = buildUsageByHourJs()
+  popular_help_queries_js = buildPopularHelpQueriesJs()
 
   # Write the output file.
   with file_util.openForWriting(OUTPUT_JS_FILE_NAME) as f:
@@ -151,6 +175,7 @@ def main():
     f.write("%s\n\n" % usage_by_module_js)
     f.write("%s\n\n" % usage_by_city_js)
     f.write("%s\n\n" % usage_by_hour_js)
+    f.write("%s\n\n" % popular_help_queries_js)
 
   print "View this file in your browser:"
   print "file://%s" % file_util.VISUALIZATION_FILE

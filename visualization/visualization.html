@@ -9,7 +9,7 @@
     <script type="text/javascript">
 
       // Load the Visualization API and some packages.
-      google.charts.load('current', {'packages':['corechart', 'geochart']});
+      google.charts.load('current', {'packages':['corechart', 'geochart', 'table']});
 
       // Set a callback to run when the Google Visualization API is loaded.
       google.charts.setOnLoadCallback(drawCharts);
@@ -19,8 +19,9 @@
         drawUsageByModulePieChart();
         drawUsageByCityGeoChart();
         drawUsageByHourColumnChart();
+        drawPopularHelpQueriesColumnChart();
+        drawPopularHelpQueriesInTabularForm();
       };
-
 
       function drawUsageByModulePieChart() {
         // Parse the data table.
@@ -54,7 +55,7 @@
       function drawUsageByHourColumnChart() {
         // Parse the data table.
         var data = new google.visualization.DataTable(usage_by_hour_data)
-         var options = {
+        var options = {
           title: 'Fuchsia average usage, by hour of the day, PST',
         };
          var options = {
@@ -71,6 +72,45 @@
         chart.draw(data, options);
       }
 
+      function drawPopularHelpQueriesColumnChart() {
+        // Parse the data table.
+        var data = new google.visualization.DataTable(popular_help_queries_data)
+        var options = {
+          title: 'Fuchsia top 50 popular help queries',
+        };
+        var options = {
+          title: 'Fuchsia top 50 popular help queries',
+          'width': 850,
+          hAxis: {
+            title: 'Popular help queries',
+            gridlines: {count: 12},
+          },
+        };
+
+        // Instantiate and draw our chart.
+        var chart = new google.visualization.ColumnChart(document.getElementById('popular_help_queries'));
+        chart.draw(data, options);
+      }
+
+      function drawPopularHelpQueriesInTabularForm() {
+        // Parse the data table.
+        var data = new google.visualization.DataTable(popular_help_queries_data);
+
+        // Instantiate and draw our table.
+        var table = new google.visualization.Table(document.getElementById('popular_help_queries_table'));
+
+        // Set table options while drawing, and list the most popular queries in tabular form
+        table.draw(data, {
+            showRowNumber: false,
+            sortAscending: false,
+            allowHtml: true,
+            alternatingRowStyle: true,
+            page: 'enable',
+            pageSize: 20,
+            cssClassNames: {oddTableRow: 'odd_row', tableRow: 'table_row'}
+        });
+      }
+
     </script>
   </head>
 
@@ -82,5 +122,11 @@
     <div id="usage_by_city"></div>
 
     <div id="usage_by_hour"></div>
+
+    <div id="popular_help_queries"></div>
+
+    Fuchsia Top 50 Popular Help Queries
+    <div id="popular_help_queries_table"></div>
+
   </body>
 </html>
