@@ -41,12 +41,11 @@ class CityRandomizer:
     with file_util.openForRandomizerWriting(
       file_util.CITY_RANDOMIZER_OUTPUT_FILE_NAME) as f:
       writer = csv.writer(f)
-      count = 0  # for cohorts in rappor.Encoder
       # Format string for city name RAPPOR reports.
       city_name_fmt_string = '0%ib' % city_name_params.num_bloombits
       for entry in entries:
-        count += 1
-        city_name_cohort = count % city_name_params.num_cohorts
+        # user_id is used to derive a cohort.
+        city_name_cohort = int(entry.user_id) % city_name_params.num_cohorts
         # user_id is used to derive a per-client secret as required by the
         # RAPPOR encoder. For the current prototype, clients only report one
         # value, so using RAPPOR protection across multiple client values is
