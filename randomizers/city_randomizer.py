@@ -13,6 +13,14 @@ sys.path.insert(0, ROOT_DIR)
 
 import third_party.rappor.client.python.rappor as rappor
 
+try:
+  import fastrand.fastrand as fastrand
+except ImportError:
+  print >>sys.stderr, (
+      "Native fastrand module not imported; see README for speedups")
+  fastrand = None
+
+
 import utils.data as data
 import utils.file_util as file_util
 
@@ -35,9 +43,20 @@ class CityRandomizer:
     Args:
       entries {list of Entry}: The entries to be randomized.
     """
+    # Fastrand module written in C++ speeds up random number generation.
+    if fastrand:
+      print('Using fastrand extension')
+      # NOTE: This doesn't take 'rand'.  It's seeded in C with srand().
+      irr_rand = fastrand.FastIrrRand
+    else:
+      print('Warning: fastrand module not importable; see README for build '
+          'instructions.  Falling back to simple randomness.')
+      irr_rand = rappor.SecureIrrRand
+
     with file_util.openFileForReading(
       file_util.RAPPOR_CITY_NAME_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
       city_name_params = rappor.Params.from_csv(cf)
+
     with file_util.openForRandomizerWriting(
       file_util.CITY_RANDOMIZER_OUTPUT_FILE_NAME) as f:
       writer = csv.writer(f)
@@ -52,7 +71,7 @@ class CityRandomizer:
         # not demonstrated.
         city_name_e = rappor.Encoder(city_name_params, city_name_cohort,
                                      str(entry.user_id),
-                                     rappor.SecureIrrRand(city_name_params))
+                                     irr_rand(city_name_params))
         city_name_rr = city_name_e.encode(entry.city)
         # TODO(pseudorandom, rudominer): Add a second randomized response for
         # the rating using Basic RAPPOR. (See Co. prototype design doc for
