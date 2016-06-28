@@ -45,13 +45,13 @@ class CityRandomizer:
       city_name_fmt_string = '0%ib' % city_name_params.num_bloombits
       for entry in entries:
         # user_id is used to derive a cohort.
-        city_name_cohort = int(entry.user_id) % city_name_params.num_cohorts
+        city_name_cohort = entry.user_id % city_name_params.num_cohorts
         # user_id is used to derive a per-client secret as required by the
         # RAPPOR encoder. For the current prototype, clients only report one
         # value, so using RAPPOR protection across multiple client values is
         # not demonstrated.
         city_name_e = rappor.Encoder(city_name_params, city_name_cohort,
-                                     entry.user_id,
+                                     str(entry.user_id),
                                      rappor.SecureIrrRand(city_name_params))
         city_name_rr = city_name_e.encode(entry.city)
         # TODO(pseudorandom, rudominer): Add a second randomized response for
