@@ -152,6 +152,7 @@ def generateRandomEntries(num_entries):
   Returns:
     {list of Entry} A list of random entries of length |num_entries|.
   """
+  rating_values = [7, 8, 6, 5, 9, 4, 3, 2, 10, 1, 0]
   entries = []
   for i in xrange(num_entries):
     city_index = powerRandomInt(len(US_CITIES)-1)
@@ -159,7 +160,8 @@ def generateRandomEntries(num_entries):
     name_index = powerRandomInt(len(GIRLS_NAMES)-1)
     name = GIRLS_NAMES[name_index]
     hour = int(random.triangular(0,23))
-    rating = random.randint(0, 10)
+    rating_index = powerRandomInt(len(rating_values) - 1)
+    rating = rating_values[rating_index]
     user_id = random.randint(1, NUM_USERS + 1)
     # Generate free-form help queries from a list of primary nouns, verbs and
     # secondary nouns.
