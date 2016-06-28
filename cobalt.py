@@ -50,25 +50,38 @@ def _initLogging(verbose_count):
 def _test():
   print "Test"
 
-def _run_all():
+def _clean_all():
   print "Deleting the out directory..."
   shutil.rmtree(file_util.OUT_DIR, ignore_errors=True)
 
-  # Generate fake data and run the straight-counting pipeline
+def _generate():
+  # Generates fake data and runs the straight-counting pipeline
   fake_data.main()
 
+def _randomize():
   # Run the randomizers
   randomizer.main()
 
+def _shuffle():
   # Run the shufflers
   shuffler.main()
 
+def _analyze():
   # Run the analyzers
   analyzer.main()
 
+def _visualize():
   # Generate the visualization
   visualization.main()
 
+def _run_all():
+  print "Running all stages of the prototype..."
+  _clean_all()
+  _generate()
+  _randomize()
+  _shuffle()
+  _analyze()
+  _visualize()
   print "Done."
 
 def main():
@@ -83,14 +96,40 @@ def main():
 
   subparsers = parser.add_subparsers()
 
-  run_parser = subparsers.add_parser('run', parents=[parent_parser],
+  sub_parser = subparsers.add_parser('run', parents=[parent_parser],
     help='Runs the synthetic data generator, the straight '
-    'counting pipeline and the Cobalt prototype pipeline.')
-  run_parser.set_defaults(func=_run_all)
+    'counting pipeline and the Cobalt prototype pipeline.'
+    'This is equivalent to: clean, gen, randomize, shuffle, analyze, '
+    'visualize.')
+  sub_parser.set_defaults(func=_run_all)
 
-  test_parser = subparsers.add_parser('test', parents=[parent_parser],
+  sub_parser = subparsers.add_parser('test', parents=[parent_parser],
     help='Runs the Cobalt tests.')
-  test_parser.set_defaults(func=_test)
+  sub_parser.set_defaults(func=_test)
+
+  sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
+    help='Deletes the out directory.')
+  sub_parser.set_defaults(func=_clean_all)
+
+  sub_parser = subparsers.add_parser('gen', parents=[parent_parser],
+    help='Generates fake input data and runs the straight counting pipeline.')
+  sub_parser.set_defaults(func=_generate)
+
+  sub_parser = subparsers.add_parser('randomize', parents=[parent_parser],
+    help='Runs all the randomizers in Cobalt prototype pipeline.')
+  sub_parser.set_defaults(func=_randomize)
+
+  sub_parser = subparsers.add_parser('shuffle', parents=[parent_parser],
+    help='Runs all the shufflers in Cobalt prototype pipeline.')
+  sub_parser.set_defaults(func=_shuffle)
+
+  sub_parser = subparsers.add_parser('analyze', parents=[parent_parser],
+    help='Runs all the analyzers in Cobalt prototype pipeline.')
+  sub_parser.set_defaults(func=_analyze)
+
+  sub_parser = subparsers.add_parser('visualize', parents=[parent_parser],
+    help='Generates the visualization data from Cobalt prototype pipeline.')
+  sub_parser.set_defaults(func=_visualize)
 
   args = parser.parse_args()
   global _verbose_count
