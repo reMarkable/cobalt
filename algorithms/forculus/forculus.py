@@ -66,28 +66,23 @@ def _ro_hmac(msg, h=None):
   h.update(msg)
   return h.digest()
 
-
-# Simple function to unpack bytes from a byte sequence string into an int
+# Simple function to unpack bytes from a big-endian byte string into an integer.
 def _unpack_bytes(string):
-  b = bytearray(string)
-  return int(binascii.hexlify(b), 16)
+  return int(binascii.hexlify(string), 16)
 
 
-# Simple function to pack integer into byte string (base 256 effectively)
-# Does padding to 16 bytes
-def _pack_into_bytes(integer):
-  string = ""
-  strlen = 0
-  _log("Converting integer %d into byte string" % integer)
-  while integer > 0:
-    string += chr(integer%256)
-    strlen += 1
-    integer /= 256
-  if strlen < 16:  # padding required for AES key
-    string += "0" * (16 - strlen)
-    strlen = 16
-  return string[:strlen]
-
+# Simple function to pack an integer into a big-endian byte string.
+# (base 256 effectively). If |min_length| > 0 then the returned string
+# will have length at least |min_length|. Zero bytes will be pre-pended
+# if necessary.
+def _pack_into_bytes(integer, min_length=16):
+  s = '%x' % integer
+  if len(s) % 2 == 1:
+    s = '0' + s
+  string = binascii.unhexlify(s)
+  if min_length > 0 and len(string) < min_length:
+    string = str(bytearray([0] * (min_length- len(string)))) + string
+  return string
 
 def _DE_enc(key, msg):
   """Implements deterministic encryption.
