@@ -20,6 +20,7 @@ This file also contains utilities common to all shufflers.
 
 import csv
 import os
+import random
 import sys
 
 THIS_DIR = os.path.dirname(__file__)
@@ -72,7 +73,7 @@ def permute(entries):
   Returns:
     {list of Entry} A list of entries after permutation.
   """
-  return entries
+  random.shuffle(entries)
 
 def shuffleAllData(entries):
   """Performs some common, generic shuffling routines on |entries|.
