@@ -1,6 +1,6 @@
 # Cobalt Prototype Demo
 
-* ` ./build.sh fastrand`
+* ` ./cobalt.py build`
   * This generates a fastrand python module that wraps a fast C random
     number generator. This is particularly useful in speeding up randomized
     response simulations, but not necessary.

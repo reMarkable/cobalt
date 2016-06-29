@@ -14,7 +14,7 @@ sys.path.insert(0, ROOT_DIR)
 import third_party.rappor.client.python.rappor as rappor
 
 try:
-  import fastrand.fastrand as fastrand
+  import third_party.fastrand.fastrand as fastrand
 except ImportError:
   print >>sys.stderr, (
       "Native fastrand module not imported; see README for speedups")

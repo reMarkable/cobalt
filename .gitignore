@@ -1,2 +1,4 @@
 *.pyc
+*.so
 /out/
+/third_party/fastrand/build/

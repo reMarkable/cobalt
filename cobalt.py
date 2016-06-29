@@ -17,7 +17,9 @@
 
 import argparse
 import logging
+import os
 import shutil
+import subprocess
 import sys
 
 import analyzers.analyzer as analyzer
@@ -26,6 +28,8 @@ import randomizers.randomizer as randomizer
 import shufflers.shuffler as shuffler
 import utils.file_util as file_util
 import visualization.generate_data_js as visualization
+
+THIS_DIR = os.path.dirname(__file__)
 
 _logger = logging.getLogger()
 _verbose_count = 0
@@ -46,6 +50,15 @@ def _initLogging(verbose_count):
   logger.setLevel(level)
   logger.debug("Initialized logging: verbose_count=%d, level=%d" %
                (verbose_count, level))
+
+def _build_fastrand():
+  savedir = os.getcwd()
+  os.chdir(os.path.join(THIS_DIR, 'third_party', 'fastrand'))
+  subprocess.call(['./build.sh'])
+  os.chdir(savedir)
+
+def _build():
+  _build_fastrand()
 
 def _test():
   print "Test"
@@ -95,6 +108,10 @@ def main():
     default=0, dest='verbose_count', action='count')
 
   subparsers = parser.add_subparsers()
+
+  sub_parser = subparsers.add_parser('build', parents=[parent_parser],
+    help='Builds the Cobalt prototype pipeline.')
+  sub_parser.set_defaults(func=_build)
 
   sub_parser = subparsers.add_parser('run', parents=[parent_parser],
     help='Runs the synthetic data generator, the straight '
