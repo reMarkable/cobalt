@@ -44,6 +44,7 @@ CONFIG_DIRECTORY = 'config_files'
 # Line 2: RAPPOR params (# bloom bits, # hashes, # cohorts, and noise
 # probabilities p, q, and f.)
 RAPPOR_CITY_NAME_CONFIG = 'rappor_city_name_config.csv'
+RAPPOR_RATING_CONFIG = 'rappor_rating_config.csv'
 
 # The names of the randomizer output files
 HELP_QUERY_RANDOMIZER_OUTPUT_FILE_NAME = 'help_query_randomizer_out.csv'

@@ -57,11 +57,16 @@ class CityRandomizer:
       file_util.RAPPOR_CITY_NAME_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
       city_name_params = rappor.Params.from_csv(cf)
 
+    with file_util.openFileForReading(
+      file_util.RAPPOR_RATING_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+      rating_params = rappor.Params.from_csv(cf)
+
     with file_util.openForRandomizerWriting(
       file_util.CITY_RANDOMIZER_OUTPUT_FILE_NAME) as f:
       writer = csv.writer(f)
-      # Format string for city name RAPPOR reports.
+      # Format strings for RAPPOR reports.
       city_name_fmt_string = '0%ib' % city_name_params.num_bloombits
+      rating_fmt_string = '0%ib' % rating_params.num_bloombits
       for entry in entries:
         # user_id is used to derive a cohort.
         city_name_cohort = entry.user_id % city_name_params.num_cohorts
@@ -72,9 +77,21 @@ class CityRandomizer:
         city_name_e = rappor.Encoder(city_name_params, city_name_cohort,
                                      str(entry.user_id),
                                      irr_rand(city_name_params))
+
+        # For rating there are only 11 values and so we use basic RAPPOR
+        # (no Bloom filters) and so we use a single cohort for all users.
+        rating_e = rappor.Encoder(rating_params, 0,
+                                  str(entry.user_id),
+                                  irr_rand(rating_params))
+
         city_name_rr = city_name_e.encode(entry.city)
-        # TODO(pseudorandom, rudominer): Add a second randomized response for
-        # the rating using Basic RAPPOR. (See Co. prototype design doc for
-        # mode details.)
+
+        # The rating is an integer from 0 through 10.
+        # We use basic RAPPOR (no Bloom filters) and represent the value
+        # |n| as a bit string with all zeroes except a 1 in position n;
+        # in other words as the number 2^n.
+        rating_rr = rating_e.encode_bits(2**entry.rating)
+
         writer.writerow(['%d' % city_name_cohort,
-                         format(city_name_rr, city_name_fmt_string)])
+                         format(city_name_rr, city_name_fmt_string),
+                         format(rating_rr, rating_fmt_string)])

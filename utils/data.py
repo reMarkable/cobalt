@@ -51,6 +51,6 @@ def readEntries(file_name):
   """
   with file_util.openForReading(file_name) as csvfile:
     reader = csv.reader(csvfile)
-    return [Entry(int(row[0]), row[1], row[2], int(row[3]), float(row[4]),
+    return [Entry(int(row[0]), row[1], row[2], int(row[3]), int(row[4]),
                   row[5])
         for row in reader]
