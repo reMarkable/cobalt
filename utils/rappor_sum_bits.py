@@ -1,12 +1,11 @@
-#!/usr/bin/python
-#
-# Copyright 2014 Google Inc. All rights reserved.
+#!/usr/bin/env python
+# Copyright 2016 The Fuchsia Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#    http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,15 +16,24 @@
 """
 Read the RAPPOR'd values on stdin, and sum the bits to produce a Counting Bloom
 filter by cohort.  This can then be analyzed by R.
+
+This file contains a stand alone function sumBits as well as command line
+argument. It can be called as ./rappor_sum_bits <params file>
 """
 
 import csv
 import sys
 
-import rappor
+import third_party.rappor.client.python.rappor as rappor
 
 
-def SumBits(params, stdin, stdout):
+# Sums bits from stdin to stdout with params; fields indicates which
+# correspond to (RAPPOR cohort, RAPPOR IRR)
+def sumBits(params, stdin, stdout, fields = [0, 1], header = False):
+
+  if len(fields) != 2:
+    raise RuntimeError('Error with length of fields in sumBits')
+
   csv_in = csv.reader(stdin)
   csv_out = csv.writer(stdout)
 
@@ -36,12 +44,14 @@ def SumBits(params, stdin, stdout):
   num_reports = [0] * num_cohorts
 
   for i, row in enumerate(csv_in):
+    subset_of_row = [row[i] for i in fields]
     try:
-      (user_id, cohort, unused_bloom, unused_prr, irr) = row
+      (cohort, irr) = subset_of_row
     except ValueError:
-      raise RuntimeError('Error parsing row %r' % row)
+      raise RuntimeError('Error parsing row %r or subset %r' % (row,
+                                                                subset_of_row))
 
-    if i == 0:
+    if i == 0 and header == True:
       continue  # skip header
 
     cohort = int(cohort)
@@ -68,7 +78,7 @@ def main(argv):
   try:
     filename = argv[1]
   except IndexError:
-    raise RuntimeError('Usage: sum_bits.py <params file>')
+    raise RuntimeError('Usage: ./rappor_sum_bits.py <params file>')
   with open(filename) as f:
     try:
       params = rappor.Params.from_csv(f)

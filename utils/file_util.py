@@ -27,6 +27,10 @@ import sys
 THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 OUT_DIR = os.path.abspath(os.path.join(ROOT_DIR,'out'))
+ANALYZER_TMP_OUT_DIR = os.path.abspath(os.path.join(OUT_DIR,'analyzer_tmp'))
+CITY_NAME_RAPPOR_OUT_DIR = os.path.abspath(os.path.join(
+                                                OUT_DIR,
+                                                'city_name_rappor_out'))
 R_TO_S_DIR = os.path.abspath(os.path.join(OUT_DIR,'r_to_s'))
 S_TO_A_DIR = os.path.abspath(os.path.join(OUT_DIR,'s_to_a'))
 VISUALIZATION_DIR = os.path.abspath(os.path.join(ROOT_DIR, 'visualization'))
@@ -56,6 +60,11 @@ CITY_SHUFFLER_OUTPUT_FILE_NAME = "city_shuffler_out.csv"
 
 # The names of the analyzer output files
 HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME = "help_query_analyzer_out.csv"
+
+# The names of RAPPOR intermediate files
+CITY_NAME_COUNTS_FILE_NAME = "city_name_counts.csv"
+CITY_CANDIDATES_FILE_NAME = "city_candidates.csv"
+CITY_MAP_FILE_NAME = "city_map.csv"
 
 # The csv files written by the direct-counting pipeline
 USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
@@ -111,6 +120,9 @@ def openFileForWriting(file_name, dir_path):
 
 def openForWriting(name):
   return openFileForWriting(name, OUT_DIR)
+
+def openForAnalyzerTempWriting(name):
+  return openFileForWriting(name, ANALYZER_TMP_OUT_DIR)
 
 def openForRandomizerWriting(name):
   return openFileForWriting(name, R_TO_S_DIR)
