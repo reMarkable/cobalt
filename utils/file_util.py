@@ -52,6 +52,7 @@ CITY_RANDOMIZER_OUTPUT_FILE_NAME = 'city_randomizer_out.csv'
 
 # The names of the shuffler output files
 HELP_QUERY_SHUFFLER_OUTPUT_FILE_NAME = "help_query_shuffler_out.csv"
+CITY_SHUFFLER_OUTPUT_FILE_NAME = "city_shuffler_out.csv"
 
 # The names of the analyzer output files
 HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME = "help_query_analyzer_out.csv"

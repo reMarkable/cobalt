@@ -27,6 +27,7 @@ THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 sys.path.insert(0, ROOT_DIR)
 
+import city_shuffler
 import help_query_shuffler
 import utils.data as data
 import utils.file_util as file_util
@@ -128,6 +129,10 @@ def runAllShufflers():
   print "Running the help-query shuffler..."
   hq_shuffler = help_query_shuffler.HelpQueryShuffler()
   hq_shuffler.shuffle()
+
+  print "Running the city shuffler..."
+  ct_shuffler = city_shuffler.CityShuffler()
+  ct_shuffler.shuffle()
 
 def main():
   runAllShufflers()
