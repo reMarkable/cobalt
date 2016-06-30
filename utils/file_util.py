@@ -50,6 +50,8 @@ CONFIG_DIRECTORY = 'config_files'
 RAPPOR_CITY_NAME_CONFIG = 'rappor_city_name_config.csv'
 RAPPOR_RATING_CONFIG = 'rappor_rating_config.csv'
 
+FORCULUS_HELP_QUERY_CONFIG = 'forculus_help_query_config.csv'
+
 # The names of the randomizer output files
 HELP_QUERY_RANDOMIZER_OUTPUT_FILE_NAME = 'help_query_randomizer_out.csv'
 CITY_RANDOMIZER_OUTPUT_FILE_NAME = 'city_randomizer_out.csv'

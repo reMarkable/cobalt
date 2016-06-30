@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import csv
+
 import algorithms.forculus.forculus as forculus
 import utils.file_util as file_util
-
-# TODO(rudominer) Read  THRESHOLD from a config file.
-THRESHOLD = 20
 
 class HelpQueryAnalyzer:
   """ An Analyzer that decrypts the data that was encrypted using Forculus
@@ -25,12 +24,17 @@ class HelpQueryAnalyzer:
   """
 
   def analyze(self):
-    ''' Uses Forculus to decrypt the those entries that occur more than
-    |THRESHOLD| times.
+    ''' Uses Forculus to decrypt those entries that occur more than
+    |threshold| times, where |threshold| is read from the config file.
     '''
+    with file_util.openFileForReading(
+        file_util.FORCULUS_HELP_QUERY_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+      config = forculus.Config.from_csv(cf)
+
     with file_util.openForAnalyzerReading(
         file_util.HELP_QUERY_SHUFFLER_OUTPUT_FILE_NAME) as input_f:
       with file_util.openForWriting(
           file_util.HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME) as output_f:
-        forculus_evaluator = forculus.ForculusEvaluator(THRESHOLD, input_f)
+        forculus_evaluator = forculus.ForculusEvaluator(
+            config.threshold, input_f)
         forculus_evaluator.ComputeAndWriteResults(output_f)

@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import csv
+import logging
 import os
 import sys
 
@@ -11,15 +12,14 @@ THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 sys.path.insert(0, ROOT_DIR)
 
+_logger = logging.getLogger()
+
 import third_party.rappor.client.python.rappor as rappor
 
 try:
   import third_party.fastrand.fastrand as fastrand
 except ImportError:
-  print >>sys.stderr, (
-      "Native fastrand module not imported; see README for speedups")
   fastrand = None
-
 
 import utils.data as data
 import utils.file_util as file_util
@@ -45,11 +45,11 @@ class CityRandomizer:
     """
     # Fastrand module written in C++ speeds up random number generation.
     if fastrand:
-      print('Using fastrand extension')
+      _logger.info('Using fastrand extension')
       # NOTE: This doesn't take 'rand'.  It's seeded in C with srand().
       irr_rand = fastrand.FastIrrRand
     else:
-      print('Warning: fastrand module not importable; see README for build '
+      _logger.warning('fastrand module not importable; see README for build '
           'instructions.  Falling back to simple randomness.')
       irr_rand = rappor.SecureIrrRand
 

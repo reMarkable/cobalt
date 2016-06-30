@@ -5,6 +5,9 @@
     number generator. This is particularly useful in speeding up randomized
     response simulations, but not necessary.
 
+* ` ./cobalt.py test`
+  * Runs all tests.
+
 * `./cobalt.py run`
   * This generates synthetic data, runs the straight-counting pipeline, runs the
   Cobalt prototype pipeline, and generates a visualization of the results. You
@@ -45,4 +48,4 @@
       visualization API.
 
 * Load `./visualization/visualization.html` in your browser
-  * This displays some charts based on the data in `data.js
+  * This displays some charts based on the data in `data.js`

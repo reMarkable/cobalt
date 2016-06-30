@@ -26,6 +26,7 @@ import analyzers.analyzer as analyzer
 import fake_data.generate_fake_data as fake_data
 import randomizers.randomizer as randomizer
 import shufflers.shuffler as shuffler
+import tests.e2e.end_to_end_test as end_to_end_test
 import utils.file_util as file_util
 import visualization.generate_data_js as visualization
 
@@ -60,8 +61,12 @@ def _build_fastrand():
 def _build():
   _build_fastrand()
 
+def _run_end_to_end_test():
+  _run_all()
+  end_to_end_test.check_results()
+
 def _test():
-  print "Test"
+  _run_end_to_end_test()
 
 def _clean_all():
   print "Deleting the out directory..."
@@ -88,7 +93,6 @@ def _visualize():
   visualization.main()
 
 def _run_all():
-  print "Running all stages of the prototype..."
   _clean_all()
   _generate()
   _randomize()

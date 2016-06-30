@@ -35,6 +35,50 @@ from struct import pack
 from struct import unpack
 
 
+class Config(object):
+  """Forculus configuration parameters.
+  """
+  def __init__(self):
+    self.threshold = 20
+
+  @staticmethod
+  def from_csv(f):
+    """Read the Forculus parameters from a CSV file.
+
+    Args:
+      f: file handle
+
+    Returns:
+      Params instance.
+
+    Raises:
+      Exception: when the file is malformed.
+    """
+    c = csv.reader(f)
+    ok = False
+    p = Config()
+    for i, row in enumerate(c):
+
+      if i == 0:
+        if row != ['threshold']:
+          raise Exception('Header %s is malformed; expected "threshold"' % row)
+
+      elif i == 1:
+        try:
+          # NOTE: May raise exceptions
+          p.threshold = int(row[0])
+        except (ValueError, IndexError) as e:
+          raise Exception('Row is malformed: %s' % e)
+        ok = True
+
+      else:
+        raise Exception('Params file should only have two rows')
+
+    if not ok:
+      raise Exception("Expected second row with params")
+
+    return p
+
 def _log(string):
   logging_flag = False  # set to True for logging, False otherwise
   if logging_flag:
@@ -344,8 +388,6 @@ class ForculusEvaluator(_Forculus):
     """
     dictionary = {}
     for i, row in enumerate(self.edb_reader):
-      if i == 0:
-        continue  # skip first row
       (iv, ctxt, eval_point, eval_data) = row
       key = iv + " " + ctxt
       if key in dictionary:

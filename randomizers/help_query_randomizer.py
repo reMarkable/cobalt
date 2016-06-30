@@ -16,9 +16,6 @@
 import algorithms.forculus.forculus as forculus
 import utils.file_util as file_util
 
-# TODO(rudominer) Read  THRESHOLD from a config file.
-THRESHOLD = 20
-
 class HelpQueryRandomizer:
   """ A Randomizer that extracts the help query string from an |Entry| and uses
   Forculus threshold encryption to emit an encrypted version of it.
@@ -34,8 +31,12 @@ class HelpQueryRandomizer:
     Args:
       entries {list of Entry}: The entries to be randomized.
     """
+    with file_util.openFileForReading(
+        file_util.FORCULUS_HELP_QUERY_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+      config = forculus.Config.from_csv(cf)
+
     with file_util.openForRandomizerWriting(
         file_util.HELP_QUERY_RANDOMIZER_OUTPUT_FILE_NAME) as f:
-      forculus_inserter = forculus.ForculusInserter(THRESHOLD, f)
+      forculus_inserter = forculus.ForculusInserter(config.threshold, f)
       for entry in entries:
         forculus_inserter.Insert(entry.help_query)
