@@ -14,7 +14,7 @@
   can also *run individual steps manually* as follows:
 
   * `./cobalt.py clean`
-    * This cleans up the cache and output folders from previous runs.
+    * This deletes the |out| directory.
 
   * `./cobalt.py gen`
 

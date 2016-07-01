@@ -28,7 +28,7 @@ class HelpQueryAnalyzer:
     |threshold| times, where |threshold| is read from the config file.
     '''
     with file_util.openFileForReading(
-        file_util.FORCULUS_HELP_QUERY_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+        file_util.FORCULUS_HELP_QUERY_CONFIG, file_util.CONFIG_DIR) as cf:
       config = forculus.Config.from_csv(cf)
 
     with file_util.openForAnalyzerReading(

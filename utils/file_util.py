@@ -22,26 +22,23 @@ import csv
 import os
 import sys
 
-# Add the third_party directory to the Python path so that we can import the
-# gviz library.
+# directories
 THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 OUT_DIR = os.path.abspath(os.path.join(ROOT_DIR,'out'))
+
 ANALYZER_TMP_OUT_DIR = os.path.abspath(os.path.join(OUT_DIR,'analyzer_tmp'))
-CITY_NAME_RAPPOR_OUT_DIR = os.path.abspath(os.path.join(
-                                                OUT_DIR,
-                                                'city_name_rappor_out'))
+CACHE_DIR = os.path.abspath(os.path.join(ROOT_DIR,'cache'))
+CONFIG_DIR = 'config_files'
 R_TO_S_DIR = os.path.abspath(os.path.join(OUT_DIR,'r_to_s'))
 S_TO_A_DIR = os.path.abspath(os.path.join(OUT_DIR,'s_to_a'))
 VISUALIZATION_DIR = os.path.abspath(os.path.join(ROOT_DIR, 'visualization'))
-VISUALIZATION_FILE = os.path.join(VISUALIZATION_DIR, 'visualization.html')
 
 # The name of the file we write containing the synthetic, random input data.
 # This will be the input to both the straight counting pipeline and the
 # Cobalt prototype pipeline.
 GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
 
-CONFIG_DIRECTORY = 'config_files'
 # The names of config files for RAPPOR
 # Each config file should comprise two lines
 # Line 1: k,h,m,p,q,f
@@ -50,6 +47,7 @@ CONFIG_DIRECTORY = 'config_files'
 RAPPOR_CITY_NAME_CONFIG = 'rappor_city_name_config.csv'
 RAPPOR_RATING_CONFIG = 'rappor_rating_config.csv'
 
+# Forculus config files
 FORCULUS_HELP_QUERY_CONFIG = 'forculus_help_query_config.csv'
 
 # The names of the randomizer output files
@@ -73,6 +71,9 @@ USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
 USAGE_BY_CITY_CSV_FILE_NAME = 'usage_and_rating_by_city.csv'
 USAGE_BY_HOUR_CSV_FILE_NAME = 'usage_by_hour.csv'
 POPULAR_HELP_QUERIES_CSV_FILE_NAME = 'popular_help_queries.csv'
+
+# visualization
+VISUALIZATION_FILE = os.path.join(VISUALIZATION_DIR, 'visualization.html')
 
 def openFileForReading(file_name, dir_path):
   """Opens the file with the given name in the given directory for reading.

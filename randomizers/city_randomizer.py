@@ -54,11 +54,11 @@ class CityRandomizer:
       irr_rand = rappor.SecureIrrRand
 
     with file_util.openFileForReading(
-      file_util.RAPPOR_CITY_NAME_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+      file_util.RAPPOR_CITY_NAME_CONFIG, file_util.CONFIG_DIR) as cf:
       city_name_params = rappor.Params.from_csv(cf)
 
     with file_util.openFileForReading(
-      file_util.RAPPOR_RATING_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+      file_util.RAPPOR_RATING_CONFIG, file_util.CONFIG_DIR) as cf:
       rating_params = rappor.Params.from_csv(cf)
 
     with file_util.openForRandomizerWriting(

@@ -56,7 +56,7 @@ def _check_help_query_results():
 
   print "\nEnd-to-end test: Checking help-query-results."
   with file_util.openFileForReading(
-      file_util.FORCULUS_HELP_QUERY_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+      file_util.FORCULUS_HELP_QUERY_CONFIG, file_util.CONFIG_DIR) as cf:
     config = forculus.Config.from_csv(cf)
 
   # Read the output of the straight-counting pipeline from the csv file and
