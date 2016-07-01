@@ -29,6 +29,8 @@ sys.path.insert(0, ROOT_DIR)
 
 import city_shuffler
 import help_query_shuffler
+import module_name_shuffler
+import hour_shuffler
 import utils.data as data
 import utils.file_util as file_util
 
@@ -133,6 +135,14 @@ def runAllShufflers():
   print "Running the city shuffler..."
   ct_shuffler = city_shuffler.CityShuffler()
   ct_shuffler.shuffle()
+
+  print "Running the module name shuffler..."
+  mn_shuffler = module_name_shuffler.ModuleNameShuffler()
+  mn_shuffler.shuffle()
+
+  print "Running the hour-of-day shuffler..."
+  hr_shuffler = hour_shuffler.HourShuffler()
+  hr_shuffler.shuffle()
 
 def main():
   runAllShufflers()

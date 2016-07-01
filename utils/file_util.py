@@ -46,6 +46,8 @@ GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
 # probabilities p, q, and f.)
 RAPPOR_CITY_NAME_CONFIG = 'rappor_city_name_config.csv'
 RAPPOR_RATING_CONFIG = 'rappor_rating_config.csv'
+RAPPOR_MODULE_NAME_CONFIG = 'rappor_module_name_config.csv'
+RAPPOR_HOUR_CONFIG = 'rappor_hour_config.csv'
 
 # Forculus config files
 FORCULUS_HELP_QUERY_CONFIG = 'forculus_help_query_config.csv'
@@ -53,10 +55,14 @@ FORCULUS_HELP_QUERY_CONFIG = 'forculus_help_query_config.csv'
 # The names of the randomizer output files
 HELP_QUERY_RANDOMIZER_OUTPUT_FILE_NAME = 'help_query_randomizer_out.csv'
 CITY_RANDOMIZER_OUTPUT_FILE_NAME = 'city_randomizer_out.csv'
+MODULE_NAME_RANDOMIZER_OUTPUT_FILE_NAME = 'module_name_randomizer_out.csv'
+HOUR_RANDOMIZER_OUTPUT_FILE_NAME = 'hour_randomizer_out.csv'
 
 # The names of the shuffler output files
 HELP_QUERY_SHUFFLER_OUTPUT_FILE_NAME = "help_query_shuffler_out.csv"
 CITY_SHUFFLER_OUTPUT_FILE_NAME = "city_shuffler_out.csv"
+MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME = "module_name_shuffler_out.csv"
+HOUR_SHUFFLER_OUTPUT_FILE_NAME = "hour_shuffler_out.csv"
 
 # The names of the analyzer output files
 HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME = "help_query_analyzer_out.csv"

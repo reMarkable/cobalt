@@ -27,6 +27,8 @@ sys.path.insert(0, ROOT_DIR)
 
 import help_query_randomizer
 import city_randomizer
+import module_name_randomizer
+import hour_randomizer
 
 import utils.data as data
 import utils.file_util as file_util
@@ -51,6 +53,16 @@ def runAllRandomizers(entries):
   print "Running the city randomizer..."
   c_randomizer = city_randomizer.CityRandomizer()
   c_randomizer.randomize(entries)
+
+  # Run the module name randomizer
+  print "Running the module name randomizer..."
+  mn_randomizer = module_name_randomizer.ModuleNameRandomizer()
+  mn_randomizer.randomize(entries)
+
+  # Run the hour randomizer
+  print "Running the hour of day randomizer..."
+  hr_randomizer = hour_randomizer.HourRandomizer()
+  hr_randomizer.randomize(entries)
 
 def main():
   entries = data.readEntries(file_util.GENERATED_INPUT_DATA_FILE_NAME)
