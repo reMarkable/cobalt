@@ -15,11 +15,17 @@
 
 import logging
 import os
+import shutil
+import subprocess
 
+import algorithms.rappor.sum_bits as sum_bits
 import utils.file_util as file_util
-import utils.rappor_sum_bits as sum_bits
 import third_party.rappor.client.python.rappor as rappor
 import third_party.rappor.bin.hash_candidates as hash_candidates
+
+THIS_DIR = os.path.dirname(__file__)
+ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
+THIRD_PARTY_DIR = os.path.join(ROOT_DIR, "third_party")
 
 _logger = logging.getLogger()
 
@@ -37,33 +43,55 @@ class CityNamesAnalyzer:
       file_util.RAPPOR_CITY_NAME_CONFIG, file_util.CONFIG_DIR) as cf:
       city_name_params = rappor.Params.from_csv(cf)
 
-    self._generateMapFileIfNecessary(city_name_params)
-    #TODO(rudominer) We also need to consider the caching of the .rda file.
+    map_file = os.path.join(file_util.CACHE_DIR, file_util.CITY_MAP_FILE_NAME)
 
-    # Next, compute counts per cohort in to analyzer temp directory.
+    self._generateMapFileIfNecessary(map_file, city_name_params)
+
+    # Next, compute counts per cohort and write into analyzer temp directory.
     with file_util.openForAnalyzerReading(
         file_util.CITY_SHUFFLER_OUTPUT_FILE_NAME) as input_f:
       with file_util.openForAnalyzerTempWriting(
           file_util.CITY_NAME_COUNTS_FILE_NAME) as output_f:
-
         sum_bits.sumBits(city_name_params, input_f, output_f)
-    # TODO(pseudorandom, rudominer): Run third_party/rappor/bin/decode_dist.R
-    # on inputs
-    # --map = file_util.CITY_MAP_FILE_NAME
-    # --counts = file_util.CITY_NAME_COUNTS_FILE_NAME
-    # --params = file_util.RAPPOR_CITY_NAME_CONFIG
-    # --output-dir = <this should be either analyzer temp out or |out|>
-    # then pull out results from the RAPPOR output directory (results.csv)
 
-  def _generateMapFileIfNecessary(self, params):
+    # Next invoke the R script 'decode_dist.R'.
+
+    # First we build the command string.
+    rappor_decode_script = os.path.join(THIRD_PARTY_DIR,
+        'rappor', 'bin', 'decode_dist.R')
+    counts_file = os.path.abspath(os.path.join(file_util.ANALYZER_TMP_OUT_DIR,
+        file_util.CITY_NAME_COUNTS_FILE_NAME))
+    params_file =  os.path.abspath(os.path.join(file_util.CONFIG_DIR,
+        file_util.RAPPOR_CITY_NAME_CONFIG))
+    cmd = [rappor_decode_script, '--map', map_file, '--counts', counts_file,
+           '--params', params_file, '--output-dir',
+           file_util.ANALYZER_TMP_OUT_DIR]
+
+    # Then we change into the Rappor directory and execute the command.
+    savedir = os.getcwd()
+    os.chdir(os.path.join(THIRD_PARTY_DIR, 'rappor'))
+    # We supress the output from the R script unless it fails.
+    try:
+      subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+      print "\n**** Error running RAPPOR decode script:"
+      print e.output
+      raise Exception('Fatal error. Cobalt pipeline terminating.')
+    os.chdir(savedir)
+
+    # Finally we copy the results file to the out directory
+    src = os.path.abspath(os.path.join(
+        file_util.ANALYZER_TMP_OUT_DIR, 'results.csv'))
+    dst = os.path.abspath(os.path.join(
+        file_util.OUT_DIR, file_util.CITY_ANALYZER_OUTPUT_FILE_NAME))
+    shutil.copyfile(src, dst)
+
+  def _generateMapFileIfNecessary(self, map_file, params):
     ''' Generates the map file in the cache directory if there is not already
     an up-to-date version.
     '''
     candidate_file = os.path.join(file_util.CONFIG_DIR,
         file_util.CITY_CANDIDATES_FILE_NAME)
-
-    map_file = os.path.join(file_util.CACHE_DIR,
-        file_util.CITY_MAP_FILE_NAME)
 
     # Generate the map file unless it already exists and has a modified
     # timestamp later than that of the candidate file. We allow a buffer of

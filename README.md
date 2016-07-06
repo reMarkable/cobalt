@@ -1,5 +1,17 @@
 # Cobalt Prototype Demo
 
+* Prerequisites
+  * Currently this demo is only supported on Linux.
+
+* One-time setup. You must install R and some other packages:
+  * `cd third_party/rappor`
+  * `./setup.sh`
+  * You will be asked to enter your sudo password.
+  * The setup script may take a few minutes to install everything.
+  * You may see a few error messages but if the script keeps going everything
+    is probably ok.
+  * `cd ../..`
+
 * ` ./cobalt.py build`
   * This generates a fastrand python module that wraps a fast C random
     number generator. This is particularly useful in speeding up randomized

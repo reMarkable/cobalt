@@ -29,7 +29,7 @@ OUT_DIR = os.path.abspath(os.path.join(ROOT_DIR,'out'))
 
 ANALYZER_TMP_OUT_DIR = os.path.abspath(os.path.join(OUT_DIR,'analyzer_tmp'))
 CACHE_DIR = os.path.abspath(os.path.join(ROOT_DIR,'cache'))
-CONFIG_DIR = 'config_files'
+CONFIG_DIR = os.path.abspath(os.path.join(ROOT_DIR, 'config_files'))
 R_TO_S_DIR = os.path.abspath(os.path.join(OUT_DIR,'r_to_s'))
 S_TO_A_DIR = os.path.abspath(os.path.join(OUT_DIR,'s_to_a'))
 VISUALIZATION_DIR = os.path.abspath(os.path.join(ROOT_DIR, 'visualization'))
@@ -66,6 +66,7 @@ HOUR_SHUFFLER_OUTPUT_FILE_NAME = "hour_shuffler_out.csv"
 
 # The names of the analyzer output files
 HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME = "help_query_analyzer_out.csv"
+CITY_ANALYZER_OUTPUT_FILE_NAME = "city_analyzer_out.csv"
 
 # The names of RAPPOR intermediate files
 CITY_NAME_COUNTS_FILE_NAME = "city_name_counts.csv"
