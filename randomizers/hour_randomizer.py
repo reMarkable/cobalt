@@ -53,7 +53,7 @@ class HourRandomizer:
       irr_rand = rappor.SecureIrrRand
 
     with file_util.openFileForReading(
-      file_util.RAPPOR_HOUR_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+      file_util.RAPPOR_HOUR_CONFIG, file_util.CONFIG_DIR) as cf:
       hour_params = rappor.Params.from_csv(cf)
 
     with file_util.openForRandomizerWriting(

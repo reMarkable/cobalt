@@ -63,7 +63,7 @@ class ModuleNameRandomizer:
       irr_rand = rappor.SecureIrrRand
 
     with file_util.openFileForReading(
-      file_util.RAPPOR_MODULE_NAME_CONFIG, file_util.CONFIG_DIRECTORY) as cf:
+      file_util.RAPPOR_MODULE_NAME_CONFIG, file_util.CONFIG_DIR) as cf:
       module_name_params = rappor.Params.from_csv(cf)
 
     with file_util.openForRandomizerWriting(
