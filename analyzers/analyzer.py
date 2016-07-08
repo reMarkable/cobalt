@@ -24,8 +24,9 @@ THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 sys.path.insert(0, ROOT_DIR)
 
-import help_query_analyzer
 import city_analyzer
+import module_name_analyzer
+import help_query_analyzer
 import utils.data as data
 import utils.file_util as file_util
 
@@ -46,6 +47,11 @@ def runAllAnalyzers():
   print "Running the city names analyzer..."
   cn_analyzer = city_analyzer.CityNamesAnalyzer()
   cn_analyzer.analyze()
+
+  # Run the module names analyzer
+  print "Running the module names analyzer..."
+  mn_analyzer = module_name_analyzer.ModuleNameAnalyzer()
+  mn_analyzer.analyze()
 
 def main():
   runAllAnalyzers()

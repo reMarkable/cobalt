@@ -67,11 +67,15 @@ HOUR_SHUFFLER_OUTPUT_FILE_NAME = "hour_shuffler_out.csv"
 # The names of the analyzer output files
 HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME = "help_query_analyzer_out.csv"
 CITY_ANALYZER_OUTPUT_FILE_NAME = "city_analyzer_out.csv"
+MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME = "module_name_analyzer_out.csv"
 
 # The names of RAPPOR intermediate files
 CITY_NAME_COUNTS_FILE_NAME = "city_name_counts.csv"
 CITY_CANDIDATES_FILE_NAME = "city_candidates.csv"
 CITY_MAP_FILE_NAME = "city_map.csv"
+MODULE_NAME_COUNTS_FILE_NAME = "module_name_counts.csv"
+MODULE_CANDIDATES_FILE_NAME = "module_candidates.csv"
+MODULE_MAP_FILE_NAME = "module_map.csv"
 
 # The csv files written by the direct-counting pipeline
 USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
