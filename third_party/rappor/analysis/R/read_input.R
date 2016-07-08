@@ -102,9 +102,18 @@ ReadMapFile <- function(map_file, params) {
   map_pos <- map_pos[ind, ]
 
   n <- ncol(map_pos) - 1
-  if (n != (params$h * params$m)) {
+  h = params$h
+  if (h == 0 && params$m == 1) {
+    # basic RAPPOR case is indicated by h==0, m==1.
+    # But in this case there should be two columns
+    # in the map file as if h=1.
+    # TODO(pseudorandom, rudominer) Should we just use h==1, m==1
+    # to indicate basic RAPPOR?
+    h <- 1
+  }
+  if (n != (h * params$m)) {
     stop(paste0("Map file: number of columns should equal hm + 1:",
-                n, "_", params$h * params$m))
+                n, "_", h * params$m))
   }
 
   row_pos <- unlist(map_pos[, -1], use.names = FALSE)

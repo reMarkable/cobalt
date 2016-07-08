@@ -25,6 +25,7 @@ ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 sys.path.insert(0, ROOT_DIR)
 
 import city_analyzer
+import hour_analyzer
 import module_name_analyzer
 import help_query_analyzer
 import utils.data as data
@@ -52,6 +53,12 @@ def runAllAnalyzers():
   print "Running the module names analyzer..."
   mn_analyzer = module_name_analyzer.ModuleNameAnalyzer()
   mn_analyzer.analyze()
+
+  # Run the hour-of-day analyzer
+  print "Running the hour-of-day analyzer..."
+  hd_analyzer = hour_analyzer.HourOfDayAnalyzer()
+  hd_analyzer.analyze()
+
 
 def main():
   runAllAnalyzers()

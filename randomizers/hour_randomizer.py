@@ -76,5 +76,5 @@ class HourRandomizer:
         hour_rr = hour_e.encode_bits(2**entry.hour)
 
         # Only a single cohort for all users.
-        writer.writerow(['%d' % 1,
+        writer.writerow(['%d' % 0,
                          format(hour_rr, hour_fmt_string)])

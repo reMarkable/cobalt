@@ -30,7 +30,7 @@ option_list <- list(
 
   make_option("--adjust-counts-hack", dest="adjust_counts_hack",
               default=FALSE, action="store_true",
-              help="Allow the counts file to have more rows than cohorts. 
+              help="Allow the counts file to have more rows than cohorts.
                     Most users should not use this.")
 )
 
@@ -88,7 +88,8 @@ main <- function(opts) {
   params <- ReadParameterFile(opts$params)
   counts <- ReadCountsFile(opts$counts, params, adjust_counts = opts$adjust_counts_hack)
   counts <- AdjustCounts(counts, params)
-
+  # When m = 1, counts does not have the right dimensions. Fixing this.
+  dim(counts) <- c(params$m, params$k + 1)
 
   # The left-most column has totals.
   num_reports <- sum(counts[, 1])
@@ -110,14 +111,18 @@ main <- function(opts) {
   write.csv(res$fit, file = results_csv_path, row.names = FALSE)
 
   # Write residual histograph as a png.
-  results_png_path <- file.path(opts$output_dir, 'residual.png')
-  png(results_png_path)
-  breaks <- pretty(res$residual, n = 200)
-  histogram <- hist(res$residual, breaks, plot = FALSE)
-  histogram$counts <- histogram$counts / sum(histogram$counts)  # convert the histogram to frequencies
-  plot(histogram, main = "Histogram of the residual",
-       xlab = sprintf("Residual (observed - explained, %d x %d values)", params$m, params$k))
-  dev.off()
+  results_png_path = '<Did not write residual.png>'
+  if (!is.null(res$residual)) {
+    results_png_path <- file.path(opts$output_dir, 'residual.png')
+    png(results_png_path)
+    breaks <- pretty(res$residual, n = 200)
+    histogram <- hist(res$residual, breaks, plot = FALSE)
+    histogram$counts <- histogram$counts / sum(histogram$counts)  # convert the histogram to frequencies
+    plot(histogram, main = "Histogram of the residual",
+         xlab = sprintf("Residual (observed - explained, %d x %d values)", params$m, params$k))
+    dev.off()
+  }
+
 
   res$metrics$total_elapsed_time <- proc.time()[['elapsed']]
 

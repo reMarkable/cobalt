@@ -95,7 +95,10 @@ EstimateBloomCounts <- function(params, obs_counts) {
   # Transform counts from absolute values to fractional, removing bias due to
   #      variability of reporting between cohorts.
   ests <- apply(ests, 1, function(x) x / obs_counts[,1])
+  dim(ests) <- c(m, k)
+
   stds <- apply(variances^.5, 1, function(x) x / obs_counts[,1])
+  dim(stds) <- c(m, k)
 
   # Some estimates may be set to infinity, e.g. if f=1. We want to account for
   # this possibility, and set the corresponding counts to 0.
@@ -312,6 +315,34 @@ Resample <- function(e) {
   return(list(fit = fit))
 }
 
+# Private function
+# Decode for basic RAPPOR. This function should be invoked when
+# m = 1 and h = 0.
+# Returns a list with attribute fit only. (Inference and other aspects
+# currently not incorporated because they're unnecessary for association.)
+.DecodeBasic <- function(counts, map, params, num_reports) {
+  es <- EstimateBloomCounts(params, counts)  # estimate boolean counts
+
+  ests <- es$estimates
+  std <- es$stds
+  fit <- data.frame(
+           string           = colnames(map),
+           estimate         = matrix(ests, ncol=1) * num_reports,
+           std_error        = matrix(std, ncol=1) * num_reports,
+           proportion       = matrix(std, ncol=1),
+           prop_std_error   = matrix(std, ncol=1),
+           stringsAsFactors = FALSE)
+
+  low_95 <- fit$proportion - 1.96 * fit$prop_std_error
+  high_95 <- fit$proportion + 1.96 * fit$prop_std_error
+
+  fit$prop_low_95 <- pmax(low_95, 0.0)
+  fit$prop_high_95 <- pmin(high_95, 1.0)
+  rownames(fit) <- fit$string
+
+  return(list(fit = fit))
+}
+
 CheckDecodeInputs <- function(counts, map, params) {
   # Returns an error message, or NULL if there is no error.
 
@@ -357,6 +388,9 @@ Decode <- function(counts, map, params, alpha = 0.05,
   N <- sum(counts[, 1])
   if (k == 1) {
     return(.DecodeBoolean(counts, params, N))
+  }
+  if (h == 0 && m == 1) {
+    return(.DecodeBasic(counts, map, params, N))
   }
 
   filter_cohorts <- which(counts[, 1] != 0)  # exclude cohorts with zero reports
@@ -470,7 +504,7 @@ Decode <- function(counts, map, params, alpha = 0.05,
   list(fit = fit, summary = res_summary, privacy = privacy, params = params,
        lasso = NULL, residual = as.vector(residual),
        counts = counts[, -1], resid = NULL, metrics = metrics,
-       ests = es$estimates  # ests needed by Shiny rappor-sim app      
+       ests = es$estimates  # ests needed by Shiny rappor-sim app
   )
 }
 
