@@ -18,16 +18,15 @@ import csv
 import analyzer
 import utils.file_util as file_util
 
-class HelpQueryAnalyzer:
+class UrlAnalyzer:
   """ An Analyzer that decrypts the data that was encrypted using Forculus
-  threshold encryption in the HelpQueryRandomizer
+  threshold encryption in the UrlRandomizer
   """
 
   def analyze(self):
     ''' Uses Forculus to decrypt those entries that occur more than
     |threshold| times, where |threshold| is read from the config file.
     '''
-    analyzer.analyzeUsingForculus(
-        file_util.HELP_QUERY_SHUFFLER_OUTPUT_FILE_NAME,
-        file_util.FORCULUS_HELP_QUERY_CONFIG,
-        file_util.HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME);
+    analyzer.analyzeUsingForculus(file_util.URL_SHUFFLER_OUTPUT_FILE_NAME,
+        file_util.FORCULUS_URL_CONFIG,
+        file_util.URL_ANALYZER_OUTPUT_FILE_NAME);

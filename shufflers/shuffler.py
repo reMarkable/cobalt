@@ -31,6 +31,8 @@ import city_shuffler
 import help_query_shuffler
 import module_name_shuffler
 import hour_shuffler
+import url_shuffler
+
 import utils.data as data
 import utils.file_util as file_util
 
@@ -143,6 +145,10 @@ def runAllShufflers():
   print "Running the hour-of-day shuffler..."
   hr_shuffler = hour_shuffler.HourShuffler()
   hr_shuffler.shuffle()
+
+  print "Running the url shuffler..."
+  u_shuffler = url_shuffler.UrlShuffler()
+  u_shuffler.shuffle()
 
 def main():
   runAllShufflers()

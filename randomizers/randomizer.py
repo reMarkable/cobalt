@@ -35,20 +35,21 @@ try:
 except ImportError:
       fastrand = None
 
-import help_query_randomizer
+import algorithms.forculus.forculus as forculus
 import city_randomizer
-import module_name_randomizer
+import help_query_randomizer
 import hour_randomizer
-
+import module_name_randomizer
+import url_randomizer
 import utils.data as data
 import utils.file_util as file_util
 
 def initializeFastrand():
-  """ Initializes fastrand environment.
+  ''' Initializes fastrand environment.
 
   Returns: A fastrand module or an object for performing simple
   randomness depending on the fastrand extension availability.
-  """
+  '''
   # Fastrand module written in C++ speeds up random number generation.
   if fastrand:
     _logger.info('Using fastrand extension')
@@ -61,20 +62,20 @@ def initializeFastrand():
   return irr_rand
 
 def readRapporConfigParamsFromFile(config_file):
-  """ Returns the RAPPOR config params as specified by the config file in csv
+  ''' Returns the RAPPOR config params as specified by the config file in csv
   format.
 
   Args:
     config_file {string}: The simple name of the RAPPOR config file.
 
   Returns: A list of RAPPOR configuration values.
-  """
+  '''
   with file_util.openFileForReading(
     config_file, file_util.CONFIG_DIR) as cf:
     return rappor.Params.from_csv(cf)
 
 def encodeWithBloomFilter(user_id, data, config_params):
-  """ Encodes plain text using RAPPOR with bloom filters using user_id to
+  ''' Encodes plain text using RAPPOR with bloom filters using user_id to
   derive per-client secret and returns an encoded string along with the
   generated cohort value.
 
@@ -87,7 +88,7 @@ def encodeWithBloomFilter(user_id, data, config_params):
     config_params: A list of RAPPOR configuration values.
 
   Returns: cohort value and the RAPPOR encoded string.
-  """
+  '''
   # Initialize fastrand module
   irr_rand = initializeFastrand()
 
@@ -106,7 +107,7 @@ def encodeWithBloomFilter(user_id, data, config_params):
   return cohort, data_rr
 
 def encodeWithoutBloomFilter(user_id, data, config_params):
-  """ Encodes plain text using basic RAPPOR (without any bloom filters)
+  ''' Encodes plain text using basic RAPPOR (without any bloom filters)
   and returns an encoded string with cohort set to 0.
 
   Args:
@@ -118,7 +119,7 @@ def encodeWithoutBloomFilter(user_id, data, config_params):
     config_params: A list of RAPPOR configuration values.
 
   Returns: cohort value and the RAPPOR encoded string.
-  """
+  '''
   # Initialize fastrand module
   irr_rand = initializeFastrand()
 
@@ -140,7 +141,7 @@ def encodeWithoutBloomFilter(user_id, data, config_params):
   return cohort, data_rr
 
 def randomizeUsingRappor(entries, param_configs, output_file):
-  """ A helper function that may be invoked by individual randomizers.
+  ''' A helper function that may be invoked by individual randomizers.
   It reads input data in the form of a CSV file, performs some randomization
   on data using RAPPOR with or without bloom filters, and then writes output
   to another CSV file to be consumed by a shuffler.
@@ -159,7 +160,7 @@ def randomizeUsingRappor(entries, param_configs, output_file):
 
     output_file {string}: The simple name of the CSV file to be written in
     the 'r_to_s' directory.
-  """
+  '''
   with file_util.openForRandomizerWriting(output_file) as f:
     writer = csv.writer(f)
 
@@ -202,8 +203,34 @@ def randomizeUsingRappor(entries, param_configs, output_file):
       # {cohort, city_name_rr, rating_rr)
       writer.writerow([data for data in data_out])
 
+def randomizeUsingForculus(entries, param_index, config_file, output_file):
+  '''A helper function that may be invoked by individual randomizers.
+  It reads input data in the form of a CSV file, performs some randomization
+  on data using Forculus, and then writes output to another CSV file to be
+  consumed by a shuffler.
+
+  Args:
+    entries: A list of input entries to be randomized.
+
+    param_index {int}: An index into |Entry| tuple that identifies the
+    parameter to be randomized.
+
+    config_file {string}: The simple name of the Forculus config file used for
+    randomizing the param specified by |param_index|.
+
+    output_file {string}: The simple name of the CSV file to be written in
+    the 'r_to_s' directory.
+  '''
+  with file_util.openFileForReading(config_file, file_util.CONFIG_DIR) as cf:
+    config = forculus.Config.from_csv(cf)
+
+  with file_util.openForRandomizerWriting(output_file) as f:
+    forculus_inserter = forculus.ForculusInserter(config.threshold, f)
+    for entry in entries:
+      forculus_inserter.Insert(entry[param_index])
+
 def runAllRandomizers(entries):
-  """Runs all of the randomizers on the given list of entries.
+  '''Runs all of the randomizers on the given list of entries.
 
   This function does not return anything but it invokes all of the
   randomizers each of which will write a file
@@ -211,7 +238,7 @@ def runAllRandomizers(entries):
 
   Args:
     entries {list of Entry}: The entries to be randomized.
-  """
+  '''
 
   # Run the help query randomizer
   print "Running the help-query randomizer..."
@@ -232,6 +259,11 @@ def runAllRandomizers(entries):
   print "Running the hour of day randomizer..."
   hr_randomizer = hour_randomizer.HourRandomizer()
   hr_randomizer.randomize(entries)
+
+  # Run the url randomizer
+  print "Running the url randomizer..."
+  u_randomizer = url_randomizer.UrlRandomizer()
+  u_randomizer.randomize(entries)
 
 def main():
   entries = data.readEntries(file_util.GENERATED_INPUT_DATA_FILE_NAME)

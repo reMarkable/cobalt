@@ -23,9 +23,9 @@ import csv
 
 import file_util
 
-# This defines a new type |Entry| as a tuple with six named fields.
+# This defines a new type |Entry| as a tuple with seven named fields.
 Entry = collections.namedtuple('Entry',['user_id', 'name', 'city', 'hour',
-  'rating', 'help_query'])
+  'rating', 'help_query', 'url'])
 
 def writeEntries(entries, file_name):
   """ Writes a csv file containing the given entries.
@@ -38,7 +38,7 @@ def writeEntries(entries, file_name):
     writer = csv.writer(f)
     for entry in entries:
       writer.writerow([entry.user_id, entry.name, entry.city, entry.hour,
-                       entry.rating, entry.help_query])
+                       entry.rating, entry.help_query, entry.url])
 
 
 def readEntries(file_name):
@@ -52,5 +52,5 @@ def readEntries(file_name):
   with file_util.openForReading(file_name) as csvfile:
     reader = csv.reader(csvfile)
     return [Entry(int(row[0]), row[1], row[2], int(row[3]), int(row[4]),
-                  row[5])
+                  row[5], row[6])
         for row in reader]

@@ -24,12 +24,42 @@ THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
 sys.path.insert(0, ROOT_DIR)
 
+import algorithms.forculus.forculus as forculus
 import city_analyzer
 import hour_analyzer
 import module_name_analyzer
 import help_query_analyzer
+import url_analyzer
 import utils.data as data
 import utils.file_util as file_util
+
+def analyzeUsingForculus(input_file, config_file, output_file):
+  ''' A helper function that may be invoked by individual analyzers. It reads
+  input data in the form of a CSV file (that is generated as output from the
+  preceeding shuffle operation in the pipeline), analyzes the data using
+  Forculus, and then writes output to another CSV file to be consumed by the
+  visualizer at the end of the pipeline.
+
+  It uses Forculus to decrypt those entries that occur more than |threshold|
+  times, where |threshold| is read from the config file.
+
+  Args:
+    input_file {string}: The simple name of the CSV file to be read from
+    the 's_to_a' directory.
+
+    config_file {string}: The simple name of the Forculus config file used
+    for analyzing the data from the input file.
+
+    output_file {string}: The simple name of the CSV file to be written in
+    the 'out' directory, that is consumed by the visualizer.
+  '''
+  with file_util.openFileForReading(config_file, file_util.CONFIG_DIR) as cf:
+    config = forculus.Config.from_csv(cf)
+
+  with file_util.openForAnalyzerReading(input_file) as input_f:
+    with file_util.openForWriting(output_file) as output_f:
+      forculus_evaluator = forculus.ForculusEvaluator(config.threshold, input_f)
+      forculus_evaluator.ComputeAndWriteResults(output_f)
 
 def runAllAnalyzers():
   """Runs all of the analyzers.
@@ -58,6 +88,11 @@ def runAllAnalyzers():
   print "Running the hour-of-day analyzer..."
   hd_analyzer = hour_analyzer.HourOfDayAnalyzer()
   hd_analyzer.analyze()
+
+  # Run the url analyzer
+  print "Running the url analyzer..."
+  u_analyzer = url_analyzer.UrlAnalyzer()
+  u_analyzer.analyze()
 
 
 def main():

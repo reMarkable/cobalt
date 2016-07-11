@@ -19,8 +19,10 @@ input_data.csv, then runs the straight counting pipeline on the
 data which emits several csv files to the out directory.
 """
 
+import base64
 import collections
 import csv
+import hashlib
 import os
 import random
 import sys
@@ -44,6 +46,9 @@ from help_query_primary_nouns import HELP_QUERY_PRIMARY_NOUNS
 from help_query_verbs import HELP_QUERY_VERBS
 # We will use predefined set of secondary nouns commonly used in speaking.
 from help_query_secondary_nouns import HELP_QUERY_SECONDARY_NOUNS
+# We will use predefined set of most visited urls for covering the low entropy
+# url usecase.
+from most_visited_urls import MOST_VISITED_URLS
 
 # Total number of users
 # TODO(rudominer) Move to a config file.
@@ -146,6 +151,24 @@ def generateRandomHelpQuery():
   help_query += HELP_QUERY_SECONDARY_NOUNS[index]
   return help_query
 
+def generateHighEntropyUrls():
+  """Generates a list of urls that are long and hard to guess such as Google doc
+  urls. These urls inherently have high entropy guaranteed by the high
+  randomness in the url string. Also, these urls are assumed to appear
+  infrequently in the real-world scenarios such as Google doc urls or spam urls
+  sent in hangout messages.
+
+  Returns:
+    {list of string} A list of 5000 randomly generated urls.
+  """
+  url_base_path = "https://docs.google.com/document/d/"
+  high_entropy_urls = []
+  for i in xrange(5000):
+    hash_object = hashlib.sha256(bytes(i))
+    high_entropy_urls.append(url_base_path + base64.b64encode(str.encode(hash_object.hexdigest())))
+
+  return high_entropy_urls
+
 def generateRandomEntries(num_entries):
   """Generates a random list of Entries.
 
@@ -154,6 +177,13 @@ def generateRandomEntries(num_entries):
   Returns:
     {list of Entry} A list of random entries of length |num_entries|.
   """
+  # Generate a list of high-entropy urls.
+  high_entropy_urls = generateHighEntropyUrls()
+  # Bucket 5 urls as spammy that appear 2% of the time in the final outcome.
+  spammy_high_entropy_urls = []
+  for i in xrange(5):
+    spammy_high_entropy_urls.append(high_entropy_urls.pop())
+
   entries = []
   for i in xrange(num_entries):
     city_index = powerRandomInt(len(US_CITIES)-1)
@@ -180,7 +210,25 @@ def generateRandomEntries(num_entries):
     # Generate free-form help queries from a list of primary nouns, verbs and
     # secondary nouns.
     help_query = generateRandomHelpQuery()
-    entries.append(data.Entry(user_id, name, city, hour, rating, help_query))
+    # Generate either a low_entropy or a high_entropy url using the following
+    # random selection:
+    # - 60% of the time a most-visited URL is used.
+    # - 38% of the time a uniformly random high-entropy URL is used.
+    # - 2% of the time one of the 5 spammy high-entropy URL is used.
+
+    # Generates the next random floating point number in the range [0.0, 1.0).
+    r = random.random()
+    if r > 0.4:
+        url_index = powerRandomInt(len(MOST_VISITED_URLS)-1)
+        url = MOST_VISITED_URLS[url_index]
+    elif (0.02 < r <= 0.4):
+        url_index = random.randint(0, len(high_entropy_urls)-1)
+        url = high_entropy_urls[url_index]
+    else:
+        url_index = random.randint(0, len(spammy_high_entropy_urls)-1)
+        url = spammy_high_entropy_urls[url_index]
+
+    entries.append(data.Entry(user_id, name, city, hour, rating, help_query, url))
   return entries
 
 class Accumulator:
@@ -195,11 +243,14 @@ class Accumulator:
     self.usage_by_hour=[[0] for i in xrange(24)]
     # A counter used to count occurences of each help query.
     self.popular_help_query=collections.Counter()
+    # A counter used to count occurences of each url.
+    self.popular_url=collections.Counter()
 
   def addEntry(self, entry):
     self.usage_by_module[entry.name] +=1
     self.usage_by_hour[entry.hour][0] += 1
     self.popular_help_query[entry.help_query] +=1
+    self.popular_url[entry.url] +=1
     if entry.city in self.usage_and_rating_by_city:
       self.usage_and_rating_by_city[entry.city].num_uses = (
         self.usage_and_rating_by_city[entry.city].num_uses + 1)
@@ -238,6 +289,11 @@ def main():
       file_util.POPULAR_HELP_QUERIES_CSV_FILE_NAME) as f:
     writer = csv.writer(f)
     writer.writerows(accumulator.popular_help_query.most_common(50))
+
+  with file_util.openForWriting(
+      file_util.POPULAR_URLS_CSV_FILE_NAME) as f:
+    writer = csv.writer(f)
+    writer.writerows(accumulator.popular_url.most_common(50))
 
   with file_util.openForWriting(file_util.USAGE_BY_CITY_CSV_FILE_NAME) as f:
     writer = csv.writer(f)

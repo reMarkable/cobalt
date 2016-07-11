@@ -16,13 +16,13 @@
 import randomizer
 import utils.file_util as file_util
 
-class HelpQueryRandomizer:
+class UrlRandomizer:
   """ A Randomizer that extracts the help query string from an |Entry| and uses
   Forculus threshold encryption to emit an encrypted version of it.
   """
 
   def randomize(self, entries):
-    """ Extracts the help query string from each |Entry| in |entries| and
+    """ Extracts the url string from each |Entry| in |entries| and
     uses Forculus threshold encryption to emit an encrypted version of it.
 
     This function does not return anything but it writes a file
@@ -32,7 +32,7 @@ class HelpQueryRandomizer:
       entries {list of Entry}: The entries to be randomized.
     """
     randomizer.randomizeUsingForculus(entries,
-        5, # help_query index in |Entry| tuple
-        file_util.FORCULUS_HELP_QUERY_CONFIG,
-        file_util.HELP_QUERY_RANDOMIZER_OUTPUT_FILE_NAME
+        6, # url index in |Entry| tuple
+        file_util.FORCULUS_URL_CONFIG,
+        file_util.URL_RANDOMIZER_OUTPUT_FILE_NAME
         );

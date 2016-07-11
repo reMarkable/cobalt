@@ -51,24 +51,28 @@ RAPPOR_HOUR_CONFIG = 'rappor_hour_config.csv'
 
 # Forculus config files
 FORCULUS_HELP_QUERY_CONFIG = 'forculus_help_query_config.csv'
+FORCULUS_URL_CONFIG = 'forculus_url_config.csv'
 
 # The names of the randomizer output files
 HELP_QUERY_RANDOMIZER_OUTPUT_FILE_NAME = 'help_query_randomizer_out.csv'
 CITY_RANDOMIZER_OUTPUT_FILE_NAME = 'city_randomizer_out.csv'
 MODULE_NAME_RANDOMIZER_OUTPUT_FILE_NAME = 'module_name_randomizer_out.csv'
 HOUR_RANDOMIZER_OUTPUT_FILE_NAME = 'hour_randomizer_out.csv'
+URL_RANDOMIZER_OUTPUT_FILE_NAME = 'url_randomizer_out.csv'
 
 # The names of the shuffler output files
 HELP_QUERY_SHUFFLER_OUTPUT_FILE_NAME = "help_query_shuffler_out.csv"
 CITY_SHUFFLER_OUTPUT_FILE_NAME = "city_shuffler_out.csv"
 MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME = "module_name_shuffler_out.csv"
 HOUR_SHUFFLER_OUTPUT_FILE_NAME = "hour_shuffler_out.csv"
+URL_SHUFFLER_OUTPUT_FILE_NAME = "url_shuffler_out.csv"
 
 # The names of the analyzer output files
 HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME = "help_query_analyzer_out.csv"
 CITY_ANALYZER_OUTPUT_FILE_NAME = "city_analyzer_out.csv"
 MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME = "module_name_analyzer_out.csv"
 HOUR_ANALYZER_OUTPUT_FILE_NAME = "hour_analyzer_out.csv"
+URL_ANALYZER_OUTPUT_FILE_NAME = "url_analyzer_out.csv"
 
 # The names of RAPPOR intermediate files
 CITY_NAME_COUNTS_FILE_NAME = "city_name_counts.csv"
@@ -85,6 +89,7 @@ USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
 USAGE_BY_CITY_CSV_FILE_NAME = 'usage_and_rating_by_city.csv'
 USAGE_BY_HOUR_CSV_FILE_NAME = 'usage_by_hour.csv'
 POPULAR_HELP_QUERIES_CSV_FILE_NAME = 'popular_help_queries.csv'
+POPULAR_URLS_CSV_FILE_NAME = 'popular_urls.csv'
 
 # visualization
 VISUALIZATION_FILE = os.path.join(VISUALIZATION_DIR, 'visualization.html')
