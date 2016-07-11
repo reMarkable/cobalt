@@ -35,8 +35,9 @@ class ModuleNameRandomizer:
       entries {list of Entry}: The entries to be randomized.
     """
     randomizer.randomizeUsingRappor(entries,
-        1, # module name index in |Entry|
+        [(1, # module name index in |Entry|
+         True, #use bloom filters
+         file_util.RAPPOR_MODULE_NAME_CONFIG # rappor config file name
+        )],
         file_util.MODULE_NAME_RANDOMIZER_OUTPUT_FILE_NAME,
-        file_util.RAPPOR_MODULE_NAME_CONFIG,
-        True, #use bloom filters
         );

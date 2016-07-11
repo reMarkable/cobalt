@@ -60,7 +60,7 @@ def initializeFastrand():
     irr_rand = rappor.SecureIrrRand
   return irr_rand
 
-def readRapporConfigParams(config_file):
+def readRapporConfigParamsFromFile(config_file):
   """ Returns the RAPPOR config params as specified by the config file in csv
   format.
 
@@ -81,18 +81,20 @@ def encodeWithBloomFilter(user_id, data, config_params):
   Args:
     user_id {Int}: A unique value for each input entry that is used for
                    deriving client secret.
+
     data {string}: Data to be encoded.
+
     config_params: A list of RAPPOR configuration values.
 
   Returns: cohort value and the RAPPOR encoded string.
   """
-  # initialize fastrand module
+  # Initialize fastrand module
   irr_rand = initializeFastrand()
 
-  # user_id is used to derive a cohort.
+  # User_id is used to derive a cohort.
   cohort = user_id % config_params.num_cohorts
 
-  # user_id is used to derive a per-client secret as required by the
+  # User_id is used to derive a per-client secret as required by the
   # RAPPOR encoder. For the current prototype, clients only report one
   # value, so using RAPPOR protection across multiple client values is
   # not demonstrated.
@@ -110,15 +112,17 @@ def encodeWithoutBloomFilter(user_id, data, config_params):
   Args:
     user_id {Int}: A unique value for each input entry that is used for
                    deriving client secret.
+
     data {string}: Data to be encoded.
+
     config_params: A list of RAPPOR configuration values.
 
   Returns: cohort value and the RAPPOR encoded string.
   """
-  # initialize fastrand module
+  # Initialize fastrand module
   irr_rand = initializeFastrand()
 
-  # Only a single cohort for all users.
+  # Using a single cohort for all users.
   cohort = 0
 
   # For simple data like hour of the day that is bounded between 0 and
@@ -135,8 +139,7 @@ def encodeWithoutBloomFilter(user_id, data, config_params):
   data_rr = data_e.encode_bits(2**data)
   return cohort, data_rr
 
-def randomizeUsingRappor(entries, param_index, output_file, config_file,
-    use_bloom_filters):
+def randomizeUsingRappor(entries, param_configs, output_file):
   """ A helper function that may be invoked by individual randomizers.
   It reads input data in the form of a CSV file, performs some randomization
   on data using RAPPOR with or without bloom filters, and then writes output
@@ -145,37 +148,59 @@ def randomizeUsingRappor(entries, param_index, output_file, config_file,
   Args:
     entries: A list of input entries to be randomized.
 
-    param_index: Data to be encoded is specified by an index into |Entry| tuple.
-
-    input_file {string}: The simple name of the input CSV file to be read from
-    the 'out' directory.
+    param_configs: A list of tuples containing a param index into |Entry| tuple,
+    a boolean value to specify whether that param supports cohort based analysis
+    or not, and the name of the RAPPOR config_file for the specified param.
+    For example:
+       param_configs = [(1, True, 'rappor_module_name_config.csv')]
+    implies that the randomization should be performed on module_names using
+    bloom filters and RAPPOR configuration as specified in file:
+    <rappor_module_name_config.csv>.
 
     output_file {string}: The simple name of the CSV file to be written in
     the 'r_to_s' directory.
-
   """
-  # read RAPPOR config params
-  config_params = readRapporConfigParams(config_file)
-
   with file_util.openForRandomizerWriting(output_file) as f:
     writer = csv.writer(f)
 
+    # Read RAPPOR config params into a list of config params with keys as
+    # param index from |Entry|.
+    rappor_configs = {}
+    for config in param_configs:
+      config_params = readRapporConfigParamsFromFile(config[2])
+      config_fmt_string = '0%ib' % config_params.num_bloombits
+      rappor_configs[config[0]] = (config_params, config_fmt_string)
+
     # Format strings for RAPPOR reports.
-    config_fmt_string = '0%ib' % config_params.num_bloombits
-
     for entry in entries:
-      if use_bloom_filters:
-        (cohort, data_rr) = encodeWithBloomFilter(entry.user_id,
-                                entry[param_index],
-                                config_params)
-      else:
-        (cohort, data_rr) = encodeWithoutBloomFilter(entry.user_id,
-                                entry[param_index],
-                                config_params)
+      # For randomizing multiple params, generate the encoded data based on
+      # cohort configuration for each param separately.
+      data_out = []
+      data_out.append('%d' % 0) # default cohort
+      for param_index, use_bloom_filter, config_file in param_configs:
+        if use_bloom_filter:
+          (cohort, data_rr) = encodeWithBloomFilter(entry.user_id,
+                                  entry[param_index],
+                                  rappor_configs[param_index][0])
+          # For now, always use the cohort generated from the bloom filter, if
+          # multiple params are involved.
+          # TODO(ukode): From an API perspective, it might be best to have
+          # (cohort, report) separate for each metric we report and just treat
+          # the cohort as redundant if it's boolean/basic RAPPOR. If we ever
+          # choose to use different # of cohorts for different metrics, this
+          # will be useful in the future.
+          data_out[0] = '%d' % cohort
+        else:
+          (cohort, data_rr) = encodeWithoutBloomFilter(entry.user_id,
+                                  entry[param_index],
+                                  rappor_configs[param_index][0])
+        data_out.append(format(data_rr, rappor_configs[param_index][1]))
 
-      writer.writerow(['%d' % cohort,
-                      format(data_rr, config_fmt_string)])
-
+      # Write each row to the out file with the following syntax:
+      # {cohort, data1_rr, data2_rr, data3_rr, ...}
+      # for example, city_rating_randomized output looks like:
+      # {cohort, city_name_rr, rating_rr)
+      writer.writerow([data for data in data_out])
 
 def runAllRandomizers(entries):
   """Runs all of the randomizers on the given list of entries.

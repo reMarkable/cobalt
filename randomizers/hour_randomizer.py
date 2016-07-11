@@ -25,8 +25,9 @@ class HourRandomizer:
       entries {list of Entry}: The entries to be randomized.
     """
     randomizer.randomizeUsingRappor(entries,
-        3, # hour index in |Entry|
+        [(3, # hour index in |Entry|
+         False, # no bloom filters
+         file_util.RAPPOR_HOUR_CONFIG # rappor config file name
+        )],
         file_util.HOUR_RANDOMIZER_OUTPUT_FILE_NAME,
-        file_util.RAPPOR_HOUR_CONFIG,
-        False, # no bloom filters
         );
