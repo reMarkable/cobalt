@@ -110,12 +110,14 @@ def normalRandomInt(max_val, spread, skew=0):
     spread {float} Should be a value between 0 and 1. The standard deviation of
       the normal distribution will be set to this value times max_val.
     skew {float} Should be value between -1 and 1. The mean of the normal
-      distribution will be set to max_val*(0.5 + skew).
+      distribution will be set to max_val * 0.5 * (1 + skew).
 
   Returns:
     {int} A random integer in the range [0, max_val].
   """
-  x  = int(random.normalvariate(max_val*(0.5 + skew), max_val*spread))
+  mu = max_val * 0.5 * (1.0 + skew)
+  sigma = max_val*spread
+  x  = int(random.normalvariate(mu, sigma))
   # Ensure the value is in the range [0, max_val]
   return max(0, min(x, max_val))
 
@@ -152,7 +154,6 @@ def generateRandomEntries(num_entries):
   Returns:
     {list of Entry} A list of random entries of length |num_entries|.
   """
-  rating_values = [7, 8, 6, 5, 9, 4, 3, 2, 10, 1, 0]
   entries = []
   for i in xrange(num_entries):
     city_index = powerRandomInt(len(US_CITIES)-1)
@@ -160,8 +161,21 @@ def generateRandomEntries(num_entries):
     name_index = powerRandomInt(len(GIRLS_NAMES)-1)
     name = GIRLS_NAMES[name_index]
     hour = int(random.triangular(0,23))
-    rating_index = powerRandomInt(len(rating_values) - 1)
-    rating = rating_values[rating_index]
+    # The |rating_skew| and |rating_spread| parameters below are functions
+    # of |city_index| that were arrived at by experimentation. The goal
+    # was to have the rating and city be statistically dependent and for
+    # the conditional distribution of the rating to have the property that
+    # the mean decreases and the variance increases as the
+    # city index increases (and therefore as the popularity of the city
+    # decreases) in such a way that the geo-chart tends to show larger
+    # greener circles and smaller redish circles. We have arranged for the skew
+    # to be a number in the range [-0.9, 0.9] and the spread to be a number
+    # in the range [0.3, 1]. The slopes of the linear functions have no
+    # great explanation--they just seem to give rates of increase
+    # and decrease that look good.
+    rating_skew = max(-0.9, 0.9 - 0.111 * city_index)
+    rating_spread = min(1, 0.3 + 0.07 * city_index)
+    rating = normalRandomInt(10, rating_spread, rating_skew)
     user_id = random.randint(1, NUM_USERS + 1)
     # Generate free-form help queries from a list of primary nouns, verbs and
     # secondary nouns.
@@ -231,7 +245,7 @@ def main():
       num_uses = accumulator.usage_and_rating_by_city[city].num_uses
       avg_rating = (accumulator.usage_and_rating_by_city[city].total_rating /
       	            float(num_uses))
-      writer.writerow([city, num_uses, int(avg_rating)])
+      writer.writerow([city, num_uses, avg_rating])
 
 if __name__ == '__main__':
   main()
