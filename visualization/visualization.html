@@ -3,7 +3,7 @@
     <!--Load the AJAX API-->
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-    <!-- Defines usage_by_module_data and usage_by_city_data and usage_by_hour_data -->
+    <!-- Defines the variables named foo_data and foo_data_sc -->
     <script type="text/javascript" src="../out/data.js"></script>
 
     <script type="text/javascript">
@@ -15,30 +15,55 @@
       google.charts.setOnLoadCallback(drawCharts);
 
       // Callback that invokes the chart-drawing functions.
+      // NOTE: "_SC" refers to charts that represent data from the
+      // "Straight Counting" pipeline.
       function drawCharts() {
-        drawUsageByModulePieChart();
-        drawUsageByCityGeoChart();
-        drawUsageByHourColumnChart();
-        drawPopularHelpQueriesColumnChart();
-        drawPopularHelpQueriesInTabularForm();
+        drawUsageByModulePieChart_SC();
+        drawUsageByModuleIntervalChart();
+
+        drawUsageByCityGeoChart_SC();
+        drawUsageByHourColumnChart_SC();
+        drawPopularHelpQueriesColumnChart_SC();
+        drawPopularHelpQueriesInTabularForm_SC();
       };
 
-      function drawUsageByModulePieChart() {
+      function drawUsageByModulePieChart_SC() {
         // Parse the data table.
-        var data = new google.visualization.DataTable(usage_by_module_data);
+        var data = new google.visualization.DataTable(usage_by_module_data_sc);
 
         // Set chart options
         var options = {'title':'Top Modules by Usage',
                        'width':400,
                        'height':300};
         // Instantiate and draw our chart.
-        var chart = new google.visualization.PieChart(document.getElementById('usage_by_module_chart'));
+        var chart = new google.visualization.PieChart(document.getElementById('usage_by_module_chart_sc'));
         chart.draw(data, options);
       };
 
-      function drawUsageByCityGeoChart() {
+      function drawUsageByModuleIntervalChart() {
+        var data = new google.visualization.DataTable(usage_by_module_data);
+
+        // The intervals data as narrow lines (useful for showing raw source data)
+        var options = {
+            title: 'Top Modules by Usage, Estimates with 95% Confidence Intervals',
+            curveType: 'function',
+            pointSize: 10,
+            lineWidth: 0,
+            orientation: 'vertical',
+            height: 300,
+            width: 600,
+            intervals: { style: 'bars' },
+            vAxis: {title: 'Module'},
+            hAxis: {title: 'Usage Count', minorGridlines: {count: 4}}
+        };
+        var chart = new google.visualization.LineChart(document.getElementById('usage_by_module_chart'));
+        chart.draw(data, options);
+      };
+
+
+      function drawUsageByCityGeoChart_SC() {
         // Parse the data table.
-        var data = new google.visualization.DataTable(usage_by_city_data)
+        var data = new google.visualization.DataTable(usage_by_city_data_sc)
         var options = {
           region: 'US',
           'width': 600,
@@ -48,39 +73,36 @@
           colorAxis: {colors: ['red', 'yellow', 'green']}
         };
         // Instantiate and draw our chart.
-        var chart = new google.visualization.GeoChart(document.getElementById('usage_by_city'));
+        var chart = new google.visualization.GeoChart(document.getElementById('usage_by_city_chart_sc'));
         chart.draw(data, options);
       }
 
-      function drawUsageByHourColumnChart() {
+      function drawUsageByHourColumnChart_SC() {
         // Parse the data table.
-        var data = new google.visualization.DataTable(usage_by_hour_data)
+        var data = new google.visualization.DataTable(usage_by_hour_data_sc)
         var options = {
           title: 'Fuchsia average usage, by hour of the day, PST',
+          'width': 700,
+          hAxis: {
+            title: 'Hour of Day',
+            gridlines: {count: 12},
+          },
         };
-         var options = {
-           title: 'Fuchsia average usage, by hour of the day, PST',
-           'width': 850,
-           hAxis: {
-             title: 'Hour of Day',
-             gridlines: {count: 12},
-           },
-         };
 
         // Instantiate and draw our chart.
-        var chart = new google.visualization.ColumnChart(document.getElementById('usage_by_hour'));
+        var chart = new google.visualization.ColumnChart(document.getElementById('usage_by_hour_chart_sc'));
         chart.draw(data, options);
       }
 
-      function drawPopularHelpQueriesColumnChart() {
+      function drawPopularHelpQueriesColumnChart_SC() {
         // Parse the data table.
-        var data = new google.visualization.DataTable(popular_help_queries_data)
+        var data = new google.visualization.DataTable(popular_help_queries_data_sc)
         var options = {
           title: 'Fuchsia top 50 popular help queries',
         };
         var options = {
           title: 'Fuchsia top 50 popular help queries',
-          'width': 850,
+          'width': 700,
           hAxis: {
             title: 'Popular help queries',
             gridlines: {count: 12},
@@ -88,25 +110,24 @@
         };
 
         // Instantiate and draw our chart.
-        var chart = new google.visualization.ColumnChart(document.getElementById('popular_help_queries'));
+        var chart = new google.visualization.ColumnChart(document.getElementById('popular_help_queries_chart_sc'));
         chart.draw(data, options);
       }
 
-      function drawPopularHelpQueriesInTabularForm() {
+      function drawPopularHelpQueriesInTabularForm_SC() {
         // Parse the data table.
-        var data = new google.visualization.DataTable(popular_help_queries_data);
+        var data = new google.visualization.DataTable(popular_help_queries_data_sc);
 
         // Instantiate and draw our table.
-        var table = new google.visualization.Table(document.getElementById('popular_help_queries_table'));
+        var table = new google.visualization.Table(document.getElementById('popular_help_queries_table_sc'));
 
         // Set table options while drawing, and list the most popular queries in tabular form
         table.draw(data, {
-            showRowNumber: false,
+            showRowNumber: true,
             sortAscending: false,
             allowHtml: true,
             alternatingRowStyle: true,
-            page: 'enable',
-            pageSize: 20,
+            pageSize: 50,
             cssClassNames: {oddTableRow: 'odd_row', tableRow: 'table_row'}
         });
       }
@@ -115,18 +136,45 @@
   </head>
 
   <body>
-    <!--Div that will hold the pie chart-->
-    <div id="usage_by_module_chart"></div>
+    <table>
+      <tr>
+        <th> Straight Counting Pipeline </th>
+        <th> Cobalt Prototype Pipeline </th>
+      </tr>
 
-    Fuchsia Usage and Ratings By City
-    <div id="usage_by_city"></div>
+      <tr>
+        <td><div id="usage_by_module_chart_sc"></div></td>
+        <td><div id="usage_by_module_chart"></div></td>
+      </tr>
 
-    <div id="usage_by_hour"></div>
+      <tr>
+        <td>
+          Fuchsia Usage and Ratings By City
+          <div id="usage_by_city_chart_sc"></div>
+        </td>
+        <td></td>
+      </tr>
 
-    <div id="popular_help_queries"></div>
+      <tr>
+        <td><div id="usage_by_hour_chart_sc"></div></td>
+        <td></td>
+      </tr>
 
-    Fuchsia Top 50 Popular Help Queries
-    <div id="popular_help_queries_table"></div>
+      <tr>
+        <td><div id="popular_help_queries_chart_sc"></div></td>
+        <td></td>
+      </tr>
+
+      <tr>
+        <td>
+          Fuchsia Top 50 Popular Help Queries
+          <div id="popular_help_queries_table_sc"></div>
+        </td>
+        <td></td>
+      </tr>
+
+    </table>
+
 
   </body>
 </html>

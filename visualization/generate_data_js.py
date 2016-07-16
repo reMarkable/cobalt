@@ -30,11 +30,14 @@ sys.path.insert(0, ROOT_DIR)
 import utils.file_util as file_util
 import third_party.google_visualization.gviz_api as gviz_api
 
-# The javascript variables to write.
+# The javascript variables to write. Note "_sc" refers to the data from
+# the "straight-counting pipeline"
 USAGE_BY_MODULE_JS_VAR_NAME = 'usage_by_module_data'
-USAGE_BY_CITY_JS_VAR_NAME = 'usage_by_city_data'
-USAGE_BY_HOUR_JS_VAR_NAME = 'usage_by_hour_data'
-POPULAR_HELP_QUERIES_JS_VAR_NAME = 'popular_help_queries_data'
+USAGE_BY_MODULE_SC_JS_VAR_NAME = 'usage_by_module_data_sc'
+
+USAGE_BY_CITY_SC_JS_VAR_NAME = 'usage_by_city_data_sc'
+USAGE_BY_HOUR_SC_JS_VAR_NAME = 'usage_by_hour_data_sc'
+POPULAR_HELP_QUERIES_SC_JS_VAR_NAME = 'popular_help_queries_data_sc'
 
 # The outut JavaScript file to be created.
 OUTPUT_JS_FILE_NAME = 'data.js'
@@ -53,9 +56,8 @@ def buildDataTableJs(data=None, var_name=None, description=None,
       to sort the rows by the 'foo' column in descending order.
 
   Returns:
-    {string} of the formm <var_name>=<json>, where |var_name| is
-    USAGE_BY_HOUR_JS_VAR_NAME and |json| is a json string defining
-    a data table.
+    {string} of the form |var_name|=<json>, where <json> is a json string
+    defining a data table.
   """
   # Load data into a gviz_api.DataTable
   data_table = gviz_api.DataTable(description)
@@ -65,26 +67,57 @@ def buildDataTableJs(data=None, var_name=None, description=None,
   return "%s=%s;" % (var_name, json)
 
 def buildUsageByModuleJs():
-  """Reads a CSV file containing the usage-by-module data and uses it
-  to build a JavaScript string defining a DataTable containing the data.
+  """Reads two CSV files containing the usage-by-module data for the straight-
+  counting pipeline and the Cobalt prototype pipeline respectively and uses them
+  to build two JavaScript strings defining DataTables containing the data.
 
   Returns:
-    {string} of the form <var_name>=<json>, where |var_name| is
-    USAGE_BY_MODULE_JS_VAR_NAME and |json| is a json string defining
-    a data table.
+    {tuple of two strings} (sc_string, cobalt_string). Each of the two strings
+    is of the form <var_name>=<json>, where |json| is a json string defining
+    a data table. The |var_name|s are respectively
+    USAGE_BY_MODULE_SC_JS_VAR_NAME and USAGE_BY_MODULE_JS_VAR_NAME.
   """
+  # straight-counting:
   # Read the data from the csv file and put it into a dictionary.
   with file_util.openForReading(
       file_util.USAGE_BY_MODULE_CSV_FILE_NAME) as csvfile:
     reader = csv.reader(csvfile)
     data = [{"module" : row[0], "count": int(row[1])} for row in reader]
-  return buildDataTableJs(
+  usage_by_module_sc_js = buildDataTableJs(
       data=data,
-      var_name=USAGE_BY_MODULE_JS_VAR_NAME,
+      var_name=USAGE_BY_MODULE_SC_JS_VAR_NAME,
       description={"module": ("string", "Module"),
                    "count": ("number", "Count")},
       columns_order=("module", "count"),
       order_by=("count", "desc"))
+
+  # cobalt:
+  # Here the CSV file is the output of the RAPPOR analyzer.
+  # We read it and put the data into a dictionary.
+  # We skip row zero because it is the header row. We are going to visualize
+  # the data as an interval chart and so we want to compute the high and
+  # low 95% confidence interval values wich we may do using the "std_error"
+  # column, column 2.
+  with file_util.openForReading(
+      file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME) as csvfile:
+    reader = csv.reader(csvfile)
+    data = [{"module" : row[0], "estimate": float(row[1]),
+             "low" : float(row[1]) - 1.96 * float(row[2]),
+             "high": float(row[1]) + 1.96 * float(row[2])}
+        for row in reader if reader.line_num > 1]
+  usage_by_module_cobalt_js = buildDataTableJs(
+      data=data,
+      var_name=USAGE_BY_MODULE_JS_VAR_NAME,
+      description={"module": ("string", "Module"),
+                   "estimate": ("number", "Estimate"),
+                   # The role: 'interval' property is what tells the Google
+                   # Visualization API to draw an interval chart.
+                   "low": ("number", "Low", {'role':'interval'}),
+                   "high": ("number", "High", {'role':'interval'})},
+      columns_order=("module", "estimate", "low", "high"),
+      order_by=("estimate", "desc"))
+
+  return (usage_by_module_sc_js, usage_by_module_cobalt_js)
 
 
 def buildUsageByCityJs():
@@ -93,7 +126,7 @@ def buildUsageByCityJs():
 
   Returns:
     {string} of the form <var_name>=<json>, where |var_name| is
-    USAGE_BY_CITY_JS_VAR_NAME and |json| is a json string defining
+    USAGE_BY_CITY_SC_JS_VAR_NAME and |json| is a json string defining
     a data table.
   """
   # Read the data from the csv file and put it into a dictionary.
@@ -107,7 +140,7 @@ def buildUsageByCityJs():
   # colun determines the size of the circles.
   return buildDataTableJs(
       data=data,
-      var_name=USAGE_BY_CITY_JS_VAR_NAME,
+      var_name=USAGE_BY_CITY_SC_JS_VAR_NAME,
       description = {"city": ("string", "City"),
                      "rating": ("number", "Rating"),
                      "usage": ("number", "Usage")},
@@ -120,7 +153,7 @@ def buildUsageByHourJs():
 
   Returns:
     {string} of the form <var_name>=<json>, where |var_name| is
-    USAGE_BY_HOUR_JS_VAR_NAME and |json| is a json string defining
+    USAGE_BY_HOUR_SC_JS_VAR_NAME and |json| is a json string defining
     a data table.
   """
   # Read the data from the csv file and put it into a dictionary.
@@ -132,7 +165,7 @@ def buildUsageByHourJs():
         for (i, row) in zip(xrange(10000), reader)]
   return buildDataTableJs(
       data=data,
-      var_name=USAGE_BY_HOUR_JS_VAR_NAME,
+      var_name=USAGE_BY_HOUR_SC_JS_VAR_NAME,
       description = {"hour": ("number", "Hour of Day"),
                      "usage": ("number", "Usage")},
       columns_order=("hour", "usage"))
@@ -143,7 +176,7 @@ def buildPopularHelpQueriesJs():
 
   Returns:
     {string} of the form <var_name>=<json>, where |var_name| is
-    POPULAR_HELP_QUERIES_JS_VAR_NAME and |json| is a json string defining
+    POPULAR_HELP_QUERIES_SC_JS_VAR_NAME and |json| is a json string defining
     a data table.
   """
   # Read the data from the csv file and put it into a dictionary.
@@ -153,7 +186,7 @@ def buildPopularHelpQueriesJs():
     data = [{"help_query" : row[0], "count": int(row[1])} for row in reader]
   return buildDataTableJs(
       data=data,
-      var_name=POPULAR_HELP_QUERIES_JS_VAR_NAME,
+      var_name=POPULAR_HELP_QUERIES_SC_JS_VAR_NAME,
       description={"help_query": ("string", "Help queries"),
                    "count": ("number", "Count")},
       columns_order=("help_query", "count"),
@@ -163,7 +196,7 @@ def main():
   print "Generating visualization..."
 
   # Read the input file and build the JavaScript strings to write.
-  usage_by_module_js = buildUsageByModuleJs()
+  usage_by_module_sc_js, usage_by_module_js = buildUsageByModuleJs()
   usage_by_city_js = buildUsageByCityJs()
   usage_by_hour_js = buildUsageByHourJs()
   popular_help_queries_js = buildPopularHelpQueriesJs()
@@ -172,7 +205,9 @@ def main():
   with file_util.openForWriting(OUTPUT_JS_FILE_NAME) as f:
     f.write("// This js file is generated by the script "
             "generate_data_js.py\n\n")
+    f.write("%s\n\n" % usage_by_module_sc_js)
     f.write("%s\n\n" % usage_by_module_js)
+
     f.write("%s\n\n" % usage_by_city_js)
     f.write("%s\n\n" % usage_by_hour_js)
     f.write("%s\n\n" % popular_help_queries_js)
