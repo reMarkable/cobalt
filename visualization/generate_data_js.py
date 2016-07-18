@@ -82,7 +82,15 @@ def buildUsageByModuleJs():
   with file_util.openForReading(
       file_util.USAGE_BY_MODULE_CSV_FILE_NAME) as csvfile:
     reader = csv.reader(csvfile)
-    data = [{"module" : row[0], "count": int(row[1])} for row in reader]
+    # |data| will be used to generate the visualiation data for the
+    # straight-counting pipeline
+    data = []
+    # |values| will be used below to include the actual values along with
+    # the RAPPOR estimates in the visualization of the Cobalt pipeline.
+    values = {}
+    for row in reader:
+      data.append({"module" : row[0], "count": int(row[1])})
+      values[row[0]] = int(row[1])
   usage_by_module_sc_js = buildDataTableJs(
       data=data,
       var_name=USAGE_BY_MODULE_SC_JS_VAR_NAME,
@@ -102,6 +110,7 @@ def buildUsageByModuleJs():
       file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME) as csvfile:
     reader = csv.reader(csvfile)
     data = [{"module" : row[0], "estimate": float(row[1]),
+             "actual" : values.get(row[0], 0),
              "low" : float(row[1]) - 1.96 * float(row[2]),
              "high": float(row[1]) + 1.96 * float(row[2])}
         for row in reader if reader.line_num > 1]
@@ -110,11 +119,12 @@ def buildUsageByModuleJs():
       var_name=USAGE_BY_MODULE_JS_VAR_NAME,
       description={"module": ("string", "Module"),
                    "estimate": ("number", "Estimate"),
+                   "actual": ("number", "Actual"),
                    # The role: 'interval' property is what tells the Google
                    # Visualization API to draw an interval chart.
                    "low": ("number", "Low", {'role':'interval'}),
                    "high": ("number", "High", {'role':'interval'})},
-      columns_order=("module", "estimate", "low", "high"),
+      columns_order=("module", "estimate", "actual", "low", "high"),
       order_by=("estimate", "desc"))
 
   return (usage_by_module_sc_js, usage_by_module_cobalt_js)

@@ -47,14 +47,15 @@
         var options = {
             title: 'Top Modules by Usage, Estimates with 95% Confidence Intervals',
             curveType: 'function',
-            pointSize: 10,
+            pointSize: 5,
             lineWidth: 0,
             orientation: 'vertical',
             height: 300,
             width: 600,
-            intervals: { style: 'bars' },
+            intervals: { style: 'bars', color: 'grey' },
             vAxis: {title: 'Module'},
-            hAxis: {title: 'Usage Count', minorGridlines: {count: 4}}
+            hAxis: {title: 'Usage Count', viewWindow: {min: 0},
+                    minorGridlines: {count: 4}}
         };
         var chart = new google.visualization.LineChart(document.getElementById('usage_by_module_chart'));
         chart.draw(data, options);
