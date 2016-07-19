@@ -36,7 +36,9 @@ USAGE_BY_MODULE_JS_VAR_NAME = 'usage_by_module_data'
 USAGE_BY_MODULE_SC_JS_VAR_NAME = 'usage_by_module_data_sc'
 
 USAGE_BY_CITY_SC_JS_VAR_NAME = 'usage_by_city_data_sc'
+
 USAGE_BY_HOUR_SC_JS_VAR_NAME = 'usage_by_hour_data_sc'
+USAGE_BY_HOUR_JS_VAR_NAME = 'usage_by_hour_data'
 
 POPULAR_URLS_JS_VAR_NAME = 'popular_urls_data'
 POPULAR_URLS_SC_JS_VAR_NAME = 'popular_urls_data_sc'
@@ -165,14 +167,17 @@ def buildUsageByCityJs():
       order_by=("usage", "desc"))
 
 def buildUsageByHourJs():
-  """Reads a CSV file containing the usage-by-hour data and uses it
-  to build a JavaScript string defining a DataTable containing the data.
+  """Reads two CSV files containing the usage-by-hour data for the straight-
+  counting pipeline and the Cobalt prototype pipeline respectively and uses them
+  to build two JavaScript strings defining DataTables containing the data.
 
   Returns:
-    {string} of the form <var_name>=<json>, where |var_name| is
-    USAGE_BY_HOUR_SC_JS_VAR_NAME and |json| is a json string defining
-    a data table.
+    {tuple of two strings} (sc_string, cobalt_string). Each of the two strings
+    is of the form <var_name>=<json>, where |json| is a json string defining
+    a data table. The |var_name|s are respectively
+    USAGE_BY_HOUR_SC_JS_VAR_NAME and USAGE_BY_HOUR_JS_VAR_NAME.
   """
+  # straight-counting:
   # Read the data from the csv file and put it into a dictionary.
   with file_util.openForReading(
       file_util.USAGE_BY_HOUR_CSV_FILE_NAME) as csvfile:
@@ -180,12 +185,40 @@ def buildUsageByHourJs():
     # Read up to 10,000 rows adding the row index as "hour".
     data = [{"hour" : i, "usage": int(row[0])}
         for (i, row) in zip(xrange(10000), reader)]
-  return buildDataTableJs(
+  usage_by_hour_sc_js = buildDataTableJs(
       data=data,
       var_name=USAGE_BY_HOUR_SC_JS_VAR_NAME,
       description = {"hour": ("number", "Hour of Day"),
                      "usage": ("number", "Usage")},
       columns_order=("hour", "usage"))
+
+  # cobalt:
+  # Here the CSV file is the output of the RAPPOR analyzer.
+  # We read it and put the data into a dictionary.
+  # We skip row zero because it is the header row. We are going to visualize
+  # the data as an interval chart and so we want to compute the high and
+  # low 95% confidence interval values wich we may do using the "std_error"
+  # column, column 2.
+  with file_util.openForReading(
+      file_util.HOUR_ANALYZER_OUTPUT_FILE_NAME) as csvfile:
+    reader = csv.reader(csvfile)
+    data = [{"hour" : int(row[0]), "estimate": float(row[1]),
+             "low" : float(row[1]) - 1.96 * float(row[2]),
+             "high": float(row[1]) + 1.96 * float(row[2])}
+        for row in reader if reader.line_num > 1]
+  usage_by_hour_cobalt_js = buildDataTableJs(
+      data=data,
+      var_name=USAGE_BY_HOUR_JS_VAR_NAME,
+      description={"hour": ("number", "Hour"),
+                   "estimate": ("number", "Estimate"),
+                   # The role: 'interval' property is what tells the Google
+                   # Visualization API to draw an interval chart.
+                   "low": ("number", "Low", {'role':'interval'}),
+                   "high": ("number", "High", {'role':'interval'})},
+      columns_order=("hour", "estimate", "low", "high"),
+      order_by=("hour", "asc"))
+
+  return (usage_by_hour_sc_js, usage_by_hour_cobalt_js)
 
 def buildItemAndCountJs(filename, varname1, varname2, item_column,
                         item_description):
@@ -292,7 +325,7 @@ def main():
   # Read the input file and build the JavaScript strings to write.
   usage_by_module_sc_js, usage_by_module_js = buildUsageByModuleJs()
   usage_by_city_js = buildUsageByCityJs()
-  usage_by_hour_js = buildUsageByHourJs()
+  usage_by_hour_sc_js, usage_by_hour_js = buildUsageByHourJs()
   popular_urls_sc_js, popular_urls_js = buildPopularUrlsJs()
   (popular_help_queries_sc_js, popular_help_queries_histogram_sc_js,
       popular_help_queries_js) = buildPopularHelpQueriesJs()
@@ -306,6 +339,7 @@ def main():
 
     f.write("%s\n\n" % usage_by_city_js)
 
+    f.write("%s\n\n" % usage_by_hour_sc_js)
     f.write("%s\n\n" % usage_by_hour_js)
 
     f.write("%s\n\n" % popular_urls_sc_js)

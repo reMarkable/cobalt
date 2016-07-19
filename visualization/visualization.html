@@ -24,11 +24,11 @@
         drawUsageByCityGeoChart_SC();
 
         drawUsageByHourColumnChart_SC();
+        drawUsageByHourColumnChart();
 
         drawPopularUrlsTables();
 
         drawPopularHelpQueriesColumnChart_SC();
-
         drawPopularHelpQueriesTables();
       };
 
@@ -86,8 +86,9 @@
         // Parse the data table.
         var data = new google.visualization.DataTable(usage_by_hour_data_sc)
         var options = {
-          title: 'Fuchsia average usage, by hour of the day, PST',
-          'width': 600,
+          title: 'Fuchsia usage, by hour of the day, PST',
+          'width': 650,
+          'height': 350,
           hAxis: {
             title: 'Hour of Day',
             gridlines: {count: 12},
@@ -96,6 +97,25 @@
 
         // Instantiate and draw our chart.
         var chart = new google.visualization.ColumnChart(document.getElementById('usage_by_hour_chart_sc'));
+        chart.draw(data, options);
+      }
+
+      function drawUsageByHourColumnChart() {
+        // Parse the data table.
+        var data = new google.visualization.DataTable(usage_by_hour_data)
+        var options = {
+          title: 'Fuchsia usage by hour, estimates with 95% Confidence intervals',
+          'width': 650,
+          'height': 350,
+          intervals: { style: 'boxes', color: 'grey', 'lineWidth':3},
+          hAxis: {
+            title: 'Hour of Day',
+            gridlines: {count: 12},
+          },
+        };
+
+        // Instantiate and draw our chart.
+        var chart = new google.visualization.ColumnChart(document.getElementById('usage_by_hour_chart'));
         chart.draw(data, options);
       }
 
@@ -174,6 +194,15 @@
       </tr>
 
       <tr>
+        <td>
+          <div id="usage_by_hour_chart_sc"></div>
+        </td>
+        <td>
+          <div id="usage_by_hour_chart"></div>
+        </td>
+      </tr>
+
+      <tr>
         <td>&nbsp;</td><td>&nbsp;</td>
       </tr>
 
@@ -205,13 +234,6 @@
           Help Queries decrypted because they occur at least 20 times.
           <div id="popular_help_queries_table"></div>
         </td>
-      </tr>
-
-      <tr>
-        <td>
-          <div id="usage_by_hour_chart_sc"></div>
-        </td>
-        <td></td>
       </tr>
 
     </table>
