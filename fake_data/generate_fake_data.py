@@ -219,14 +219,14 @@ def generateRandomEntries(num_entries):
     # Generates the next random floating point number in the range [0.0, 1.0).
     r = random.random()
     if r > 0.4:
-        url_index = powerRandomInt(len(MOST_VISITED_URLS)-1)
-        url = MOST_VISITED_URLS[url_index]
+      url_index = powerRandomInt(len(MOST_VISITED_URLS)-1)
+      url = MOST_VISITED_URLS[url_index]
     elif (0.02 < r <= 0.4):
-        url_index = random.randint(0, len(high_entropy_urls)-1)
-        url = high_entropy_urls[url_index]
+      url_index = random.randint(0, len(high_entropy_urls)-1)
+      url = high_entropy_urls[url_index]
     else:
-        url_index = random.randint(0, len(spammy_high_entropy_urls)-1)
-        url = spammy_high_entropy_urls[url_index]
+      url_index = random.randint(0, len(spammy_high_entropy_urls)-1)
+      url = spammy_high_entropy_urls[url_index]
 
     entries.append(data.Entry(user_id, name, city, hour, rating, help_query, url))
   return entries

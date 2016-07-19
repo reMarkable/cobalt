@@ -22,9 +22,14 @@
         drawUsageByModuleIntervalChart();
 
         drawUsageByCityGeoChart_SC();
+
         drawUsageByHourColumnChart_SC();
+
+        drawPopularUrlsTables();
+
         drawPopularHelpQueriesColumnChart_SC();
-        drawPopularHelpQueriesInTabularForm_SC();
+
+        drawPopularHelpQueriesTables();
       };
 
       function drawUsageByModulePieChart_SC() {
@@ -61,13 +66,12 @@
         chart.draw(data, options);
       };
 
-
       function drawUsageByCityGeoChart_SC() {
         // Parse the data table.
         var data = new google.visualization.DataTable(usage_by_city_data_sc)
         var options = {
           region: 'US',
-          'width': 600,
+          'width': 500,
           backgroundColor: '#81d4fa',
           datalessRegionColor: '#85e085',
           displayMode: 'markers',
@@ -83,7 +87,7 @@
         var data = new google.visualization.DataTable(usage_by_hour_data_sc)
         var options = {
           title: 'Fuchsia average usage, by hour of the day, PST',
-          'width': 700,
+          'width': 600,
           hAxis: {
             title: 'Hour of Day',
             gridlines: {count: 12},
@@ -97,12 +101,9 @@
 
       function drawPopularHelpQueriesColumnChart_SC() {
         // Parse the data table.
-        var data = new google.visualization.DataTable(popular_help_queries_data_sc)
+        var data = new google.visualization.DataTable(popular_help_queries_histogram_data_sc)
         var options = {
-          title: 'Fuchsia top 50 popular help queries',
-        };
-        var options = {
-          title: 'Fuchsia top 50 popular help queries',
+          title: 'Popular help queries -- histogram',
           'width': 700,
           hAxis: {
             title: 'Popular help queries',
@@ -115,26 +116,42 @@
         chart.draw(data, options);
       }
 
-      function drawPopularHelpQueriesInTabularForm_SC() {
+      function drawTable(data_var, element_id) {
         // Parse the data table.
-        var data = new google.visualization.DataTable(popular_help_queries_data_sc);
+        var data = new google.visualization.DataTable(data_var);
 
         // Instantiate and draw our table.
-        var table = new google.visualization.Table(document.getElementById('popular_help_queries_table_sc'));
+        var table = new google.visualization.Table(document.getElementById(element_id));
 
-        // Set table options while drawing, and list the most popular queries in tabular form
         table.draw(data, {
-            showRowNumber: true,
+            showRowNumber: false,
+            alternatingRowStyle: true,
             sortAscending: false,
             allowHtml: true,
-            alternatingRowStyle: true,
-            pageSize: 50,
-            cssClassNames: {oddTableRow: 'odd_row', tableRow: 'table_row'}
+            cssClassNames: {headerRow: 'table_header'},
+            width: 500,
+            frozenColumns: 1,
         });
+      }
+
+      function drawPopularUrlsTables() {
+        drawTable(popular_urls_data_sc, 'popular_urls_table_sc')
+        drawTable(popular_urls_data, 'popular_urls_table')
+      }
+
+      function drawPopularHelpQueriesTables() {
+        drawTable(popular_help_queries_data_sc, 'popular_help_queries_table_sc')
+        drawTable(popular_help_queries_data, 'popular_help_queries_table')
       }
 
     </script>
   </head>
+
+  <style>
+.table_header {
+   text-align: left;
+  }
+ </style>
 
   <body>
     <table>
@@ -157,19 +174,42 @@
       </tr>
 
       <tr>
-        <td><div id="usage_by_hour_chart_sc"></div></td>
-        <td></td>
+        <td>&nbsp;</td><td>&nbsp;</td>
       </tr>
 
       <tr>
-        <td><div id="popular_help_queries_chart_sc"></div></td>
-        <td></td>
+        <td>
+          Top 50 URLs by usage
+          <div id="popular_urls_table_sc"></div>
+        </td>
+        <td style="vertical-align:top">
+          URLs decrypted because they occur at least 20 times.
+          <div id="popular_urls_table"></div>
+        </td>
+      </tr>
+
+      <tr>
+        <td colspan="2"><div id="popular_help_queries_chart_sc"></div></td>
+      </tr>
+
+      <tr>
+        <td>&nbsp;</td><td>&nbsp;</td>
       </tr>
 
       <tr>
         <td>
           Fuchsia Top 50 Popular Help Queries
           <div id="popular_help_queries_table_sc"></div>
+        </td>
+        <td style="vertical-align:top">
+          Help Queries decrypted because they occur at least 20 times.
+          <div id="popular_help_queries_table"></div>
+        </td>
+      </tr>
+
+      <tr>
+        <td>
+          <div id="usage_by_hour_chart_sc"></div>
         </td>
         <td></td>
       </tr>

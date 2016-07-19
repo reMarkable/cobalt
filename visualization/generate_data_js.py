@@ -37,7 +37,14 @@ USAGE_BY_MODULE_SC_JS_VAR_NAME = 'usage_by_module_data_sc'
 
 USAGE_BY_CITY_SC_JS_VAR_NAME = 'usage_by_city_data_sc'
 USAGE_BY_HOUR_SC_JS_VAR_NAME = 'usage_by_hour_data_sc'
+
+POPULAR_URLS_JS_VAR_NAME = 'popular_urls_data'
+POPULAR_URLS_SC_JS_VAR_NAME = 'popular_urls_data_sc'
+
+POPULAR_HELP_QUERIES_JS_VAR_NAME = 'popular_help_queries_data'
 POPULAR_HELP_QUERIES_SC_JS_VAR_NAME = 'popular_help_queries_data_sc'
+POPULAR_HELP_QUERIES_HISTOGRAM_SC_JS_VAR_NAME = \
+    'popular_help_queries_histogram_data_sc'
 
 # The outut JavaScript file to be created.
 OUTPUT_JS_FILE_NAME = 'data.js'
@@ -180,27 +187,104 @@ def buildUsageByHourJs():
                      "usage": ("number", "Usage")},
       columns_order=("hour", "usage"))
 
-def buildPopularHelpQueriesJs():
-  """Reads a CSV file containing the popular help queries data and uses it
-  to build a JavaScript string defining a DataTable containing the data.
+def buildItemAndCountJs(filename, varname1, varname2, item_column,
+                        item_description):
+  """Reads a CSV file containing two columns, an item column and a
+  count column, and and uses the data to build two JavaScript strings defining
+  DataTables containing the data. The two DataTables will be the same except
+  for the order of the columns: The first DataTable will have the count
+  column first and the second DataTable will have the item column first.
+
+  Args:
+    filename: {string} The full path of the CSV file to read.
+    varname1: {string} The name of the first javascript variable to generate.
+    varname2: {string} The name of the second javascript variable to generate.
+                       If this is None then the second returned string will
+                       also be None.
+    item_column: {string} The name of the item column to use in the generated
+                          JS.
+    item_description: The description string to use in the generated JS.
 
   Returns:
-    {string} of the form <var_name>=<json>, where |var_name| is
-    POPULAR_HELP_QUERIES_SC_JS_VAR_NAME and |json| is a json string defining
-    a data table.
+    {tuple of two string} of the form <varname>=<json>, where <json> is a json
+    string defining a data table. In the first returned string <varname> will
+    be |varname1| and the "count" column will come first in the DataTable.
+    In the second returned string <varname> will be |varname1| and |item_column|
+    will come first in the DataTable.
   """
-  # Read the data from the csv file and put it into a dictionary.
-  with file_util.openForReading(
-      file_util.POPULAR_HELP_QUERIES_CSV_FILE_NAME) as csvfile:
+
+  with file_util.openForReading(filename) as csvfile:
     reader = csv.reader(csvfile)
-    data = [{"help_query" : row[0], "count": int(row[1])} for row in reader]
-  return buildDataTableJs(
+    data = [{item_column : row[0], "count": int(row[1])} for row in reader]
+  count_first_string = buildDataTableJs(
       data=data,
-      var_name=POPULAR_HELP_QUERIES_SC_JS_VAR_NAME,
-      description={"help_query": ("string", "Help queries"),
+      var_name=varname1,
+      description={item_column: ("string", item_description),
                    "count": ("number", "Count")},
-      columns_order=("help_query", "count"),
-      order_by=("count", "desc"))
+      columns_order=("count", item_column),
+      order_by=(("count", "desc"), item_column))
+  item_first_string = None
+  if varname2 is not None:
+    item_first_string = buildDataTableJs(
+        data=data,
+        var_name=varname2,
+        description={item_column: ("string", item_description),
+                    "count": ("number", "Count")},
+        columns_order=(item_column, "count"),
+        order_by=(("count", "desc"), item_column))
+  return (count_first_string, item_first_string)
+
+def buildPopularUrlsJs():
+  """Reads two CSV files containing the popular URL data for the straight-
+  counting pipeline and the Cobalt prototype pipeline respectively and uses them
+  to build two JavaScript strings defining DataTables containing the data.
+
+ Returns:
+    {tuple of two strings} (sc_string, cobalt_string). Each of the two strings
+    is of the form <var_name>=<json>, where |json| is a json string defining
+    a data table. The |var_name|s are respectively
+    POPULAR_URLS_SC_JS_VAR_NAME and POPULAR_URLS_JS_VAR_NAME.
+  """
+  # straight-counting
+  popular_urls_sc_js,_ = buildItemAndCountJs(
+      file_util.POPULAR_URLS_CSV_FILE_NAME, POPULAR_URLS_SC_JS_VAR_NAME, None,
+      "url", "URL")
+
+  # Cobalt.
+  popular_urls_js, _ = buildItemAndCountJs(
+    file_util.URL_ANALYZER_OUTPUT_FILE_NAME, POPULAR_URLS_JS_VAR_NAME, None,
+    "url", "URL")
+
+  return (popular_urls_sc_js, popular_urls_js)
+
+def buildPopularHelpQueriesJs():
+  """Reads two CSV files containing the popular help-qury data for the straight-
+  counting pipeline and the Cobalt prototype pipeline respectively and uses them
+  to build three JavaScript strings defining DataTables containing the data.
+
+ Returns:
+    {tuple of three strings} (sc_string, sc_histogram_string, cobalt_string).
+    Each of the three strings is of the form <var_name>=<json>, where |json| is
+    a json string defining a data table. The |var_name|s are respectively
+    POPULAR_HELP_QUERIES_SC_JS_VAR_NAME,
+    POPULAR_HELP_QUERIES_HISTOGRAM_SC_JS_VAR_NAME,
+    and POPULAR_HELP_QUERIES_JS_VAR_NAME.
+  """
+  # straight-counting, table visualization
+  popular_help_queries_sc_js, popular_help_queries_histogram_sc_js = \
+      buildItemAndCountJs(file_util.POPULAR_HELP_QUERIES_CSV_FILE_NAME,
+                          POPULAR_HELP_QUERIES_SC_JS_VAR_NAME,
+                          POPULAR_HELP_QUERIES_HISTOGRAM_SC_JS_VAR_NAME,
+                          "help_query ", "Help Query")
+
+  # Cobalt.
+  popular_help_queries_js, _ = buildItemAndCountJs(
+    file_util.HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME,
+    POPULAR_HELP_QUERIES_JS_VAR_NAME, None,
+    "help_query", "Help Query")
+
+  return (popular_help_queries_sc_js, popular_help_queries_histogram_sc_js,
+      popular_help_queries_js)
 
 def main():
   print "Generating visualization..."
@@ -209,7 +293,9 @@ def main():
   usage_by_module_sc_js, usage_by_module_js = buildUsageByModuleJs()
   usage_by_city_js = buildUsageByCityJs()
   usage_by_hour_js = buildUsageByHourJs()
-  popular_help_queries_js = buildPopularHelpQueriesJs()
+  popular_urls_sc_js, popular_urls_js = buildPopularUrlsJs()
+  (popular_help_queries_sc_js, popular_help_queries_histogram_sc_js,
+      popular_help_queries_js) = buildPopularHelpQueriesJs()
 
   # Write the output file.
   with file_util.openForWriting(OUTPUT_JS_FILE_NAME) as f:
@@ -219,7 +305,14 @@ def main():
     f.write("%s\n\n" % usage_by_module_js)
 
     f.write("%s\n\n" % usage_by_city_js)
+
     f.write("%s\n\n" % usage_by_hour_js)
+
+    f.write("%s\n\n" % popular_urls_sc_js)
+    f.write("%s\n\n" % popular_urls_js)
+
+    f.write("%s\n\n" % popular_help_queries_sc_js)
+    f.write("%s\n\n" % popular_help_queries_histogram_sc_js)
     f.write("%s\n\n" % popular_help_queries_js)
 
   print "View this file in your browser:"
