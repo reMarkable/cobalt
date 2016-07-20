@@ -30,6 +30,8 @@ sys.path.insert(0, ROOT_DIR)
 import utils.file_util as file_util
 import third_party.google_visualization.gviz_api as gviz_api
 
+from randomizers.randomizer import readRapporConfigParamsFromFile
+
 # The javascript variables to write. Note "_sc" refers to the data from
 # the "straight-counting pipeline"
 USAGE_BY_MODULE_JS_VAR_NAME = 'usage_by_module_data'
@@ -48,7 +50,7 @@ POPULAR_HELP_QUERIES_SC_JS_VAR_NAME = 'popular_help_queries_data_sc'
 POPULAR_HELP_QUERIES_HISTOGRAM_SC_JS_VAR_NAME = \
     'popular_help_queries_histogram_data_sc'
 
-# The outut JavaScript file to be created.
+# The output JavaScript file to be created.
 OUTPUT_JS_FILE_NAME = 'data.js'
 
 def buildDataTableJs(data=None, var_name=None, description=None,
@@ -77,14 +79,16 @@ def buildDataTableJs(data=None, var_name=None, description=None,
 
 def buildUsageByModuleJs():
   """Reads two CSV files containing the usage-by-module data for the straight-
+
   counting pipeline and the Cobalt prototype pipeline respectively and uses them
   to build two JavaScript strings defining DataTables containing the data.
 
   Returns:
-    {tuple of two strings} (sc_string, cobalt_string). Each of the two strings
-    is of the form <var_name>=<json>, where |json| is a json string defining
-    a data table. The |var_name|s are respectively
+    {tuple of three strings} (sc_string, cobalt_string, rappor_parameters). The
+    first two strings are of the form <var_name>=<json>, where |json| is a json
+    string defining a data table. The |var_name|s are respectively
     USAGE_BY_MODULE_SC_JS_VAR_NAME and USAGE_BY_MODULE_JS_VAR_NAME.
+    rappor_parameters is a json string containing values for k, h, m, p, q, f.
   """
   # straight-counting:
   # Read the data from the csv file and put it into a dictionary.
@@ -113,7 +117,7 @@ def buildUsageByModuleJs():
   # We read it and put the data into a dictionary.
   # We skip row zero because it is the header row. We are going to visualize
   # the data as an interval chart and so we want to compute the high and
-  # low 95% confidence interval values wich we may do using the "std_error"
+  # low 95% confidence interval values which we may do using the "std_error"
   # column, column 2.
   with file_util.openForReading(
       file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME) as csvfile:
@@ -131,12 +135,17 @@ def buildUsageByModuleJs():
                    "actual": ("number", "Actual"),
                    # The role: 'interval' property is what tells the Google
                    # Visualization API to draw an interval chart.
-                   "low": ("number", "Low", {'role':'interval'}),
-                   "high": ("number", "High", {'role':'interval'})},
+                   "low": ("number", "Low", {'role': 'interval'}),
+                   "high": ("number", "High", {'role': 'interval'})},
       columns_order=("module", "estimate", "actual", "low", "high"),
       order_by=("estimate", "desc"))
 
-  return (usage_by_module_sc_js, usage_by_module_cobalt_js)
+  # RAPPOR parameters
+  rappor_params_js = "usage_by_module_params = {};".format(
+      readRapporConfigParamsFromFile(
+          file_util.RAPPOR_MODULE_NAME_CONFIG).to_json())
+
+  return (usage_by_module_sc_js, usage_by_module_cobalt_js, rappor_params_js)
 
 
 def buildUsageByCityJs():
@@ -323,7 +332,7 @@ def main():
   print "Generating visualization..."
 
   # Read the input file and build the JavaScript strings to write.
-  usage_by_module_sc_js, usage_by_module_js = buildUsageByModuleJs()
+  usage_by_module_sc_js, usage_by_module_js, usage_by_module_params_js = buildUsageByModuleJs()
   usage_by_city_js = buildUsageByCityJs()
   usage_by_hour_sc_js, usage_by_hour_js = buildUsageByHourJs()
   popular_urls_sc_js, popular_urls_js = buildPopularUrlsJs()
@@ -336,6 +345,7 @@ def main():
             "generate_data_js.py\n\n")
     f.write("%s\n\n" % usage_by_module_sc_js)
     f.write("%s\n\n" % usage_by_module_js)
+    f.write("%s\n\n" % usage_by_module_params_js)
 
     f.write("%s\n\n" % usage_by_city_js)
 
@@ -348,6 +358,7 @@ def main():
     f.write("%s\n\n" % popular_help_queries_sc_js)
     f.write("%s\n\n" % popular_help_queries_histogram_sc_js)
     f.write("%s\n\n" % popular_help_queries_js)
+    f.write("")
 
   print "View this file in your browser:"
   print "file://%s" % file_util.VISUALIZATION_FILE

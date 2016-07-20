@@ -14,6 +14,12 @@
       // Set a callback to run when the Google Visualization API is loaded.
       google.charts.setOnLoadCallback(drawCharts);
 
+      function privacyBudget(rappor_params) {
+        q = rappor_params.probIrr0;
+        p = rappor_params.probIrr1;
+        return rappor_params.numHashes * Math.abs(Math.log(q * (1 - p) / (p * (1 - q))));
+      }
+
       // Callback that invokes the chart-drawing functions.
       // NOTE: "_SC" refers to charts that represent data from the
       // "Straight Counting" pipeline.
@@ -64,6 +70,9 @@
         };
         var chart = new google.visualization.LineChart(document.getElementById('usage_by_module_chart'));
         chart.draw(data, options);
+        
+        document.getElementById('usage_by_module_eps').innerHTML = 
+          privacyBudget(usage_by_module_params).toFixed(2);
       };
 
       function drawUsageByCityGeoChart_SC() {
@@ -182,7 +191,9 @@
 
       <tr>
         <td><div id="usage_by_module_chart_sc"></div></td>
-        <td><div id="usage_by_module_chart"></div></td>
+        <td><div id="usage_by_module_chart"></div>
+            <p>Privacy budget &epsilon; = <span id="usage_by_module_eps"></span></p>
+        </td>
       </tr>
 
       <tr>
