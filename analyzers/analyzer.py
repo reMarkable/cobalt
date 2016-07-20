@@ -79,6 +79,14 @@ def runAllAnalyzers():
   cn_analyzer = city_analyzer.CityNamesAnalyzer()
   cn_analyzer.analyze()
 
+  # Run the city ratings analyzer
+  print "Running the city ratings analyzer..."
+  cr_analyzer = city_analyzer.CityRatingsAnalyzer()
+  try:
+    cr_analyzer.analyze()
+  except Exception as e:
+    print e
+
   # Run the module names analyzer
   print "Running the module names analyzer..."
   mn_analyzer = module_name_analyzer.ModuleNameAnalyzer()

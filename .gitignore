@@ -4,3 +4,4 @@
 /out/
 /third_party/fastrand/build/
 /third_party/rappor/_tmp/
+/third_party/rappor/analysis/cpp/_tmp/

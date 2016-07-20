@@ -46,6 +46,7 @@ GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
 # probabilities p, q, and f.)
 RAPPOR_CITY_NAME_CONFIG = 'rappor_city_name_config.csv'
 RAPPOR_RATING_CONFIG = 'rappor_rating_config.csv'
+RAPPOR_CITY_RATINGS_ASSOC_CONFIG = 'rappor_city_ratings_assoc.csv'
 RAPPOR_MODULE_NAME_CONFIG = 'rappor_module_name_config.csv'
 RAPPOR_HOUR_CONFIG = 'rappor_hour_config.csv'
 
@@ -69,7 +70,8 @@ URL_SHUFFLER_OUTPUT_FILE_NAME = "url_shuffler_out.csv"
 
 # The names of the analyzer output files
 HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME = "help_query_analyzer_out.csv"
-CITY_ANALYZER_OUTPUT_FILE_NAME = "city_analyzer_out.csv"
+CITY_NAMES_ANALYZER_OUTPUT_FILE_NAME = "city_names_analyzer_out.csv"
+CITY_RATINGS_ANALYZER_OUTPUT_FILE_NAME = "city_ratings_analyzer_out.csv"
 MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME = "module_name_analyzer_out.csv"
 HOUR_ANALYZER_OUTPUT_FILE_NAME = "hour_analyzer_out.csv"
 URL_ANALYZER_OUTPUT_FILE_NAME = "url_analyzer_out.csv"

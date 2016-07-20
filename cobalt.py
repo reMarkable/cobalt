@@ -58,8 +58,16 @@ def _build_fastrand():
   subprocess.call(['./build.sh'])
   os.chdir(savedir)
 
+def _build_fastem():
+  savedir = os.getcwd()
+  os.chdir(os.path.join(THIS_DIR, 'third_party', 'rappor', 'analysis',
+                        'cpp'))
+  subprocess.call(['./run.sh', 'build-fast-em'])
+  os.chdir(savedir)
+
 def _build():
   _build_fastrand()
+  _build_fastem()
 
 def _run_end_to_end_test():
   _run_all()
