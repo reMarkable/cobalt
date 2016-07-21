@@ -1,5 +1,9 @@
 # Cobalt Prototype Demo
 
+* WARNING: Do not deploy this code to production---it is not secure! This
+implementation is intended only as a prototype. In particular the PyCrypto
+library has not been approved by the Google ISE team.
+
 * Prerequisites
   * Currently this demo is only supported on Linux.
 
@@ -14,8 +18,8 @@
 
 * ` ./cobalt.py build`
   * This generates a fastrand python module that wraps a fast C random
-    number generator. This is particularly useful in speeding up randomized
-    response simulations, but not necessary.
+    number generator and a fast_em module that is invoked from RAPPOR R
+    code to perform a fast expectation maximization iteration.
 
 * ` ./cobalt.py test`
   * Runs all tests.
