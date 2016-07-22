@@ -17,7 +17,8 @@
       function privacyBudget(rappor_params) {
         q = rappor_params.probIrr0;
         p = rappor_params.probIrr1;
-        return rappor_params.numHashes * Math.abs(Math.log(q * (1 - p) / (p * (1 - q))));
+        h = Math.max(1., rappor_params.numHashes); // Basic RAPPOR is signaled by numHashes == 0
+        return h * Math.abs(Math.log(q * (1 - p) / (p * (1 - q))));
       }
 
       // Callback that invokes the chart-drawing functions.
@@ -52,11 +53,16 @@
       };
 
       function drawUsageByModuleIntervalChart() {
+        // Format the title to include privacy budget
+        var privacy_eps = privacyBudget(usage_by_module_params).toFixed(2);
+        var title = 'Top Modules by Usage, Estimates with 95% Confidence Intervals' +
+        ' (privacy budget = ' + privacy_eps + ')';
+
         var data = new google.visualization.DataTable(usage_by_module_data);
 
         // The intervals data as narrow lines (useful for showing raw source data)
         var options = {
-            title: 'Top Modules by Usage, Estimates with 95% Confidence Intervals',
+            title: title,
             curveType: 'function',
             pointSize: 5,
             lineWidth: 0,
@@ -70,9 +76,6 @@
         };
         var chart = new google.visualization.LineChart(document.getElementById('usage_by_module_chart'));
         chart.draw(data, options);
-        
-        document.getElementById('usage_by_module_eps').innerHTML = 
-          privacyBudget(usage_by_module_params).toFixed(2);
       };
 
       function drawUsageByCityGeoChart_SC() {
@@ -110,10 +113,15 @@
       }
 
       function drawUsageByHourColumnChart() {
+        // Format the title to include privacy budget
+        var privacy_eps = privacyBudget(usage_by_hour_params).toFixed(2);
+        var title = 'Fuchsia usage by hour, estimates with 95% Confidence Intervals' +
+        ' (privacy budget = ' + privacy_eps + ')';
+
         // Parse the data table.
-        var data = new google.visualization.DataTable(usage_by_hour_data)
+        var data = new google.visualization.DataTable(usage_by_hour_data);
         var options = {
-          title: 'Fuchsia usage by hour, estimates with 95% Confidence intervals',
+          title: title,
           'width': 650,
           'height': 350,
           intervals: { style: 'boxes', color: 'grey', 'lineWidth':3},
@@ -192,7 +200,6 @@
       <tr>
         <td><div id="usage_by_module_chart_sc"></div></td>
         <td><div id="usage_by_module_chart"></div>
-            <p>Privacy budget &epsilon; = <span id="usage_by_module_eps"></span></p>
         </td>
       </tr>
 

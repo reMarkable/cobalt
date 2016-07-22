@@ -36,11 +36,13 @@ from randomizers.randomizer import readRapporConfigParamsFromFile
 # the "straight-counting pipeline"
 USAGE_BY_MODULE_JS_VAR_NAME = 'usage_by_module_data'
 USAGE_BY_MODULE_SC_JS_VAR_NAME = 'usage_by_module_data_sc'
+USAGE_BY_MODULE_PARAMS_JS_VAR_NAME = 'usage_by_module_params'
 
 USAGE_BY_CITY_SC_JS_VAR_NAME = 'usage_by_city_data_sc'
 
 USAGE_BY_HOUR_SC_JS_VAR_NAME = 'usage_by_hour_data_sc'
 USAGE_BY_HOUR_JS_VAR_NAME = 'usage_by_hour_data'
+USAGE_BY_HOUR_PARAMS_JS_VAR_NAME = 'usage_by_hour_params'
 
 POPULAR_URLS_JS_VAR_NAME = 'popular_urls_data'
 POPULAR_URLS_SC_JS_VAR_NAME = 'popular_urls_data_sc'
@@ -141,8 +143,8 @@ def buildUsageByModuleJs():
       order_by=("estimate", "desc"))
 
   # RAPPOR parameters
-  rappor_params_js = "usage_by_module_params = {};".format(
-      readRapporConfigParamsFromFile(
+  rappor_params_js = "{} = {};".format(
+      USAGE_BY_MODULE_PARAMS_JS_VAR_NAME, readRapporConfigParamsFromFile(
           file_util.RAPPOR_MODULE_NAME_CONFIG).to_json())
 
   return (usage_by_module_sc_js, usage_by_module_cobalt_js, rappor_params_js)
@@ -176,15 +178,17 @@ def buildUsageByCityJs():
       order_by=("usage", "desc"))
 
 def buildUsageByHourJs():
-  """Reads two CSV files containing the usage-by-hour data for the straight-
-  counting pipeline and the Cobalt prototype pipeline respectively and uses them
-  to build two JavaScript strings defining DataTables containing the data.
+  """Reads two CSV files containing the usage-by-hour data for the
+  straight-counting pipeline and the Cobalt prototype pipeline respectively and
+  uses them to build two JavaScript strings defining DataTables containing the
+  data and one string describing basic RAPPOR parameters.
 
   Returns:
-    {tuple of two strings} (sc_string, cobalt_string). Each of the two strings
-    is of the form <var_name>=<json>, where |json| is a json string defining
-    a data table. The |var_name|s are respectively
+    {tuple of two strings} (sc_string, cobalt_string, params_string). The first
+    two strings are of the form <var_name>=<json>, where |json| is a json string
+    defining a data table. The |var_name|s are respectively
     USAGE_BY_HOUR_SC_JS_VAR_NAME and USAGE_BY_HOUR_JS_VAR_NAME.
+    params_string is a json string containing RAPPOR parameters.
   """
   # straight-counting:
   # Read the data from the csv file and put it into a dictionary.
@@ -222,12 +226,17 @@ def buildUsageByHourJs():
                    "estimate": ("number", "Estimate"),
                    # The role: 'interval' property is what tells the Google
                    # Visualization API to draw an interval chart.
-                   "low": ("number", "Low", {'role':'interval'}),
-                   "high": ("number", "High", {'role':'interval'})},
+                   "low": ("number", "Low", {'role': 'interval'}),
+                   "high": ("number", "High", {'role': 'interval'})},
       columns_order=("hour", "estimate", "low", "high"),
       order_by=("hour", "asc"))
 
-  return (usage_by_hour_sc_js, usage_by_hour_cobalt_js)
+  # RAPPOR parameters
+  rappor_params_js = "{} = {};".format(
+      USAGE_BY_HOUR_PARAMS_JS_VAR_NAME,
+      readRapporConfigParamsFromFile(file_util.RAPPOR_HOUR_CONFIG).to_json())
+
+  return (usage_by_hour_sc_js, usage_by_hour_cobalt_js, rappor_params_js)
 
 def buildItemAndCountJs(filename, varname1, varname2, item_column,
                         item_description):
@@ -334,7 +343,7 @@ def main():
   # Read the input file and build the JavaScript strings to write.
   usage_by_module_sc_js, usage_by_module_js, usage_by_module_params_js = buildUsageByModuleJs()
   usage_by_city_js = buildUsageByCityJs()
-  usage_by_hour_sc_js, usage_by_hour_js = buildUsageByHourJs()
+  usage_by_hour_sc_js, usage_by_hour_js, usage_by_hour_params_js = buildUsageByHourJs()
   popular_urls_sc_js, popular_urls_js = buildPopularUrlsJs()
   (popular_help_queries_sc_js, popular_help_queries_histogram_sc_js,
       popular_help_queries_js) = buildPopularHelpQueriesJs()
@@ -351,6 +360,7 @@ def main():
 
     f.write("%s\n\n" % usage_by_hour_sc_js)
     f.write("%s\n\n" % usage_by_hour_js)
+    f.write("%s\n\n" % usage_by_hour_params_js)
 
     f.write("%s\n\n" % popular_urls_sc_js)
     f.write("%s\n\n" % popular_urls_js)
