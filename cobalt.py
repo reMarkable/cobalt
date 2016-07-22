@@ -35,6 +35,10 @@ THIS_DIR = os.path.dirname(__file__)
 _logger = logging.getLogger()
 _verbose_count = 0
 
+# Should public key encryption be used for communication between the
+# Randomizers and the Analyzers via the Shufflers?
+_use_public_key_encryption=True
+
 def _initLogging(verbose_count):
   """Ensures that the logger (obtained via logging.getLogger(), as usual) is
   initialized, with the log level set as appropriate for |verbose_count|
@@ -51,6 +55,7 @@ def _initLogging(verbose_count):
   logger.setLevel(level)
   logger.debug("Initialized logging: verbose_count=%d, level=%d" %
                (verbose_count, level))
+  logger.debug("_use_public_key_encryption=%s" % _use_public_key_encryption)
 
 def _build_fastrand():
   savedir = os.getcwd()
@@ -86,7 +91,7 @@ def _generate():
 
 def _randomize():
   # Run the randomizers
-  randomizer.main()
+  randomizer.readAndRandomize(_use_public_key_encryption)
 
 def _shuffle():
   # Run the shufflers
@@ -94,7 +99,7 @@ def _shuffle():
 
 def _analyze():
   # Run the analyzers
-  analyzer.main()
+  analyzer.runAllAnalyzers(_use_public_key_encryption)
 
 def _visualize():
   # Generate the visualization
@@ -118,6 +123,12 @@ def main():
   parent_parser.add_argument('--verbose',
     help='Be verbose (multiple times for more)',
     default=0, dest='verbose_count', action='count')
+
+  parent_parser.add_argument('--no-use-encryption',
+    help='Do not us public key encryption for communication between the '
+    'randomizers and the analyzers via the shufflers. By default encryption '
+    'is used.',
+    dest="use_encryption", action='store_false')
 
   subparsers = parser.add_subparsers()
 
@@ -163,6 +174,8 @@ def main():
   args = parser.parse_args()
   global _verbose_count
   _verbose_count = args.verbose_count
+  global _use_public_key_encryption
+  _use_public_key_encryption = args.use_encryption
   _initLogging(_verbose_count)
 
   return args.func()

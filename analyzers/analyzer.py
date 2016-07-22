@@ -32,6 +32,11 @@ import help_query_analyzer
 import url_analyzer
 import utils.data as data
 import utils.file_util as file_util
+import utils.public_key_crypto_helper as crypto_helper
+
+# Should public key encryption be used for communication between the
+# Randomizers and the Analyzers via the Shufflers?
+_use_public_key_encryption=False
 
 def analyzeUsingForculus(input_file, config_file, output_file):
   ''' A helper function that may be invoked by individual analyzers. It reads
@@ -56,18 +61,33 @@ def analyzeUsingForculus(input_file, config_file, output_file):
   with file_util.openFileForReading(config_file, file_util.CONFIG_DIR) as cf:
     config = forculus.Config.from_csv(cf)
 
+  decrypt_on_analyzer=None
+  if _use_public_key_encryption:
+    ch = crypto_helper.CryptoHelper()
+    decrypt_on_analyzer=ch.decryptOnAnalyzer
+
   with file_util.openForAnalyzerReading(input_file) as input_f:
     with file_util.openForWriting(output_file) as output_f:
       forculus_evaluator = forculus.ForculusEvaluator(config.threshold, input_f)
-      forculus_evaluator.ComputeAndWriteResults(output_f)
+      forculus_evaluator.ComputeAndWriteResults(output_f,
+          additional_decryption_func=decrypt_on_analyzer)
 
-def runAllAnalyzers():
+def runAllAnalyzers(use_public_key_encryption=False):
   """Runs all of the analyzers.
 
   This function does not return anything but it invokes all of the
   analyzers each of which will read a file from the 's_to_a' directory
   and write a file in the top level out directory.
+
+  Args:
+    use_public_key_encryption {boolean}: Should public key encrytpion be
+    used to encrypt communication between the Randomizers and the Analyzers
+    via the shufflers?
   """
+
+  global _use_public_key_encryption
+  _use_public_key_encryption = use_public_key_encryption
+
   print "Running the help-query analyzer..."
   hq_analyzer = help_query_analyzer.HelpQueryAnalyzer()
   hq_analyzer.analyze()

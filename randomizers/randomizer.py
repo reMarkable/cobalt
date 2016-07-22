@@ -43,6 +43,11 @@ import module_name_randomizer
 import url_randomizer
 import utils.data as data
 import utils.file_util as file_util
+import utils.public_key_crypto_helper as crypto_helper
+
+# Should public key encryption be used for communication between the
+# Randomizers and the Analyzers via the Shufflers?
+_use_public_key_encryption=False
 
 def initializeFastrand():
   ''' Initializes fastrand environment.
@@ -74,7 +79,7 @@ def readRapporConfigParamsFromFile(config_file):
     config_file, file_util.CONFIG_DIR) as cf:
     return rappor.Params.from_csv(cf)
 
-def encodeWithBloomFilter(user_id, data, config_params):
+def encodeWithBloomFilter(user_id, data, config_params, irr_rand):
   ''' Encodes plain text using RAPPOR with bloom filters using user_id to
   derive per-client secret and returns an encoded string along with the
   generated cohort value.
@@ -86,11 +91,11 @@ def encodeWithBloomFilter(user_id, data, config_params):
     data {string}: Data to be encoded.
 
     config_params: A list of RAPPOR configuration values.
+    irr_rand {function} A function that complies with the signature of
+      rappor.SecureIrrRand
 
   Returns: cohort value and the RAPPOR encoded string.
   '''
-  # Initialize fastrand module
-  irr_rand = initializeFastrand()
 
   # User_id is used to derive a cohort.
   cohort = user_id % config_params.num_cohorts
@@ -106,7 +111,7 @@ def encodeWithBloomFilter(user_id, data, config_params):
   data_rr = data_e.encode(data)
   return cohort, data_rr
 
-def encodeWithoutBloomFilter(user_id, data, config_params):
+def encodeWithoutBloomFilter(user_id, data, config_params, irr_rand):
   ''' Encodes plain text using basic RAPPOR (without any bloom filters)
   and returns an encoded string with cohort set to 0.
 
@@ -117,12 +122,11 @@ def encodeWithoutBloomFilter(user_id, data, config_params):
     data {string}: Data to be encoded.
 
     config_params: A list of RAPPOR configuration values.
+    irr_rand {function} A function that complies with the signature of
+      rappor.SecureIrrRand
 
   Returns: cohort value and the RAPPOR encoded string.
   '''
-  # Initialize fastrand module
-  irr_rand = initializeFastrand()
-
   # Using a single cohort for all users.
   cohort = 0
 
@@ -172,6 +176,9 @@ def randomizeUsingRappor(entries, param_configs, output_file):
       config_fmt_string = '0%ib' % config_params.num_bloombits
       rappor_configs[config[0]] = (config_params, config_fmt_string)
 
+    # Initialize fastrand module
+    irr_rand = initializeFastrand()
+
     # Format strings for RAPPOR reports.
     for entry in entries:
       # For randomizing multiple params, generate the encoded data based on
@@ -182,7 +189,8 @@ def randomizeUsingRappor(entries, param_configs, output_file):
         if use_bloom_filter:
           (cohort, data_rr) = encodeWithBloomFilter(entry.user_id,
                                   entry[param_index],
-                                  rappor_configs[param_index][0])
+                                  rappor_configs[param_index][0],
+                                  irr_rand)
           # For now, always use the cohort generated from the bloom filter, if
           # multiple params are involved.
           # TODO(ukode): From an API perspective, it might be best to have
@@ -194,7 +202,8 @@ def randomizeUsingRappor(entries, param_configs, output_file):
         else:
           (cohort, data_rr) = encodeWithoutBloomFilter(entry.user_id,
                                   entry[param_index],
-                                  rappor_configs[param_index][0])
+                                  rappor_configs[param_index][0],
+                                  irr_rand)
         data_out.append(format(data_rr, rappor_configs[param_index][1]))
 
       # Write each row to the out file with the following syntax:
@@ -224,12 +233,18 @@ def randomizeUsingForculus(entries, param_index, config_file, output_file):
   with file_util.openFileForReading(config_file, file_util.CONFIG_DIR) as cf:
     config = forculus.Config.from_csv(cf)
 
+  encrypt_for_analyzer = None
+  if _use_public_key_encryption:
+    ch = crypto_helper.CryptoHelper()
+    encrypt_for_analyzer=ch.encryptForSendingToAnalyzer
+
   with file_util.openForRandomizerWriting(output_file) as f:
     forculus_inserter = forculus.ForculusInserter(config.threshold, f)
     for entry in entries:
-      forculus_inserter.Insert(entry[param_index])
+      forculus_inserter.Insert(entry[param_index],
+          additional_encryption_func=encrypt_for_analyzer)
 
-def runAllRandomizers(entries):
+def runAllRandomizers(entries, use_public_key_encryption=False):
   '''Runs all of the randomizers on the given list of entries.
 
   This function does not return anything but it invokes all of the
@@ -238,7 +253,13 @@ def runAllRandomizers(entries):
 
   Args:
     entries {list of Entry}: The entries to be randomized.
+    use_public_key_encryption {boolean}: Should public key encrytpion be
+    used to encrypt communication between the Randomizers and the Analyzers
+    via the shufflers?
   '''
+
+  global _use_public_key_encryption
+  _use_public_key_encryption = use_public_key_encryption
 
   # Run the help query randomizer
   print "Running the help-query randomizer..."
@@ -270,9 +291,19 @@ def runAllRandomizers(entries):
   u_randomizer = url_randomizer.UrlRandomizer()
   u_randomizer.randomize(entries)
 
-def main():
+def readAndRandomize(use_public_key_encryption=False):
+  '''Reads the fake data and runs all of the Randomizers on it.
+
+  Args:
+    use_public_key_encryption {boolean}: Should public key encrytpion be
+    used to encrypt communication between the Randomizers and the Analyzers
+    via the shufflers?
+  '''
   entries = data.readEntries(file_util.GENERATED_INPUT_DATA_FILE_NAME)
-  runAllRandomizers(entries)
+  runAllRandomizers(entries, use_public_key_encryption)
+
+def main():
+  readAndRandomize()
 
 if __name__ == '__main__':
   main()

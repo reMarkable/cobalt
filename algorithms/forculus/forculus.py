@@ -343,15 +343,29 @@ class ForculusInserter(_Forculus):
     super(ForculusInserter, self).__init__(threshold)
     self.edb_writer = csv.writer(e_db)
 
-  def Insert(self, ptxt):
+  def Insert(self, ptxt, additional_encryption_func=None):
     """ Insert an encrypted version of the given plaintext into the database.
 
     Args:
       ptxt {string}: The plaintext to insert.
+
+      additional_encryption_func {function}: If this is not None then the
+      encryption function will be applied to each row of data just before
+      writing to e_db. The function should accept a string and return a tuple of
+      one or more strings representing the ciphertext. In this case a
+      corresponding decryption function must be passed to
+      ForculusEvaluator.ComputeAndWriteResults().
     """
     iv, ctxt, eval_point, eval_value, key = self._Encrypt(ptxt)
-    self.edb_writer.writerow([base64.b64encode(iv),
-        base64.b64encode(ctxt), eval_point, eval_value])
+    data_to_write = [base64.b64encode(iv), base64.b64encode(ctxt),
+                     eval_point, eval_value]
+    if additional_encryption_func is not None:
+      # Express the data-to-write as a single string with comma-separated
+      # fields. Then encrypt that string, receiving a tuple of strings
+      # representing the ciphertext. We use that tuple as the data-to-write.
+      data_to_write = additional_encryption_func(
+          ",".join(map(str,data_to_write)))
+    self.edb_writer.writerow(data_to_write)
 
 class ForculusEvaluator(_Forculus):
   """ A ForculusEvaluator is used to evaluate a Forculus-encrypted database
@@ -376,7 +390,7 @@ class ForculusEvaluator(_Forculus):
     super(ForculusEvaluator, self).__init__(threshold)
     self.edb_reader = csv.reader(e_db)
 
-  def ComputeAndWriteResults(self, r_db):
+  def ComputeAndWriteResults(self, r_db, additional_decryption_func=None):
     """ Reads the entries from the encrypted database and decrypts any
     entries that occur at least |threshold| times. The dycrpted plaintexts
     are written to the result database along with there counts.
@@ -385,9 +399,23 @@ class ForculusEvaluator(_Forculus):
       r_db {writer}: The database into which decrypted results will be written.
       Any object with a write() method. If r_db is a file object
       it must have been opened for writing with the 'b' flag.
+
+      additional_decryption_func {function}: If this is not None then the
+      decryption function will be applied to each row of data just after reading
+      it from |e_db|. The function should accept a tuple of strings representing
+      the ciphertext and return a single string representing the plain text.
+      The decryption function should be the inverse of the encryption function
+      passed to the ForculusInserter.Insert() method.
     """
     dictionary = {}
     for i, row in enumerate(self.edb_reader):
+      if additional_decryption_func is not None:
+        # The tuple read from e_db represents a cipher text. Pass the elements
+        # of that tuple as arguments to the decryption function receiving
+        # back the plaintext which is a single string that is a comma-separated
+        # list of fields. Split that string into fields and use that as
+        # the value of the read row.
+        row =  additional_decryption_func(*row).split(",")
       (iv, ctxt, eval_point, eval_data) = row
       key = iv + " " + ctxt
       if key in dictionary:
