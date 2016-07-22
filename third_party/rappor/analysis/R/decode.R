@@ -84,10 +84,7 @@ EstimateBloomCounts <- function(params, obs_counts) {
   variances <- apply(obs_counts, 1, function(cohort_row) {
       N <- cohort_row[1]
       v <- cohort_row[-1]
-      p_hats <- (v - p01 * N) / (N * p2)  # expectation of a true 1
-      p_hats <- pmax(0, pmin(1, p_hats))  # clamp to [0,1]
-      r <- p_hats * p11 + (1 - p_hats) * p01  # expectation of a reported 1
-      N * r * (1 - r) / p2^2  # variance of the binomial
+      v * (1 - v/N) / p2^2  # variance of the binomial
      })
 
   dim(variances) <- c(k, m)
