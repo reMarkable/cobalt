@@ -36,7 +36,7 @@ import utils.data as data
 
 # For the names of the modules in our fake data we will use names from a
 # list of "girl's names" found on the internet.
-from girls_names import GIRLS_NAMES
+from baby_names import BABY_NAMES
 # We will use cities from a list of cities found on the internet.
 from us_cities import US_CITIES
 # We will use proper nouns from a sample list constructed with few special
@@ -188,8 +188,8 @@ def generateRandomEntries(num_entries):
   for i in xrange(num_entries):
     city_index = powerRandomInt(len(US_CITIES)-1)
     city = US_CITIES[city_index]
-    name_index = powerRandomInt(len(GIRLS_NAMES)-1)
-    name = GIRLS_NAMES[name_index]
+    name_index = powerRandomInt(len(BABY_NAMES)-1)
+    name = BABY_NAMES[name_index]
     hour = int(random.triangular(0,23))
     # The |rating_skew| and |rating_spread| parameters below are functions
     # of |city_index| that were arrived at by experimentation. The goal
