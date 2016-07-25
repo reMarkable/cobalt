@@ -195,9 +195,17 @@ def buildUsageByHourJs():
   with file_util.openForReading(
       file_util.USAGE_BY_HOUR_CSV_FILE_NAME) as csvfile:
     reader = csv.reader(csvfile)
-    # Read up to 10,000 rows adding the row index as "hour".
-    data = [{"hour" : i, "usage": int(row[0])}
-        for (i, row) in zip(xrange(10000), reader)]
+    # |data| will be used to generate the visualiation data for the
+    # straight-counting pipeline
+    data = []
+    # |values| will be used below to include the actual values along with
+    # the RAPPOR estimates in the visualization of the Cobalt pipeline.
+    values = []
+    hour = 0
+    for row in reader:
+      data.append({"hour" : hour, "usage": int(row[0])})
+      values.append(int(row[0]))
+      hour += 1
   usage_by_hour_sc_js = buildDataTableJs(
       data=data,
       var_name=USAGE_BY_HOUR_SC_JS_VAR_NAME,
@@ -215,8 +223,9 @@ def buildUsageByHourJs():
   with file_util.openForReading(
       file_util.HOUR_ANALYZER_OUTPUT_FILE_NAME) as csvfile:
     reader = csv.reader(csvfile)
-    data = [{"hour" : int(row[0]), "estimate": float(row[1]),
-             "low" : float(row[1]) - 1.96 * float(row[2]),
+    data = [{"hour" : int(row[0]), "estimate": max(float(row[1]), 0),
+             "actual": values[int(row[0])],
+             "low" : max(float(row[1])  - 1.96 * float(row[2]), 0),
              "high": float(row[1]) + 1.96 * float(row[2])}
         for row in reader if reader.line_num > 1]
   usage_by_hour_cobalt_js = buildDataTableJs(
@@ -224,11 +233,12 @@ def buildUsageByHourJs():
       var_name=USAGE_BY_HOUR_JS_VAR_NAME,
       description={"hour": ("number", "Hour"),
                    "estimate": ("number", "Estimate"),
+                   "actual": ("number", "Actual"),
                    # The role: 'interval' property is what tells the Google
                    # Visualization API to draw an interval chart.
                    "low": ("number", "Low", {'role': 'interval'}),
                    "high": ("number", "High", {'role': 'interval'})},
-      columns_order=("hour", "estimate", "low", "high"),
+      columns_order=("hour", "estimate", "low", "high", "actual"),
       order_by=("hour", "asc"))
 
   # RAPPOR parameters

@@ -100,11 +100,12 @@
         var options = {
           title: 'Fuchsia usage, by hour of the day, PST',
           'width': 650,
-          'height': 350,
+          'height': 400,
           hAxis: {
             title: 'Hour of Day',
             gridlines: {count: 12},
           },
+          vAxis: {viewWindow: {max: 1200}},
         };
 
         // Instantiate and draw our chart.
@@ -122,13 +123,14 @@
         var data = new google.visualization.DataTable(usage_by_hour_data);
         var options = {
           title: title,
-          'width': 650,
-          'height': 350,
-          intervals: { style: 'boxes', color: 'grey', 'lineWidth':3},
+          'width': 900,
+          'height': 400,
+          intervals: { color: 'black', 'lineWidth':2, 'barWidth': 1.2},
           hAxis: {
             title: 'Hour of Day',
             gridlines: {count: 12},
           },
+          vAxis: {viewWindow: {max: 1200}},
         };
 
         // Instantiate and draw our chart.
