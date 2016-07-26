@@ -29,6 +29,7 @@
         drawUsageByModuleIntervalChart();
 
         drawUsageByCityGeoChart_SC();
+        drawUsageAndRatingBubbleChart();
 
         drawUsageByHourColumnChart_SC();
         drawUsageByHourColumnChart();
@@ -91,6 +92,27 @@
         };
         // Instantiate and draw our chart.
         var chart = new google.visualization.GeoChart(document.getElementById('usage_by_city_chart_sc'));
+        chart.draw(data, options);
+      }
+
+      function drawUsageAndRatingBubbleChart() {
+        // Parse the data table.
+        var data = new google.visualization.DataTable(usage_by_city_data)
+
+        var options = {
+          title: 'Correlation between Fuchsia usage counts and ' +
+                 'ratings for various US Cities. (Size of bubble ' +
+                 'reflects, but is not proportional to, size of ' +
+                 'confidence interval for count.)',
+          width: 900,
+          height: 600,
+          hAxis: {title: 'Usage Count'},
+          vAxis: {title: 'Rating'},
+          sizeAxis: {minValue: 0, maxValue: 200, minSize: 5, maxSize: 25},
+          bubble: {textStyle: {fontSize: 11}}
+        };
+
+        var chart = new google.visualization.BubbleChart(document.getElementById('usage_and_rating_chart'));
         chart.draw(data, options);
       }
 
@@ -210,7 +232,9 @@
           Fuchsia Usage and Ratings By City
           <div id="usage_by_city_chart_sc"></div>
         </td>
-        <td></td>
+        <td>
+          <div id="usage_and_rating_chart"></div>
+        </td>
       </tr>
 
       <tr>

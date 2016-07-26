@@ -39,6 +39,7 @@ USAGE_BY_MODULE_SC_JS_VAR_NAME = 'usage_by_module_data_sc'
 USAGE_BY_MODULE_PARAMS_JS_VAR_NAME = 'usage_by_module_params'
 
 USAGE_BY_CITY_SC_JS_VAR_NAME = 'usage_by_city_data_sc'
+USAGE_BY_CITY_JS_VAR_NAME = 'usage_by_city_data'
 
 USAGE_BY_HOUR_SC_JS_VAR_NAME = 'usage_by_hour_data_sc'
 USAGE_BY_HOUR_JS_VAR_NAME = 'usage_by_hour_data'
@@ -150,7 +151,7 @@ def buildUsageByModuleJs():
   return (usage_by_module_sc_js, usage_by_module_cobalt_js, rappor_params_js)
 
 
-def buildUsageByCityJs():
+def buildUsageAndRatingByCityJs():
   """Reads a CSV file containing the usage-by-city data and uses it
   to build a JavaScript string defining a DataTable containing the data.
 
@@ -159,16 +160,26 @@ def buildUsageByCityJs():
     USAGE_BY_CITY_SC_JS_VAR_NAME and |json| is a json string defining
     a data table.
   """
+  # straight-counting:
   # Read the data from the csv file and put it into a dictionary.
   with file_util.openForReading(
       file_util.USAGE_BY_CITY_CSV_FILE_NAME) as csvfile:
     reader = csv.reader(csvfile)
-    data = [{"city" : row[0], "usage": int(row[1]), "rating": float(row[2])}
-        for row in reader]
-  # We write the rating column before the usage colun because this will be used
-  # in a geo chart and the first column determines the color and the second
-  # colun determines the size of the circles.
-  return buildDataTableJs(
+    # |data| will be used to generate the visualiation data for the
+    # straight-counting pipeline
+    data = []
+    # |values| will be used below to include the actual values along with
+    # the RAPPOR estimates in the visualization of the Cobalt pipeline.
+    values = []
+    for row in reader:
+      data.append({"city" : row[0], "usage": int(row[1]),
+                   "rating": float(row[2])})
+      if int(row[1]) > 50:
+        values.append({"city" : row[0], "usage": int(row[1]),
+                       "type" : "actual",
+                       "radius_95" : 0,
+                       "rating": float(row[2])})
+  usage_and_rating_by_city_sc_js = buildDataTableJs(
       data=data,
       var_name=USAGE_BY_CITY_SC_JS_VAR_NAME,
       description = {"city": ("string", "City"),
@@ -176,6 +187,32 @@ def buildUsageByCityJs():
                      "usage": ("number", "Usage")},
       columns_order=("city", "rating", "usage"),
       order_by=("usage", "desc"))
+
+  # cobalt:
+  # Here the CSV file is the output of the RAPPOR analyzer.
+  # We read it and put the data into a dictionary.
+  # We skip row zero because it is the header row.
+  with file_util.openForReading(
+      file_util.CITY_RATINGS_ANALYZER_OUTPUT_FILE_NAME) as csvfile:
+    reader = csv.reader(csvfile)
+    data = [{"city" : row[0], "usage": float(row[1]),
+             "type" : "estimate",
+             "radius_95" : 1.96 * float(row[2]),
+             "rating": float(row[7])}
+        for row in reader if reader.line_num > 1]
+    data.extend(values)
+  usage_and_rating_by_city_cobalt_js = buildDataTableJs(
+      data=data,
+      var_name=USAGE_BY_CITY_JS_VAR_NAME,
+      description={"city": ("string", "City"),
+                   "usage": ("number", "Usage"),
+                   "rating": ("number", "Rating"),
+                   "type" : ("string", "Estimate or Actual"),
+                   "radius_95": ("number", "95% conf. intlv. radius")},
+      columns_order=("city", "usage", "rating", "type", "radius_95"),
+      order_by=("estimate", "desc"))
+
+  return (usage_and_rating_by_city_sc_js, usage_and_rating_by_city_cobalt_js)
 
 def buildUsageByHourJs():
   """Reads two CSV files containing the usage-by-hour data for the
@@ -351,9 +388,11 @@ def main():
   print "Generating visualization..."
 
   # Read the input file and build the JavaScript strings to write.
-  usage_by_module_sc_js, usage_by_module_js, usage_by_module_params_js = buildUsageByModuleJs()
-  usage_by_city_js = buildUsageByCityJs()
-  usage_by_hour_sc_js, usage_by_hour_js, usage_by_hour_params_js = buildUsageByHourJs()
+  usage_by_module_sc_js, usage_by_module_js, usage_by_module_params_js = \
+      buildUsageByModuleJs()
+  usage_by_city_js, usage_by_city_sc_js = buildUsageAndRatingByCityJs()
+  usage_by_hour_sc_js, usage_by_hour_js, usage_by_hour_params_js = \
+      buildUsageByHourJs()
   popular_urls_sc_js, popular_urls_js = buildPopularUrlsJs()
   (popular_help_queries_sc_js, popular_help_queries_histogram_sc_js,
       popular_help_queries_js) = buildPopularHelpQueriesJs()
@@ -366,6 +405,7 @@ def main():
     f.write("%s\n\n" % usage_by_module_js)
     f.write("%s\n\n" % usage_by_module_params_js)
 
+    f.write("%s\n\n" % usage_by_city_sc_js)
     f.write("%s\n\n" % usage_by_city_js)
 
     f.write("%s\n\n" % usage_by_hour_sc_js)
