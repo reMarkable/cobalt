@@ -79,6 +79,7 @@ HELP_QUERY_ANALYZER_OUTPUT_FILE_NAME = "help_query_analyzer_out.csv"
 CITY_NAMES_ANALYZER_OUTPUT_FILE_NAME = "city_names_analyzer_out.csv"
 CITY_RATINGS_ANALYZER_OUTPUT_FILE_NAME = "city_ratings_analyzer_out.csv"
 MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME = "module_name_analyzer_out.csv"
+MODULE_NAME_PR_ANALYZER_OUTPUT_FILE_NAME = "module_name_pr_analyzer_out.csv"
 HOUR_ANALYZER_OUTPUT_FILE_NAME = "hour_analyzer_out.csv"
 URL_ANALYZER_OUTPUT_FILE_NAME = "url_analyzer_out.csv"
 
@@ -89,6 +90,7 @@ CITY_MAP_FILE_NAME = "city_map.csv"
 MODULE_NAME_COUNTS_FILE_NAME = "module_name_counts.csv"
 MODULE_CANDIDATES_FILE_NAME = "module_candidates.csv"
 MODULE_MAP_FILE_NAME = "module_map.csv"
+MODULE_PR_MAP_FILE_NAME = "module_pr_map.csv"
 HOUR_COUNTS_FILE_NAME = "hour_counts.csv"
 HOUR_MAP_FILE_NAME = "hour_map.csv"
 
@@ -142,10 +144,19 @@ def openForAnalyzerReading(name):
   """
   return openFileForReading(name, S_TO_A_DIR)
 
-def openFileForWriting(file_name, dir_path):
-  # Create the directory if it does not exist.
+def ensureDir(dir_path):
+  """Ensures that the directory at |dir_path| exists. If not it is created.
+
+  Args:
+    dir_path{string} The path to a directory. If it does not exist it will be
+    created.
+  """
   if not os.path.exists(dir_path):
     os.makedirs(dir_path)
+
+def openFileForWriting(file_name, dir_path):
+  # Create the directory if it does not exist.
+  ensureDir(dir_path)
   return open(os.path.join(dir_path, file_name), 'w+b')
 
 def openForWriting(name):

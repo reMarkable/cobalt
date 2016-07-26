@@ -70,6 +70,9 @@ class CityRatingsAnalyzer:
 
     _generateMapFileIfNecessary(map_file, city_name_params)
 
+    # Create the temp directory.
+    file_util.ensureDir(file_util.ANALYZER_TMP_OUT_DIR)
+
     # Next invoke the R script 'decode_assoc_averages.R'.
     # First we build the command string.
     rappor_avg_decode_script = os.path.join(ALGORITHMS_DIR,

@@ -68,40 +68,35 @@ def runAllAnalyzers():
   analyzers each of which will read a file from the 's_to_a' directory
   and write a file in the top level out directory.
   """
-
-  # Run the help query analyzer
   print "Running the help-query analyzer..."
   hq_analyzer = help_query_analyzer.HelpQueryAnalyzer()
   hq_analyzer.analyze()
 
-  # Run the city names analyzer
-  print "Running the city names analyzer..."
-  cn_analyzer = city_analyzer.CityNamesAnalyzer()
-  cn_analyzer.analyze()
+  # Note(rudominer) We don't visualize the results of this analysis so there
+  # is not point running it. The CityRatingsAnalyzer below is used instead.
+  # print "Running the city names analyzer..."
+  # cn_analyzer = city_analyzer.CityNamesAnalyzer()
+  # cn_analyzer.analyze()
 
-  # Run the city ratings analyzer
   print "Running the city ratings analyzer..."
   cr_analyzer = city_analyzer.CityRatingsAnalyzer()
-  try:
-    cr_analyzer.analyze()
-  except Exception as e:
-    print e
+  cr_analyzer.analyze()
 
-  # Run the module names analyzer
   print "Running the module names analyzer..."
   mn_analyzer = module_name_analyzer.ModuleNameAnalyzer()
   mn_analyzer.analyze()
 
-  # Run the hour-of-day analyzer
+  print("Running the module names analyzer with differentially private "
+        "release...")
+  mn_analyzer.analyze(for_private_release=True)
+
   print "Running the hour-of-day analyzer..."
   hd_analyzer = hour_analyzer.HourOfDayAnalyzer()
   hd_analyzer.analyze()
 
-  # Run the url analyzer
   print "Running the url analyzer..."
   u_analyzer = url_analyzer.UrlAnalyzer()
   u_analyzer.analyze()
-
 
 def main():
   runAllAnalyzers()

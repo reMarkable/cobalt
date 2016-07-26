@@ -34,22 +34,40 @@ class ModuleNameAnalyzer:
   name.
   """
 
-  def analyze(self):
+  def analyze(self, for_private_release=False):
     ''' Use RAPPOR analysis to output estimates for number of reports by module
     name.
+
+    Args:
+      for_private_release {bool}: If True then in addition to doing the RAPPOR
+      decoding, Laplace noise is also added to the analyzed output. We use
+      different input, output and config files in this case.
     '''
+    # TODO(rudominer) Implement the differentially private release using
+    # Laplace noise.
+    config_file = (file_util.RAPPOR_MODULE_NAME_PR_CONFIG if
+        for_private_release else file_util.RAPPOR_MODULE_NAME_CONFIG)
+    map_file_name = (file_util.MODULE_PR_MAP_FILE_NAME if
+        for_private_release else file_util.MODULE_MAP_FILE_NAME)
+    input_file = (file_util.MODULE_NAME_PR_SHUFFLER_OUTPUT_FILE_NAME if
+      for_private_release else
+      file_util.MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME)
+    output_file = (file_util.MODULE_NAME_PR_ANALYZER_OUTPUT_FILE_NAME if
+      for_private_release else
+      file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME)
+
     # First get module names params.
     with file_util.openFileForReading(
-      file_util.RAPPOR_MODULE_NAME_CONFIG, file_util.CONFIG_DIR) as cf:
+      config_file, file_util.CONFIG_DIR) as cf:
       module_name_params = rappor.Params.from_csv(cf)
 
-    map_file = os.path.join(file_util.CACHE_DIR, file_util.MODULE_MAP_FILE_NAME)
+    map_file = os.path.join(file_util.CACHE_DIR, map_file_name)
 
-    self._generateMapFileIfNecessary(map_file, module_name_params)
+    self._generateMapFileIfNecessary(map_file, map_file_name,
+                                     module_name_params)
 
     # Next, compute counts per cohort and write into analyzer temp directory.
-    with file_util.openForAnalyzerReading(
-        file_util.MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME) as input_f:
+    with file_util.openForAnalyzerReading(input_file) as input_f:
       with file_util.openForAnalyzerTempWriting(
           file_util.MODULE_NAME_COUNTS_FILE_NAME) as output_f:
         sum_bits.sumBits(module_name_params, input_f, output_f)
@@ -62,7 +80,7 @@ class ModuleNameAnalyzer:
     counts_file = os.path.abspath(os.path.join(file_util.ANALYZER_TMP_OUT_DIR,
         file_util.MODULE_NAME_COUNTS_FILE_NAME))
     params_file =  os.path.abspath(os.path.join(file_util.CONFIG_DIR,
-        file_util.RAPPOR_MODULE_NAME_CONFIG))
+        config_file))
     cmd = [rappor_decode_script, '--map', map_file, '--counts', counts_file,
            '--params', params_file, '--output-dir',
            file_util.ANALYZER_TMP_OUT_DIR]
@@ -83,10 +101,10 @@ class ModuleNameAnalyzer:
     src = os.path.abspath(os.path.join(
         file_util.ANALYZER_TMP_OUT_DIR, 'results.csv'))
     dst = os.path.abspath(os.path.join(
-        file_util.OUT_DIR, file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME))
+        file_util.OUT_DIR, output_file))
     shutil.copyfile(src, dst)
 
-  def _generateMapFileIfNecessary(self, map_file, params):
+  def _generateMapFileIfNecessary(self, map_file, map_file_name, params):
     ''' Generates the map file in the cache directory if there is not already
     an up-to-date version.
     '''
@@ -100,7 +118,7 @@ class ModuleNameAnalyzer:
         os.path.getmtime(map_file) < os.path.getmtime(candidate_file) + 10):
       with file_util.openFileForReading(file_util.MODULE_CANDIDATES_FILE_NAME,
           file_util.CONFIG_DIR) as cand_f:
-        with file_util.openFileForWriting(file_util.MODULE_MAP_FILE_NAME,
+        with file_util.openFileForWriting(map_file_name,
             file_util.CACHE_DIR) as map_f:
           _logger.debug('Generating a RAPPOR map file at %s based on '
                         'candidate file at %s' % (map_file, candidate_file))
