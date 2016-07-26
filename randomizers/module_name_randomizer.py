@@ -24,7 +24,7 @@ class ModuleNameRandomizer:
   (The secret is irrelevant for the purposes of this demo.)
   """
 
-  def randomize(self, entries):
+  def randomize(self, entries, for_private_release=False):
     """ A Randomizer that extracts module name from |Entry| and applies
     randomized response algorithms to it to emit noised reports.
 
@@ -33,11 +33,19 @@ class ModuleNameRandomizer:
 
     Args:
       entries {list of Entry}: The entries to be randomized.
+      for_private_release {bool}: Will the extracted data be analyzed using
+      differentially private release? If True then very weak RAPPOR params
+      will be used.
     """
+    config_file = (file_util.RAPPOR_MODULE_NAME_PR_CONFIG if
+        for_private_release else file_util.RAPPOR_MODULE_NAME_CONFIG)
+    output_file = (file_util.MODULE_NAME_PR_RANDOMIZER_OUTPUT_FILE_NAME if
+        for_private_release else
+        file_util.MODULE_NAME_RANDOMIZER_OUTPUT_FILE_NAME)
     randomizer.randomizeUsingRappor(entries,
         [(1, # module name index in |Entry|
          True, #use bloom filters
-         file_util.RAPPOR_MODULE_NAME_CONFIG # rappor config file name
+         config_file,
         )],
-        file_util.MODULE_NAME_RANDOMIZER_OUTPUT_FILE_NAME,
+        output_file,
         );

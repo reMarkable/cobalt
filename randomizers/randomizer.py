@@ -255,6 +255,11 @@ def runAllRandomizers(entries):
   mn_randomizer = module_name_randomizer.ModuleNameRandomizer()
   mn_randomizer.randomize(entries)
 
+   # Run the module name randomizer in another mode
+  print("Running the module name randomizer for differentially "
+      "private release...")
+  mn_randomizer.randomize(entries, for_private_release=True)
+
   # Run the hour randomizer
   print "Running the hour of day randomizer..."
   hr_randomizer = hour_randomizer.HourRandomizer()
