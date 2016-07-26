@@ -35,6 +35,7 @@
         drawUsageByHourColumnChart();
 
         drawPopularUrlsTables();
+        drawPopularUrlsColumnChart_SC();
 
         drawPopularHelpQueriesColumnChart_SC();
         drawPopularHelpQueriesTables();
@@ -177,6 +178,24 @@
         chart.draw(data, options);
       }
 
+      function drawPopularUrlsColumnChart_SC() {
+        // Parse the data table.
+        var data = new google.visualization.DataTable(popular_urls_histogram_data_sc)
+        var options = {
+          title: 'Popular urls -- histogram',
+          'width': 700,
+          'height': 400,
+          hAxis: {
+            title: 'Popular urls',
+            gridlines: {count: 12},
+          },
+        };
+
+        // Instantiate and draw our chart.
+        var chart = new google.visualization.ColumnChart(document.getElementById('popular_urls_chart_sc'));
+        chart.draw(data, options);
+      }
+
       function drawTable(data_var, element_id) {
         // Parse the data table.
         var data = new google.visualization.DataTable(data_var);
@@ -259,6 +278,14 @@
           URLs decrypted because they occur at least 20 times.
           <div id="popular_urls_table"></div>
         </td>
+      </tr>
+
+      <tr>
+        <td colspan="2"><div id="popular_urls_chart_sc"></div></td>
+      </tr>
+
+      <tr>
+        <td>&nbsp;</td><td>&nbsp;</td>
       </tr>
 
       <tr>

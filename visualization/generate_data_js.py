@@ -47,6 +47,8 @@ USAGE_BY_HOUR_PARAMS_JS_VAR_NAME = 'usage_by_hour_params'
 
 POPULAR_URLS_JS_VAR_NAME = 'popular_urls_data'
 POPULAR_URLS_SC_JS_VAR_NAME = 'popular_urls_data_sc'
+POPULAR_URLS_HISTOGRAM_SC_JS_VAR_NAME = \
+    'popular_urls_histogram_data_sc'
 
 POPULAR_HELP_QUERIES_JS_VAR_NAME = 'popular_help_queries_data'
 POPULAR_HELP_QUERIES_SC_JS_VAR_NAME = 'popular_help_queries_data_sc'
@@ -335,17 +337,20 @@ def buildItemAndCountJs(filename, varname1, varname2, item_column,
 def buildPopularUrlsJs():
   """Reads two CSV files containing the popular URL data for the straight-
   counting pipeline and the Cobalt prototype pipeline respectively and uses them
-  to build two JavaScript strings defining DataTables containing the data.
+  to build three JavaScript strings defining DataTables containing the data.
 
  Returns:
-    {tuple of two strings} (sc_string, cobalt_string). Each of the two strings
-    is of the form <var_name>=<json>, where |json| is a json string defining
-    a data table. The |var_name|s are respectively
-    POPULAR_URLS_SC_JS_VAR_NAME and POPULAR_URLS_JS_VAR_NAME.
+    {tuple of three strings} (sc_string, sc_histogram_string, cobalt_string).
+    Each of the three strings is of the form <var_name>=<json>, where |json|
+    is a json string defining a data table. The |var_name|s are respectively
+    POPULAR_URLS_SC_JS_VAR_NAME,
+    POPULAR_URLS_HISTOGRAM_SC_JS_VAR_NAME,
+    POPULAR_URLS_JS_VAR_NAME.
   """
   # straight-counting
-  popular_urls_sc_js,_ = buildItemAndCountJs(
-      file_util.POPULAR_URLS_CSV_FILE_NAME, POPULAR_URLS_SC_JS_VAR_NAME, None,
+  popular_urls_sc_js, popular_urls_histogram_sc_js = buildItemAndCountJs(
+      file_util.POPULAR_URLS_CSV_FILE_NAME, POPULAR_URLS_SC_JS_VAR_NAME,
+      POPULAR_URLS_HISTOGRAM_SC_JS_VAR_NAME,
       "url", "URL")
 
   # Cobalt.
@@ -353,7 +358,7 @@ def buildPopularUrlsJs():
     file_util.URL_ANALYZER_OUTPUT_FILE_NAME, POPULAR_URLS_JS_VAR_NAME, None,
     "url", "URL")
 
-  return (popular_urls_sc_js, popular_urls_js)
+  return (popular_urls_sc_js, popular_urls_histogram_sc_js, popular_urls_js)
 
 def buildPopularHelpQueriesJs():
   """Reads two CSV files containing the popular help-qury data for the straight-
@@ -393,7 +398,8 @@ def main():
   usage_by_city_js, usage_by_city_sc_js = buildUsageAndRatingByCityJs()
   usage_by_hour_sc_js, usage_by_hour_js, usage_by_hour_params_js = \
       buildUsageByHourJs()
-  popular_urls_sc_js, popular_urls_js = buildPopularUrlsJs()
+  (popular_urls_sc_js, popular_urls_histogram_sc_js,
+   popular_urls_js) = buildPopularUrlsJs()
   (popular_help_queries_sc_js, popular_help_queries_histogram_sc_js,
       popular_help_queries_js) = buildPopularHelpQueriesJs()
 
@@ -413,6 +419,7 @@ def main():
     f.write("%s\n\n" % usage_by_hour_params_js)
 
     f.write("%s\n\n" % popular_urls_sc_js)
+    f.write("%s\n\n" % popular_urls_histogram_sc_js)
     f.write("%s\n\n" % popular_urls_js)
 
     f.write("%s\n\n" % popular_help_queries_sc_js)
