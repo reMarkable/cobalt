@@ -142,6 +142,9 @@ def runAllShufflers():
   mn_shuffler = module_name_shuffler.ModuleNameShuffler()
   mn_shuffler.shuffle()
 
+  print "Running the module name shuffler for differentially private release..."
+  mn_shuffler.shuffle(for_private_release=True)
+
   print "Running the hour-of-day shuffler..."
   hr_shuffler = hour_shuffler.HourShuffler()
   hr_shuffler.shuffle()

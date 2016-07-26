@@ -19,11 +19,21 @@ import utils.file_util as file_util
 
 class ModuleNameShuffler:
   """ A shuffler for the module usage pipeline
+
+  Args:
+    for_private_release {bool}: Will the extracted data be analyzed using
+    differentially private release? We use different input and output files
+    in this case.
   """
 
-  def shuffle(self):
+  def shuffle(self, for_private_release=False):
     ''' This function invokes the generic function shuffleCSVFiles() on
     the module-usage-specific CSV files.
     '''
-    shuffler.shuffleCSVFiles(file_util.MODULE_NAME_RANDOMIZER_OUTPUT_FILE_NAME,
-        file_util.MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME)
+    input_file = (file_util.MODULE_NAME_PR_RANDOMIZER_OUTPUT_FILE_NAME if
+      for_private_release else
+    	file_util.MODULE_NAME_RANDOMIZER_OUTPUT_FILE_NAME)
+    output_file = (file_util.MODULE_NAME_PR_SHUFFLER_OUTPUT_FILE_NAME if
+    	for_private_release else
+    	file_util.MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME)
+    shuffler.shuffleCSVFiles(input_file, output_file)

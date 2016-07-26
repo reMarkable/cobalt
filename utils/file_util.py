@@ -70,6 +70,7 @@ URL_RANDOMIZER_OUTPUT_FILE_NAME = 'url_randomizer_out.csv'
 HELP_QUERY_SHUFFLER_OUTPUT_FILE_NAME = "help_query_shuffler_out.csv"
 CITY_SHUFFLER_OUTPUT_FILE_NAME = "city_shuffler_out.csv"
 MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME = "module_name_shuffler_out.csv"
+MODULE_NAME_PR_SHUFFLER_OUTPUT_FILE_NAME = "module_name_pr_shuffler_out.csv"
 HOUR_SHUFFLER_OUTPUT_FILE_NAME = "hour_shuffler_out.csv"
 URL_SHUFFLER_OUTPUT_FILE_NAME = "url_shuffler_out.csv"
 
