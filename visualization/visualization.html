@@ -26,7 +26,10 @@
       // "Straight Counting" pipeline.
       function drawCharts() {
         drawUsageByModulePieChart_SC();
-        drawUsageByModuleIntervalChart();
+        // without differentially private release
+        drawUsageByModuleIntervalChart(false);
+        // with differentially private release
+        drawUsageByModuleIntervalChart(true);
 
         drawUsageByCityGeoChart_SC();
         drawUsageAndRatingBubbleChart();
@@ -54,29 +57,36 @@
         chart.draw(data, options);
       };
 
-      function drawUsageByModuleIntervalChart() {
+      function drawUsageByModuleIntervalChart(with_private_release) {
         // Format the title to include privacy budget
         var privacy_eps = privacyBudget(usage_by_module_params).toFixed(2);
         var title = 'Top Modules by Usage, Estimates with 95% Confidence Intervals' +
         ' (privacy budget = ' + privacy_eps + ')';
+        if (with_private_release) {
+          title = 'Modules by Usage. Weak RAPPOR privacy with Laplacian noise for differentially private release.' +
+          ' (Privacy budget = 1)';
+        }
 
-        var data = new google.visualization.DataTable(usage_by_module_data);
+        var usage_data = with_private_release ? usage_by_module_pr_data : usage_by_module_data
+        var data = new google.visualization.DataTable(usage_data);
 
-        // The intervals data as narrow lines (useful for showing raw source data)
+        var chart_height = with_private_release ? 750 : 450
+        var chart_width = with_private_release ? 650 : 600
         var options = {
             title: title,
             curveType: 'function',
             pointSize: 5,
             lineWidth: 0,
             orientation: 'vertical',
-            height: 300,
-            width: 600,
+            height: chart_height,
+            width: chart_width,
             intervals: { style: 'bars', color: 'grey' },
             vAxis: {title: 'Module'},
             hAxis: {title: 'Usage Count', viewWindow: {min: 0},
                     minorGridlines: {count: 4}}
         };
-        var chart = new google.visualization.LineChart(document.getElementById('usage_by_module_chart'));
+        element_id = with_private_release ? 'usage_by_module_with_pr_chart' : 'usage_by_module_chart'
+        var chart = new google.visualization.LineChart(document.getElementById(element_id));
         chart.draw(data, options);
       };
 
@@ -243,6 +253,12 @@
       <tr>
         <td><div id="usage_by_module_chart_sc"></div></td>
         <td><div id="usage_by_module_chart"></div>
+        </td>
+      </tr>
+
+      <tr>
+        <td></div></td>
+        <td><div id="usage_by_module_with_pr_chart"></div>
         </td>
       </tr>
 

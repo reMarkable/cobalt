@@ -33,10 +33,13 @@ import third_party.google_visualization.gviz_api as gviz_api
 from randomizers.randomizer import readRapporConfigParamsFromFile
 
 # The javascript variables to write. Note "_sc" refers to the data from
-# the "straight-counting pipeline"
+# the "straight-counting pipeline" "_pr_" refers to the version of
+# a metric that uses differentially-private release.
 USAGE_BY_MODULE_JS_VAR_NAME = 'usage_by_module_data'
+USAGE_BY_MODULE_PR_JS_VAR_NAME = 'usage_by_module_pr_data'
 USAGE_BY_MODULE_SC_JS_VAR_NAME = 'usage_by_module_data_sc'
 USAGE_BY_MODULE_PARAMS_JS_VAR_NAME = 'usage_by_module_params'
+USAGE_BY_MODULE_PR_PARAMS_JS_VAR_NAME = 'usage_by_module_pr_params'
 
 USAGE_BY_CITY_SC_JS_VAR_NAME = 'usage_by_city_data_sc'
 USAGE_BY_CITY_JS_VAR_NAME = 'usage_by_city_data'
@@ -82,17 +85,82 @@ def buildDataTableJs(data=None, var_name=None, description=None,
 
   return "%s=%s;" % (var_name, json)
 
-def buildUsageByModuleJs():
-  """Reads two CSV files containing the usage-by-module data for the straight-
+def buildUsageByModuleJsFromRapporOutput(sc_values, rappor_out_file, jsvar,
+                                         params_jsvar, config_file):
+  """ A helper function for buildUsageByModuleJs().
 
-  counting pipeline and the Cobalt prototype pipeline respectively and uses them
-  to build two JavaScript strings defining DataTables containing the data.
+  This function will be
+  invoked twice: once for the metric without differentially-private release
+  and once for the metric with differentially-private release.
+
+  Args:
+    sc_values: {dictionary} A dictionary of actual values from the straigh-
+    counting pipeline.
+
+    rappor_out_file: {string} The path to the file containing RAPPOR output
+    data.
+
+    jsvar: {string} The name of the Javascript variable to be used for the
+    data table.
+
+    params_jsvar: {string} The name of the Javascript variable to be used for
+    the RAPPOR parameters.
+
+    config_file: {string} The path of the file containing RAPPOR config data.
 
   Returns:
-    {tuple of three strings} (sc_string, cobalt_string, rappor_parameters). The
-    first two strings are of the form <var_name>=<json>, where |json| is a json
+    {tuple of two strings} (usage_data, rappor_parameters).
+    See buildUsageByModuleJs() for details.
+  """
+  # We skip row zero because it is the header row. We are going to visualize
+  # the data as an interval chart and so we want to compute the high and
+  # low 95% confidence interval values which we may do using the "std_error"
+  # column, column 2.
+  with file_util.openForReading(rappor_out_file) as csvfile:
+    reader = csv.reader(csvfile)
+    data = [{"module" : row[0], "estimate": float(row[1]),
+             "actual" : sc_values.get(row[0], 0),
+             "low" : float(row[1]) - 1.96 * float(row[2]),
+             "high": float(row[1]) + 1.96 * float(row[2])}
+        for row in reader if reader.line_num > 1]
+  usage_data_js = buildDataTableJs(
+      data=data,
+      var_name=jsvar,
+      description={"module": ("string", "Module"),
+                   "estimate": ("number", "Estimate"),
+                   "actual": ("number", "Actual"),
+                   # The role: 'interval' property is what tells the Google
+                   # Visualization API to draw an interval chart.
+                   "low": ("number", "Low", {'role': 'interval'}),
+                   "high": ("number", "High", {'role': 'interval'})},
+      columns_order=("module", "estimate", "actual", "low", "high"),
+      order_by=("estimate", "desc"))
+
+  # RAPPOR parameters
+  rappor_params_js = "{} = {};".format(params_jsvar,
+      readRapporConfigParamsFromFile(config_file).to_json())
+
+  return (usage_data_js, rappor_params_js)
+
+
+def buildUsageByModuleJs():
+  """ Builds several strings defining variables used for visualization.
+
+  Reads some CSV files containing the usage-by-module data for the straight-
+  counting pipeline and the Cobalt prototype pipeline respectively and uses them
+  to build three JavaScript strings defining DataTables containing the data
+  and two JavaScript strings defining RAPPOR parameters.
+
+  Returns:
+    {tuple of five strings} (sc_string, cobalt_string, cobalt_with_pr_string,
+    rappor_parameters, rappor_with_pr_parameters). The "_pr_" variables
+    refer to the version of the RAPPOR metric that uses very weak RAPPOR
+    parameters but then adds Laplace noise at the end to affect differentially
+    private release. So "_pr_" for "private release". The first three
+    strings are of the form <var_name>=<json>, where |json| is a json
     string defining a data table. The |var_name|s are respectively
-    USAGE_BY_MODULE_SC_JS_VAR_NAME and USAGE_BY_MODULE_JS_VAR_NAME.
+    USAGE_BY_MODULE_SC_JS_VAR_NAME, USAGE_BY_MODULE_JS_VAR_NAME, and
+    USAGE_BY_MODULE_PR_JS_VAR_NAME.
     rappor_parameters is a json string containing values for k, h, m, p, q, f.
   """
   # straight-counting:
@@ -120,41 +188,30 @@ def buildUsageByModuleJs():
   # cobalt:
   # Here the CSV file is the output of the RAPPOR analyzer.
   # We read it and put the data into a dictionary.
-  # We skip row zero because it is the header row. We are going to visualize
-  # the data as an interval chart and so we want to compute the high and
-  # low 95% confidence interval values which we may do using the "std_error"
-  # column, column 2.
-  with file_util.openForReading(
-      file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME) as csvfile:
-    reader = csv.reader(csvfile)
-    data = [{"module" : row[0], "estimate": float(row[1]),
-             "actual" : values.get(row[0], 0),
-             "low" : float(row[1]) - 1.96 * float(row[2]),
-             "high": float(row[1]) + 1.96 * float(row[2])}
-        for row in reader if reader.line_num > 1]
-  usage_by_module_cobalt_js = buildDataTableJs(
-      data=data,
-      var_name=USAGE_BY_MODULE_JS_VAR_NAME,
-      description={"module": ("string", "Module"),
-                   "estimate": ("number", "Estimate"),
-                   "actual": ("number", "Actual"),
-                   # The role: 'interval' property is what tells the Google
-                   # Visualization API to draw an interval chart.
-                   "low": ("number", "Low", {'role': 'interval'}),
-                   "high": ("number", "High", {'role': 'interval'})},
-      columns_order=("module", "estimate", "actual", "low", "high"),
-      order_by=("estimate", "desc"))
+  usage_by_module_cobalt_js, rappor_params_js = \
+      buildUsageByModuleJsFromRapporOutput(values,
+          file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME,
+          USAGE_BY_MODULE_JS_VAR_NAME,
+          USAGE_BY_MODULE_PARAMS_JS_VAR_NAME,
+          file_util.RAPPOR_MODULE_NAME_CONFIG)
 
-  # RAPPOR parameters
-  rappor_params_js = "{} = {};".format(
-      USAGE_BY_MODULE_PARAMS_JS_VAR_NAME, readRapporConfigParamsFromFile(
-          file_util.RAPPOR_MODULE_NAME_CONFIG).to_json())
+  # cobalt with differentially-private release:
+  usage_by_module_cobalt_with_pr_js, rappor_with_pr_params_js = \
+      buildUsageByModuleJsFromRapporOutput(values,
+          file_util.MODULE_NAME_PR_ANALYZER_OUTPUT_FILE_NAME,
+          USAGE_BY_MODULE_PR_JS_VAR_NAME,
+          USAGE_BY_MODULE_PR_PARAMS_JS_VAR_NAME,
+          file_util.RAPPOR_MODULE_NAME_PR_CONFIG)
 
-  return (usage_by_module_sc_js, usage_by_module_cobalt_js, rappor_params_js)
+  return (usage_by_module_sc_js, usage_by_module_cobalt_js,
+          usage_by_module_cobalt_with_pr_js,
+          rappor_params_js, rappor_with_pr_params_js)
 
 
 def buildUsageAndRatingByCityJs():
-  """Reads a CSV file containing the usage-by-city data and uses it
+  """Builds several strings defining variables used for visualization.
+
+  Reads a CSV file containing the usage-by-city data and uses it
   to build a JavaScript string defining a DataTable containing the data.
 
   Returns:
@@ -217,7 +274,9 @@ def buildUsageAndRatingByCityJs():
   return (usage_and_rating_by_city_sc_js, usage_and_rating_by_city_cobalt_js)
 
 def buildUsageByHourJs():
-  """Reads two CSV files containing the usage-by-hour data for the
+  """Builds several strings defining variables used for visualization.
+
+  Reads two CSV files containing the usage-by-hour data for the
   straight-counting pipeline and the Cobalt prototype pipeline respectively and
   uses them to build two JavaScript strings defining DataTables containing the
   data and one string describing basic RAPPOR parameters.
@@ -289,7 +348,9 @@ def buildUsageByHourJs():
 
 def buildItemAndCountJs(filename, varname1, varname2, item_column,
                         item_description):
-  """Reads a CSV file containing two columns, an item column and a
+  """Builds several strings defining variables used for visualization.
+
+  Reads a CSV file containing two columns, an item column and a
   count column, and and uses the data to build two JavaScript strings defining
   DataTables containing the data. The two DataTables will be the same except
   for the order of the columns: The first DataTable will have the count
@@ -335,7 +396,9 @@ def buildItemAndCountJs(filename, varname1, varname2, item_column,
   return (count_first_string, item_first_string)
 
 def buildPopularUrlsJs():
-  """Reads two CSV files containing the popular URL data for the straight-
+  """Builds several strings defining variables used for visualization.
+
+  Reads two CSV files containing the popular URL data for the straight-
   counting pipeline and the Cobalt prototype pipeline respectively and uses them
   to build three JavaScript strings defining DataTables containing the data.
 
@@ -361,7 +424,9 @@ def buildPopularUrlsJs():
   return (popular_urls_sc_js, popular_urls_histogram_sc_js, popular_urls_js)
 
 def buildPopularHelpQueriesJs():
-  """Reads two CSV files containing the popular help-qury data for the straight-
+  """Builds several strings defining variables used for visualization.
+
+  Reads two CSV files containing the popular help-qury data for the straight-
   counting pipeline and the Cobalt prototype pipeline respectively and uses them
   to build three JavaScript strings defining DataTables containing the data.
 
@@ -393,8 +458,9 @@ def main():
   print "Generating visualization..."
 
   # Read the input file and build the JavaScript strings to write.
-  usage_by_module_sc_js, usage_by_module_js, usage_by_module_params_js = \
-      buildUsageByModuleJs()
+  usage_by_module_sc_js, usage_by_module_js, usage_by_module_with_pr_js, \
+      usage_by_module_params_js, usage_by_module_with_pr_params_js = \
+          buildUsageByModuleJs()
   usage_by_city_js, usage_by_city_sc_js = buildUsageAndRatingByCityJs()
   usage_by_hour_sc_js, usage_by_hour_js, usage_by_hour_params_js = \
       buildUsageByHourJs()
@@ -409,7 +475,9 @@ def main():
             "generate_data_js.py\n\n")
     f.write("%s\n\n" % usage_by_module_sc_js)
     f.write("%s\n\n" % usage_by_module_js)
+    f.write("%s\n\n" % usage_by_module_with_pr_js)
     f.write("%s\n\n" % usage_by_module_params_js)
+    f.write("%s\n\n" % usage_by_module_with_pr_params_js)
 
     f.write("%s\n\n" % usage_by_city_sc_js)
     f.write("%s\n\n" % usage_by_city_js)

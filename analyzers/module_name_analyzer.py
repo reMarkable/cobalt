@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import csv
 import logging
 import os
-import shutil
 import subprocess
 
+import algorithms.laplace.laplacian as laplacian
 import algorithms.rappor.sum_bits as sum_bits
 import utils.file_util as file_util
 import third_party.rappor.client.python.rappor as rappor
@@ -43,8 +44,6 @@ class ModuleNameAnalyzer:
       decoding, Laplace noise is also added to the analyzed output. We use
       different input, output and config files in this case.
     '''
-    # TODO(rudominer) Implement the differentially private release using
-    # Laplace noise.
     config_file = (file_util.RAPPOR_MODULE_NAME_PR_CONFIG if
         for_private_release else file_util.RAPPOR_MODULE_NAME_CONFIG)
     map_file_name = (file_util.MODULE_PR_MAP_FILE_NAME if
@@ -97,12 +96,29 @@ class ModuleNameAnalyzer:
       raise Exception('Fatal error. Cobalt pipeline terminating.')
     os.chdir(savedir)
 
-    # Finally we copy the results file to the out directory
-    src = os.path.abspath(os.path.join(
-        file_util.ANALYZER_TMP_OUT_DIR, 'results.csv'))
-    dst = os.path.abspath(os.path.join(
-        file_util.OUT_DIR, output_file))
-    shutil.copyfile(src, dst)
+    # Read in the results of the RAPPOR analysis
+    with file_util.openFileForReading('results.csv',
+        file_util.ANALYZER_TMP_OUT_DIR) as f:
+      reader = csv.reader(f)
+      results = [result for result in reader]
+
+    # If requested, add Laplacian noise in order to affect differentially
+    # private release.
+    if for_private_release:
+      # Here we are using  a Laplacian with lambda = 1. This gives use
+      # differential privacy with epsilon = 1.
+      laplacian_distribution = laplacian.Laplacian(1)
+      # We skip row 1 of results because it is a header row.
+      for result in results[1:]:
+        # The estimated count is in column 1 of the RAPPOR results. Since
+        # the values are counts we round to a whole number.
+        result[1] = int(round(int(result[1]) + laplacian_distribution.sample()))
+
+    # Write the final output file.
+    with file_util.openForWriting(output_file) as f:
+      writer = csv.writer(f)
+      for result in results:
+        writer.writerow(result)
 
   def _generateMapFileIfNecessary(self, map_file, map_file_name, params):
     ''' Generates the map file in the cache directory if there is not already
