@@ -15,8 +15,8 @@
       google.charts.setOnLoadCallback(drawCharts);
 
       function privacyBudget(rappor_params) {
-        q = rappor_params.probIrr0;
-        p = rappor_params.probIrr1;
+        p = rappor_params.probIrr0;
+        q = rappor_params.probIrr1;
         h = Math.max(1., rappor_params.numHashes); // Basic RAPPOR is signaled by numHashes == 0
         return h * Math.abs(Math.log(q * (1 - p) / (p * (1 - q))));
       }
