@@ -5,7 +5,7 @@ implementation is intended only as a prototype. In particular the PyCrypto
 library has not been approved by the Google ISE team.
 
 * Prerequisites
-  * Currently this demo is only supported on Linux.
+  * Currently this demo is only supported on Ubuntu Linux.
 
 * One-time setup. You must install R and some other packages:
   * `cd third_party/rappor`
@@ -15,6 +15,10 @@ library has not been approved by the Google ISE team.
   * You may see a few error messages but if the script keeps going everything
     is probably ok.
   * `cd ../..`
+
+* More one-time setup. You must install the Python cryptography package.
+  * `sudo apt-get install build-essential libssl-dev libffi-dev python-dev`
+  * `sudo pip install cryptography`
 
 * ` ./cobalt.py build`
   * This generates a fastrand python module that wraps a fast C random

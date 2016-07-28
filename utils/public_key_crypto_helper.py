@@ -1,4 +1,5 @@
 import base64
+from cryptography.fernet import Fernet
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 import os
@@ -12,29 +13,45 @@ ANALYZER_PUBLIC_KEY_FILE = "analyzer_public_key.pem"
 ANALYZER_PRIVATE_KEY_FILE = "analyzer_private_key.pem"
 
 class CryptoHelper(object):
-  """ An object to assist in performing public key encryption/decription in
+  """ An object to assist in performing hybrid encryption/decription in
   the Cobalt prototype pipeline. Data is encrypted by the randomizers using
-  the public key of the analyzer and decrypted by the analyzer using the
-  analyzer's private key. The keys are generated once per installation
+  symmetric, authenticated, non-determinsitic encryption, and then the
+  symmetric key is encrypted using the public key of the analyzer. The
+  sealed envelope consisting of the pair (ciphertext, encrypted_key) is sent to
+  the shuffler which shuffles the sealed envelopes while being unable to
+  decrypt the data. The shuffler forwards the shuffled data to the analyzer
+  which decrypts the symmetric key using its private key and then uses
+  the symmetric key to decrypt the paylod.
+
+  A new symmetric key is generated for each encryption. The analyzer's public/
+  private key pair is generated once per installation
   and cached in the |cache| directory. If either key file is deleted then
   both keys will be regenerated.
 
-  Uses the RSA encryption protocol according to PKCS#1 OAEP.
+  The public key encryption uses the RSA encryption protocol according to
+  PKCS#1 OAEP.
+
+  The symmetric authenticated encryption uses AES 128 in CBC mode with HMAC,
+  as implemented by the Fernet library from cryptography.io. Fernet uses
+  encrypt-then-mac authenticated encryption.
+  See https://github.com/fernet/spec/blob/master/Spec.md.
 
   Example:
 
   # In a randomizer:
   ch = CryptoHelper()
-  ciphertext1 = ch.encryptForSendingToAnalyzer("Hello world!")
-  ciphertext2 = ch.encryptForSendingToAnalyzer("Goodbye world!")
+  ciphertext1, encrypted_key1 = ch.encryptForSendingToAnalyzer("Hello world!")
+  ciphertext2, encrypted_key2 = ch.encryptForSendingToAnalyzer("Goodbye world!")
 
   # Later in an analyzer:
   ch = CryptoHelper()
-  print(ch.decryptOnAnalyzer(ciphertext1)) # prints "Hello world!"
-  print(ch.decryptOnAnalyzer(ciphertext2)) # prints "Goodbye world!"
+  # prints "Hello world!"
+  print(ch.decryptOnAnalyzer(ciphertext1, encrypted_key1))
+  # prints "Goodbye world!"
+  print(ch.decryptOnAnalyzer(ciphertext2, encrypted_key2))
 
-  The ciphertexts are base64 encoded so they may be conveniently included
-  in a human-readable file.
+  The ciphertexts and encrypted keys are base64 encoded so they may be
+  conveniently included in a human-readable file.
   """
 
   def __init__(self):
@@ -87,45 +104,73 @@ class CryptoHelper(object):
       return RSA.importKey(f.read())
 
   def encryptForSendingToAnalyzer(self, plaintext):
-    """ Encrypts the plain text using the analyzer's public key.
-    This function should be invoked from a randomizer. The returned value
-    is a base64 encoding of the bytes of the ciphertext.
+    """Encrypts plaintext for sending to the analyzer.
+
+    A new symmetric key is generated and then the plaintext is encrypted
+    into a ciphertext using this key. Then the symmetric key is encrypted
+    using the analyzer's public key. The pair consisting of the ciphertext
+    and the encrypted symmetric key is returned.
+
+    This function should be invoked from a randomizer.
 
     Args:
       plaintext {string} The plain text to encrypt.
 
     Returns:
-      {string} The base64 encoding of the encrypted ciphertext
+      {pair of string} (ciphertext, encrypted_key) Both values are base64
+      encoded.
     """
-    return base64.b64encode(self._analyzer_public_key_cipher.encrypt(plaintext))
+    symmetric_key = Fernet.generate_key()
+    symmetric_encryption = Fernet(symmetric_key)
+    ciphertext = symmetric_encryption.encrypt(plaintext)
+    encrypted_key = base64.b64encode(self._analyzer_public_key_cipher.encrypt(
+      symmetric_key))
+    return (ciphertext, encrypted_key)
 
-  def decryptOnAnalyzer(self, ciphtertext):
-    """ Decrypts the ciphertext using the analyzer's private key.
+  def decryptOnAnalyzer(self, ciphtertext, encrypted_key):
+    """ Decrypts the ciphertext on the analyzer.
+
+    First the encrypted_key is decrypted using the analyzer's private key.
+    Then the ciphertext is decrypted using the decrypted symmetric key.
+
     This function should be invoked from an analyzer.
 
     Args:
-      ciphertext: {string} The base64 encoding of the ciphertext to decrypt.
+      ciphertext: {string} Ciphertext to decrypt
+      encrypted_key: {string} The encryption of the symmetric key.
+
 
     Returns:
       {string} The decrypted plaintext.
     """
-    return self._analyzer_private_key_cipher.decrypt(
-        base64.b64decode(ciphtertext))
+    symmetric_key = self._analyzer_private_key_cipher.decrypt(
+        base64.b64decode(encrypted_key))
+    symmetric_encryption = Fernet(symmetric_key)
+    return symmetric_encryption.decrypt(ciphtertext)
 
 def main():
   # This main() function is a manual test of the code in this file.
   ch = CryptoHelper()
   for i in xrange(10):
     plain_text = "message number %i" % i
-    cipher_text = ch.encryptForSendingToAnalyzer(plain_text)
-    print cipher_text
-    print(ch.decryptOnAnalyzer(cipher_text))
+    cipher_text, encrypted_key = ch.encryptForSendingToAnalyzer(plain_text)
+    print("_______________________")
+    print "cipher_text=%s"%cipher_text
+    print("_______________________")
+    print "encrypted_key=%s"%encrypted_key
+    print("_______________________")
+    print(ch.decryptOnAnalyzer(cipher_text, encrypted_key))
 
   ch = CryptoHelper()
   for i in xrange(10):
     plain_text = "message number %i" % i
-    cipher_text = ch.encryptForSendingToAnalyzer(plain_text)
-    print(ch.decryptOnAnalyzer(cipher_text))
+    cipher_text, encrypted_key = ch.encryptForSendingToAnalyzer(plain_text)
+    print(ch.decryptOnAnalyzer(cipher_text, encrypted_key))
+
+  plain_text = "A very long message " * 100
+  cipher_text, encrypted_key = ch.encryptForSendingToAnalyzer(plain_text)
+  ch = CryptoHelper()
+  print(ch.decryptOnAnalyzer(cipher_text, encrypted_key))
 
 if __name__ == '__main__':
   sys.exit(main())
