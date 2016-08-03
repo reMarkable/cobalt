@@ -26,11 +26,33 @@ import sys
 
 import third_party.rappor.client.python.rappor as rappor
 
+def sumBits(params, stdin, stdout, additional_decryption_func = None,
+            fields = [0, 1], header = False):
+  """Sums bits from stdin to stdout with params; fields indicates which
+  correspond to (RAPPOR cohort, RAPPOR IRR).
 
-# Sums bits from stdin to stdout with params; fields indicates which
-# correspond to (RAPPOR cohort, RAPPOR IRR)
-def sumBits(params, stdin, stdout, fields = [0, 1], header = False):
+  Args:
+    params {list of int}: List of param values from RAPPOR config file.
 
+    stdin {file handle}: A file handle to the input file containing
+    randomized data.
+
+    stdout {file handle}: A file handle to the output file for storing
+    intermediate results from aggregation based on cohorts.
+
+    additional_decryption_func {function}: If this is not None then the
+    decryption function will be applied to each row of data just after reading
+    it from |stdin|. The function should accept a tuple of strings representing
+    the ciphertext and return a single string representing the plain text.
+    The decryption function should be the inverse of the encryption function
+    applied in randomizeUsingRappor function.
+
+    fields {list of int}: A list of two integer values to specify RAPPOR cohort
+    and IRR for each param.
+
+    header {bool}: If True, analysis computation takes place by omitting the
+    header row from the input file.
+  """
   if len(fields) != 2:
     raise RuntimeError('Error with length of fields in sumBits')
 
@@ -44,6 +66,14 @@ def sumBits(params, stdin, stdout, fields = [0, 1], header = False):
   num_reports = [0] * num_cohorts
 
   for i, row in enumerate(csv_in):
+    if additional_decryption_func is not None:
+      # The tuple read from csv_in represents a cipher text. Pass the elements
+      # of that tuple as arguments to the decryption function receiving
+      # back the plaintext which is a single string that is a comma-separated
+      # list of fields. Split that string into fields and use that as
+      # the value of the read row.
+      row = additional_decryption_func(*row).split(",")
+
     subset_of_row = [row[i] for i in fields]
     try:
       (cohort, irr) = subset_of_row

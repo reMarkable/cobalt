@@ -93,6 +93,7 @@ MODULE_MAP_FILE_NAME = "module_map.csv"
 MODULE_PR_MAP_FILE_NAME = "module_pr_map.csv"
 HOUR_COUNTS_FILE_NAME = "hour_counts.csv"
 HOUR_MAP_FILE_NAME = "hour_map.csv"
+DECRYPTED_SHUFFLER_OUTPUT_FILE_NAME = "decrypted_shuffler_out.csv"
 
 # The csv files written by the direct-counting pipeline
 USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'

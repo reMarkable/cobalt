@@ -13,22 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import csv
-import logging
-import os
-import subprocess
-
-import algorithms.laplace.laplacian as laplacian
-import algorithms.rappor.sum_bits as sum_bits
+import analyzer
 import utils.file_util as file_util
-import third_party.rappor.client.python.rappor as rappor
-import third_party.rappor.bin.hash_candidates as hash_candidates
-
-THIS_DIR = os.path.dirname(__file__)
-ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.path.pardir))
-THIRD_PARTY_DIR = os.path.join(ROOT_DIR, "third_party")
-
-_logger = logging.getLogger()
 
 class ModuleNameAnalyzer:
   """ An Analyzer that outputs RAPPOR estimates of number of reports by module
@@ -48,6 +34,8 @@ class ModuleNameAnalyzer:
         for_private_release else file_util.RAPPOR_MODULE_NAME_CONFIG)
     map_file_name = (file_util.MODULE_PR_MAP_FILE_NAME if
         for_private_release else file_util.MODULE_MAP_FILE_NAME)
+    counts_file_name = file_util.MODULE_NAME_COUNTS_FILE_NAME
+    candidates_file_name = file_util.MODULE_CANDIDATES_FILE_NAME
     input_file = (file_util.MODULE_NAME_PR_SHUFFLER_OUTPUT_FILE_NAME if
       for_private_release else
       file_util.MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME)
@@ -55,89 +43,13 @@ class ModuleNameAnalyzer:
       for_private_release else
       file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME)
 
-    # First get module names params.
-    with file_util.openFileForReading(
-      config_file, file_util.CONFIG_DIR) as cf:
-      module_name_params = rappor.Params.from_csv(cf)
+    rappor_files = {
+        'input_file': input_file,
+        'config_file': config_file,
+        'map_file_name': map_file_name,
+        'counts_file_name': counts_file_name,
+        'output_file': output_file,
+        'candidates_file_name': candidates_file_name,
+        }
 
-    map_file = os.path.join(file_util.CACHE_DIR, map_file_name)
-
-    self._generateMapFileIfNecessary(map_file, map_file_name,
-                                     module_name_params)
-
-    # Next, compute counts per cohort and write into analyzer temp directory.
-    with file_util.openForAnalyzerReading(input_file) as input_f:
-      with file_util.openForAnalyzerTempWriting(
-          file_util.MODULE_NAME_COUNTS_FILE_NAME) as output_f:
-        sum_bits.sumBits(module_name_params, input_f, output_f)
-
-    # Next invoke the R script 'decode_dist.R'.
-
-    # First we build the command string.
-    rappor_decode_script = os.path.join(THIRD_PARTY_DIR,
-        'rappor', 'bin', 'decode_dist.R')
-    counts_file = os.path.abspath(os.path.join(file_util.ANALYZER_TMP_OUT_DIR,
-        file_util.MODULE_NAME_COUNTS_FILE_NAME))
-    params_file =  os.path.abspath(os.path.join(file_util.CONFIG_DIR,
-        config_file))
-    cmd = [rappor_decode_script, '--map', map_file, '--counts', counts_file,
-           '--params', params_file, '--output-dir',
-           file_util.ANALYZER_TMP_OUT_DIR]
-
-    # Then we change into the Rappor directory and execute the command.
-    savedir = os.getcwd()
-    os.chdir(os.path.join(THIRD_PARTY_DIR, 'rappor'))
-    # We supress the output from the R script unless it fails.
-    try:
-      subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-      print "\n**** Error running RAPPOR decode script:"
-      print e.output
-      raise Exception('Fatal error. Cobalt pipeline terminating.')
-    os.chdir(savedir)
-
-    # Read in the results of the RAPPOR analysis
-    with file_util.openFileForReading('results.csv',
-        file_util.ANALYZER_TMP_OUT_DIR) as f:
-      reader = csv.reader(f)
-      results = [result for result in reader]
-
-    # If requested, add Laplacian noise in order to affect differentially
-    # private release.
-    if for_private_release:
-      # Here we are using  a Laplacian with lambda = 1. This gives use
-      # differential privacy with epsilon = 1.
-      laplacian_distribution = laplacian.Laplacian(1)
-      # We skip row 1 of results because it is a header row.
-      for result in results[1:]:
-        # The estimated count is in column 1 of the RAPPOR results. Since
-        # the values are counts we round to a whole number.
-        result[1] = int(round(int(result[1]) + laplacian_distribution.sample()))
-
-    # Write the final output file.
-    with file_util.openForWriting(output_file) as f:
-      writer = csv.writer(f)
-      for result in results:
-        writer.writerow(result)
-
-  def _generateMapFileIfNecessary(self, map_file, map_file_name, params):
-    ''' Generates the map file in the cache directory if there is not already
-    an up-to-date version.
-    '''
-    candidate_file = os.path.join(file_util.CONFIG_DIR,
-        file_util.MODULE_CANDIDATES_FILE_NAME)
-
-    # Generate the map file unless it already exists and has a modified
-    # timestamp later than that of the candidate file. We allow a buffer of
-    # 10 seconds in case the timestamps are out of sync for some reason.
-    if (not os.path.exists(map_file) or
-        os.path.getmtime(map_file) < os.path.getmtime(candidate_file) + 10):
-      with file_util.openFileForReading(file_util.MODULE_CANDIDATES_FILE_NAME,
-          file_util.CONFIG_DIR) as cand_f:
-        with file_util.openFileForWriting(map_file_name,
-            file_util.CACHE_DIR) as map_f:
-          _logger.debug('Generating a RAPPOR map file at %s based on '
-                        'candidate file at %s' % (map_file, candidate_file))
-          hash_candidates.HashCandidates(params, cand_f, map_f)
-
-
+    analyzer.analyzeUsingRAPPOR(rappor_files, for_private_release=for_private_release)

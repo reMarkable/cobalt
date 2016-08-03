@@ -179,6 +179,11 @@ def randomizeUsingRappor(entries, param_configs, output_file):
     # Initialize fastrand module
     irr_rand = initializeFastrand()
 
+    encrypt_for_analyzer=None
+    if _use_public_key_encryption:
+      ch = crypto_helper.CryptoHelper()
+      encrypt_for_analyzer = ch.encryptForSendingToAnalyzer
+
     # Format strings for RAPPOR reports.
     for entry in entries:
       # For randomizing multiple params, generate the encoded data based on
@@ -210,7 +215,13 @@ def randomizeUsingRappor(entries, param_configs, output_file):
       # {cohort, data1_rr, data2_rr, data3_rr, ...}
       # for example, city_rating_randomized output looks like:
       # {cohort, city_name_rr, rating_rr)
-      writer.writerow([data for data in data_out])
+      data_to_write = [data for data in data_out]
+      if _use_public_key_encryption:
+        # Express the data-to-write as a single string with comma-separated
+        # fields. Then encrypt that string, receiving a tuple of strings
+        # representing the ciphertext. We use that tuple as the data-to-write.
+        data_to_write = encrypt_for_analyzer(",".join(map(str, data_to_write)))
+      writer.writerow(data_to_write)
 
 def randomizeUsingForculus(entries, param_index, config_file, output_file):
   '''A helper function that may be invoked by individual randomizers.
