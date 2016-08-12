@@ -84,62 +84,87 @@ def analyzeUsingForculus(input_file, config_file, output_file):
       forculus_evaluator.ComputeAndWriteResults(output_f,
           additional_decryption_func=decrypt_on_analyzer)
 
-def analyzeUsingRAPPOR(rappor_files, assoc_options=None, use_basic_rappor=False, for_private_release=False):
-  ''' Use RAPPOR analysis to output estimates for number of reports by each
-  specific param identified by the input, map and counts configuration files.
+def analyzeUsingRAPPOR(input_file, config_file, output_file,
+                       metric_name="metric",
+                       candidates_file_name=None,
+                       basic_map_file_name=None,
+                       assoc_options=None,
+                       use_basic_rappor=False,
+                       for_private_release=False):
+  ''' Run the RAPPOR analysis using the given inputs.
 
   Args:
-    rappor_files {dictionary}: A dictionary of configuration file names used
-    for RAPPOR analysis with the following keys and values specified as strings:
-      - "input_file": The simple name of the CSV file to be read from
-        the 's_to_a' directory.
+    input_file: {string} The simple name of the CSV file to be read from the
+      's_to_a' directory.
 
-      - "config_file": The simple name of the RAPPOR config file used
-        for analyzing the data from the input file.
+    config_file: {string} The simple name of the RAPPOR config file to be read
+        from the 'config' directory
 
-      - "map_file_name": The simple name of the RAPPOR mapping config
-        file used for the analysis.
+    output_file: {string} The simple name of the CSV file to be written in
+        the 'out' directory
 
-      - "counts_file_name": The simple name of the RAPPOR counts file
-        name that is specific to each param.
+    metric_name: {string} A short name for the metric being computed. It will
+      be used to form the name of temporary files and so it should contain
+      only letters and underscores.
 
-      - "candidates_file_name": The simple name of the RAPPOR candidates
-        file name that is specific to each param.
+    candidates_file_name: {string} The simple name of the RAPPOR candidates
+      file to be read from the 'config' directory. This must be none-None if and
+      only if |use_basic_rappor|=False.
 
-      - "output_file": The simple name of the CSV file to be written in
-        the 'out' directory, that is consumed by the visualizer.
+    basic_map_file_name: {string} The name of the pre-computed map file
+      to be read from the 'config' directory. This must be none-None if and
+      only if |use_basic_rappor|=True.
 
-    assoc_options {dictionary}: A dictionary of options used for correlation
-    analysis using multiple RAPPOR params. This dictionary contains the
-    following keys and values:
-      - "metric_name": The final analysis metric name such as
-        |CityAverageRating|.
-
-      - "vars": A list of variable names used for correlation during analysis
-        such as 'city_name' and 'rating'.
-
-      - "config_file": The simple name of the CSV file specifying the
-        correlation configuration parameters.
-
-    use_basic_rappor {bool}: If True use the basic RAPPOR analysis without
-    generating the map file.
+    use_basic_rappor {bool}: If True use basic RAPPOR analysis
+      (no Bloom filters.)
 
     for_private_release {bool}: If True then in addition to doing the RAPPOR
-    decoding, Laplace noise is also added to the analyzed output. We use
-    different input, output and config files in this case.
-  '''
-  input_file = rappor_files['input_file']
-  config_file = rappor_files['config_file']
-  map_file_name = rappor_files['map_file_name']
-  counts_file_name = rappor_files['counts_file_name']
-  candidates_file_name = rappor_files['candidates_file_name']
-  output_file = rappor_files['output_file']
+      decoding, Laplace noise is also added to the analyzed output. We use
+      different input, output and config files in this case.
 
+    assoc_options {dictionary}: If this parameter is not None it indicates that
+      a special two-dimensional RAPPOR analysis should be performed. This
+      analysis uses correlation to compute average scores for the second
+      dimension as a function of the first dimension. This assumes that the
+      second dimension uses basic RAPPOR with values being integers in the
+      range 1 to N for some positive integer N.
+
+      In that case this parameter should be a dictionary of options for the
+      correlation analysis. Also in this case there are additional requirements
+      on the other parameters of this method:
+        - The |input_file| must contain the data for *both* variables. The
+        - |config_file| should contain the RAPPOR params for the *first*
+          variable.
+        - The |output_file| should be named appropriately for *both* variables.
+        - The |metric_name| should be named appropriately for *both* variables.
+        - The |candidates_file_name| should refer to the candidates of
+          the *first* variable.
+
+      The dictionary should contain the following string keys and values:
+        - "metric_name": The final correlation analysis metric name such as
+          |CityAverageRating|. Note that this is a different value than the
+          parameter to this function called |metric_name|. This "metric_name"
+          refers to a field in the csv file specified by "config_file" below.
+
+        - "vars": A list of two variable names used for correlation during
+          analysis such as ['city_name', 'rating']. These strings refer to
+          fields in the csv file specified by "config_file" below.
+
+        - "config_file": The simple name of the CSV file specifying the
+          correlation configuration parameters.
+  '''
   # First get the RAPPOR config params.
   with file_util.openFileForReading(
     config_file, file_util.CONFIG_DIR) as cf:
     config_params = rappor.Params.from_csv(cf)
 
+  map_file_prefix = metric_name
+  if assoc_options is not None:
+    # If we are doing a correlation analysis then the map file corresponds
+    # only to the first variable.
+    assert len(assoc_options["vars"]) == 2
+    map_file_prefix = assoc_options["vars"][0]
+  map_file_name = '%s_map_file.csv' % map_file_prefix
   map_file = os.path.join(file_util.CACHE_DIR, map_file_name)
 
   if use_basic_rappor:
@@ -148,35 +173,40 @@ def analyzeUsingRAPPOR(rappor_files, assoc_options=None, use_basic_rappor=False,
     # file. But we copy it into the cache directory because the R script will
     # write a .rda file in the same directory and we don't want it to write
     # into the config directory.
-    map_config_file = os.path.join(file_util.CONFIG_DIR, map_file_name)
-    _copyFileIfNecessary(map_config_file, map_file)
+    assert basic_map_file_name is not None
+    assert candidates_file_name is None
+    basic_map_file = os.path.join(file_util.CONFIG_DIR, basic_map_file_name)
+    _copyFileIfNecessary(basic_map_file, map_file)
   else:
-    _generateMapFileIfNecessary(map_file, map_file_name, candidates_file_name, config_params)
+    assert basic_map_file_name is None
+    assert candidates_file_name is not None
+    _generateMapFileIfNecessary(map_file, map_file_name, candidates_file_name,
+        config_params)
 
-  # First, decrypt the input file contents from shuffler
+  # Decrypt the input file contents from shuffler if necessary.
   decrypt_on_analyzer=None
   if _use_public_key_encryption:
     ch = crypto_helper.CryptoHelper()
     decrypt_on_analyzer = ch.decryptOnAnalyzer
 
-  # Build the RAPPOR cmd string
+  # Build the command string to invoke the appropriate R script.
   if assoc_options is None:
     # Use generic RAPPOR analysis
     # Compute counts per cohort and write into analyzer temp directory.
+    counts_file_name = '%s_count_file.csv' % metric_name
     with file_util.openForAnalyzerReading(input_file) as input_f:
       with file_util.openForAnalyzerTempWriting(counts_file_name) as output_f:
         sum_bits.sumBits(config_params, input_f, output_f, decrypt_on_analyzer)
-
-    # Next, invoke the R script 'decode_dist.R'.
     cmd = _buildRAPPORAnalysisCmd(counts_file_name, config_file, map_file)
   else:
     # Use correlation based RAPPOR analysis
     if decrypt_on_analyzer is not None:
       # Decrypt the input contents into a temporary file before invoking the
       # RAPPOR script.
+      decrypted_input_file = ('%s_decrypted_shuffler_out.csv' % metric_name)
       with file_util.openForAnalyzerReading(input_file) as input_f:
         with file_util.openForAnalyzerTempWriting(
-            file_util.DECRYPTED_SHUFFLER_OUTPUT_FILE_NAME) as tmp_output_f:
+            decrypted_input_file) as tmp_output_f:
           reader = csv.reader(input_f)
           writer = csv.writer(tmp_output_f)
           for i, row in enumerate(reader):
@@ -186,11 +216,16 @@ def analyzeUsingRAPPOR(rappor_files, assoc_options=None, use_basic_rappor=False,
             # comma-separated list of fields. Split that string into fields and
             # use that as the value of the read row.
             writer.writerow(decrypt_on_analyzer(*row).split(","))
+      reports_file = os.path.abspath(os.path.join(
+          file_util.ANALYZER_TMP_OUT_DIR, decrypted_input_file))
+    else:
+      reports_file = os.path.abspath(os.path.join(file_util.S_TO_A_DIR,
+                                                  input_file))
 
     cmd = _buildRAPPORCorrelationAnalysisCmd(
         assoc_options['config_file'],
         map_file,
-        file_util.DECRYPTED_SHUFFLER_OUTPUT_FILE_NAME,
+        reports_file,
         assoc_options['metric_name'],
         assoc_options['vars'])
 
@@ -242,8 +277,10 @@ def analyzeUsingRAPPOR(rappor_files, assoc_options=None, use_basic_rappor=False,
     for result in results:
       writer.writerow(result)
 
-def _buildRAPPORCorrelationAnalysisCmd(assoc_config_file, map_file, input_file, metric_name, vars):
-  ''' Invoke the R script 'decode_assoc_averages.R' for running correlation analysis using multiple params.
+def _buildRAPPORCorrelationAnalysisCmd(assoc_config_file, map1_file,
+    reports_file, metric_name, vars):
+  ''' Invoke the R script 'decode_assoc_averages.R' for running correlation
+      analysis using multiple params.
   '''
   # Create the temp directory.
   file_util.ensureDir(file_util.ANALYZER_TMP_OUT_DIR)
@@ -254,14 +291,7 @@ def _buildRAPPORCorrelationAnalysisCmd(assoc_config_file, map_file, input_file, 
   schema_file = os.path.abspath(os.path.join(
                 file_util.CONFIG_DIR,
                 assoc_config_file))
-  if input_file == file_util.DECRYPTED_SHUFFLER_OUTPUT_FILE_NAME:
-    reports_file = os.path.abspath(os.path.join(
-                   file_util.ANALYZER_TMP_OUT_DIR,
-                   input_file))
-  else:
-    reports_file = os.path.abspath(os.path.join(
-                   file_util.S_TO_A_DIR,
-                   input_file))
+
   em_executable_file = os.path.abspath(os.path.join(THIRD_PARTY_DIR,
                                        'rappor', 'analysis',
                                        'cpp', '_tmp', 'fast_em'))
@@ -280,7 +310,7 @@ def _buildRAPPORCorrelationAnalysisCmd(assoc_config_file, map_file, input_file, 
          '--params-dir', file_util.CONFIG_DIR,
          '--var1', vars[0],
          '--var2', vars[1],
-         '--map1', map_file,
+         '--map1', map1_file,
          '--create-cat-map',
          '--max-em-iters', "1000",
          '--num-cores', "2",
@@ -290,7 +320,6 @@ def _buildRAPPORCorrelationAnalysisCmd(assoc_config_file, map_file, input_file, 
   return cmd
 
 def _buildRAPPORAnalysisCmd(counts_file_name, config_file, map_file):
-  # First we build the command string.
   rappor_decode_script = os.path.join(THIRD_PARTY_DIR,
       'rappor', 'bin', 'decode_dist.R')
   counts_file = os.path.abspath(os.path.join(file_util.ANALYZER_TMP_OUT_DIR,
@@ -302,7 +331,8 @@ def _buildRAPPORAnalysisCmd(counts_file_name, config_file, map_file):
          file_util.ANALYZER_TMP_OUT_DIR]
   return cmd
 
-def _generateMapFileIfNecessary(map_file, map_file_name, candidates_file_name, params):
+def _generateMapFileIfNecessary(map_file, map_file_name, candidates_file_name,
+                                params):
   ''' Generates the map file in the cache directory if there is not already
   an up-to-date version.
   '''
@@ -349,7 +379,7 @@ def runAllAnalyzers(use_public_key_encryption=False):
   hq_analyzer = help_query_analyzer.HelpQueryAnalyzer()
   hq_analyzer.analyze()
 
-  print "Running the city ratings analyzer..."
+  print "Running the city/ratings analyzer..."
   cr_analyzer = city_analyzer.CityRatingsAnalyzer()
   cr_analyzer.analyze()
 

@@ -26,19 +26,13 @@ class CityRatingsAnalyzer:
 
     Use this information to compute average rating across cities.
     '''
-    rappor_files = {
-        'input_file': file_util.CITY_SHUFFLER_OUTPUT_FILE_NAME,
-        'config_file': file_util.RAPPOR_CITY_NAME_CONFIG,
-        'map_file_name': file_util.CITY_MAP_FILE_NAME,
-        'counts_file_name': None,
-        'output_file': file_util.CITY_RATINGS_ANALYZER_OUTPUT_FILE_NAME,
-        'candidates_file_name': file_util.CITY_CANDIDATES_FILE_NAME # using basic RAPPOR
-    }
-
-    assoc_options = {
-        'config_file': file_util.RAPPOR_CITY_RATINGS_ASSOC_CONFIG,
-        'metric_name': 'CityAverageRating',
-        'vars': ['city_name', 'rating'],
-    }
-
-    analyzer.analyzeUsingRAPPOR(rappor_files, assoc_options)
+    analyzer.analyzeUsingRAPPOR(file_util.CITY_SHUFFLER_OUTPUT_FILE_NAME,
+        file_util.RAPPOR_CITY_NAME_CONFIG,
+        file_util.CITY_RATINGS_ANALYZER_OUTPUT_FILE_NAME,
+        metric_name='city_name_and_rating',
+        candidates_file_name=file_util.CITY_CANDIDATES_FILE_NAME,
+        assoc_options = {
+          'config_file': file_util.RAPPOR_CITY_RATINGS_ASSOC_CONFIG,
+          'metric_name': 'CityAverageRating',
+          'vars': ['city_name', 'rating'],
+        })

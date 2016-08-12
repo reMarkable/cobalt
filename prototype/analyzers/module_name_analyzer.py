@@ -32,10 +32,6 @@ class ModuleNameAnalyzer:
     '''
     config_file = (file_util.RAPPOR_MODULE_NAME_PR_CONFIG if
         for_private_release else file_util.RAPPOR_MODULE_NAME_CONFIG)
-    map_file_name = (file_util.MODULE_PR_MAP_FILE_NAME if
-        for_private_release else file_util.MODULE_MAP_FILE_NAME)
-    counts_file_name = file_util.MODULE_NAME_COUNTS_FILE_NAME
-    candidates_file_name = file_util.MODULE_CANDIDATES_FILE_NAME
     input_file = (file_util.MODULE_NAME_PR_SHUFFLER_OUTPUT_FILE_NAME if
       for_private_release else
       file_util.MODULE_NAME_SHUFFLER_OUTPUT_FILE_NAME)
@@ -43,13 +39,9 @@ class ModuleNameAnalyzer:
       for_private_release else
       file_util.MODULE_NAME_ANALYZER_OUTPUT_FILE_NAME)
 
-    rappor_files = {
-        'input_file': input_file,
-        'config_file': config_file,
-        'map_file_name': map_file_name,
-        'counts_file_name': counts_file_name,
-        'output_file': output_file,
-        'candidates_file_name': candidates_file_name,
-        }
-
-    analyzer.analyzeUsingRAPPOR(rappor_files, for_private_release=for_private_release)
+    analyzer.analyzeUsingRAPPOR(input_file, config_file, output_file,
+                                metric_name="module_pr" if for_private_release
+                                  else "module",
+                                candidates_file_name=
+                                    file_util.MODULE_CANDIDATES_FILE_NAME,
+                                for_private_release=for_private_release)

@@ -25,13 +25,11 @@ class HourOfDayAnalyzer:
     ''' Use RAPPOR analysis to output estimates for number of reports by hour-
     of-the-day.
     '''
-    rappor_files = {
-        'input_file': file_util.HOUR_SHUFFLER_OUTPUT_FILE_NAME,
-        'config_file': file_util.RAPPOR_HOUR_CONFIG,
-        'map_file_name': file_util.HOUR_MAP_FILE_NAME,
-        'counts_file_name': file_util.HOUR_COUNTS_FILE_NAME,
-        'output_file': file_util.HOUR_ANALYZER_OUTPUT_FILE_NAME,
-        'candidates_file_name': '' # using basic RAPPOR
-    }
 
-    analyzer.analyzeUsingRAPPOR(rappor_files, use_basic_rappor=True)
+    analyzer.analyzeUsingRAPPOR(file_util.HOUR_SHUFFLER_OUTPUT_FILE_NAME,
+                                file_util.RAPPOR_HOUR_CONFIG,
+                                file_util.HOUR_ANALYZER_OUTPUT_FILE_NAME,
+                                metric_name="hour",
+                                basic_map_file_name= \
+                                    file_util.HOUR_BASIC_MAP_FILE_NAME,
+                                use_basic_rappor=True)

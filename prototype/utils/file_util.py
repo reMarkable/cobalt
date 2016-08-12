@@ -44,14 +44,21 @@ GENERATED_INPUT_DATA_FILE_NAME = 'input_data.csv'
 # Line 1: k,h,m,p,q,f
 # Line 2: RAPPOR params (# bloom bits, # hashes, # cohorts, and noise
 # probabilities p, q, and f.)
-RAPPOR_CITY_NAME_CONFIG = 'rappor_city_name_config.csv'
+RAPPOR_CITY_NAME_CONFIG = 'rappor_city_config.csv'
 RAPPOR_RATING_CONFIG = 'rappor_rating_config.csv'
 RAPPOR_CITY_RATINGS_ASSOC_CONFIG = 'rappor_city_ratings_assoc.csv'
-RAPPOR_MODULE_NAME_CONFIG = 'rappor_module_name_config.csv'
+RAPPOR_MODULE_NAME_CONFIG = 'rappor_module_config.csv'
 RAPPOR_HOUR_CONFIG = 'rappor_hour_config.csv'
 # RAPPOR onfig file for the private-release pipeline. We use
 # very weak RAPPOR params because we will add Laplace noise at the end.
-RAPPOR_MODULE_NAME_PR_CONFIG = 'rappor_module_name_pr_config.csv'
+RAPPOR_MODULE_NAME_PR_CONFIG = 'rappor_module_pr_config.csv'
+
+# The names of RAPPOR candidate files. (Not needed for basic RAPPOR)
+CITY_CANDIDATES_FILE_NAME = "rappor_city_candidates.csv"
+MODULE_CANDIDATES_FILE_NAME = "rappor_module_candidates.csv"
+
+# The names of basic RAPPOR  map files (Only needed for basic RAPPOR)
+HOUR_BASIC_MAP_FILE_NAME = "rappor_hour_map.csv"
 
 # Forculus config files
 FORCULUS_HELP_QUERY_CONFIG = 'forculus_help_query_config.csv'
@@ -83,17 +90,6 @@ MODULE_NAME_PR_ANALYZER_OUTPUT_FILE_NAME = "module_name_pr_analyzer_out.csv"
 HOUR_ANALYZER_OUTPUT_FILE_NAME = "hour_analyzer_out.csv"
 URL_ANALYZER_OUTPUT_FILE_NAME = "url_analyzer_out.csv"
 
-# The names of RAPPOR intermediate files
-CITY_NAME_COUNTS_FILE_NAME = "city_name_counts.csv"
-CITY_CANDIDATES_FILE_NAME = "city_candidates.csv"
-CITY_MAP_FILE_NAME = "city_map.csv"
-MODULE_NAME_COUNTS_FILE_NAME = "module_name_counts.csv"
-MODULE_CANDIDATES_FILE_NAME = "module_candidates.csv"
-MODULE_MAP_FILE_NAME = "module_map.csv"
-MODULE_PR_MAP_FILE_NAME = "module_pr_map.csv"
-HOUR_COUNTS_FILE_NAME = "hour_counts.csv"
-HOUR_MAP_FILE_NAME = "hour_map.csv"
-DECRYPTED_SHUFFLER_OUTPUT_FILE_NAME = "decrypted_shuffler_out.csv"
 
 # The csv files written by the direct-counting pipeline
 USAGE_BY_MODULE_CSV_FILE_NAME = 'usage_by_module.csv'
