@@ -118,12 +118,39 @@ def main():
   parser = argparse.ArgumentParser(description='The Cobalt command-line '
       'interface.')
 
+  # Note(rudominer) A note about the handling of optional arguments here.
+  # We create |parent_parser| and make it a parent of all of our sub parsers.
+  # When we want to add a global optional argument (i.e. one that applies
+  # to all sub-commands such as --verbose) we add the optional argument
+  # to both |parent_parser| and |parser|. The reason for this is that
+  # that appears to be the only way to get the help string  to show up both
+  # when the top-level command is invoked and when
+  # a sub-command is invoked.
+  #
+  # In other words when the user types:
+  #
+  #                python cobalt.py -h
+  #
+  # and also when the user types
+  #
+  #                python cobalt.py run -h
+  #
+  # we want to show the help for the --verbose option.
   parent_parser = argparse.ArgumentParser(add_help=False)
 
+  parser.add_argument('--verbose',
+    help='Be verbose (multiple times for more)',
+    default=0, dest='verbose_count', action='count')
   parent_parser.add_argument('--verbose',
     help='Be verbose (multiple times for more)',
     default=0, dest='verbose_count', action='count')
 
+
+  parser.add_argument('--no-use-encryption',
+    help='Do not us public key encryption for communication between the '
+    'randomizers and the analyzers via the shufflers. By default encryption '
+    'is used.',
+    dest="use_encryption", action='store_false')
   parent_parser.add_argument('--no-use-encryption',
     help='Do not us public key encryption for communication between the '
     'randomizers and the analyzers via the shufflers. By default encryption '
