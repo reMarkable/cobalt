@@ -6,13 +6,16 @@ An extensible, privacy-preserving, user-data analysis pipeline.
 * Prerequisites
   * Currently this repo has only been tested on Goobuntu.
 
-* One-time setup: This repo uses git modules. After pulling it you must do:
-  * `git submodule init`
-  * `git submodule update`
+* One-time setup:
+  * This repo uses git modules. After pulling it you must do:
+    * `git submodule init`
+    * `git submodule update`
+  * You must install clang
+    * `sudo apt-get install clang`
 
 * The script cobaltb.py orchestrates building and testing Cobalt.
-  * `python cobaltb.py build`
-  * `python cobaltb.py test`
-  * `python cobaltb.py -h` for help
+  * `cobaltb.py build`
+  * `cobaltb.py test`
+  * `cobaltb.py -h` for help
 
 * See the *prototype* subdirectory for the Cobalt prototype demo

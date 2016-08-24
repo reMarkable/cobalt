@@ -16,9 +16,15 @@ cmake_minimum_required (VERSION 2.8.10)
 
 project(cobalt)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
+SET (CMAKE_C_COMPILER "/usr/bin/clang")
+SET (CMAKE_CXX_COMPILER "/usr/bin/clang++")
+SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
+
+include_directories(${CMAKE_SOURCE_DIR})
 
 add_subdirectory(third_party/boringssl/src)
+include_directories(BEFORE PRIVATE "${BoringSSL_SOURCE_DIR}/include")
+
 add_subdirectory(third_party/googletest)
 add_subdirectory(util/crypto_util)
 

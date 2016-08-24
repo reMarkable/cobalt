@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// A dummy utility library. Just a place-holder to test the Cobalt
-// build and test framework.
+#include "util/crypto_util/random.h"
 
-#ifndef UTIL_DUMMY_UTIL_H_
-#define UTIL_DUMMY_UTIL_H_
+#include "third_party/boringssl/src/include/openssl/rand.h"
 
-// Returns n! (the factorial of n).  For negative n, n! is defined to be 1.
-int Factorial(int n);
+namespace cobalt {
+namespace crypto {
 
-// Returns true iff n is a prime number.
-bool IsPrime(int n);
+int Random_Bytes(unsigned char *buf, int num) {
+  return RAND_bytes(buf, num);
+}
 
-#endif  // UTIL_DUMMY_UTIL_H_
+}  // namespace crypto
+
+}  // namespace cobalt

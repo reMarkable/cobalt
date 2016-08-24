@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 
+import tools.cpplint as cpplint
 import tools.gtest_runner as gtest_runner
 
 THIS_DIR = os.path.dirname(__file__)
@@ -64,6 +65,9 @@ def _build():
   subprocess.check_call(['cmake', '-G', 'Ninja','..'])
   subprocess.check_call(['ninja'])
   os.chdir(savedir)
+
+def _lint():
+  cpplint.main()
 
 def _test():
   gtest_runner.run_all_gtests()
@@ -108,6 +112,10 @@ def main():
   sub_parser = subparsers.add_parser('build', parents=[parent_parser],
     help='Builds Cobalt.')
   sub_parser.set_defaults(func=_build)
+
+  sub_parser = subparsers.add_parser('lint', parents=[parent_parser],
+    help='Run language linters on all source files.')
+  sub_parser.set_defaults(func=_lint)
 
   sub_parser = subparsers.add_parser('test', parents=[parent_parser],
     help='Runs Cobalt tests. You must build first.')

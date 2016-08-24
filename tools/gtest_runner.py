@@ -35,8 +35,9 @@ def run_all_gtests():
     return
   print "Running all gtests in %s " % GTESTS_DIR
   for test_executable in os.listdir(GTESTS_DIR):
-  	print "Running %s..." % test_executable
-  	path = os.path.abspath(os.path.join(GTESTS_DIR, test_executable))
-  	subprocess.call([path])
+    print "Running %s..." % test_executable
+    path = os.path.abspath(os.path.join(GTESTS_DIR, test_executable))
+    subprocess.check_call([path], shell=True)
+    print "DONE!"
 
 
