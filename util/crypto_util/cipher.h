@@ -15,6 +15,8 @@
 #include <memory>
 #include <vector>
 
+#include "util/crypto_util/types.h"
+
 #ifndef COBALT_UTIL_CRYPTO_UTIL_CIPHER_H_
 #define COBALT_UTIL_CRYPTO_UTIL_CIPHER_H_
 
@@ -34,8 +36,6 @@ class SymmetricCipher {
  public:
   static const size_t KEY_SIZE = 32;
   static const size_t NONCE_SIZE = 16;
-
-  typedef unsigned char byte;
 
   SymmetricCipher();
   ~SymmetricCipher();

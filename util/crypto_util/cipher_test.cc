@@ -25,8 +25,6 @@
 namespace cobalt {
 namespace crypto {
 
-using byte = SymmetricCipher::byte;
-
 const char* kLine1 = "The woods are lovely, dark and deep,\n";
 const char* kLine2 = "But I have promises to keep,\n";
 const char* kLine3 = "And miles to go before I sleep,\n";

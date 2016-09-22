@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "third_party/boringssl/src/include/openssl/aead.h"
-#include "third_party/boringssl/src/include/openssl/rand.h"
 
 namespace cobalt {
 
