@@ -12,20 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8.10)
+SET (GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
 
-project(cobalt)
+file(MAKE_DIRECTORY ${GO_TESTS})
 
-SET (CMAKE_C_COMPILER "/usr/bin/clang")
-SET (CMAKE_CXX_COMPILER "/usr/bin/clang++")
-SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
-
-include_directories(${CMAKE_SOURCE_DIR})
-
-add_subdirectory(shuffler)
-
-add_subdirectory(third_party/boringssl/src)
-include_directories(BEFORE PRIVATE "${BoringSSL_SOURCE_DIR}/include")
-
-add_subdirectory(third_party/googletest)
-add_subdirectory(util/crypto_util)
+add_custom_target(shuffler ALL
+    COMMAND go build -o ${CMAKE_BINARY_DIR}/shuffler/shuffler
+    COMMAND go test -c -o ${GO_TESTS}/shuffler_test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)

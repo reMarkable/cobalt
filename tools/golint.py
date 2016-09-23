@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright 2016 The Fuchsia Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,20 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8.10)
+"""Runs gofmt on all of Cobalt's go files."""
 
-project(cobalt)
+import os
+import shutil
+import subprocess
+import sys
 
-SET (CMAKE_C_COMPILER "/usr/bin/clang")
-SET (CMAKE_CXX_COMPILER "/usr/bin/clang++")
-SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
+THIS_DIR = os.path.dirname(__file__)
+SRC_ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.pardir))
 
-include_directories(${CMAKE_SOURCE_DIR})
+GO_DIRS = [
+    os.path.join(SRC_ROOT_DIR, 'shuffler'),
+]
 
-add_subdirectory(shuffler)
+def main():
+  for dir_path in GO_DIRS:
+    print "\nLinting go files in %s...\n" % dir_path
+    p = subprocess.Popen(['gofmt', '-l', dir_path], stdout=subprocess.PIPE)
+    out = p.communicate()[0]
 
-add_subdirectory(third_party/boringssl/src)
-include_directories(BEFORE PRIVATE "${BoringSSL_SOURCE_DIR}/include")
+    if len(out) > 0:
+      print "Errors found in:\n%s" % out
 
-add_subdirectory(third_party/googletest)
-add_subdirectory(util/crypto_util)
+if __name__ == '__main__':
+  main()

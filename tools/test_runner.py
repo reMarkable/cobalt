@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs all of the gtests in the directory out/gtests"""
+"""Runs all executables (tests) in a directory"""
 
 import logging
 import os
@@ -23,20 +23,21 @@ import sys
 
 THIS_DIR = os.path.dirname(__file__)
 SRC_ROOT_DIR = os.path.join(THIS_DIR, os.pardir)
-GTESTS_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'out', 'gtests'))
 
 _logger = logging.getLogger()
 
-def run_all_gtests():
-  if not os.path.exists(GTESTS_DIR):
+def run_all_tests(dirs):
+  tdir = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'out', *dirs))
+
+  if not os.path.exists(tdir):
     print "\n*************** ERROR ****************"
-    print "Directory %s does not exist." % GTESTS_DIR
+    print "Directory %s does not exist." % tdir
     print "Run 'cobaltb.py build' first."
     return
-  print "Running all gtests in %s " % GTESTS_DIR
-  for test_executable in os.listdir(GTESTS_DIR):
+  print "Running all tests in %s " % tdir
+  for test_executable in os.listdir(tdir):
     print "Running %s..." % test_executable
-    path = os.path.abspath(os.path.join(GTESTS_DIR, test_executable))
+    path = os.path.abspath(os.path.join(tdir, test_executable))
     subprocess.check_call([path], shell=True)
     print "DONE!"
 

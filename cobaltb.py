@@ -23,7 +23,8 @@ import subprocess
 import sys
 
 import tools.cpplint as cpplint
-import tools.gtest_runner as gtest_runner
+import tools.golint as golint
+import tools.test_runner as test_runner
 
 THIS_DIR = os.path.dirname(__file__)
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
@@ -68,9 +69,11 @@ def _build():
 
 def _lint():
   cpplint.main()
+  golint.main()
 
 def _test():
-  gtest_runner.run_all_gtests()
+  test_runner.run_all_tests(['gtests'])
+  test_runner.run_all_tests(['go_tests'])
 
 def _clean():
   print "Deleting the out directory..."
