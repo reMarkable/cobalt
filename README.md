@@ -10,8 +10,8 @@ An extensible, privacy-preserving, user-data analysis pipeline.
   * This repo uses git modules. After pulling it you must do:
     * `git submodule init`
     * `git submodule update`
-  * You must install clang
-    * `sudo apt-get install clang`
+  * You must install clang, cmake and ninja
+    * `sudo apt-get install clang cmake ninja-build`
 
 * The script cobaltb.py orchestrates building and testing Cobalt.
   * `cobaltb.py build`
