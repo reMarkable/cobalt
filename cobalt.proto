@@ -1,0 +1,127 @@
+// Copyright 2016 The Fuchsia Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+syntax = "proto3";
+
+///////////////////////////////////////////////////////////////
+// Messages created in the Encoder and consumed in the Analyzer
+///////////////////////////////////////////////////////////////
+message ForculusObservation {
+  bytes ciphertext = 1;
+  bytes point_x = 2;
+  bytes point_y = 3;
+}
+
+message RapporObservation {
+  uint32 cohort = 1;
+  bytes data = 2;
+}
+
+message BasicRapporObservation {
+  bytes data = 1;
+}
+
+message ObservationPart {
+  oneof value {
+    ForculusObservation forculus = 1;
+    RapporObservation rappor = 2;
+    BasicRapporObservation basic_rappor = 3;
+  }
+
+  // The encoding_config_id, along with the customer_id and project_id
+  // (specified in the containing Observation) form the primary key into the
+  // "EncodingConfigs" table in the Cobalt configuration database. The value
+  // column is an "EncodingConfg" proto message describing how this
+  // ObservationPart is encoded.
+  uint32 encoding_config_id = 4;  // e.g. 114=(Forculus with threshold=50)
+}
+
+// A single observation consists of one or more parts. An observation is for
+// a particular metric and the parts of the observation must correspond to
+// the parts of the metric. For example if an Observation is for the
+// Metric "City-and-Rating" and this Metric has two parts named "city"
+// and "rating" then an observation for this Metric must also have two
+// parts named "city" and "rating".
+message Observation {
+  // The following three values are the primary key into the "Metrics" table
+  // in the Cobalt configuration database. The value column is a "Metric"
+  // proto message.
+  uint32 customer_id = 1;
+  uint32 project_id = 2;
+  uint32 metric_id = 3;  // e.g. 7 = City-And-Rating
+
+  // The keys are the names of the metric parts (from the Metric message
+  // in metrics.proto) to which this ObservationPart is associated.
+  map<string, ObservationPart> parts = 4;
+
+  // The day on which the observation occurred, expressed as the zero-based
+  // index relative to January 1, 1970.
+  // i.e. 0 = January 1, 1970
+  //      1 = January 2, 1970
+  //      etc.
+  //
+  // We intentionally leave the meaning of this vague and leave it to each
+  // Encoder Client to define how to make it precise. Which day it is depends on
+  // time zone. The Encoder client is free to use the local time zone or a
+  // different time zone. The Encoder client is free to add some random noise to
+  // the time at which an event occurred and this might change the day.
+  uint32 day_index = 5;
+}
+
+///////////////////////////////////////////////////////////////
+// Messages created in the Encoder and transmitted to the Shuffler
+///////////////////////////////////////////////////////////////
+message Manifest {
+  enum ShufflerPolicy {
+    UNKNOWN_POLICY = 0;
+    POLICY1 = 1;
+    POLICY2 = 2; // TODO: Add some real policies here.
+  }
+  ShufflerPolicy shuffler_policy = 2;
+  // TODO(rudominer) Consider adding a recipient field here. This would tell
+  // the shuffler which analyzer to forward the EncryptedMessage to. We
+  // don't really need this field in v 0.1 of Cobalt as there will only be
+  // one Analyzer.
+}
+
+
+// An EncryptedMessage sits inside of an |Envelope|. If the intended recipient
+// is the Analyzer then |ciphertext| contains the encryption of the standard
+// serialization of an |Observations| using the Analyzer's public key, and the
+// Shuffler cannot decrypt it. If the intended recipient is the Shuffler then
+// |ciphertext| contains the encryption of the standard serialization of
+// another |Envelope| using the Shuffler's public key and the Shuffler can
+// decrypt it.
+message EncryptedMessage {
+  enum EncryptionScheme {
+    UNKNOWN_SCHEME = 0;
+    ENVELOPE_1 = 1;
+  }
+  EncryptionScheme scheme = 1;
+  string pub_key = 2;   // Fingerprint (SHA256) of the recipient’s key. This is
+                        // used for key rotation.
+  bytes ciphertext = 3; // Encrypted Envelope or Observations
+}
+
+message Envelope {
+  Manifest manifest = 1;
+  EncryptedMessage encrypted_message = 2;
+}
+
+///////////////////////////////////////////////////////////////
+// Messages created in the Shuffler transmitted to the Analyzer
+///////////////////////////////////////////////////////////////
+
+message ObservationBatch {
+  repeated EncryptedMessage encrypted_message = 1;
+}

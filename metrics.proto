@@ -1,0 +1,98 @@
+// Copyright 2016 The Fuchsia Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+syntax = "proto3";
+
+// A Metric represents a real-world value to be observed and reported by Cobalt.
+// For example "Fuchsia Usage Hour-of-the-day" might be a metric that measures
+// Fuchsia system usage as a function of the hour of the day.
+// Each Observation from the Encoder is for a particular metric.
+// Each Observation for the metric "Fuchsia Usage Hour-of-the-day" would
+// report the hour of the day for a paticular usage of Fuchsia.
+// A Metric has one or more named parts and each Observation sent by the Encoder
+// must contain ObservationParts corresponding to these Metric parts.
+// For example the Metric described above might have only one part named
+// "hour" and so each Observation for this metric should have a single
+// ObservationPart named "hour". On the other hand the Metric "Fuchsia Usage
+// City-and-Rating" might have two parts called "City" and "Rating".
+message Metric {
+  // These three numbers form this Metric's unique ID in the Cobalt Config
+  // DB.
+  uint32 customer_id = 1;
+  uint32 project_id = 2;
+  uint32 id = 3;
+
+  string name = 4;
+  string description = 5;
+
+  repeated string parts = 6;
+}
+
+message DifferentialPrivacyConfig {
+  float epsilon = 1;
+  float delta = 2;
+}
+
+// A ReportVariable is used within a |ReportConfig|. It specifies that
+// a generated report should include a named part of a metric and it
+// gives additional information necessary to analyze that metric part.
+message ReportVariable {
+  // The named part of the metric to include in the report.
+  string metric_part = 1;
+
+  // In case the report includes a String RAPPOR analysis, this field gives
+  // the Analyzer a hint about where to find the RAPPOR map file.
+  string candidate_map_location = 2;
+}
+
+// A ReportConfig describes to the Analyzer a particular report to produce.
+// A report is for a particular metric.
+message ReportConfig {
+  // These three numbers form this ReportConfig's unique ID in the Cobalt Config
+  // DB.
+  uint32 customer_id = 1;
+  uint32 project_id = 2;
+  uint32 id = 3;
+
+  // e.g. "Fuchsia Usage by Hour"
+  string name = 4;
+
+  // e.g. "Whenever a Fuchsia device is woken up from sleep we capture the
+  //  hour of the day."
+  string description = 5;
+
+  // The customer_id, project_id and metric_id refer to the metric that this
+  // is a report of.
+  uint32 metric_id = 6;
+
+  // This field must contain either one or two values which specify the parts
+  // of the Metric to include in the report. If there is a single value that
+  // indicates a univariate analysis of the specified variable.
+  // If there are two values that specifies a Correlation Analysis between
+  // the two variables.
+  repeated ReportVariable variables = 7;
+
+  // The number of days to use for the length of an aggregation window.
+  // Must be positive.
+  //
+  // The report will aggregate observations that occurred during a window
+  // of this length. The analyzer will choose a small, implementation-defined
+  // but constant lookback period. For example if aggregation_window_days = 7
+  // and the Analyzer's lookback period is 2 days then the report will
+  // aggregate observatoins that occurred during the seven-day period ending
+  // 2 days prior to the day on which the analysis occurs.
+  uint32 aggregation_window_days = 8;
+
+  DifferentialPrivacyConfig dp_config = 9;
+}
+
