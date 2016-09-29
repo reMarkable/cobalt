@@ -20,8 +20,11 @@ SET (CMAKE_C_COMPILER "/usr/bin/clang")
 SET (CMAKE_CXX_COMPILER "/usr/bin/clang++")
 SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
 
+SET (DIR_GTESTS "${CMAKE_BINARY_DIR}/gtests")
+
 include_directories(${CMAKE_SOURCE_DIR})
 
+add_subdirectory(analyzer)
 add_subdirectory(shuffler)
 
 add_subdirectory(third_party/boringssl/src)

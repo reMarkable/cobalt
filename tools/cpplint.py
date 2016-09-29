@@ -26,6 +26,7 @@ CPP_LINT = os.path.join(SRC_ROOT_DIR, 'third_party', 'cpplint', 'cpplint.py')
 
 CPP_DIRS = [
     os.path.join(SRC_ROOT_DIR, 'util', 'crypto_util'),
+    os.path.join(SRC_ROOT_DIR, 'analyzer'),
 ]
 
 def main():

@@ -11,7 +11,13 @@ An extensible, privacy-preserving, user-data analysis pipeline.
     * `git submodule init`
     * `git submodule update`
   * You must install the following dependencies:
-    * `sudo apt-get install clang cmake ninja-build golang`
+    * clang
+    * cmake
+    * ninja-build
+    * golang
+    * protobuf3
+    * gRPC
+    * run setup.sh as root to install the dependencies
 
 * The script cobaltb.py orchestrates building and testing Cobalt.
   * `cobaltb.py build`
@@ -19,3 +25,7 @@ An extensible, privacy-preserving, user-data analysis pipeline.
   * `cobaltb.py -h` for help
 
 * See the *prototype* subdirectory for the Cobalt prototype demo
+
+* Troubleshooting:
+  * If setup.sh or compiling fails, try removing any previously installed
+    versions of protobuf and grpc.
