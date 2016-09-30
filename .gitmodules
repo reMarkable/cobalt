@@ -4,3 +4,12 @@
 [submodule "third_party/googletest"]
 	path = third_party/googletest
 	url = https://github.com/google/googletest
+[submodule "third_party/go/src/github.com/golang/protobuf"]
+	path = third_party/go/src/github.com/golang/protobuf
+	url = https://github.com/golang/protobuf
+[submodule "third_party/go/src/golang.org/x/net"]
+	path = third_party/go/src/golang.org/x/net
+	url = https://github.com/golang/net
+[submodule "third_party/go/src/google.golang.org/grpc"]
+	path = third_party/go/src/google.golang.org/grpc
+	url = https://github.com/grpc/grpc-go

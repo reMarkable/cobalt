@@ -12,12 +12,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SET (GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
+set(GO_PATH env GOPATH="${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen:${CMAKE_CURRENT_SOURCE_DIR}")
+set(GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
+set(GO_PROTO_GEN "${CMAKE_BINARY_DIR}/go-proto-gen/src/shuffler")
+set(GO_BIN ${GO_PATH} /usr/local/go/bin/go)
+set(PROTOC ${GO_PATH} protoc)
 
-file(MAKE_DIRECTORY ${GO_TESTS})
+file(MAKE_DIRECTORY ${GO_TESTS} ${GO_PROTO_GEN})
 
-add_custom_target(shuffler ALL
-    COMMAND go build -o ${CMAKE_BINARY_DIR}/shuffler/shuffler
-    COMMAND go test -c -o ${GO_TESTS}/shuffler_test
+# generate the go bindings for shuffler proto
+set(GEN_PROTO_FILE "${GO_PROTO_GEN}/shuffler.pb.go")
+add_custom_command(OUTPUT ${GEN_PROTO_FILE}
+    COMMAND ${PROTOC} -I ${CMAKE_CURRENT_SOURCE_DIR}/:${CMAKE_SOURCE_DIR}/
+            ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
+            --proto_path=${CMAKE_SOURCE_DIR}:${CMAKE_SOURCE_DIR}/third_party/go/src:.
+            --go_out=plugins=grpc:${GO_PROTO_GEN}
+    DEPENDS shuffler.proto
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Build shuffler executables
+set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
+add_custom_command(OUTPUT ${SHUFFLER_BIN}
+    COMMAND ${GO_BIN} build dispatcher
+    COMMAND ${GO_BIN} build receiver
+    # Compiles all dependencies and installs main service package
+    COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN} shuffler_main.go
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+    DEPENDS ${GEN_PROTO_FILE}
+)
+
+# Build shuffler test tools
+set(TEST_CLIENT_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler_test_client")
+add_custom_command(OUTPUT ${TEST_CLIENT_BIN}
+    COMMAND ${GO_BIN} build -o ${TEST_CLIENT_BIN} tools/test_client.go
+    DEPENDS src/tools/test_client.go ${GEN_PROTO_FILE}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Build shuffler functional tests
+set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
+set(DISPATCHER_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher_test.go")
+set(DISPATCHER_TEST_BIN ${GO_TESTS}/dispatcher_test)
+add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
+    COMMAND ${GO_BIN} test -c -o ${DISPATCHER_TEST_BIN} ${DISPATCHER_TEST_SRC}
+            ${DISPATCHER_SRC}
+    DEPENDS ${DISPATCHER_SRC} ${DISPATCHER_TEST_SRC}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Build shuffler target
+add_custom_target(shuffler_all ALL
+    DEPENDS ${SHUFFLER_BIN}
+            ${TEST_CLIENT_BIN}
+            ${DISPATCHER_TEST_BIN}
 )

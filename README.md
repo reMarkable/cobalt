@@ -26,6 +26,10 @@ An extensible, privacy-preserving, user-data analysis pipeline.
 
 * See the *prototype* subdirectory for the Cobalt prototype demo
 
+* Troubleshooting:
+  * If setup.sh or compiling fails, try removing any previously installed
+    versions of protobuf, grpc and golang.
+
 ## Google Container Engine (GCE)
 
 The cobaltb.py tool is also a helper to interact with GCE.  The following

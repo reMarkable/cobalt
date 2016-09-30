@@ -34,13 +34,34 @@ if [ "$Y" != 'y' ] ; then
     exit 1
 fi
 
+# Current dir
+CD=$(pwd)
+
 # scratch dir (if needed)
 WD=/tmp/cobalt_setup
 rm -fr $WD
 mkdir $WD
 
 # Install apt packages
-apt-get -y install clang cmake ninja-build golang libgflags-dev
+apt-get -y install clang cmake ninja-build libgflags-dev
+
+# Install golang 1.7.1
+GO_DIR=/usr/local/go
+
+if ls $GO_DIR > /dev/null ; then
+    GO_VERSION=$($GO_DIR/bin/go version | awk '{print $3}')
+fi
+
+if [ "$GO_VERSION" != "go1.7.1" ] ; then
+    if [ -d $GO_DIR ] ; then
+        echo "Removing the incompatible golang package...: ${GO_VERSION}"
+        rm -rf $GO_DIR
+    fi
+    cd $WD
+    wget https://storage.googleapis.com/golang/go1.7.1.linux-amd64.tar.gz
+    tar -C /usr/local -xvf go1.7.1.linux-amd64.tar.gz
+    export PATH=/usr/local/go/bin:$PATH
+fi
 
 # Install protobuf 3
 if ! which protoc > /dev/null ||
@@ -83,5 +104,15 @@ if [ ! -f /usr/lib/libgoogleapis.so ] ; then
     cd google
     find . -name \*.h -exec cp --parents {} /usr/include/google/ \;
 fi
+
+# Build and install protoc-gen-go binary
+GOPATH=${CD}/third_party/go
+export GOPATH
+if ! which protoc-gen-go > /dev/null ; then
+    cd $WD
+    go build -o $PREFIX/bin/protoc-gen-go github.com/golang/protobuf/protoc-gen-go
+fi
+
+unset GOPATH
 
 rm -fr $WD

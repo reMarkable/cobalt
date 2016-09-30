@@ -12,26 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-A Shuffler receives ciphertexts from Encoders (end users), buffers them
-according to a policy, and then batch sends them in a random order to an
-Analyzer.
+// Shuffler receives ciphertexts from Encoders (end users), buffers them
+// according to a policy, and then batch sends them in a random order to an
+// Analyzer. The purpose is to break linkability between end users and
+// ciphertexts from the Analyzer's point of view. The Analyzer does not know
+// which end user produced which ciphertext.
 
-The purpose is to break linkability between end users and ciphertexts from the
-Analyzer's point of view.  The Analyzer does not know which end user produced
-which ciphertext.
-*/
-package main
+package dispatcher
 
-import (
-	"math/rand"
-)
+import "math/rand"
 
-// TODO(bittau) define policies
+// Policy defines instructions on how to route messages to Analyzers
 type Policy struct{}
 
-// You can add a ciphertext to a shuffler.  It will eventually be sent out to an
-// Analyzer according to a policy.
+// Shuffler interface provides functionality to add a policy to a ciphertext.
+// It will eventually be sent out to an Analyzer according to a policy.
 // TODO(bittau) use protobus directly once they are defined and committed
 type Shuffler interface {
 	add(policy Policy, ciphertext []byte)
@@ -42,8 +37,9 @@ type Analyzer interface {
 	send(ciphertexts [][]byte)
 }
 
-// An implementation of a basic shuffler.  It will wait until batchsize
-// ciphertexts are received, and then send them in a random order to anaylzer
+// BasicShuffler is An implementation of a basic shuffler.  It will wait until
+// batchsize ciphertexts are received, and then send them in a random order to
+// anaylzer
 type BasicShuffler struct {
 	analyzer  Analyzer
 	batchsize int
@@ -56,11 +52,11 @@ func (s *BasicShuffler) add(policy Policy, ciphertext []byte) {
 	s.ciphertexts = append(s.ciphertexts, ciphertext)
 
 	if len(s.ciphertexts) >= s.batchsize {
-		s.shuffle_and_send()
+		s.shuffleAndSend()
 	}
 }
 
-func (s *BasicShuffler) shuffle_and_send() {
+func (s *BasicShuffler) shuffleAndSend() {
 	num := len(s.ciphertexts)
 	shuffled := make([][]byte, num)
 

@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-import "cobalt.proto";
+import "payload.proto";
 
 import "google/protobuf/empty.proto";
 
