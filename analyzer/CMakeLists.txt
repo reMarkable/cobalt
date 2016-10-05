@@ -24,7 +24,10 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
                 --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
     DEPENDS analyzer.proto
 )
-set(PROTOBUF_LIBRARY ${PROTOBUF_LIBRARY} grpc++)
+# Note - we specify the exact library version because dev environments have
+# protobuf.so.8 (v2) preinstalled in a higher priority search path.  Instead we
+# want to link against protobuf v3
+set(PROTOBUF_LIBRARY /usr/lib/libprotobuf.so.10 grpc++)
 set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 
 # Build the analyzer library
