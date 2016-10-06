@@ -86,13 +86,18 @@ message ReportConfig {
   // Must be positive.
   //
   // The report will aggregate observations that occurred during a window
-  // of this length. The analyzer will choose a small, implementation-defined
-  // but constant lookback period. For example if aggregation_window_days = 7
-  // and the Analyzer's lookback period is 2 days then the report will
-  // aggregate observatoins that occurred during the seven-day period ending
-  // 2 days prior to the day on which the analysis occurs.
+  // of this length. See also the next field, aggregation_lookback_days.
   uint32 aggregation_window_days = 8;
 
-  DifferentialPrivacyConfig dp_config = 9;
+  // The number of days prior to the day on which an analysis occurs
+  // that the aggregation window should end. Must be positive.
+  //
+  // For example if aggregation_window_days = 7
+  // and aggregation_lookback_days = 3 then the report will
+  // aggregate observatoins that occurred during the seven-day period ending
+  // 3 days prior to the day on which the analysis occurs.
+  uint32 aggregation_lookback_days = 9;
+
+  DifferentialPrivacyConfig dp_config = 10;
 }
 
