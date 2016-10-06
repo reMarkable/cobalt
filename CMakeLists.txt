@@ -22,8 +22,21 @@ SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11 -stdlib=libstdc++ -
 
 SET (DIR_GTESTS "${CMAKE_BINARY_DIR}/gtests")
 
-include_directories(${CMAKE_SOURCE_DIR})
+# Note - we specify the exact library version because dev environments have
+# protobuf.so.8 (v2) preinstalled in a higher priority search path.  Instead we
+# want to link against protobuf v3
+set(PROTOBUF_LIBRARY /usr/lib/libprotobuf.so.10 grpc++)
 
+include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_BINARY_DIR})
+
+# Run protoc on the top-level protos in order to generate C++ files for them.
+find_package(Protobuf REQUIRED)
+protobuf_generate_cpp(COBALT_PROTO_SRCS COBALT_PROTO_HDRS
+                      cobalt.proto encodings.proto metrics.proto)
+add_custom_target(build_protos, DEPENDS ${COBALT_PROTO_SRCS})
+
+add_subdirectory(algorithms)
 add_subdirectory(analyzer)
 add_subdirectory(shuffler)
 

@@ -24,19 +24,32 @@ THIS_DIR = os.path.dirname(__file__)
 SRC_ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.pardir))
 CPP_LINT = os.path.join(SRC_ROOT_DIR, 'third_party', 'cpplint', 'cpplint.py')
 
-CPP_DIRS = [
-    os.path.join(SRC_ROOT_DIR, 'util', 'crypto_util'),
-    os.path.join(SRC_ROOT_DIR, 'analyzer'),
+# A list of directories which should be skipped while walking the directory
+# tree looking for C++ files to be linted. We also skip directories starting
+# with a "." such as ".git"
+SKIP_LINT_DIRS = [
+    os.path.join(SRC_ROOT_DIR, 'docker'),
+    os.path.join(SRC_ROOT_DIR, 'out'),
+    os.path.join(SRC_ROOT_DIR, 'prototype'),
+    os.path.join(SRC_ROOT_DIR, 'shuffler'),
+    os.path.join(SRC_ROOT_DIR, 'third_party'),
+    os.path.join(SRC_ROOT_DIR, 'tools'),
 ]
 
 def main():
-  for dir_path in CPP_DIRS:
-    print "\nLinting cpp files in %s...\n" % dir_path
-    for f in os.listdir(dir_path):
+  print "\nLinting C++ files...\n"
+  for root, dirs, files in os.walk(SRC_ROOT_DIR):
+    for f in files:
       if f.endswith('.h') or f.endswith('.cc'):
-        full_path = os.path.join(dir_path, f)
+        full_path = os.path.join(root, f)
         subprocess.call([CPP_LINT,  full_path])
         print
+
+    # Before recursing into directories remove the ones we want to skip.
+    dirs_to_skip = [dir for dir in dirs if dir.startswith(".") or
+        os.path.join(root, dir) in SKIP_LINT_DIRS]
+    for d in dirs_to_skip:
+      dirs.remove(d)
 
 if __name__ == '__main__':
   main()

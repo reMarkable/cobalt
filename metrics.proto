@@ -13,6 +13,10 @@
 // limitations under the License.
 syntax = "proto3";
 
+import "encodings.proto";
+
+package cobalt;
+
 // A Metric represents a real-world value to be observed and reported by Cobalt.
 // For example "Fuchsia Usage Hour-of-the-day" might be a metric that measures
 // Fuchsia system usage as a function of the hour of the day.
@@ -82,21 +86,16 @@ message ReportConfig {
   // the two variables.
   repeated ReportVariable variables = 7;
 
-  // The number of days to use for the length of an aggregation window.
-  // Must be positive.
-  //
-  // The report will aggregate observations that occurred during a window
-  // of this length. See also the next field, aggregation_lookback_days.
-  uint32 aggregation_window_days = 8;
+  // The type of epoch to use when aggregating Observations for a report.
+  // This also determines the frequency of generating reports.
+  EpochType aggregation_epoch_type = 8;
 
-  // The number of days prior to the day on which an analysis occurs
-  // that the aggregation window should end. Must be positive.
-  //
-  // For example if aggregation_window_days = 7
-  // and aggregation_lookback_days = 3 then the report will
-  // aggregate observatoins that occurred during the seven-day period ending
-  // 3 days prior to the day on which the analysis occurs.
-  uint32 aggregation_lookback_days = 9;
+  // The number of days after an epoch ends before a report analyzing that
+  // epoch should be run. For example if |aggregation_epoch_type| = WEEK
+  // and report_delay_days = 3 then an analyis will be executed and a report
+  // will be generated every Tuesday for the 7 day period ending on the Saturday
+  // three days prior to the report day.
+  uint32 report_delay_days = 9;
 
   DifferentialPrivacyConfig dp_config = 10;
 }

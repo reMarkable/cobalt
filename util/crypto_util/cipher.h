@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef COBALT_UTIL_CRYPTO_UTIL_CIPHER_H_
+#define COBALT_UTIL_CRYPTO_UTIL_CIPHER_H_
+
 #include <memory>
 #include <vector>
 
 #include "util/crypto_util/types.h"
-
-#ifndef COBALT_UTIL_CRYPTO_UTIL_CIPHER_H_
-#define COBALT_UTIL_CRYPTO_UTIL_CIPHER_H_
 
 namespace cobalt {
 

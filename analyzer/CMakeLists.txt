@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-find_package(Protobuf REQUIRED)
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS analyzer.proto)
 
 # generate the gRPC service.  CMake doesn't support it by default.
@@ -24,14 +23,10 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
                 --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
     DEPENDS analyzer.proto
 )
-# Note - we specify the exact library version because dev environments have
-# protobuf.so.8 (v2) preinstalled in a higher priority search path.  Instead we
-# want to link against protobuf v3
-set(PROTOBUF_LIBRARY /usr/lib/libprotobuf.so.10 grpc++)
+
 set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 
 # Build the analyzer library
-include_directories(${CMAKE_BINARY_DIR})
 add_library(cobalt_analyzer SHARED analyzer.cc ${PROTO_SRCS})
 target_link_libraries(cobalt_analyzer ${PROTOBUF_LIBRARY})
 
