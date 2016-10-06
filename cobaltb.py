@@ -29,6 +29,11 @@ import tools.test_runner as test_runner
 THIS_DIR = os.path.dirname(__file__)
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 
+IMAGES = ["analyzer"]
+GCE_PROJECT = "shuffler-test"
+GCE_CLUSTER = "cluster-1"
+GCE_TAG = "us.gcr.io/google.com/%s" % GCE_PROJECT
+
 _logger = logging.getLogger()
 _verbose_count = 0
 
@@ -79,6 +84,58 @@ def _clean():
   print "Deleting the out directory..."
   shutil.rmtree(OUT_DIR, ignore_errors=True)
 
+def _gce_build():
+  # Copy over the dependencies for the cobalt base image
+  cobalt = "%s/cobalt" % OUT_DIR
+
+  if not os.path.exists(cobalt):
+    os.mkdir(cobalt)
+
+  for dep in ["/usr/lib/libprotobuf.so.10",
+              "/usr/lib/libgrpc++.so.1",
+              "/usr/lib/libgrpc.so.1",
+             ]:
+    shutil.copy(dep, cobalt)
+
+  # Build all images
+  for i in ["cobalt"] + IMAGES:
+    # copy over the dockerfile
+    dstdir = "%s/%s" % (OUT_DIR, i)
+    shutil.copy("%s/docker/%s/Dockerfile" % (THIS_DIR, i), dstdir)
+
+    subprocess.check_call(["docker", "build", dstdir])
+
+def _gce_push():
+  for i in IMAGES:
+    tag = "%s/%s" % (GCE_TAG, i)
+    subprocess.check_call(["docker", "tag", "-f", i, tag])
+    subprocess.check_call(["gcloud", "docker", "push", tag])
+
+def kube_setup():
+  subprocess.check_call(["gcloud", "container", "clusters", "get-credentials",
+                         GCE_CLUSTER, "--project",
+                         "google.com:%s" % GCE_PROJECT])
+
+def _gce_start():
+  kube_setup()
+
+  for i in IMAGES:
+    print("Starting %s" % i)
+
+    subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
+                           "--port=8080"])
+
+    subprocess.check_call(["kubectl", "expose", "deployment", i,
+                           "--type=LoadBalancer"])
+
+def _gce_stop():
+  kube_setup()
+
+  for i in IMAGES:
+    print("Stopping %s" % i)
+
+    subprocess.check_call(["kubectl", "delete", "service,deployment", i,])
+
 def main():
   parser = argparse.ArgumentParser(description='The Cobalt command-line '
       'interface.')
@@ -127,6 +184,22 @@ def main():
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes the "out" directory.')
   sub_parser.set_defaults(func=_clean)
+
+  sub_parser = subparsers.add_parser('gce_build', parents=[parent_parser],
+    help='Builds Docker images for GCE.')
+  sub_parser.set_defaults(func=_gce_build)
+
+  sub_parser = subparsers.add_parser('gce_push', parents=[parent_parser],
+    help='Push docker images to GCE.')
+  sub_parser.set_defaults(func=_gce_push)
+
+  sub_parser = subparsers.add_parser('gce_start', parents=[parent_parser],
+    help='Start GCE instances.')
+  sub_parser.set_defaults(func=_gce_start)
+
+  sub_parser = subparsers.add_parser('gce_stop', parents=[parent_parser],
+    help='Stop GCE instances.')
+  sub_parser.set_defaults(func=_gce_stop)
 
   args = parser.parse_args()
   global _verbose_count
