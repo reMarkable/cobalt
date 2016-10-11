@@ -25,7 +25,6 @@
 namespace cobalt {
 namespace forculus {
 
-
 enum Status {
   kOK = 0,
   kInvalidInput,

@@ -52,21 +52,45 @@ message ForculusConfig {
 }
 
 message RapporConfig {
-  uint32 k = 1;
-  uint32 h = 2;
-  uint32 m = 3;
-  float p = 4;
-  float q = 5;
-  float f = 6;
+  // k = the number of Bloom filter bits. Must be positive.
+  uint32 num_bloom_bits = 1;
+
+  // h = the number of hashes. Must be positive.
+  uint32 num_hashes = 2;
+
+  // m = the number of cohorts. Must be positive.
+  uint32 num_cohorts = 3;
+
+  // All probabilities below must be in the range [0.0, 1.0]
+
+  // p = p(a zero bit is changed to a one bit in the IRR)
+  float prob_0_becomes_1 = 4;
+
+  // q = p(a one bit remains a one bit in the IRR)
+  float prob_1_stays_1 = 5;
+
+  // f = p(a bit is randomly assigned a value in the PRR)
+  // Note: Not Implemented in version 0.1 of Cobalt.
+  // This value will be ignored.
+  float prob_rr = 6;
 }
 
 message BasicRapporConfig {
-  uint32 k = 1;
-  float p = 4;
-  float q = 5;
-  float f = 6;
+  // All probabilities below must be in the range [0.0, 1.0]
+
+  // p = p(a zero bit is changed to a one bit in the IRR)
+  float prob_0_becomes_1 = 1;
+
+  // q = p(a one bit remains a one bit in the IRR)
+  float prob_1_stays_1 = 2;
+
+  // f = p(a bit is randomly assigned a value in the PRR)
+  float prob_rr = 3;
+
   // For basic RAPPOR the Encoder needs to know the list of categories.
-  // They are listed in order of their category.
+  // The categories are indexed from 0 to n - 1 where n is the number
+  // of categories. The index of a category determines its bit position in
+  // the encoding. The categories are listed here in index order.
   repeated string categories = 7;
 }
 
