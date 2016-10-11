@@ -39,9 +39,10 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
   // Wait() to return.
   void Wait();
 
-  // A simple gRPC for testing
-  grpc::Status EchoTest(grpc::ServerContext* context, const EchoMsg* request,
-                        EchoMsg* reply) override;
+  // Shuffler -> Analyzer entry point
+  grpc::Status AddObservations(grpc::ServerContext* context,
+                               const ObservationBatch* request,
+                               google::protobuf::Empty* response) override;
 
  private:
   std::unique_ptr<grpc::Server> server_;

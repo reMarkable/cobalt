@@ -16,6 +16,7 @@
 
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
+using google::protobuf::Empty;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -42,7 +43,6 @@ class AnalyzerFunctionalTest : public ::testing::Test {
 // We connect to the analyzer and send a test RPC and assert the result
 TEST_F(AnalyzerFunctionalTest, TestGRPC) {
   char dst[1024];
-  const char *kTestMsg = "test_message";
   ClientContext context;
 
   // Connect to the analyzer
@@ -54,15 +54,11 @@ TEST_F(AnalyzerFunctionalTest, TestGRPC) {
   std::unique_ptr<Analyzer::Stub> analyzer(Analyzer::NewStub(chan));
 
   // Execute the RPC
-  EchoMsg req, reply;
+  ObservationBatch req;
+  Empty resp;
 
-  req.set_msg(kTestMsg);
-
-  Status status = analyzer->EchoTest(&context, req, &reply);
+  Status status = analyzer->AddObservations(&context, req, &resp);
   ASSERT_TRUE(status.ok());
-
-  // Check the result
-  ASSERT_STREQ(reply.msg().c_str(), kTestMsg);
 }
 
 }  // namespace analyzer

@@ -14,12 +14,15 @@
 
 syntax = "proto3";
 
+import "cobalt.proto";
+
+import "google/protobuf/empty.proto";
+
 package cobalt.analyzer;
 
+// The Analyzer receives observations from the shufflers.  Reports based on
+// these observations are periodically generated and published.
 service Analyzer {
-  rpc EchoTest (EchoMsg) returns (EchoMsg) {}
-}
-
-message EchoMsg {
-  string msg = 1;
+  // Shuffler -> Analyzer RPC
+  rpc AddObservations (ObservationBatch) returns (google.protobuf.Empty) {}
 }

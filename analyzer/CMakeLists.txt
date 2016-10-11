@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS analyzer.proto)
 
 # generate the gRPC service.  CMake doesn't support it by default.
 set(PROTO_GRPC "${CMAKE_CURRENT_BINARY_DIR}/analyzer.grpc.pb.cc")
 add_custom_command(OUTPUT ${PROTO_GRPC}
     COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/analyzer.proto
-		-I ${CMAKE_CURRENT_SOURCE_DIR}
+                -I ${CMAKE_CURRENT_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
                 --grpc_out=.
                 --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
     DEPENDS analyzer.proto
@@ -28,7 +29,7 @@ set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 
 # Build the analyzer library
 add_library(cobalt_analyzer SHARED analyzer.cc ${PROTO_SRCS})
-target_link_libraries(cobalt_analyzer ${PROTOBUF_LIBRARY})
+target_link_libraries(cobalt_analyzer ${PROTOBUF_LIBRARY} ${COBALT_PROTO_SRCS})
 
 # Build the analyzer executable
 add_executable(analyzer main.cc)

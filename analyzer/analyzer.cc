@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 
+using google::protobuf::Empty;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
@@ -27,10 +28,9 @@ using grpc::Status;
 namespace cobalt {
 namespace analyzer {
 
-Status AnalyzerServiceImpl::EchoTest(ServerContext* context,
-                                     const EchoMsg* request,
-                                     EchoMsg* reply) {
-  reply->set_msg(request->msg());
+Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
+                                            const ObservationBatch* request,
+                                            Empty* response) {
   return Status::OK;
 }
 
