@@ -44,11 +44,11 @@ message ForculusConfig {
   uint32 threshold = 1;
 
   // Forculus threshold encryption is based on the current epoch. For example
-  // if epoch_size = WEEK and threshold = 20 then the criteria for being able
+  // if epoch_type = WEEK and threshold = 20 then the criteria for being able
   // to decrypt a given ciphertext is that at least 20 different clients
   // all submit observations of that ciphertext tagged with a day_index in
   // the same week, from Sunday to Saturday.
-  EpochType epoch_size = 2;
+  EpochType epoch_type = 2;
 }
 
 message RapporConfig {
