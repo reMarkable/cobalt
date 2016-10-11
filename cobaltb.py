@@ -64,7 +64,7 @@ def ensureDir(dir_path):
   if not os.path.exists(dir_path):
     os.makedirs(dir_path)
 
-def _build():
+def _build(args):
   ensureDir(OUT_DIR)
   savedir = os.getcwd()
   os.chdir(OUT_DIR)
@@ -72,19 +72,39 @@ def _build():
   subprocess.check_call(['ninja'])
   os.chdir(savedir)
 
-def _lint():
+def _lint(args):
   cpplint.main()
   golint.main()
 
-def _test():
+def _test(args):
   test_runner.run_all_tests(['gtests'])
   test_runner.run_all_tests(['go_tests'])
 
-def _clean():
-  print "Deleting the out directory..."
-  shutil.rmtree(OUT_DIR, ignore_errors=True)
+# Files and directories in the out directory to NOT delete when doing
+# a partial clean.
+TO_SKIP_ON_PARTIAL_CLEAN = [
+  'CMakeFiles', 'third_party', '.ninja_deps', '.ninja_log', 'CMakeCache.txt',
+  'build.ninja', 'cmake_install.cmake', 'rules.ninja'
+]
 
-def _gce_build():
+def _clean(args):
+  if args.full:
+    print "Deleting the out directory..."
+    shutil.rmtree(OUT_DIR, ignore_errors=True)
+  else:
+    print "Doing a partial clean. Pass --full for a full clean."
+    if not os.path.exists(OUT_DIR):
+      return
+    for f in os.listdir(OUT_DIR):
+      if not f in TO_SKIP_ON_PARTIAL_CLEAN:
+        full_path = os.path.join(OUT_DIR, f)
+        if os.path.isfile(full_path):
+          os.remove(full_path)
+        else:
+           shutil.rmtree(full_path, ignore_errors=True)
+
+
+def _gce_build(args):
   # Copy over the dependencies for the cobalt base image
   cobalt = "%s/cobalt" % OUT_DIR
 
@@ -105,7 +125,7 @@ def _gce_build():
 
     subprocess.check_call(["docker", "build", dstdir])
 
-def _gce_push():
+def _gce_push(args):
   for i in IMAGES:
     tag = "%s/%s" % (GCE_TAG, i)
     subprocess.check_call(["docker", "tag", "-f", i, tag])
@@ -116,7 +136,7 @@ def kube_setup():
                          GCE_CLUSTER, "--project",
                          "google.com:%s" % GCE_PROJECT])
 
-def _gce_start():
+def _gce_start(args):
   kube_setup()
 
   for i in IMAGES:
@@ -128,7 +148,7 @@ def _gce_start():
     subprocess.check_call(["kubectl", "expose", "deployment", i,
                            "--type=LoadBalancer"])
 
-def _gce_stop():
+def _gce_stop(args):
   kube_setup()
 
   for i in IMAGES:
@@ -182,8 +202,11 @@ def main():
   sub_parser.set_defaults(func=_test)
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
-    help='Deletes the "out" directory.')
+    help='Deletes some or all of the build products.')
   sub_parser.set_defaults(func=_clean)
+  sub_parser.add_argument('--full',
+      help='Delete the entire "out" directory.',
+      action='store_true')
 
   sub_parser = subparsers.add_parser('gce_build', parents=[parent_parser],
     help='Builds Docker images for GCE.')
@@ -206,7 +229,7 @@ def main():
   _verbose_count = args.verbose_count
   _initLogging(_verbose_count)
 
-  return args.func()
+  return args.func(args)
 
 
 if __name__ == '__main__':
