@@ -40,7 +40,7 @@ rm -fr $WD
 mkdir $WD
 
 # Install apt packages
-apt-get -y install clang cmake ninja-build golang
+apt-get -y install clang cmake ninja-build golang libgflags-dev
 
 # Install protobuf 3
 if ! which protoc > /dev/null ||

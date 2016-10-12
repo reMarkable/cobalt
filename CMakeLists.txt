@@ -39,6 +39,7 @@ add_custom_target(build_protos, DEPENDS ${COBALT_PROTO_SRCS})
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)
 add_subdirectory(shuffler)
+add_subdirectory(tools)
 
 add_subdirectory(third_party/boringssl/src)
 include_directories(BEFORE PRIVATE "${BoringSSL_SOURCE_DIR}/include")

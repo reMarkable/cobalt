@@ -33,7 +33,6 @@ SKIP_LINT_DIRS = [
     os.path.join(SRC_ROOT_DIR, 'prototype'),
     os.path.join(SRC_ROOT_DIR, 'shuffler'),
     os.path.join(SRC_ROOT_DIR, 'third_party'),
-    os.path.join(SRC_ROOT_DIR, 'tools'),
 ]
 
 def main():
