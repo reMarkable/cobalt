@@ -31,8 +31,9 @@ namespace hmac {
 // 100 to 0 and we check that it completes without an error.
 TEST(HmacTest, VariousKeyLengths) {
   byte key[100], data[100];
-  Random_Bytes(key, 100);
-  Random_Bytes(data, 100);
+  Random rand;
+  rand.RandomBytes(key, 100);
+  rand.RandomBytes(data, 100);
   byte tag[hmac::TAG_SIZE];
   for (size_t key_len = 0; key_len <= 100; key_len++) {
     EXPECT_TRUE(HMAC(key, key_len, data, 100 - key_len, tag))
@@ -66,10 +67,11 @@ void checkEqualHmacs(byte key1[32], byte key2[32], byte data1[100],
 // different tag.
 TEST(HmacTest, EqualAndNotEqual) {
   byte key1[32], key2[32], data1[100], data2[100];
-  Random_Bytes(key1, 32);
-  Random_Bytes(key2, 32);
-  Random_Bytes(data1, 100);
-  Random_Bytes(data2, 100);
+  Random rand;
+  rand.RandomBytes(key1, 32);
+  rand.RandomBytes(key2, 32);
+  rand.RandomBytes(data1, 100);
+  rand.RandomBytes(data2, 100);
 
   checkEqualHmacs(key1, key1, data1, data1, true);
   checkEqualHmacs(key1, key1, data1, data2, false);

@@ -15,13 +15,33 @@
 #ifndef COBALT_UTIL_CRYPTO_UTIL_RANDOM_H_
 #define COBALT_UTIL_CRYPTO_UTIL_RANDOM_H_
 
+#include <cstdint>
+
+#include "util/crypto_util/types.h"
+
 namespace cobalt {
 
 namespace crypto {
 
-// Writes |num| bytes of random data to buf and returns one. The caller
-// must ensure that |buf| has enough space.
-int Random_Bytes(unsigned char *buf, int num);
+// An instance of Random provides some utility functions for retrieving
+// randomness.
+class Random {
+ public:
+  virtual ~Random() {}
+
+  // Writes |num| bytes of random data from a uniform distribution to buf.
+  // The caller must ensure that |buf| has enough space.
+  virtual void RandomBytes(byte *buf, std::size_t num);
+
+  // Returns a uniformly random integer in the range [0, 2^32-1].
+  uint32_t RandomUint32();
+
+  // Returns 8 independent random bits. For each bit the probability of being
+  // equal to one is the given p. p must be in the range [0.0, 1.0] or the
+  // result is undefined. p will be rounded to the nearest value of the form
+  // n/(2^32) where n is an integer in the range [0, 2^32].
+  byte RandomBits(float p);
+};
 
 }  // namespace crypto
 

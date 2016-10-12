@@ -12,15 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/crypto_util/random.h"
+#include <cmath>
 
+#include "util/crypto_util/random.h"
 #include "third_party/boringssl/src/include/openssl/rand.h"
 
 namespace cobalt {
 namespace crypto {
 
-int Random_Bytes(unsigned char *buf, int num) {
-  return RAND_bytes(buf, num);
+void Random::RandomBytes(byte *buf, std::size_t num) {
+  RAND_bytes(buf, num);
+}
+
+uint32_t Random::RandomUint32() {
+  uint32_t x;
+  RandomBytes(reinterpret_cast<byte*>(&x), 4);
+  return x;
+}
+
+byte Random::RandomBits(float p) {
+  if (p <= 0.0 || p > 1.0) {
+    return 0;
+  }
+  byte ret_val = 0;
+
+  // threshold is the integer n in the range [0, 2^32] such that
+  // n/2^32 best approximates p.
+  uint64_t threshold = round(
+      static_cast<double>(p) * (static_cast<double>(UINT32_MAX) + 1));
+
+  for (int i = 0; i < 8; i++) {
+    uint8_t random_bit = (RandomUint32() < threshold);
+    ret_val |= random_bit << i;
+  }
+  return ret_val;
 }
 
 }  // namespace crypto

@@ -21,6 +21,7 @@
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 #include "util/crypto_util/errors.h"
 #include "util/crypto_util/random.h"
+#include "util/crypto_util/types.h"
 
 namespace cobalt {
 namespace crypto {
@@ -43,8 +44,9 @@ void doSymmetricCipherTest(SymmetricCipher* cipher,
   // Initialize
   byte key[SymmetricCipher::KEY_SIZE];
   byte nonce[SymmetricCipher::NONCE_SIZE];
-  Random_Bytes(key, SymmetricCipher::KEY_SIZE);
-  Random_Bytes(nonce, SymmetricCipher::NONCE_SIZE);
+  Random rand;
+  rand.RandomBytes(key, SymmetricCipher::KEY_SIZE);
+  rand.RandomBytes(nonce, SymmetricCipher::NONCE_SIZE);
   EXPECT_TRUE(cipher->setKey(key)) << GetLastErrorMessage();
 
   // Encrypt
