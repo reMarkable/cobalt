@@ -20,6 +20,10 @@ import "google/protobuf/empty.proto";
 
 package cobalt.analyzer;
 
+message ObservationBatch {
+  repeated EncryptedMessage encrypted_message = 1;
+}
+
 // The Analyzer receives observations from the shufflers.  Reports based on
 // these observations are periodically generated and published.
 service Analyzer {

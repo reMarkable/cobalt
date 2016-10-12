@@ -119,11 +119,3 @@ message Envelope {
   Manifest manifest = 1;
   EncryptedMessage encrypted_message = 2;
 }
-
-///////////////////////////////////////////////////////////////
-// Messages created in the Shuffler transmitted to the Analyzer
-///////////////////////////////////////////////////////////////
-
-message ObservationBatch {
-  repeated EncryptedMessage encrypted_message = 1;
-}
