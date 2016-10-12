@@ -12,21 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <err.h>
+#ifndef COBALT_ANALYZER_STORE_MEM_STORE_H_
+#define COBALT_ANALYZER_STORE_MEM_STORE_H_
 
-#include "analyzer/analyzer.h"
-#include "analyzer/store/bigtable_store.h"
+#include <map>
+#include <string>
 
-int main(int argc, char *argv[]) {
-  if (argc < 2)
-    errx(1, "Usage: %s <table_name>", argv[0]);
+#include "analyzer/store/store.h"
 
-  printf("Starting analyzer...\n");
+namespace cobalt {
+namespace analyzer {
 
-  cobalt::analyzer::BigtableStore store;
-  store.initialize(argv[1]);
+// An in-memory key value store using std::map
+class MemStore : public Store {
+ public:
+  int put(const std::string& key, const std::string& val) override;
+  int get(const std::string& key, std::string* out) override;
 
-  cobalt::analyzer::AnalyzerServiceImpl analyzer(&store);
-  analyzer.Start();
-  analyzer.Wait();
-}
+  std::map<std::string, std::string> data_;
+};
+
+}  // namespace analyzer
+}  // namespace cobalt
+
+#endif  // COBALT_ANALYZER_STORE_MEM_STORE_H_

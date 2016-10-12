@@ -53,9 +53,11 @@ gce\_stop    - Stops the cobalt components.
 
 * gcloud components install kubectl
 
-The gce\_start and gce\_stop commands require setting the environment variable
-GOOGLE\_APPLICATION\_CREDENTIALS to point to the JSON file containing
-credentials.  Follow the instructions of step "1." of "How the Application
-Default Credentials work" from:
+### GCE Authentication
+
+Tasks like gce\_start, gce\_stop or running the Analyzer outside of GCE require
+setting the environment variable GOOGLE\_APPLICATION\_CREDENTIALS to point to
+the JSON file containing credentials.  Follow the instructions of step "1." of
+"How the Application Default Credentials work" from:
 
 <https://developers.google.com/identity/protocols/application-default-credentials>

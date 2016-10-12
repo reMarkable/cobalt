@@ -20,6 +20,7 @@
 #include <memory>
 
 #include "analyzer/analyzer.grpc.pb.h"
+#include "analyzer/store/store.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -29,6 +30,8 @@ const int kAnalyzerPort = 8080;
 // Main analyzer class
 class AnalyzerServiceImpl final : public Analyzer::Service {
  public:
+  explicit AnalyzerServiceImpl(Store* store);
+
   // Starts the analyzer service
   void Start();
 
@@ -46,6 +49,7 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
 
  private:
   std::unique_ptr<grpc::Server> server_;
+  Store* store_;
 };
 
 }  // namespace analyzer

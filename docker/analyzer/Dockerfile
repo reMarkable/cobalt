@@ -19,5 +19,5 @@ COPY analyzer /usr/local/bin/
 
 RUN ldconfig
 
-CMD analyzer
+ENTRYPOINT ["analyzer"]
 EXPOSE 8080

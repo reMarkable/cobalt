@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set(ANALYZER_SRCS
+    analyzer.cc
+    store/bigtable_store.cc
+    store/mem_store.cc
+    )
+
 set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS analyzer.proto)
 
@@ -28,8 +34,9 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
 set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 
 # Build the analyzer library
-add_library(cobalt_analyzer SHARED analyzer.cc ${PROTO_SRCS})
-target_link_libraries(cobalt_analyzer ${PROTOBUF_LIBRARY} ${COBALT_PROTO_SRCS})
+add_library(cobalt_analyzer SHARED ${ANALYZER_SRCS} ${PROTO_SRCS})
+target_link_libraries(cobalt_analyzer ${PROTOBUF_LIBRARY} ${COBALT_PROTO_SRCS}
+                      googleapis)
 
 # Build the analyzer executable
 add_executable(analyzer main.cc)

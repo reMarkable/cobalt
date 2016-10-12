@@ -17,7 +17,9 @@
 
 #include "analyzer/analyzer.h"
 
-#include <stdio.h>
+#include <time.h>
+
+#include <string>
 
 using google::protobuf::Empty;
 using grpc::Server;
@@ -28,9 +30,21 @@ using grpc::Status;
 namespace cobalt {
 namespace analyzer {
 
+AnalyzerServiceImpl::AnalyzerServiceImpl(Store* store)
+    : store_(store) {
+}
+
 Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
                                             const ObservationBatch* request,
                                             Empty* response) {
+  char key[64];
+  std::string val;
+
+  snprintf(key, sizeof(key), "%ld", time(NULL));
+  request->SerializeToString(&val);
+
+  store_->put(key, val);
+
   return Status::OK;
 }
 

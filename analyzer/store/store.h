@@ -12,21 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <err.h>
+#ifndef COBALT_ANALYZER_STORE_STORE_H_
+#define COBALT_ANALYZER_STORE_STORE_H_
 
-#include "analyzer/analyzer.h"
-#include "analyzer/store/bigtable_store.h"
+#include <string>
 
-int main(int argc, char *argv[]) {
-  if (argc < 2)
-    errx(1, "Usage: %s <table_name>", argv[0]);
+namespace cobalt {
+namespace analyzer {
 
-  printf("Starting analyzer...\n");
+// Interface to a key value store.
+class Store {
+ public:
+  // Returns 0 on success.
+  virtual int put(const std::string& key, const std::string& val) = 0;
 
-  cobalt::analyzer::BigtableStore store;
-  store.initialize(argv[1]);
+  // Returns 0 on success.
+  virtual int get(const std::string& key, std::string* out) = 0;
+};
 
-  cobalt::analyzer::AnalyzerServiceImpl analyzer(&store);
-  analyzer.Start();
-  analyzer.Wait();
-}
+}  // namespace analyzer
+}  // namespace cobalt
+
+#endif  // COBALT_ANALYZER_STORE_STORE_H_

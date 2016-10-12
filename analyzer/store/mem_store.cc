@@ -12,21 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <err.h>
+#include "analyzer/store/mem_store.h"
 
-#include "analyzer/analyzer.h"
-#include "analyzer/store/bigtable_store.h"
+namespace cobalt {
+namespace analyzer {
 
-int main(int argc, char *argv[]) {
-  if (argc < 2)
-    errx(1, "Usage: %s <table_name>", argv[0]);
+int MemStore::put(const std::string& key, const std::string& val) {
+  data_[key] = val;
 
-  printf("Starting analyzer...\n");
-
-  cobalt::analyzer::BigtableStore store;
-  store.initialize(argv[1]);
-
-  cobalt::analyzer::AnalyzerServiceImpl analyzer(&store);
-  analyzer.Start();
-  analyzer.Wait();
+  return 0;
 }
+
+int MemStore::get(const std::string& key, std::string* out) {
+  auto i = data_.find(key);
+
+  if (i == data_.end())
+    return -1;
+
+  *out = i->second;
+
+  return 0;
+}
+
+}  // namespace analyzer
+}  // namespace cobalt

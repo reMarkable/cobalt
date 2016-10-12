@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+
 #include "analyzer/analyzer.h"
+#include "analyzer/store/mem_store.h"
 
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
@@ -26,6 +29,9 @@ namespace analyzer {
 
 // Fixture to start and stop the analyzer
 class AnalyzerFunctionalTest : public ::testing::Test {
+ public:
+  AnalyzerFunctionalTest() : analyzer_(&store_) { }
+
  protected:
   virtual void SetUp() {
     analyzer_.Start();
@@ -36,7 +42,7 @@ class AnalyzerFunctionalTest : public ::testing::Test {
     analyzer_.Wait();
   }
 
- private:
+  MemStore store_;
   AnalyzerServiceImpl analyzer_;
 };
 
@@ -57,8 +63,27 @@ TEST_F(AnalyzerFunctionalTest, TestGRPC) {
   ObservationBatch req;
   Empty resp;
 
+  EncryptedMessage* msg = req.add_encrypted_message();
+  msg->set_ciphertext("hello");
+
   Status status = analyzer->AddObservations(&context, req, &resp);
   ASSERT_TRUE(status.ok());
+
+  // Check that an item got inserted into the store
+  ASSERT_EQ(store_.data_.size(), 1);
+
+  // Grab the item that got inserted
+  std::string key = store_.data_.begin()->first;
+  std::string val;
+
+  ASSERT_EQ(store_.get(key, &val), 0);
+
+  // check that the item matches the observation
+  std::string obs;
+
+  req.SerializeToString(&obs);
+
+  ASSERT_EQ(val, obs);
 }
 
 }  // namespace analyzer

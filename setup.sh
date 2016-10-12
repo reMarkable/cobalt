@@ -62,4 +62,26 @@ if ! which grpc_cpp_plugin > /dev/null ; then
     make prefix=$PREFIX install
 fi
 
+# Install google APIs (C++ protobuf stubs)
+if [ ! -f /usr/lib/libgoogleapis.so ] ; then
+    cd $WD
+    git clone https://github.com/googleapis/googleapis.git
+    cd googleapis
+    git checkout 14263af2cbe711f2f2aa692da1b09a8311a2e45d
+    make LANGUAGE=cpp GPRCPLUGIN=`which grpc_cpp_plugin`
+
+    echo
+    echo Compiling libgoogleapis.  This will take 5 minutes.
+    cd gens
+    find . -name \*.cc \
+      | xargs clang++ -o libgoogleapis.so -fPIC -shared --std=c++11 -I .
+
+    mv libgoogleapis.so /usr/lib
+    ldconfig
+
+    # copy headers
+    cd google
+    find . -name \*.h -exec cp --parents {} /usr/include/google/ \;
+fi
+
 rm -fr $WD

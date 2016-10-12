@@ -30,9 +30,15 @@ THIS_DIR = os.path.dirname(__file__)
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 
 IMAGES = ["analyzer"]
+
 GCE_PROJECT = "shuffler-test"
 GCE_CLUSTER = "cluster-1"
 GCE_TAG = "us.gcr.io/google.com/%s" % GCE_PROJECT
+
+BT_INSTANCE = "cobalt-analyzer"
+BT_TABLE = "observations"
+BT_TABLE_NAME = "projects/google.com:%s/instances/%s/tables/%s" \
+                % (GCE_PROJECT, BT_INSTANCE, BT_TABLE)
 
 _logger = logging.getLogger()
 _verbose_count = 0
@@ -112,8 +118,10 @@ def _gce_build(args):
     os.mkdir(cobalt)
 
   for dep in ["/usr/lib/libprotobuf.so.10",
+              "/usr/lib/libgoogleapis.so",
               "/usr/lib/libgrpc++.so.1",
               "/usr/lib/libgrpc.so.1",
+              "/usr/share/grpc/roots.pem",
              ]:
     shutil.copy(dep, cobalt)
 
@@ -123,7 +131,7 @@ def _gce_build(args):
     dstdir = "%s/%s" % (OUT_DIR, i)
     shutil.copy("%s/docker/%s/Dockerfile" % (THIS_DIR, i), dstdir)
 
-    subprocess.check_call(["docker", "build", dstdir])
+    subprocess.check_call(["docker", "build", "-t", i, dstdir])
 
 def _gce_push(args):
   for i in IMAGES:
@@ -143,7 +151,7 @@ def _gce_start(args):
     print("Starting %s" % i)
 
     subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
-                           "--port=8080"])
+                           "--port=8080", "--", BT_TABLE_NAME])
 
     subprocess.check_call(["kubectl", "expose", "deployment", i,
                            "--type=LoadBalancer"])
