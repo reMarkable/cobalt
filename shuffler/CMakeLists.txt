@@ -14,20 +14,24 @@
 
 set(GO_PATH env GOPATH="${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen:${CMAKE_CURRENT_SOURCE_DIR}")
 set(GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
-set(GO_PROTO_GEN "${CMAKE_BINARY_DIR}/go-proto-gen/src/shuffler")
+set(GO_PROTO_GEN "${CMAKE_BINARY_DIR}/go-proto-gen/src")
 set(GO_BIN ${GO_PATH} /usr/local/go/bin/go)
 set(PROTOC ${GO_PATH} protoc)
 
 file(MAKE_DIRECTORY ${GO_TESTS} ${GO_PROTO_GEN})
 
 # generate the go bindings for shuffler proto
-set(GEN_PROTO_FILE "${GO_PROTO_GEN}/shuffler.pb.go")
-add_custom_command(OUTPUT ${GEN_PROTO_FILE}
-    COMMAND ${PROTOC} -I ${CMAKE_CURRENT_SOURCE_DIR}/:${CMAKE_SOURCE_DIR}/
-            ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
-            --proto_path=${CMAKE_SOURCE_DIR}:${CMAKE_SOURCE_DIR}/third_party/go/src:.
+set(SHUFFLER_GEN_PROTO_FILE "${GO_PROTO_GEN}/shuffler/shuffler.pb.go")
+set(EM_GEN_PROTO_FILE "${GO_PROTO_GEN}/encrypted_message.pb.go")
+add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
+    COMMAND ${PROTOC} ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
+            ${CMAKE_SOURCE_DIR}/encrypted_message.proto
+            -I ${CMAKE_SOURCE_DIR}
+            -I ${CMAKE_CURRENT_SOURCE_DIR}
+            -I ${CMAKE_SOURCE_DIR}/third_party/go/src
             --go_out=plugins=grpc:${GO_PROTO_GEN}
-    DEPENDS shuffler.proto
+    COMMAND mv ${EM_GEN_PROTO_FILE} ${GO_PROTO_GEN}/shuffler
+    DEPENDS shuffler.proto ${CMAKE_SOURCE_DIR}/encrypted_message.proto
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -38,15 +42,16 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     COMMAND ${GO_BIN} build receiver
     # Compiles all dependencies and installs main service package
     COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN} shuffler_main.go
+    DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
-    DEPENDS ${GEN_PROTO_FILE}
 )
 
 # Build shuffler test tools
 set(TEST_CLIENT_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler_test_client")
 add_custom_command(OUTPUT ${TEST_CLIENT_BIN}
     COMMAND ${GO_BIN} build -o ${TEST_CLIENT_BIN} tools/test_client.go
-    DEPENDS src/tools/test_client.go ${GEN_PROTO_FILE}
+    DEPENDS src/tools/test_client.go
+    DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 

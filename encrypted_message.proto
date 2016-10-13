@@ -15,6 +15,8 @@ syntax = "proto3";
 
 package cobalt;
 
+option go_package = "shuffler";
+
 // An EncryptedMessage sits inside of an |Envelope|. If the intended recipient
 // is the Analyzer then |ciphertext| contains the encryption of the standard
 // serialization of an |Observations| using the Analyzer's public key, and the

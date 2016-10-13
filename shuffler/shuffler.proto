@@ -25,6 +25,8 @@ package cobalt.shuffler;
 
 option go_package = "shuffler";
 
+import "encrypted_message.proto";
+
 import "github.com/golang/protobuf/ptypes/empty/empty.proto";
 
 // Interface exported by the Shuffler service.
@@ -47,24 +49,6 @@ message Manifest {
   }
   ShufflerPolicy shuffler_policy = 2;
   Recipient recipient = 3;
-}
-
-// An EncryptedMessage sits inside of an |Envelope|. If the intended recipient
-// is the Analyzer then |ciphertext| contains the encryption of the standard
-// serialization of an |Observations| using the Analyzer's public key, and the
-// Shuffler cannot decrypt it. If the intended recipient is the Shuffler then
-// |ciphertext| contains the encryption of the standard serialization of
-// another |Envelope| using the Shuffler's public key and the Shuffler can
-// decrypt it.
-message EncryptedMessage {
-  enum EncryptionScheme {
-    UNKNOWN_SCHEME = 0;
-    ENVELOPE_1 = 1;
-  }
-  EncryptionScheme scheme = 1;
-  string pub_key = 2;   // Fingerprint (SHA256) of the recipient’s key. This is
-                        // used for key rotation.
-  bytes ciphertext = 3; // Encrypted Envelope or Observations
 }
 
 message Envelope {

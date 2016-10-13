@@ -14,7 +14,7 @@
 
 // Test client implements a simple gRPC client that performs unary RPC to
 // shuffler service whose definition can be found in
-// shuffler/service/shuffler.proto. This test could be used as an end to end
+// shuffler/shuffler.proto. This test could be used as an end to end
 // test for testing functionality between encoders and shufflers. A shuffler
 // processes the incoming request and returns an empty response, if successful
 // or an error in case of failures.

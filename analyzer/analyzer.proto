@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-import "payload.proto";
+import "encrypted_message.proto";
 
 import "google/protobuf/empty.proto";
 
