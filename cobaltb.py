@@ -29,16 +29,16 @@ import tools.test_runner as test_runner
 THIS_DIR = os.path.dirname(__file__)
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 
-IMAGES = ["analyzer"]
+IMAGES = ["analyzer", "shuffler"]
 
 GCE_PROJECT = "shuffler-test"
 GCE_CLUSTER = "cluster-1"
 GCE_TAG = "us.gcr.io/google.com/%s" % GCE_PROJECT
 
-BT_INSTANCE = "cobalt-analyzer"
-BT_TABLE = "observations"
-BT_TABLE_NAME = "projects/google.com:%s/instances/%s/tables/%s" \
-                % (GCE_PROJECT, BT_INSTANCE, BT_TABLE)
+A_BT_INSTANCE = "cobalt-analyzer"
+A_BT_TABLE = "observations"
+A_BT_TABLE_NAME = "projects/google.com:%s/instances/%s/tables/%s" \
+                % (GCE_PROJECT, A_BT_INSTANCE, A_BT_TABLE)
 
 _logger = logging.getLogger()
 _verbose_count = 0
@@ -69,6 +69,18 @@ def ensureDir(dir_path):
   """
   if not os.path.exists(dir_path):
     os.makedirs(dir_path)
+
+def setGCEImages(args):
+  """Sets the list of GCE images to be built/deployed/started and stopped.
+
+  Args:
+    args{list} List of parsed command line arguments.
+  """
+  global IMAGES
+  if args.shuffler_gce:
+    IMAGES = ["shuffler"]
+  elif args.analyzer_gce:
+    IMAGES = ["analyzer"]
 
 def _build(args):
   ensureDir(OUT_DIR)
@@ -111,6 +123,8 @@ def _clean(args):
 
 
 def _gce_build(args):
+  setGCEImages(args)
+
   # Copy over the dependencies for the cobalt base image
   cobalt = "%s/cobalt" % OUT_DIR
 
@@ -134,6 +148,8 @@ def _gce_build(args):
     subprocess.check_call(["docker", "build", "-t", i, dstdir])
 
 def _gce_push(args):
+  setGCEImages(args)
+
   for i in IMAGES:
     tag = "%s/%s" % (GCE_TAG, i)
     subprocess.check_call(["docker", "tag", "-f", i, tag])
@@ -145,18 +161,26 @@ def kube_setup():
                          "google.com:%s" % GCE_PROJECT])
 
 def _gce_start(args):
+  setGCEImages(args)
+
   kube_setup()
 
   for i in IMAGES:
     print("Starting %s" % i)
 
-    subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
-                           "--port=8080", "--", BT_TABLE_NAME])
+    if (i == "analyzer"):
+      subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
+                             "--port=8080", "--", A_BT_TABLE_NAME])
+    else:
+      subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
+                             "--port=8080"])
 
     subprocess.check_call(["kubectl", "expose", "deployment", i,
                            "--type=LoadBalancer"])
 
 def _gce_stop(args):
+  setGCEImages(args)
+
   kube_setup()
 
   for i in IMAGES:
@@ -219,18 +243,42 @@ def main():
   sub_parser = subparsers.add_parser('gce_build', parents=[parent_parser],
     help='Builds Docker images for GCE.')
   sub_parser.set_defaults(func=_gce_build)
+  sub_parser.add_argument('--a',
+      help='Builds Analyzer Docker image for GCE.',
+      action='store_true', dest='analyzer_gce')
+  sub_parser.add_argument('--s',
+      help='Builds Shuffler Docker image for GCE.',
+      action='store_true', dest='shuffler_gce')
 
   sub_parser = subparsers.add_parser('gce_push', parents=[parent_parser],
     help='Push docker images to GCE.')
   sub_parser.set_defaults(func=_gce_push)
+  sub_parser.add_argument('--a',
+      help='Push Analyzer Docker image to GCE.',
+      action='store_true', dest='analyzer_gce')
+  sub_parser.add_argument('--s',
+      help='Push Shuffler Docker image to GCE.',
+      action='store_true', dest='shuffler_gce')
 
   sub_parser = subparsers.add_parser('gce_start', parents=[parent_parser],
     help='Start GCE instances.')
   sub_parser.set_defaults(func=_gce_start)
+  sub_parser.add_argument('--a',
+      help='Starts Analyzer GCE instance.',
+      action='store_true', dest='analyzer_gce')
+  sub_parser.add_argument('--s',
+      help='Starts Shuffler GCE instance.',
+      action='store_true', dest='shuffler_gce')
 
   sub_parser = subparsers.add_parser('gce_stop', parents=[parent_parser],
     help='Stop GCE instances.')
   sub_parser.set_defaults(func=_gce_stop)
+  sub_parser.add_argument('--a',
+      help='Stops Analyzer GCE instance.',
+      action='store_true', dest='analyzer_gce')
+  sub_parser.add_argument('--s',
+      help='Stops Shuffler GCE instance.',
+      action='store_true', dest='shuffler_gce')
 
   args = parser.parse_args()
   global _verbose_count
