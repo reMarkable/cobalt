@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(cobalt_crypto base64.cc cipher.cc errors.cc mac.cc random.cc)
-target_link_libraries(cobalt_crypto crypto)
+# client_secret library
+add_library(client_secret client_secret.cc)
+target_link_libraries(client_secret cobalt_crypto)
 
-# Build an executable test binary. Include gtest headers at compile time
-# and gtest libraries at link time. Write the executable to the
-# out/gtests directory
-add_executable(cobalt_crypto_test base64_test.cc cipher_test.cc mac_test.cc
-               random_test.cc)
-target_link_libraries(cobalt_crypto_test gtest gtest_main cobalt_crypto)
-set_target_properties(cobalt_crypto_test PROPERTIES
+
+add_executable(client_secret_test client_secret_test.cc)
+target_link_libraries(client_secret_test gtest gtest_main client_secret)
+set_target_properties(client_secret_test PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

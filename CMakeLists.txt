@@ -39,6 +39,7 @@ add_custom_target(build_protos, DEPENDS ${COBALT_PROTO_SRCS})
 
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)
+add_subdirectory(encoder)
 add_subdirectory(shuffler)
 add_subdirectory(tools)
 
