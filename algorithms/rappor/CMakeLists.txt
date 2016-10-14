@@ -18,7 +18,7 @@
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 add_library(rappor_encoder rappor_encoder.cc ${COBALT_PROTO_SRCS})
-target_link_libraries(rappor_encoder ${PROTOBUF_LIBRARY})
+target_link_libraries(rappor_encoder client_secret ${PROTOBUF_LIBRARY})
 
 # Build an executable test binary. Include gtest headers at compile time
 # and gtest libraries at link time. Write the executable to the

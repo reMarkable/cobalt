@@ -52,13 +52,16 @@ message ForculusConfig {
 }
 
 message RapporConfig {
-  // k = the number of Bloom filter bits. Must be positive.
+  // k = the number of Bloom filter bits. This must satisfy
+  // 1 <= h < k < 1024, where h = num_hashes.
   uint32 num_bloom_bits = 1;
 
-  // h = the number of hashes. Must be positive.
+  // h = the number of hashes. This must satisfy
+  // 1 <= h <  8
   uint32 num_hashes = 2;
 
-  // m = the number of cohorts. Must be positive.
+  // m = the number of cohorts. This must satisfy
+  // 1 <= m < 1024
   uint32 num_cohorts = 3;
 
   // All probabilities below must be in the range [0.0, 1.0]
@@ -71,7 +74,7 @@ message RapporConfig {
 
   // f = p(a bit is randomly assigned a value in the PRR)
   // Note: Not Implemented in version 0.1 of Cobalt.
-  // This value will be ignored.
+  // This value must not be set to a non-zero value.
   float prob_rr = 6;
 }
 
@@ -85,13 +88,16 @@ message BasicRapporConfig {
   float prob_1_stays_1 = 2;
 
   // f = p(a bit is randomly assigned a value in the PRR)
+  // NOTE: PRR is not implemented in Version 0.1 of Cobalt.
+  // This value must not be set to a non-zero value.
   float prob_rr = 3;
 
   // For basic RAPPOR the Encoder needs to know the list of categories.
   // The categories are indexed from 0 to n - 1 where n is the number
   // of categories. The index of a category determines its bit position in
   // the encoding. The categories are listed here in index order.
-  repeated string categories = 7;
+  // They must be distinct, non-empty strings.
+  repeated string category= 7;
 }
 
 message EncodingConfig {

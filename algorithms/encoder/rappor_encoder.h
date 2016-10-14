@@ -16,13 +16,19 @@
 #define COBALT_ALGORITHMS_ENCODER_RAPPOR_ENCODER_H_
 
 #include <string>
+#include <memory>
 #include <utility>
 
 #include "./cobalt.pb.h"
 #include "./encodings.pb.h"
+#include "encoder/client_secret.h"
 
 namespace cobalt {
 namespace rappor {
+
+class RapporConfigValidator;
+
+using encoder::ClientSecret;
 
 enum Status {
   kOK = 0,
@@ -34,11 +40,9 @@ enum Status {
 class RapporEncoder {
  public:
   // Constructor.
-  // The |client_id| is used to determine the cohort and the PRR. Therefore the
-  // client_id should be derived using some scheme that uniquely and permanently
-  // identifies each logical client.
-  RapporEncoder(const RapporConfig& config, std::string client_id) :
-      config_(config), client_id_(std::move(client_id)) {}
+  // The |client_secret| is used to determine the cohort and the PRR.
+  RapporEncoder(const RapporConfig& config, ClientSecret client_secret);
+  ~RapporEncoder();
 
   // Encodes |value| using RAPPOR encoding. Returns kOK on success, or
   // kInvalidConfig if the |config| passed to the constructor is not valid.
@@ -46,18 +50,20 @@ class RapporEncoder {
                 RapporObservation *observation_out);
 
  private:
-  RapporConfig config_;
-  std::string client_id_;
+  std::unique_ptr<RapporConfigValidator> config_;
+  ClientSecret client_secret_;
 };
 
 
 // Performs encoding for Basic RAPPOR, a.k.a Categorical RAPPOR. No cohorts
 // are used and the list of all candidates must be pre-specified as part
 // of the BasicRapporConfig.
+// The |client_secret| is used to determine the cohort and the PRR.
 class BasicRapporEncoder {
  public:
-  explicit BasicRapporEncoder(const BasicRapporConfig& config) :
-      config_(config) {}
+  BasicRapporEncoder(const BasicRapporConfig& config,
+                     ClientSecret client_secret);
+  ~BasicRapporEncoder();
 
   // Encodes |value| using Basic RAPPOR encoding. |value| must be one
   // of the categories listed in the |categories| field of the |config|
@@ -68,7 +74,8 @@ class BasicRapporEncoder {
                 BasicRapporObservation *observation_out);
 
  private:
-  BasicRapporConfig config_;
+  std::unique_ptr<RapporConfigValidator> config_;
+  ClientSecret client_secret_;
 };
 
 
