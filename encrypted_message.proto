@@ -17,20 +17,45 @@ package cobalt;
 
 option go_package = "shuffler";
 
-// An EncryptedMessage sits inside of an |Envelope|. If the intended recipient
-// is the Analyzer then |ciphertext| contains the encryption of the standard
-// serialization of an |Observations| using the Analyzer's public key, and the
-// Shuffler cannot decrypt it. If the intended recipient is the Shuffler then
-// |ciphertext| contains the encryption of the standard serialization of
-// another |Envelope| using the Shuffler's public key and the Shuffler can
-// decrypt it.
+// An EncryptedMessage is used for several purposes in Cobalt. It carries
+// the bytes of the ciphertext of the standard serialization of various
+// types of proto messages.
 message EncryptedMessage {
   enum EncryptionScheme {
     UNKNOWN_SCHEME = 0;
-    ENVELOPE_1 = 1;
+    // TODO(pseudorandom) Change this to the name of an actual scheme
+    // we will use such as PKCSV_1_5 or something.
+    PK_SCHEME_1 = 1;
+
   }
   EncryptionScheme scheme = 1;
   string pub_key = 2;   // Fingerprint (SHA256) of the recipient’s key. This is
                         // used for key rotation.
-  bytes ciphertext = 3; // Encrypted Envelope or Observations
+
+  bytes ciphertext = 3; // The encryption of the standard serialization of some
+                        // proto message. Which message is determined by
+                        // context.
+}
+
+// ObservationMetadata describes the parts of an observation other than the
+// secret payload.
+message ObservationMetadata {
+  // An Observation is for a particular metric.
+  // The following three values together specify that metric.
+  uint32 customer_id = 1;
+  uint32 project_id = 2;
+  uint32 metric_id = 3;  // e.g. 7 = City-And-Rating
+
+  // The day on which the observation occurred, expressed as the zero-based
+  // index relative to January 1, 1970.
+  // i.e. 0 = January 1, 1970
+  //      1 = January 2, 1970
+  //      etc.
+  //
+  // We intentionally leave the meaning of this vague and leave it to each
+  // Encoder Client to define how to make it precise. Which day it is depends on
+  // time zone. The Encoder client is free to use the local time zone or a
+  // different time zone. The Encoder client is free to add some random noise to
+  // the time at which an event occurred and this might change the day.
+  uint32 day_index = 4;
 }

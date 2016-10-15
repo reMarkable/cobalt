@@ -63,8 +63,8 @@ TEST_F(AnalyzerFunctionalTest, TestGRPC) {
   ObservationBatch req;
   Empty resp;
 
-  EncryptedMessage* msg = req.add_encrypted_message();
-  msg->set_ciphertext("hello");
+  EncryptedMessage* encrypted_observation = req.add_encrypted_observation();
+  encrypted_observation->set_ciphertext("hello");
 
   Status status = analyzer->AddObservations(&context, req, &resp);
   ASSERT_TRUE(status.ok());

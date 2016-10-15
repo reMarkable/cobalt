@@ -102,9 +102,8 @@ class CGen {
 
     // generate observations
     ObservationBatch req;
-
-    EncryptedMessage* msg = req.add_encrypted_message();
-    generate_msg(msg);
+    EncryptedMessage* encrypted_observation = req.add_encrypted_observation();
+    generate_msg(encrypted_observation);
 
     // send RPCs
     Timer t;

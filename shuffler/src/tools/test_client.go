@@ -52,14 +52,9 @@ func main() {
 	if len(os.Args) > 1 {
 		ciphertext = []byte(os.Args[1])
 	}
-	_, err = c.Process(context.Background(), &pb.Envelope{
-		Manifest: &pb.Manifest{
-			ShufflerPolicy: pb.Manifest_UNKNOWN_POLICY,
-			Recipient:      &pb.Recipient{HostName: "analyzer_host"}},
-		EncryptedMessage: &pb.EncryptedMessage{
-			Scheme:     pb.EncryptedMessage_ENVELOPE_1,
-			PubKey:     "pub_key",
-			Ciphertext: ciphertext}})
+	_, err = c.Process(context.Background(), &pb.EncryptedMessage{
+		PubKey:     "pub_key",
+		Ciphertext: ciphertext})
 	if err != nil {
 		log.Fatalf("Could not send encoded reports: %v", err)
 	}

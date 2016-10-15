@@ -43,7 +43,7 @@ type shufflerServer struct{}
 // Process service saves the incoming request to a local database after removing
 // user identifiable fields such as IP addresses, timestamps etc and returns an
 // empty response along with an error code.
-func (s *shufflerServer) Process(ctx context.Context, report *spb.Envelope) (*emptypb.Empty, error) {
+func (s *shufflerServer) Process(ctx context.Context, encrypted_message *spb.EncryptedMessage) (*emptypb.Empty, error) {
 	// TODO(ukode): Add impl for decrypting the sealed envelope and then batch
 	// and shuffle the payloads.
 	return &emptypb.Empty{}, nil
