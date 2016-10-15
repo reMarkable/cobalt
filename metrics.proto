@@ -98,5 +98,9 @@ message ReportConfig {
   uint32 report_delay_days = 9;
 
   DifferentialPrivacyConfig dp_config = 10;
+
+  // The minimum size of the input set necessary for this report to be executed.
+  // The inputs can be from different encodings.
+  uint32 min_observations = 11;
 }
 
