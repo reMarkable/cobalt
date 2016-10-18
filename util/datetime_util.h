@@ -40,18 +40,20 @@ namespace util {
 // a leap second.
 static const uint32_t kNumUnixSecondsPerDay = 60L * 60L * 24L;
 
+static const uint32_t kInvalidDayIndex = UINT32_MAX;
+
 // A CalendarDate represents a day on the calendar using normal human-readable
 // indexing. Just as with day-index there is no well-defined mapping from an
 // instant of time to a CalendarDate because this depends on the timezone.
 struct CalendarDate {
   // A number from 1 to 31.
-  uint32_t day_of_month;
+  uint32_t day_of_month = 1;
 
   // 1 = January, 2 = February, ..., 3 = December
-  uint32_t month;
+  uint32_t month = 1;
 
   // Calendar year e.g. 2016.
-  uint32_t year;
+  uint32_t year = 1970;
 
   bool operator==(const CalendarDate& other) const {
     return (other.day_of_month == day_of_month
@@ -62,7 +64,8 @@ struct CalendarDate {
 // Converts the given CalendarDate to a Cobalt Day Index. If the fields of
 // calendar_date do not make sense as a real day of the calendar
 // (for example if month=13) then the result is undefined. If the
-// specified date is prior to January 1, 1970 then the result is undefined.
+// specified date is prior to January 1, 1970 or not before the year 10,000
+// then the result is undefined.
 uint32_t CalendarDateToDayIndex(const CalendarDate& calendar_date);
 
 // Converts the given day_index to a CalendarDate, necessarily on or

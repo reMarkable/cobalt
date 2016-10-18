@@ -17,15 +17,61 @@
 namespace cobalt {
 namespace forculus {
 
-  ForculusObservation ForculusEncrypter::Encrypt(const std::string& value,
-                                                 uint32_t day_index) {
-    // TODO(rudominer) Replace this dummy implementation with a real one.
-    ForculusObservation observation;
-    observation.set_point_x("dummy x");
-    observation.set_point_y("dummy y");
-    observation.set_ciphertext(value);
-    return observation;
+using encoder::ClientSecret;
+using util::CalendarDate;
+using util::kInvalidDayIndex;
+
+class ForculusConfigValidator {
+ public:
+  ForculusConfigValidator(const ForculusConfig& config,
+                          const ClientSecret& client_secret) :
+      threshold_(config.threshold()),
+      epoch_type_(config.epoch_type()) {
+    valid_ = false;
+    if (!client_secret.valid()) {
+      return;
+    }
+    if (threshold_ < 2 || threshold_ >= 1000000) {
+      return;
+    }
+    valid_ = true;
   }
+
+  bool valid() {
+    return valid_;
+  }
+
+ private:
+  bool valid_;
+  uint32_t threshold_;
+  EpochType epoch_type_;
+};
+
+ForculusEncrypter::ForculusEncrypter(const ForculusConfig& config,
+                                   ClientSecret client_secret) :
+    config_(new ForculusConfigValidator(config, client_secret)),
+    client_secret_(std::move(client_secret)) {}
+
+ForculusEncrypter::~ForculusEncrypter() {}
+
+ForculusEncrypter::Status ForculusEncrypter::Encrypt(const std::string& value,
+    const CalendarDate& observation_date,
+    ForculusObservation *observation_out) {
+  if (!config_->valid()) {
+    return kInvalidConfig;
+  }
+  uint32_t day_index = util::CalendarDateToDayIndex(observation_date);
+  if (day_index == kInvalidDayIndex) {
+    return kInvalidInput;
+  }
+
+  // TODO(rudominer) Replace this dummy implementation with a real one.
+  ForculusObservation observation;
+  observation_out->set_point_x("dummy x");
+  observation_out->set_point_y("dummy y");
+  observation_out->set_ciphertext(value);
+  return kOK;
+}
 
 }  // namespace forculus
 

@@ -54,8 +54,10 @@ uint32_t CalendarDateToDayIndex(const CalendarDate& calendar_date) {
   // problem presented in CalendarDateToDayIndexAltImpl() in
   // datetime_util_test.cc.
 
-  if (calendar_date.year < 1970) {
-    return UINT32_MAX;
+  if (calendar_date.year < 1970 || calendar_date.year >= 10000 ||
+    calendar_date.month < 1 || calendar_date.month > 12 ||
+    calendar_date.day_of_month < 1 || calendar_date.day_of_month > 31) {
+    return kInvalidDayIndex;
   }
 
   // This algorithm counts years as beginning on March 1. Convert to that now.

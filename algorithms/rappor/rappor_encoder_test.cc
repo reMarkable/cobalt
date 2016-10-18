@@ -19,10 +19,12 @@
 namespace cobalt {
 namespace rappor {
 
+using encoder::ClientSecret;
+
 // Constructs a RapporEncoder with the given |config|, invokes
 // encode() with a dummy string, and checks that the returned status is
 // either kOK or kInvalidConfig, whichever is expected.
-void testRapporConfig(const RapporConfig& config,
+void TestRapporConfig(const RapporConfig& config,
                       Status expected_status,
                       int caller_line_number) {
   // Make a ClientSecret once and statically store the token.
@@ -37,7 +39,7 @@ void testRapporConfig(const RapporConfig& config,
 
 // A macro to invoke testRapporConfig and pass it the current line number.
 #define TEST_RAPPOR_CONFIG(config, expected_status) \
-    (testRapporConfig(config, expected_status, __LINE__))
+    (TestRapporConfig(config, expected_status, __LINE__))
 
 // Tests the validation of config for String RAPPOR.
 TEST(RapporEncoderTest, StringRapporConfigValidation) {
@@ -159,7 +161,7 @@ TEST(RapporEncoderTest, StringRapporConfigValidation) {
 // Constructs a BasicRapporEncoder with the given |config|, invokes
 // encode() with a dummy string, and checks that the returned status is
 // either kOK or kInvalidConfig, whichever is expected.
-void testBasicRapporConfig(const BasicRapporConfig& config,
+void TestBasicRapporConfig(const BasicRapporConfig& config,
                            Status expected_status,
                            int caller_line_number) {
   // Make a ClientSecret once and statically store the token.
@@ -173,9 +175,9 @@ void testBasicRapporConfig(const BasicRapporConfig& config,
       << "Invoked from line number: " << caller_line_number;
 }
 
-// A macro to invoke testBasicRapporConfig and pass it the current line number.
+// A macro to invoke TestBasicRapporConfig and pass it the current line number.
 #define TEST_BASIC_RAPPOR_CONFIG(config, expected_status) \
-    (testBasicRapporConfig(config, expected_status, __LINE__))
+    (TestBasicRapporConfig(config, expected_status, __LINE__))
 
 // Tests the validation of config for Basic RAPPOR.
 TEST(RapporEncoderTest, BasicRapporConfigValidation) {

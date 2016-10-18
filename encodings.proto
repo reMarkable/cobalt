@@ -24,7 +24,7 @@ package cobalt;
 enum EpochType {
   // Each day is a different epoch.
   DAY = 0;
-  // A week epoch is a seven day period from  Sunday to Saturday
+  // A week epoch is a seven day period from Sunday to Saturday
   WEEK = 1;
   // A month epoch is the set of days in a single month of the Gregorian
   // calendar
@@ -41,6 +41,7 @@ enum EpochType {
 ///////////////////////////////////////////////////////////////
 
 message ForculusConfig {
+  // Must satisfy 2 <= threshold <= 1,000,000
   uint32 threshold = 1;
 
   // Forculus threshold encryption is based on the current epoch. For example

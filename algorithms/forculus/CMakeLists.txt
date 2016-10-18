@@ -18,7 +18,8 @@
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 add_library(forculus_encrypter forculus_encrypter.cc ${COBALT_PROTO_SRCS})
-target_link_libraries(forculus_encrypter ${PROTOBUF_LIBRARY})
+target_link_libraries(forculus_encrypter
+                      client_secret datetime_util ${PROTOBUF_LIBRARY})
 
 add_library(forculus_decrypter forculus_decrypter.cc ${COBALT_PROTO_SRCS})
 target_link_libraries(forculus_decrypter ${PROTOBUF_LIBRARY})

@@ -17,6 +17,8 @@
 namespace cobalt {
 namespace rappor {
 
+using encoder::ClientSecret;
+
 namespace {
 // Factors out some common validation logic.
 bool BasicValidate(float prob_0_becomes_1, float prob_1_stays_1, float prob_rr,
@@ -42,8 +44,8 @@ bool BasicValidate(float prob_0_becomes_1, float prob_1_stays_1, float prob_rr,
 class RapporConfigValidator {
  public:
   // Constructor for String RAPPOR
-  explicit RapporConfigValidator(const RapporConfig& config,
-                                 const ClientSecret& client_secret) :
+  RapporConfigValidator(const RapporConfig& config,
+                        const ClientSecret& client_secret) :
       prob_0_becomes_1_(config.prob_0_becomes_1()),
       prob_1_stays_1_(config.prob_1_stays_1()),
       num_bits_(config.num_bloom_bits()),

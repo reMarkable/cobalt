@@ -16,41 +16,59 @@
 #define COBALT_ALGORITHMS_ENCODER_FORCULUS_ENCRYPTER_H_
 
 #include <string>
+#include <memory>
 #include <utility>
 
 #include "./cobalt.pb.h"
 #include "./encodings.pb.h"
+#include "encoder/client_secret.h"
+#include "util/datetime_util.h"
 
 namespace cobalt {
 namespace forculus {
+
+class ForculusConfigValidator;
 
 // Encrypts a string value using Forculus threshold encryption. This API
 // is intended for use in the Cobalt Encoder.
 class ForculusEncrypter {
  public:
-  // Constructor.
-  // The |client_id| is used as a seed when generating random points on
-  // the polynomial. Therefore the client_id should be derived using some
-  // scheme that uniquely and permanently identifies each logical client.
-  ForculusEncrypter(const ForculusConfig& config, std::string client_id) :
-      config_(config), client_id_(std::move(client_id)) {}
+  enum Status {
+    kOK = 0,
+    kInvalidConfig,
+    kInvalidInput,
+  };
 
-  // Encrypts |value| using Forculus threshold encryption and returns
-  // a |ForculusObservation| containing the ciphertext and a random
-  // point on the polynomial.
+  // Constructor.
+  // The |client_secret| is used as a seed when generating random points on
+  // the polynomial.
+  ForculusEncrypter(const ForculusConfig& config,
+                    encoder::ClientSecret client_secret);
+
+  ~ForculusEncrypter();
+
+  // Encrypts |value| using Forculus threshold encryption and writes the
+  // ciphertext and a random point on the polynomial into |*observation_out|.
   //
-  // |day_index| is used to determine the current epoch, based on the EpochType
-  // as specified in the ForculusConfig passed into the constructor. Forculus
-  // encrypion depends on the current epoch.
-  ForculusObservation Encrypt(const std::string& value, uint32_t day_index);
+  // |observation_date| is used to determine the observation epoch, based on
+  // the EpochType as specified in the ForculusConfig passed into the
+  // constructor. Forculus encrypion uses the observation epoch in conjunction
+  // with the plaintext |value| in deriving the coefficients of the Forculus
+  // polynomial, including the ciphertext.
+  //
+  // Returns kOk on success, kInvalidConfig if the |config| passed to the
+  // constructor is not valid, or kInvalidInput if observation_date does not
+  // represent a valid date (as specified in datetime_util.h).
+  Status Encrypt(const std::string& value,
+                 const util::CalendarDate& observation_date,
+                 ForculusObservation *observation_out);
 
  private:
-  ForculusConfig config_;
-  std::string client_id_;
+  std::unique_ptr<ForculusConfigValidator> config_;
+  encoder::ClientSecret client_secret_;
 };
 
 }  // namespace forculus
-
 }  // namespace cobalt
 
 #endif  // COBALT_ALGORITHMS_ENCODER_FORCULUS_ENCRYPTER_H_

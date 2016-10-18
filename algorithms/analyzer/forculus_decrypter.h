@@ -25,12 +25,6 @@
 namespace cobalt {
 namespace forculus {
 
-enum Status {
-  kOK = 0,
-  kInvalidInput,
-  kNotEnoughPoints,
-};
-
 // Decrypts a set of Forculus observations with the same ciphertext,
 // if the number of observations exceeds the threshold. This is intended for use
 // on the Cobalt Analyzer.
@@ -41,6 +35,12 @@ enum Status {
 // points on the curve associated with the ciphertext. Finally invoke Decrypt().
 class ForculusDecrypter {
  public:
+  enum Status {
+    kOK = 0,
+    kInvalidInput,
+    kNotEnoughPoints,
+  };
+
   ForculusDecrypter(const ForculusConfig& config, std::string ciphertext);
 
   // Adds a point on the polynomial curve to the set. The threshold

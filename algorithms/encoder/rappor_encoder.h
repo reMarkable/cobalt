@@ -28,8 +28,6 @@ namespace rappor {
 
 class RapporConfigValidator;
 
-using encoder::ClientSecret;
-
 enum Status {
   kOK = 0,
   kInvalidConfig,
@@ -41,7 +39,8 @@ class RapporEncoder {
  public:
   // Constructor.
   // The |client_secret| is used to determine the cohort and the PRR.
-  RapporEncoder(const RapporConfig& config, ClientSecret client_secret);
+  RapporEncoder(const RapporConfig& config,
+                encoder::ClientSecret client_secret);
   ~RapporEncoder();
 
   // Encodes |value| using RAPPOR encoding. Returns kOK on success, or
@@ -51,7 +50,7 @@ class RapporEncoder {
 
  private:
   std::unique_ptr<RapporConfigValidator> config_;
-  ClientSecret client_secret_;
+  encoder::ClientSecret client_secret_;
 };
 
 
@@ -62,7 +61,7 @@ class RapporEncoder {
 class BasicRapporEncoder {
  public:
   BasicRapporEncoder(const BasicRapporConfig& config,
-                     ClientSecret client_secret);
+                     encoder::ClientSecret client_secret);
   ~BasicRapporEncoder();
 
   // Encodes |value| using Basic RAPPOR encoding. |value| must be one
@@ -75,12 +74,11 @@ class BasicRapporEncoder {
 
  private:
   std::unique_ptr<RapporConfigValidator> config_;
-  ClientSecret client_secret_;
+  encoder::ClientSecret client_secret_;
 };
 
 
 }  // namespace rappor
-
 }  // namespace cobalt
 
 #endif  // COBALT_ALGORITHMS_ENCODER_RAPPOR_ENCODER_H_

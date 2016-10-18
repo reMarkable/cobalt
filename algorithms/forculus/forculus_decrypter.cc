@@ -17,22 +17,23 @@
 namespace cobalt {
 namespace forculus {
 
-  ForculusDecrypter::ForculusDecrypter(const ForculusConfig& config,
-                                       std::string ciphertext) :
-    config_(config), ciphertext_(std::move(ciphertext)) {}
+ForculusDecrypter::ForculusDecrypter(const ForculusConfig& config,
+                                     std::string ciphertext) :
+  config_(config), ciphertext_(std::move(ciphertext)) {}
 
-  Status ForculusDecrypter::AddPoint(std::string x, std::string y) {
-    points_.emplace_back(std::move(x), std::move(y));
-    return kOK;
-  }
+ForculusDecrypter::Status ForculusDecrypter::AddPoint(std::string x,
+                                                      std::string y) {
+  points_.emplace_back(std::move(x), std::move(y));
+  return kOK;
+}
 
-  Status ForculusDecrypter::Decrypt(std::string *plain_text_out) {
-    // TODO(rudominer) Replace this dummy implementation with a real one.
-    plain_text_out->assign(ciphertext_);
-    return kOK;
-  }
+ForculusDecrypter::Status ForculusDecrypter::Decrypt(
+    std::string *plain_text_out) {
+  // TODO(rudominer) Replace this dummy implementation with a real one.
+  plain_text_out->assign(ciphertext_);
+  return kOK;
+}
 
 }  // namespace forculus
-
 }  // namespace cobalt
 
