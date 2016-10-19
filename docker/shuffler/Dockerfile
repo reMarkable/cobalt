@@ -17,4 +17,4 @@ FROM cobalt
 COPY shuffler /usr/local/bin/
 
 ENTRYPOINT ["shuffler"]
-EXPOSE 8080
+EXPOSE 50051

@@ -28,24 +28,44 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/grpclog"
 
-	spb "cobalt"
+	cobaltpb "cobalt"
+	"dispatcher"
+	util "util"
 )
 
 // shufflerServer is used to implement shuffler.ShufflerServer.
 type shufflerServer struct{}
 
-// Process service saves the incoming request to a local database after removing
-// user identifiable fields such as IP addresses, timestamps etc and returns an
-// empty response along with an error code.
-func (s *shufflerServer) Process(ctx context.Context, encrypted_message *spb.EncryptedMessage) (*spb.ShufflerResponse, error) {
+// Process() function processes the incoming encoder requests and sends it to
+// analyzer.
+func (s *shufflerServer) Process(ctx context.Context,
+	encryptedMessage *cobaltpb.EncryptedMessage) (*cobaltpb.ShufflerResponse, error) {
 	// TODO(ukode): Add impl for decrypting the sealed envelope and then batch
 	// and shuffle the payloads.
-	return &spb.ShufflerResponse{}, nil
+	glog.V(2).Infoln("Function Process() is invoked.")
+	pubKey := encryptedMessage.PubKey
+	ciphertext := encryptedMessage.Ciphertext
+
+	c := util.NoOpCrypter{}
+
+	envelope := &cobaltpb.Envelope{}
+	err := proto.Unmarshal(c.Decrypt(ciphertext, pubKey), envelope)
+	if err != nil {
+		return nil, fmt.Errorf("Error in unmarshalling ciphertext: %v", err)
+	}
+
+	// TODO(ukode): Replace this test code that talks to analyzer by dispatching
+	// instantaneously with real impl in the following cls.
+	go dispatcher.Dispatch(envelope)
+
+	// TODO(ukode): Replace ShufflerResponse with Empty proto.
+	return &cobaltpb.ShufflerResponse{}, nil
 }
 
 func newServer() *shufflerServer {
@@ -53,21 +73,23 @@ func newServer() *shufflerServer {
 	return s
 }
 
-// Process incoming requests from encoders and save them locally.
+// ReceiveAndStore serves incoming requests from encoders.
 func ReceiveAndStore(tls bool, certFile string, keyFile string, port int) {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		grpclog.Fatalf("failed to listen: %v", err)
+		glog.V(2).Info("Grpc: Failed to accept connections:", err)
+		return
 	}
 	var opts []grpc.ServerOption
 	if tls {
 		creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
 		if err != nil {
-			grpclog.Fatalf("Failed to generate credentials %v", err)
+			glog.V(2).Info("Grpc: Failed to generate credentials:", err)
+			return
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
 	grpcServer := grpc.NewServer(opts...)
-	spb.RegisterShufflerServer(grpcServer, newServer())
+	cobaltpb.RegisterShufflerServer(grpcServer, newServer())
 	grpcServer.Serve(lis)
 }

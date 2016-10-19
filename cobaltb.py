@@ -176,7 +176,7 @@ def _gce_start(args):
                              "--port=8080", "--", "-table", A_BT_TABLE_NAME])
     else:
       subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
-                             "--port=8080"])
+                             "--port=50051"])
 
     subprocess.check_call(["kubectl", "expose", "deployment", i,
                            "--type=LoadBalancer"])

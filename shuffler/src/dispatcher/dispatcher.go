@@ -20,14 +20,23 @@
 
 package dispatcher
 
-import "math/rand"
+import (
+	"math/rand"
+	"time"
+
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+
+	cobaltpb "cobalt"
+)
 
 // Policy defines instructions on how to route messages to Analyzers
 type Policy struct{}
 
 // Shuffler interface provides functionality to add a policy to a ciphertext.
 // It will eventually be sent out to an Analyzer according to a policy.
-// TODO(bittau) use protobus directly once they are defined and committed
+// TODO(bittau) use cobaltprotobuf directly once they are defined and committed
 type Shuffler interface {
 	add(policy Policy, ciphertext []byte)
 }
@@ -44,7 +53,7 @@ type BasicShuffler struct {
 	analyzer  Analyzer
 	batchsize int
 	// TODO(bittau): NB ciphertexts will go away (or have a different type)
-	// once protobufs are defined.  protobufs will be stored directly.
+	// once cobaltprotobufs are defined.  cobaltprotobufs will be stored directly.
 	ciphertexts [][]byte
 }
 
@@ -52,11 +61,11 @@ func (s *BasicShuffler) add(policy Policy, ciphertext []byte) {
 	s.ciphertexts = append(s.ciphertexts, ciphertext)
 
 	if len(s.ciphertexts) >= s.batchsize {
-		s.shuffleAndSend()
+		s.shuffle()
 	}
 }
 
-func (s *BasicShuffler) shuffleAndSend() {
+func (s *BasicShuffler) shuffle() {
 	num := len(s.ciphertexts)
 	shuffled := make([][]byte, num)
 
@@ -71,4 +80,37 @@ func (s *BasicShuffler) shuffleAndSend() {
 	// Send to analyzer and clear buffer
 	s.analyzer.send(shuffled)
 	s.ciphertexts = [][]byte{}
+}
+
+// Dispatch function makes a grpc call to analyzer and forwards the request
+// from encoder to analyzer.
+func Dispatch(envelope *cobaltpb.Envelope) {
+	analyzerURL := envelope.GetManifest().RecipientUrl
+
+	if analyzerURL == "" {
+		glog.V(2).Infoln("Missing recipient.")
+		return
+	}
+
+	glog.V(2).Infoln("Connecting to analyzer:", analyzerURL)
+	conn, err := grpc.Dial(analyzerURL, grpc.WithInsecure(), grpc.WithTimeout(time.Second*30))
+
+	if err != nil {
+		glog.V(2).Infoln("Unable to connect to analyzer:", analyzerURL, " with error:", err)
+		return
+	}
+
+	defer conn.Close()
+	c := cobaltpb.NewAnalyzerClient(conn)
+
+	_, err = c.AddObservations(context.Background(), &cobaltpb.ObservationBatch{
+		MetaData:             envelope.GetManifest().GetObservationMetaData(),
+		EncryptedObservation: []*cobaltpb.EncryptedMessage{envelope.GetEncryptedMessage()}})
+
+	if err != nil {
+		glog.V(2).Infoln("Error in sending shuffled reports:", err)
+		return
+	}
+
+	glog.V(2).Infoln("Shuffler to Analyzer grpc call executed successfully")
 }

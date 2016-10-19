@@ -44,11 +44,13 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
 # Build shuffler executables
 set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
 add_custom_command(OUTPUT ${SHUFFLER_BIN}
+    COMMAND ${GO_BIN} build util
     COMMAND ${GO_BIN} build dispatcher
     COMMAND ${GO_BIN} build receiver
     # Compiles all dependencies and installs main service package
     COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN} shuffler_main.go
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
+    DEPENDS ${ANALYZER_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -57,11 +59,13 @@ set(TEST_CLIENT_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler_test_client")
 add_custom_command(OUTPUT ${TEST_CLIENT_BIN}
     COMMAND ${GO_BIN} build -o ${TEST_CLIENT_BIN} tools/test_client.go
     DEPENDS src/tools/test_client.go
+    DEPENDS ${SHUFFLER_BIN}
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
+    DEPENDS ${ANALYZER_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Build shuffler functional tests
+# Build dispatcher unit tests
 set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
 set(DISPATCHER_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher_test.go")
 set(DISPATCHER_TEST_BIN ${GO_TESTS}/dispatcher_test)

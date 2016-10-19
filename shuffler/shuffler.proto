@@ -40,21 +40,18 @@ service Shuffler {
 message ShufflerResponse {
 }
 
-// Recipient specifies analyzer's host and routing attributes for sending the
-// shuffled messages.
-message Recipient {
-  string host_name = 1;
-}
-
 message Manifest {
   enum ShufflerPolicy {
     UNKNOWN_POLICY = 0;
     POLICY1 = 1;
     POLICY2 = 2; // TODO: Add some real policies here.
   }
+
   ObservationMetadata observation_meta_data = 1;
   ShufflerPolicy shuffler_policy = 2;
-  Recipient recipient = 3;
+
+  // Recipient_URL refers to analyzer that consumes shuffled envelopes.
+  string recipient_url = 3;
 }
 
 // An Envelope is decrypted from the incoming EncryptedMessage from the
