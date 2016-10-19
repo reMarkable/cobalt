@@ -47,4 +47,4 @@ add_subdirectory(third_party/boringssl/src)
 include_directories(BEFORE PRIVATE "${BoringSSL_SOURCE_DIR}/include")
 
 add_subdirectory(third_party/googletest)
-add_subdirectory(util/crypto_util)
+add_subdirectory(util)
