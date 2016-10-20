@@ -113,6 +113,33 @@ CalendarDate DayIndexToCalendarDate(uint32_t day_index) {
   return calendar_date;
 }
 
+uint32_t CalendarDateToWeekIndex(const CalendarDate& calendar_date) {
+  // Day zero was a Thursday which is 4 days after Sunday.
+  return (CalendarDateToDayIndex(calendar_date) + 4) / 7;
+}
+
+CalendarDate WeekIndexToCalendarDate(uint32_t week_index) {
+  // Day zero was a Thursday which is 4 days after Sunday.
+  return DayIndexToCalendarDate(week_index * 7 - (week_index > 0 ? 4 : 0));
+}
+
+uint32_t CalendarDateToMonthIndex(const CalendarDate& calendar_date) {
+  if (calendar_date.year < 1970 ||
+     calendar_date.month < 1 ||
+     calendar_date.month > 12) {
+    return UINT32_MAX;
+  }
+  return 12 * (calendar_date.year - 1970) + calendar_date.month - 1;
+}
+
+CalendarDate MonthIndexToCalendarDate(uint32_t month_index) {
+  CalendarDate calendar_date;
+  calendar_date.day_of_month = 1;
+  calendar_date.month = (month_index % 12) + 1;
+  calendar_date.year = month_index/12 + 1970;
+  return calendar_date;
+}
+
 }  // namespace util
 }  // namespace cobalt
 

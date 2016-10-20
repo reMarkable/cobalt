@@ -189,6 +189,166 @@ TEST(DatetimeUtilTest, DayIndexCalendarDateInversesTest) {
   }
 }
 
+TEST(DatetimeUtilTest, CalendarDateToWeekIndex) {
+  CalendarDate calendar_date;
+
+  // Thurs, January 1, 1970
+  calendar_date.day_of_month = 1;
+  calendar_date.month = 1;
+  calendar_date.year = 1970;
+  EXPECT_EQ(0, CalendarDateToWeekIndex(calendar_date));
+
+  // Fri, January 2, 1970
+  calendar_date.day_of_month = 2;
+  EXPECT_EQ(0, CalendarDateToWeekIndex(calendar_date));
+
+  // Sat, January 3, 1970
+  calendar_date.day_of_month = 3;
+  EXPECT_EQ(0, CalendarDateToWeekIndex(calendar_date));
+
+  // Sun, January 4, 1970
+  calendar_date.day_of_month = 4;
+  EXPECT_EQ(1, CalendarDateToWeekIndex(calendar_date));
+
+  // Mon January 5, 1970
+  calendar_date.day_of_month = 5;
+  EXPECT_EQ(1, CalendarDateToWeekIndex(calendar_date));
+
+  // Sat January 10, 1970
+  calendar_date.day_of_month = 10;
+  EXPECT_EQ(1, CalendarDateToWeekIndex(calendar_date));
+
+  // Sun January 11, 1970
+  calendar_date.day_of_month = 11;
+  EXPECT_EQ(2, CalendarDateToWeekIndex(calendar_date));
+
+  // Mon January 12, 1970
+  calendar_date.day_of_month = 12;
+  EXPECT_EQ(2, CalendarDateToWeekIndex(calendar_date));
+
+  // Wed March 4, 1970
+  calendar_date.day_of_month = 4;
+  calendar_date.month = 3;
+  EXPECT_EQ(9, CalendarDateToWeekIndex(calendar_date));
+
+  // Sat March 7, 1970
+  calendar_date.day_of_month = 7;
+  EXPECT_EQ(9, CalendarDateToWeekIndex(calendar_date));
+
+  // Sun March 8, 1970
+  calendar_date.day_of_month = 8;
+  EXPECT_EQ(10, CalendarDateToWeekIndex(calendar_date));
+}
+
+void doWeekIndexToCalendarDateTest(uint32_t week_index, uint32_t expected_month,
+    uint32_t expected_day_of_month, uint32_t expected_year) {
+  auto calendar_date = WeekIndexToCalendarDate(week_index);
+  EXPECT_EQ(expected_day_of_month, calendar_date.day_of_month)
+      << "week_index=" << week_index;
+  EXPECT_EQ(expected_month, calendar_date.month)
+      << "week_index=" << week_index;
+  EXPECT_EQ(expected_year, calendar_date.year)
+      << "week_index=" << week_index;
+}
+
+TEST(DatetimeUtilTest, WeekIndexToCalendarDate) {
+  // January 1, 1970
+  doWeekIndexToCalendarDateTest(0, 1, 1, 1970);
+
+  // January 4, 1970
+  doWeekIndexToCalendarDateTest(1, 1, 4, 1970);
+
+  // January 11, 1970
+  doWeekIndexToCalendarDateTest(2, 1, 11, 1970);
+
+  // Marcy 8, 1970
+  doWeekIndexToCalendarDateTest(10, 3, 8, 1970);
+
+  // Marcy 15, 1970
+  doWeekIndexToCalendarDateTest(11, 3, 15, 1970);
+}
+
+TEST(DatetimeUtilTest, WeekIndexCalendarDateInversesTest) {
+  for (uint32_t week_index = 2000; week_index < 3000; week_index++) {
+    CalendarDate calendar_date = WeekIndexToCalendarDate(week_index);
+    EXPECT_EQ(week_index, CalendarDateToWeekIndex(calendar_date));
+  }
+}
+
+TEST(DatetimeUtilTest, CalendarDateToMonthIndex) {
+  CalendarDate calendar_date;
+
+  // January 1, 1970
+  calendar_date.day_of_month = 1;
+  calendar_date.month = 1;
+  calendar_date.year = 1970;
+  EXPECT_EQ(0, CalendarDateToMonthIndex(calendar_date));
+
+  // January 31, 1970
+  calendar_date.day_of_month = 31;
+  EXPECT_EQ(0, CalendarDateToMonthIndex(calendar_date));
+
+  // February 1, 1970
+  calendar_date.month = 2;
+  calendar_date.day_of_month = 1;
+  EXPECT_EQ(1, CalendarDateToMonthIndex(calendar_date));
+
+  // December 31, 1970
+  calendar_date.month = 12;
+  calendar_date.day_of_month = 31;
+  EXPECT_EQ(11, CalendarDateToMonthIndex(calendar_date));
+
+  // January 1, 1971
+  calendar_date.month = 1;
+  calendar_date.day_of_month = 1;
+  calendar_date.year = 1971;
+  EXPECT_EQ(12, CalendarDateToMonthIndex(calendar_date));
+
+  // March 4, 1971
+  calendar_date.month = 3;
+  calendar_date.day_of_month = 4;
+  calendar_date.year = 1971;
+  EXPECT_EQ(14, CalendarDateToMonthIndex(calendar_date));
+
+  // March 4, 1976
+  calendar_date.month = 3;
+  calendar_date.day_of_month = 4;
+  calendar_date.year = 1976;
+  EXPECT_EQ(74, CalendarDateToMonthIndex(calendar_date));
+}
+
+void doMonthIndexToCalendarDateTest(uint32_t month_index,
+    uint32_t expected_month,  uint32_t expected_year) {
+  auto calendar_date = MonthIndexToCalendarDate(month_index);
+  EXPECT_EQ(1, calendar_date.day_of_month)
+      << "month_index=" << month_index;
+  EXPECT_EQ(expected_month, calendar_date.month)
+      << "month_index=" << month_index;
+  EXPECT_EQ(expected_year, calendar_date.year)
+      << "month_index=" << month_index;
+}
+
+TEST(DatetimeUtilTest, MonthIndexToCalendarDate) {
+  // January, 1970
+  doMonthIndexToCalendarDateTest(0, 1, 1970);
+
+  // February, 1970
+  doMonthIndexToCalendarDateTest(1, 2, 1970);
+
+  // March, 1970
+  doMonthIndexToCalendarDateTest(2, 3, 1970);
+
+  // April, 1978
+  doMonthIndexToCalendarDateTest(123, 4, 1980);
+}
+
+TEST(DatetimeUtilTest, MonthIndexCalendarDateInversesTest) {
+  for (uint32_t month_index = 500; month_index < 1000; month_index++) {
+    CalendarDate calendar_date = MonthIndexToCalendarDate(month_index);
+    EXPECT_EQ(month_index, CalendarDateToMonthIndex(calendar_date));
+  }
+}
+
 
 }  // namespace util
 }  // namespace cobalt
