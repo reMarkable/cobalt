@@ -1,5 +1,18 @@
 #!/usr/bin/env Rscript
+# Copyright 2014 Google Inc. All rights reserved.
 #
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Command line tool to decode multidimensional reports.  It's a simple wrapper
 # around functions in association.R.
 
@@ -60,7 +73,7 @@ option_list <- list(
     make_option(
         "--remove-bad-rows", dest="remove_bad_rows", default=FALSE,
         action="store_true",
-        help="Whether we should remove rows where any value is missing (by 
+        help="Whether we should remove rows where any value is missing (by
              default, the program aborts with an error)"),
 
     # Options that speed it up
@@ -183,17 +196,17 @@ CreateAssocCatMap <- function(params) {
   num_categories <- params$k
   names <- sprintf("%d", seq(0, num_categories - 1))
   seq_of_categories <- seq(1, num_categories)
-  
+
   map_by_cohort <- lapply(1:params$m, function(unused_cohort) {
     # The (1,1) cell is false and the (1,2) cell is true.
     m <- sparseMatrix(seq_of_categories, seq_of_categories, dims = c(num_categories, num_categories))
     colnames(m) <- names
     m
   })
-  
+
   all_cohorts_map <- sparseMatrix(1 : (params$m * num_categories), rep(seq_of_categories, params$m))
   colnames(all_cohorts_map) <- names
-  
+
   list(map_by_cohort = map_by_cohort, all_cohorts_map = all_cohorts_map)
 }
 
@@ -220,7 +233,7 @@ ResultMatrixToDataFrame <- function(m, string_var_name, bool_var_name) {
 
   # The as.table conversion gives you a Freq column.  Call it "proportion" to
   # be consistent with single variable analysis.
-  colnames(fit_df)[colnames(fit_df) == "Freq"] <- "proportion" 
+  colnames(fit_df)[colnames(fit_df) == "Freq"] <- "proportion"
 
   fit_df
 }
@@ -270,16 +283,16 @@ main <- function(opts) {
     UsageError("--map1 must be provided when --var1 is a string (var = %s)",
                opts$var1)
   }
-  
+
   params_name <- schema1$params
   params_path <- file.path(opts$params_dir, paste0(params_name, '.csv'))
   string_params <- ReadParameterFile(params_path)
   params_name <- schema2$params
   params_path <- file.path(opts$params_dir, paste0(params_name, '.csv'))
   cat_params <- ReadParameterFile(params_path)
-  
+
   # End of TODO: Remove these limitations
-  
+
 
   # Example cache speedup for 100k map file: 31 seconds to load map and write
   # cache; vs 2.2 seconds to read cache.
@@ -355,7 +368,7 @@ main <- function(opts) {
   # if (!opts$create_bool_map) {
   #  stop("ERROR: pass --create-bool-map to analyze booleans.")
   # }
-  
+
   # TODO: We should use the closed-form formulas rather than calling the
   # solver, and not require this flag.
   if (!opts$create_cat_map) {
@@ -394,7 +407,7 @@ main <- function(opts) {
     # rev needed for endianness
     rev(as.integer(strsplit(x, split = "")[[1]]))
   }, mc.cores = opts$num_cores)
-  
+
   Log('Splitting string reports 2 (%d cores)', opts$num_cores)
   cat_reports <- mclapply(cat_var, function(x) {
     # function splits strings and converts them to numeric values
@@ -445,7 +458,7 @@ main <- function(opts) {
   # fit_df <- ResultMatrixToDataFrame(t(fit), opts$var2, opts$var1)
   fit_df <- as.data.frame(fit)
   fit_df[, "avg_rating"] <- average_rating
-  
+
   # R data structure manipulation to bind results
   avg_rating_tmp <- fit_df["avg_rating"]
   avg_rating_df <- as.data.frame(avg_rating_tmp[-nrow(avg_rating_tmp),])  # Gets rid of Other
@@ -477,7 +490,7 @@ main <- function(opts) {
   metrics_json_path <- file.path(opts$output_dir, 'assoc-metrics.json')
   writeLines(toJSON(metrics), con = metrics_json_path)
   Log("Wrote %s", metrics_json_path)
-   
+
   Log('DONE decode-assoc')
 }
 
