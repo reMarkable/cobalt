@@ -16,10 +16,13 @@
 
 FROM ubuntu:14.04
 
-COPY libgoogleapis.so /usr/lib
+COPY libgflags.so.2 /usr/lib/
+COPY libglog.so.0 /usr/lib/
+COPY libgoogleapis.so /usr/lib/
 COPY libgrpc.so.1 /usr/lib/
 COPY libgrpc++.so.1 /usr/lib/
 COPY libprotobuf.so.10 /usr/lib/
+COPY libunwind.so.8 /usr/lib/
 COPY roots.pem /usr/share/grpc/
 
 RUN ldconfig

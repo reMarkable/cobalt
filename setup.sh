@@ -43,7 +43,7 @@ rm -fr $WD
 mkdir $WD
 
 # Install apt packages
-apt-get -y install clang cmake ninja-build libgflags-dev
+apt-get -y install clang cmake ninja-build libgflags-dev libgoogle-glog-dev
 
 # Install golang 1.7.1
 GO_DIR=/usr/local/go

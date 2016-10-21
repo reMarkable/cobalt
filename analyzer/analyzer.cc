@@ -17,9 +17,11 @@
 
 #include "analyzer/analyzer.h"
 
-#include <time.h>
+#include <sys/time.h>
 
 #include <string>
+
+#include "util/crypto_util/random.h"
 
 using google::protobuf::Empty;
 using grpc::Server;
@@ -37,15 +39,39 @@ AnalyzerServiceImpl::AnalyzerServiceImpl(Store* store)
 Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
                                             const ObservationBatch* request,
                                             Empty* response) {
-  char key[64];
-  std::string val;
+  // Add a row for every observation
+  for (const EncryptedMessage& em : request->encrypted_observation()) {
+    std::string key = make_row_key(request->meta_data());
+    std::string val;
 
-  snprintf(key, sizeof(key), "%ld", time(NULL));
-  request->SerializeToString(&val);
+    em.SerializeToString(&val);
 
-  store_->put(key, val);
+    // TODO(bittau): need to store metadata somehow.  Right now it's implicit in
+    // the row_key but that's bad design.
+    store_->put(key, val);
+  }
 
   return Status::OK;
+}
+
+std::string AnalyzerServiceImpl::make_row_key(const ObservationMetadata& meta) {
+  char out[128];
+  uint64_t rnd = 0;
+  cobalt::crypto::Random random;
+  struct timeval tv;
+
+  random.RandomBytes(reinterpret_cast<crypto::byte*>(&rnd), sizeof(rnd));
+  gettimeofday(&tv, NULL);
+
+  snprintf(out, sizeof(out), "%.10u:%.10u:%.10u:%.10u:%.20lu:%.20lu",
+           meta.customer_id(),
+           meta.project_id(),
+           meta.metric_id(),
+           meta.day_index(),
+           tv.tv_sec * 1000000UL + tv.tv_usec,
+           rnd);
+
+  return std::string(out);
 }
 
 void AnalyzerServiceImpl::Start() {

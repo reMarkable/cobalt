@@ -14,11 +14,15 @@
 
 #include "analyzer/store/mem_store.h"
 
+#include <glog/logging.h>
+
 namespace cobalt {
 namespace analyzer {
 
 int MemStore::put(const std::string& key, const std::string& val) {
   data_[key] = val;
+
+  VLOG(1) << "put: " << to_string(key, val);
 
   return 0;
 }
@@ -32,6 +36,26 @@ int MemStore::get(const std::string& key, std::string* out) {
   *out = i->second;
 
   return 0;
+}
+
+std::string MemStore::to_string(const std::string& key,
+                                const std::string& val) {
+  std::ostringstream oss;
+
+  oss << "Key [" << key << "]";
+  oss << " Val sz " << val.size() << " [";
+
+  for (int i = 0; i < val.size(); i++) {
+    char tmp[3];
+
+    snprintf(tmp, sizeof(tmp), "%.2x", val[i]);
+
+    oss << tmp << " ";
+  }
+
+  oss << "]";
+
+  return oss.str();
 }
 
 }  // namespace analyzer

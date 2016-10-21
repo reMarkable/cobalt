@@ -18,6 +18,7 @@
 #include <grpc++/grpc++.h>
 
 #include <memory>
+#include <string>
 
 #include "analyzer/analyzer.grpc.pb.h"
 #include "analyzer/store/store.h"
@@ -48,6 +49,12 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
                                google::protobuf::Empty* response) override;
 
  private:
+  // The row key is currently defined as:
+  // customer:project:metric:day:random
+  // Random is 64bit to try and avoid collisions on observations for the same
+  // day.
+  std::string make_row_key(const ObservationMetadata& metadata);
+
   std::unique_ptr<grpc::Server> server_;
   Store* store_;
 };

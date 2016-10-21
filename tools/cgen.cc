@@ -26,6 +26,7 @@
 #include <gflags/gflags.h>
 
 #include "analyzer/analyzer.h"
+#include "./cobalt.pb.h"
 
 using cobalt::analyzer::kAnalyzerPort;
 using cobalt::analyzer::Analyzer;
@@ -40,6 +41,7 @@ namespace cgen {
 
 DEFINE_string(analyzer, "", "Analyzer IP");
 DEFINE_int32(num_rpcs, 1, "Number of RPCs to send");
+DEFINE_int32(num_observations, 1, "Number of Observations per RPC");
 
 // Measures time between start and stop.  Useful for benchmarking.
 class Timer {
@@ -84,12 +86,35 @@ class CGen {
   }
 
   void start() {
+    generate_observations();
+
     if (FLAGS_analyzer != "")
-      do_analyzer();
+      send_analyzer();
   }
 
  private:
-  void do_analyzer() {
+  // Creates a bunch of fake observations that can be sent to shufflers or
+  // analyzers.
+  void generate_observations() {
+    for (int i = 0; i < FLAGS_num_observations; i++) {
+      Observation obs;
+      ObservationPart part;
+
+      part.set_encoding_config_id(1);
+
+      BasicRapporObservation* rappor = part.mutable_basic_rappor();
+      rappor->set_data("basic rappor");
+
+      // TODO(bittau): need to specify what key-value to use for
+      // single-dimension metrics.  Using DEFAULT for now.
+      (*obs.mutable_parts())["DEFAULT"] = part;
+
+      observations_.push_back(obs);
+    }
+  }
+
+  // Send observations to the analyzer.
+  void send_analyzer() {
     // connect to the analyzer
     char dst[1024];
 
@@ -100,10 +125,24 @@ class CGen {
 
     std::unique_ptr<Analyzer::Stub> analyzer(Analyzer::NewStub(chan));
 
-    // generate observations
+    // Generate the observation batch.
     ObservationBatch req;
-    EncryptedMessage* encrypted_observation = req.add_encrypted_observation();
-    generate_msg(encrypted_observation);
+    ObservationMetadata* metadata = req.mutable_meta_data();
+
+    metadata->set_customer_id(1);
+    metadata->set_project_id(2);
+    metadata->set_metric_id(3);
+    metadata->set_day_index(4);
+
+    for (const Observation& observation : observations_) {
+      std::string cleartext, encrypted;
+
+      observation.SerializeToString(&cleartext);
+      encrypt(cleartext, &encrypted);
+
+      EncryptedMessage* msg = req.add_encrypted_observation();
+      msg->set_ciphertext(encrypted);
+    }
 
     // send RPCs
     Timer t;
@@ -125,9 +164,12 @@ class CGen {
            t.elapsed() / 1000UL, FLAGS_num_rpcs);
   }
 
-  void generate_msg(EncryptedMessage *msg) {
-    msg->set_ciphertext("test");
+  void encrypt(const std::string& in, std::string* out) {
+    // TODO(pseudorandom): please implement
+    *out = in;
   }
+
+  std::vector<Observation> observations_;
 };  // class CGen
 
 }  // namespace cgen

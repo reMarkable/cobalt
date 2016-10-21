@@ -135,6 +135,9 @@ def _gce_build(args):
               "/usr/lib/libgoogleapis.so",
               "/usr/lib/libgrpc++.so.1",
               "/usr/lib/libgrpc.so.1",
+              "/usr/lib/x86_64-linux-gnu/libgflags.so.2",
+              "/usr/lib/x86_64-linux-gnu/libglog.so.0",
+              "/usr/lib/x86_64-linux-gnu/libunwind.so.8",
               "/usr/share/grpc/roots.pem",
              ]:
     shutil.copy(dep, cobalt)
@@ -153,7 +156,7 @@ def _gce_push(args):
   for i in IMAGES:
     tag = "%s/%s" % (GCE_TAG, i)
     subprocess.check_call(["docker", "tag", "-f", i, tag])
-    subprocess.check_call(["gcloud", "docker", "push", tag])
+    subprocess.check_call(["gcloud", "docker", "--", "push", tag])
 
 def kube_setup():
   subprocess.check_call(["gcloud", "container", "clusters", "get-credentials",

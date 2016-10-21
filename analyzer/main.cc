@@ -13,20 +13,33 @@
 // limitations under the License.
 
 #include <err.h>
+#include <glog/logging.h>
 
 #include "analyzer/analyzer.h"
 #include "analyzer/store/bigtable_store.h"
+#include "analyzer/store/mem_store.h"
 
 int main(int argc, char *argv[]) {
+  google::InitGoogleLogging(argv[0]);
+
   if (argc < 2)
     errx(1, "Usage: %s <table_name>", argv[0]);
 
-  printf("Starting analyzer...\n");
+  LOG(INFO) << "Starting analyzer";
 
-  cobalt::analyzer::BigtableStore store;
-  store.initialize(argv[1]);
+  cobalt::analyzer::BigtableStore bigtable;
+  cobalt::analyzer::MemStore mem;
+  cobalt::analyzer::Store* store;
 
-  cobalt::analyzer::AnalyzerServiceImpl analyzer(&store);
+  if (strcmp(argv[1], "mem") == 0) {
+    LOG(INFO) << "Using a memory store";
+    store = &mem;
+  } else {
+    bigtable.initialize(argv[1]);
+    store = &bigtable;
+  }
+
+  cobalt::analyzer::AnalyzerServiceImpl analyzer(store);
   analyzer.Start();
   analyzer.Wait();
 }

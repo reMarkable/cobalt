@@ -25,7 +25,7 @@ SET (DIR_GTESTS "${CMAKE_BINARY_DIR}/gtests")
 # Note - we specify the exact library version because dev environments have
 # protobuf.so.8 (v2) preinstalled in a higher priority search path.  Instead we
 # want to link against protobuf v3
-set(PROTOBUF_LIBRARY /usr/lib/libprotobuf.so.10 grpc++)
+set(PROTOBUF_LIBRARY /usr/lib/libprotobuf.so.10 grpc++ grpc)
 
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})

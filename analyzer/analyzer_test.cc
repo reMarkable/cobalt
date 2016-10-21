@@ -81,7 +81,7 @@ TEST_F(AnalyzerFunctionalTest, TestGRPC) {
   // check that the item matches the observation
   std::string obs;
 
-  req.SerializeToString(&obs);
+  encrypted_observation->SerializeToString(&obs);
 
   ASSERT_EQ(val, obs);
 }

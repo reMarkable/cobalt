@@ -34,9 +34,9 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
 set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 
 # Build the analyzer library
-add_library(cobalt_analyzer SHARED ${ANALYZER_SRCS} ${PROTO_SRCS})
+add_library(cobalt_analyzer ${ANALYZER_SRCS} ${PROTO_SRCS})
 target_link_libraries(cobalt_analyzer ${PROTOBUF_LIBRARY} ${COBALT_PROTO_SRCS}
-                      googleapis)
+                      googleapis cobalt_crypto glog)
 
 # Build the analyzer executable
 add_executable(analyzer main.cc)

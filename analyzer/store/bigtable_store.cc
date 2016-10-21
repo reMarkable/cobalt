@@ -14,6 +14,8 @@
 
 #include "analyzer/store/bigtable_store.h"
 
+#include <glog/logging.h>
+
 #include <string>
 
 using google::bigtable::v2::Bigtable;
@@ -53,7 +55,7 @@ int BigtableStore::put(const std::string& key, const std::string& val) {
   Status s = bigtable_->MutateRow(&context, req, &resp);
 
   if (!s.ok()) {
-    printf("ERR [%s]\n", s.error_message().c_str());
+    LOG(ERROR) << "ERR " << s.error_message();
     return -1;
   }
 

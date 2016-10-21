@@ -14,10 +14,7 @@
 
 FROM cobalt
 
-COPY libcobalt_analyzer.so /usr/local/lib/
 COPY analyzer /usr/local/bin/
-
-RUN ldconfig
 
 ENTRYPOINT ["analyzer"]
 EXPOSE 8080

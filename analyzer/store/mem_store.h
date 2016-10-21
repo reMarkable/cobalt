@@ -29,6 +29,11 @@ class MemStore : public Store {
   int put(const std::string& key, const std::string& val) override;
   int get(const std::string& key, std::string* out) override;
 
+ private:
+  // Used for debugging.  Will return a formatted version of the key and value.
+  std::string to_string(const std::string& key, const std::string& val);
+
+ public:
   std::map<std::string, std::string> data_;
 };
 
