@@ -25,6 +25,7 @@ SRC_ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.pardir))
 
 GO_DIRS = [
     os.path.join(SRC_ROOT_DIR, 'shuffler'),
+    os.path.join(SRC_ROOT_DIR, 'functional_tests'),
 ]
 
 def main():

@@ -66,3 +66,26 @@ the JSON file containing credentials.  Follow the instructions of step "1." of
 "How the Application Default Credentials work" from:
 
 <https://developers.google.com/identity/protocols/application-default-credentials>
+
+### Bigtable emulator
+
+You can run the analyzer locally using the Bigtable emulator as follows.  Start
+the Bigtable emulator:
+
+* gcloud beta emulators bigtable start
+
+Then start the Analyzer with the appropriate environment set:
+
+* $(gcloud beta emulators bigtable env-init)
+
+* analyzer projects/google.com:shuffler-test/instances/cobalt-analyzer/tables/observations
+
+Note, you can run the analyzer using the "mem" table name to use an internal
+in-memory database that doesn't even require Bigtable or its emulator.
+
+## cgen: Cobalt gRPC generator
+
+The following example sends a single RPC containing an ObservationBatch with two
+Observations to an Analyzer running locally:
+
+* cgen -analyzer 127.0.0.1 -num\_observations 2

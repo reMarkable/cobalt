@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(GO_PATH env GOPATH="${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen:${CMAKE_CURRENT_SOURCE_DIR}")
-set(GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
 set(GO_PROTO_GEN "${CMAKE_BINARY_DIR}/go-proto-gen/src")
-set(GO_BIN ${GO_PATH} /usr/local/go/bin/go)
 set(PROTOC ${GO_PATH} protoc)
 
-file(MAKE_DIRECTORY ${GO_TESTS} ${GO_PROTO_GEN})
+file(MAKE_DIRECTORY ${GO_PROTO_GEN})
 
 # generate the go bindings for shuffler proto
 set(SHUFFLER_GEN_PROTO_FILE "${GO_PROTO_GEN}/shuffler/shuffler.pb.go")

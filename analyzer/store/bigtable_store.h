@@ -16,6 +16,7 @@
 #define COBALT_ANALYZER_STORE_BIGTABLE_STORE_H_
 
 #include <google/bigtable/v2/bigtable.grpc.pb.h>
+#include <google/bigtable/admin/v2/bigtable_table_admin.grpc.pb.h>
 #include <grpc++/grpc++.h>
 
 #include <memory>
@@ -29,19 +30,23 @@ namespace analyzer {
 // A key value store implemented on Google Cloud Bigtable
 class BigtableStore : public Store {
  public:
-  // Call prior to put/get.  Sets up needed state for connecting to bigtable.
-  //
   // table_name format:
   //   "projects/PROJECT_NAME/instances/INSTANCE_NAME/tables/TABLE_NAME"
-  //
+  explicit BigtableStore(const std::string& table_name);
+
+  // Call prior to put/get.  Sets up needed state for connecting to bigtable.
   // Returns non-zero on error.
-  int initialize(const std::string& table_name);
+  int initialize();
 
   int put(const std::string& key, const std::string& val) override;
   int get(const std::string& key, std::string* out) override;
 
  private:
-  std::unique_ptr<google::bigtable::v2::Bigtable::Stub> bigtable_;
+  int setup_connection();
+  int init_schema();
+
+  std::unique_ptr<google::bigtable::v2::Bigtable::Stub> data_;
+  std::unique_ptr<google::bigtable::admin::v2::BigtableTableAdmin::Stub> admin_;
   std::string table_name_;
 };
 

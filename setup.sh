@@ -18,9 +18,10 @@
 # Warning this will install packages globally
 
 PREFIX=/usr
+COBALT=$PREFIX/local/cobalt
 
-if [ $(id -u) != "0" ] ; then
-    echo run as root
+if [ $(id -u) != "0" -o "$SUDO_USER" == "" ] ; then
+    echo run with sudo
     exit 1
 fi
 
@@ -46,10 +47,11 @@ mkdir $WD
 apt-get -y install clang cmake ninja-build libgflags-dev libgoogle-glog-dev
 
 # Install golang 1.7.1
-GO_DIR=/usr/local/go
+GO_DIR=$PREFIX/local/go
+GO=$GO_DIR/bin/go
 
 if ls $GO_DIR > /dev/null ; then
-    GO_VERSION=$($GO_DIR/bin/go version | awk '{print $3}')
+    GO_VERSION=$($GO version | awk '{print $3}')
 fi
 
 if [ "$GO_VERSION" != "go1.7.1" ] ; then
@@ -110,9 +112,37 @@ GOPATH=${CD}/third_party/go
 export GOPATH
 if ! which protoc-gen-go > /dev/null ; then
     cd $WD
-    go build -o $PREFIX/bin/protoc-gen-go github.com/golang/protobuf/protoc-gen-go
+    $GO build -o $PREFIX/bin/protoc-gen-go github.com/golang/protobuf/protoc-gen-go
 fi
 
 unset GOPATH
+
+# Install go dependencies
+export GOPATH=$COBALT/go
+
+if [ ! -d $GOPATH/src/cloud.google.com/go/bigtable ] ; then
+    echo Installing the bigtable client for go
+    mkdir -p $GOPATH
+    $GO get cloud.google.com/go/bigtable
+fi
+
+# Install gcloud
+if ! which gcloud > /dev/null ; then
+    SDK=google-cloud-sdk-131.0.0-linux-x86_64.tar.gz
+    GCLOUD_DIR=$COBALT/gcloud
+
+    cd $WD
+    mkdir -p $GCLOUD_DIR
+    chown $SUDO_USER $GCLOUD_DIR
+    wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$SDK
+
+    su -c "tar -f $SDK -C $GCLOUD_DIR -x" $SUDO_USER
+    cd $GCLOUD_DIR
+    su -c "./google-cloud-sdk/install.sh --quiet" $SUDO_USER
+    su -c "./google-cloud-sdk/bin/gcloud --quiet components update beta" $SUDO_USER
+    su -c "./google-cloud-sdk/bin/gcloud --quiet components install bigtable" $SUDO_USER
+
+    echo Please restart your shell to get gcloud in your path
+fi
 
 rm -fr $WD

@@ -24,12 +24,17 @@ int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  if (argc < 2)
-    errx(1, "Usage: %s <table_name>", argv[0]);
+  if (argc < 2) {
+    errx(1, "Usage: %s <table_name>\n"
+            "E.g., projects/google.com:shuffler-test/instances/cobalt-analyzer/"
+            "tables/observations\n"
+            "Use the special \"mem\" tablename for an in-memory datastore"
+            , argv[0]);
+  }
 
   LOG(INFO) << "Starting analyzer";
 
-  cobalt::analyzer::BigtableStore bigtable;
+  cobalt::analyzer::BigtableStore bigtable(argv[1]);
   cobalt::analyzer::MemStore mem;
   cobalt::analyzer::Store* store;
 
@@ -37,7 +42,9 @@ int main(int argc, char *argv[]) {
     LOG(INFO) << "Using a memory store";
     store = &mem;
   } else {
-    bigtable.initialize(argv[1]);
+    if (bigtable.initialize() < 0)
+      LOG(FATAL) << "Cannot initialzie Bigtable";
+
     store = &bigtable;
   }
 

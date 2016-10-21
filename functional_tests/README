@@ -1,0 +1,7 @@
+Please put functional, end-to-end, integration tests here.  These should be
+tests that stand up complete components (without mocks), treat them as black
+boxes, and test them based on inputs and outputs.
+
+Functional tests are currently being run as part of cobaltb.py test.
+
+Unit tests should still live in the directories of individual components.

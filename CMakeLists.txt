@@ -37,9 +37,18 @@ protobuf_generate_cpp(COBALT_PROTO_SRCS COBALT_PROTO_HDRS
                       metrics.proto)
 add_custom_target(build_protos, DEPENDS ${COBALT_PROTO_SRCS})
 
+# Go related defines
+set(GO_PATH env GOPATH="${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen:/usr/local/cobalt/go:${CMAKE_SOURCE_DIR}/shuffler")
+set(GO_BIN ${GO_PATH} /usr/local/go/bin/go)
+set(GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
+
+file(MAKE_DIRECTORY ${GO_TESTS})
+
+# Project directories
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)
 add_subdirectory(encoder)
+add_subdirectory(functional_tests)
 add_subdirectory(shuffler)
 add_subdirectory(tools)
 

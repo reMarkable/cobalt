@@ -22,20 +22,104 @@ using google::bigtable::v2::Bigtable;
 using google::bigtable::v2::MutateRowRequest;
 using google::bigtable::v2::MutateRowResponse;
 using google::bigtable::v2::Mutation_SetCell;
+using google::bigtable::admin::v2::BigtableTableAdmin;
+using google::bigtable::admin::v2::ColumnFamily;
+using google::bigtable::admin::v2::CreateTableRequest;
+using google::bigtable::admin::v2::GetTableRequest;
+using google::bigtable::admin::v2::Table;
 using grpc::ClientContext;
 using grpc::Status;
 
 namespace cobalt {
 namespace analyzer {
 
-int BigtableStore::initialize(const std::string& table_name) {
-  // If running outside of GCE, set the GOOGLE_APPLICATION_CREDENTIALS
-  // environment variable.  Otherwise you'll hit assertions.
-  auto creds = grpc::GoogleDefaultCredentials();
-  auto chan = grpc::CreateChannel("bigtable.googleapis.com", creds);
+BigtableStore::BigtableStore(const std::string& table_name)
+    : table_name_(table_name) {}
 
-  bigtable_ = Bigtable::NewStub(chan);
-  table_name_ = table_name;
+int BigtableStore::initialize() {
+  int rc;
+
+  if ((rc = setup_connection()))
+    return rc;
+
+  if ((rc = init_schema()))
+    return rc;
+
+  return 0;
+}
+
+// Connects to bigtable or the emulator.
+int BigtableStore::setup_connection() {
+  std::shared_ptr<grpc::ChannelCredentials> creds;
+  const char* host_data = "bigtable.googleapis.com";
+  const char* host_admin = "bigtableadmin.googleapis.com";
+
+  // Check to see if we're running on the emulator.
+  const char* emulator = getenv("BIGTABLE_EMULATOR_HOST");
+
+  if (emulator) {
+    LOG(INFO) << "Using the Bigtable emulator";
+    host_data = host_admin = emulator;
+    creds = grpc::InsecureChannelCredentials();
+  } else {
+    // GOOGLE_APPLICATION_CREDENTIALS must be set or you'll hit asserts when
+    // running locally and target Bigtable on Google Cloud.
+    creds = grpc::GoogleDefaultCredentials();
+  }
+
+  data_ = Bigtable::NewStub(grpc::CreateChannel(host_data, creds));
+  admin_ = BigtableTableAdmin::NewStub(grpc::CreateChannel(host_admin, creds));
+
+  return 0;
+}
+
+// Sets up tables if they do not exist.
+int BigtableStore::init_schema() {
+  ClientContext get_ctx;
+
+  GetTableRequest get_req;
+  Table get_resp;
+  get_req.set_name(table_name_);
+
+  // if the table exists, do nothing
+  Status get_s = admin_->GetTable(&get_ctx, get_req, &get_resp);
+  if (get_s.ok())
+    return 0;
+
+  // otherwise, create the table
+  LOG(INFO) << "Couldn't find table: " << get_s.error_message();
+  LOG(INFO) << "Creating the observations table.";
+
+  CreateTableRequest create_req;
+  Table create_resp;
+
+  // figure out the parent and table_id
+  const char *table_name = table_name_.c_str();
+  const char *p = strstr(table_name, "/tables/");
+
+  if (!p) {
+    LOG(ERROR) << "Bad table name: " << table_name_;
+    return -1;
+  }
+
+  std::string parent(table_name, p - table_name);
+  std::string table_id(p + 8);
+
+  create_req.set_parent(parent);
+  create_req.set_table_id(table_id);
+
+  // setup columns.
+  Table* create_req_tab = create_req.mutable_table();
+  (*create_req_tab->mutable_column_families())["data"] = ColumnFamily();
+
+  // do request.
+  ClientContext create_ctx;
+  Status create_s = admin_->CreateTable(&create_ctx, create_req, &create_resp);
+
+  if (!create_s.ok()) {
+    LOG(ERROR) << "Can't create table: " << create_s.error_message();
+    return -1;
+  }
 
   return 0;
 }
@@ -52,10 +136,10 @@ int BigtableStore::put(const std::string& key, const std::string& val) {
   cell->set_family_name("data");
   cell->set_value(val);
 
-  Status s = bigtable_->MutateRow(&context, req, &resp);
+  Status s = data_->MutateRow(&context, req, &resp);
 
   if (!s.ok()) {
-    LOG(ERROR) << "ERR " << s.error_message();
+    LOG(ERROR) << "Put failed: " << s.error_message();
     return -1;
   }
 
