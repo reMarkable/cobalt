@@ -31,6 +31,7 @@ const int kAnalyzerPort = 8080;
 // Main analyzer class
 class AnalyzerServiceImpl final : public Analyzer::Service {
  public:
+  // Does not take ownership of |store|.
   explicit AnalyzerServiceImpl(Store* store);
 
   // Starts the analyzer service
@@ -56,7 +57,7 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
   std::string make_row_key(const ObservationMetadata& metadata);
 
   std::unique_ptr<grpc::Server> server_;
-  Store* store_;
+  Store& store_;
 };
 
 }  // namespace analyzer

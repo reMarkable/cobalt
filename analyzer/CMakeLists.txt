@@ -40,7 +40,7 @@ target_link_libraries(cobalt_analyzer ${PROTOBUF_LIBRARY} ${COBALT_PROTO_SRCS}
 
 # Build the analyzer executable
 add_executable(analyzer main.cc)
-target_link_libraries(analyzer cobalt_analyzer)
+target_link_libraries(analyzer cobalt_analyzer gflags)
 
 # Build the test
 add_executable(analyzer_test analyzer_test.cc)

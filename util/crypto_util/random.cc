@@ -30,6 +30,12 @@ uint32_t Random::RandomUint32() {
   return x;
 }
 
+uint64_t Random::RandomUint64() {
+  uint64_t x;
+  RandomBytes(reinterpret_cast<byte*>(&x), 8);
+  return x;
+}
+
 byte Random::RandomBits(float p) {
   if (p <= 0.0 || p > 1.0) {
     return 0;

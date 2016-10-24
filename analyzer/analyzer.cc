@@ -33,7 +33,7 @@ namespace cobalt {
 namespace analyzer {
 
 AnalyzerServiceImpl::AnalyzerServiceImpl(Store* store)
-    : store_(store) {
+    : store_(*store) {
 }
 
 Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
@@ -48,7 +48,7 @@ Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
 
     // TODO(bittau): need to store metadata somehow.  Right now it's implicit in
     // the row_key but that's bad design.
-    store_->put(key, val);
+    store_.put(key, val);
   }
 
   return Status::OK;
@@ -56,11 +56,10 @@ Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
 
 std::string AnalyzerServiceImpl::make_row_key(const ObservationMetadata& meta) {
   char out[128];
-  uint64_t rnd = 0;
   cobalt::crypto::Random random;
+  uint64_t rnd = random.RandomUint64();
   struct timeval tv;
 
-  random.RandomBytes(reinterpret_cast<crypto::byte*>(&rnd), sizeof(rnd));
   gettimeofday(&tv, NULL);
 
   snprintf(out, sizeof(out), "%.10u:%.10u:%.10u:%.10u:%.20lu:%.20lu",

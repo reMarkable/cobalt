@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <err.h>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "analyzer/analyzer.h"
@@ -20,6 +21,7 @@
 #include "analyzer/store/mem_store.h"
 
 int main(int argc, char *argv[]) {
+  google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
   if (argc < 2)

@@ -36,6 +36,9 @@ class Random {
   // Returns a uniformly random integer in the range [0, 2^32-1].
   uint32_t RandomUint32();
 
+  // Returns a uniformly random integer in the range [0, 2^64-1].
+  uint64_t RandomUint64();
+
   // Returns 8 independent random bits. For each bit the probability of being
   // equal to one is the given p. p must be in the range [0.0, 1.0] or the
   // result is undefined. p will be rounded to the nearest value of the form
