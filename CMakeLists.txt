@@ -47,6 +47,7 @@ file(MAKE_DIRECTORY ${GO_TESTS})
 # Project directories
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)
+add_subdirectory(config)
 add_subdirectory(encoder)
 add_subdirectory(functional_tests)
 add_subdirectory(shuffler)

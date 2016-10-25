@@ -13,8 +13,6 @@
 // limitations under the License.
 syntax = "proto3";
 
-import "encrypted_message.proto";
-
 package cobalt;
 
 ///////////////////////////////////////////////////////////////

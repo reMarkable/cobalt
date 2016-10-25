@@ -1,0 +1,66 @@
+
+###########################################################################
+# This is a valid version of the registered_encodings.txt file that
+# is used by TEST(EncodingRegistryFromFile, ValidFile) in config_test.cc
+##########################################################################
+
+#########################
+# Customer 1 (Fuchsia)
+########################
+
+## Project 1
+
+#### Encoding (1, 1, 1)
+encoding {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  forculus {
+    threshold: 20
+    epoch_type: WEEK
+  }
+}
+
+#### Encoding (1, 1, 2)
+encoding {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  rappor {
+    num_bloom_bits: 64
+    num_hashes: 2
+    num_cohorts: 100
+    prob_0_becomes_1: 0.2
+    prob_1_stays_1: 0.8
+  }
+}
+
+#########################
+# Customer 2 (Acme)
+########################
+
+## Project 1
+
+#### Encoding (2, 1, 1)
+encoding {
+  customer_id: 2
+  project_id: 1
+  id: 1
+  basic_rappor {
+    prob_0_becomes_1: 0.1
+    prob_1_stays_1: 0.9
+    category: "dog"
+    category: "cat"
+    category: "fish"
+  }
+}
+
+#### Encoding (2, 1, 2)
+encoding {
+  customer_id: 2
+  project_id: 1
+  id: 2
+  forculus {
+    threshold: 50
+  }
+}

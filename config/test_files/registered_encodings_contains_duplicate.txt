@@ -1,0 +1,24 @@
+# This is a valid textual representation of the RegisteredEncodings message
+# but it contains two EncodingConfigs with the same id. This file is used
+# by config_test.cc to test that the function EncodingRegistry::FromFile
+# correctly detects the duplicate registration.
+
+encoding {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  forculus: {
+    threshold: 20
+    epoch_type: WEEK
+  }
+}
+
+encoding {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  forculus: {
+    threshold: 50
+    epoch_type: MONTH
+  }
+}
