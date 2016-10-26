@@ -13,3 +13,6 @@
 [submodule "third_party/go/src/google.golang.org/grpc"]
 	path = third_party/go/src/google.golang.org/grpc
 	url = https://github.com/grpc/grpc-go
+[submodule "third_party/go/src/github.com/golang/glog"]
+	path = third_party/go/src/github.com/golang/glog
+	url = https://github.com/golang/glog
