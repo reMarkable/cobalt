@@ -63,9 +63,20 @@ add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Build util functional tests
+set(UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util.go")
+set(UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util_test.go")
+set(UTIL_TEST_BIN ${GO_TESTS}/crypto_util_test)
+add_custom_command(OUTPUT ${UTIL_TEST_BIN}
+    COMMAND ${GO_BIN} test -c -o ${UTIL_TEST_BIN} ${UTIL_TEST_SRC} ${UTIL_SRC}
+    DEPENDS ${UTIL_SRC} ${UTIL_TEST_SRC}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 # Build shuffler target
 add_custom_target(shuffler_all ALL
     DEPENDS ${SHUFFLER_BIN}
             ${TEST_CLIENT_BIN}
             ${DISPATCHER_TEST_BIN}
+            ${UTIL_TEST_BIN}
 )
