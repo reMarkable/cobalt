@@ -67,6 +67,8 @@ message RapporConfig {
 
   // All probabilities below must be in the range [0.0, 1.0]
 
+  // prob_0_becomes_1 MAY NOT BE EQUAL to prob_1_stays_1.
+
   // p = p(a zero bit is changed to a one bit in the IRR)
   float prob_0_becomes_1 = 4;
 
@@ -80,7 +82,9 @@ message RapporConfig {
 }
 
 message BasicRapporConfig {
-  // All probabilities below must be in the range [0.0, 1.0]
+  // All probabilities below must be in the range [0.0, 1.0].
+
+  // prob_0_becomes_1 MAY NOT BE EQUAL to prob_1_stays_1.
 
   // p = p(a zero bit is changed to a one bit in the IRR)
   float prob_0_becomes_1 = 1;

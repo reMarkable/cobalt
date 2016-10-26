@@ -14,14 +14,17 @@
 
 #include "algorithms/encoder/rappor_encoder.h"
 
+#include "util/crypto_util/random.h"
+
 namespace cobalt {
 namespace rappor {
 
+using crypto::byte;
 using encoder::ClientSecret;
 
 namespace {
 // Factors out some common validation logic.
-bool BasicValidate(float prob_0_becomes_1, float prob_1_stays_1, float prob_rr,
+bool CommonValidate(float prob_0_becomes_1, float prob_1_stays_1, float prob_rr,
                    const ClientSecret& client_secret) {
   // TODO(rudominer) Consider adding logging statements here to help
   // debug an invalid config.
@@ -32,6 +35,9 @@ bool BasicValidate(float prob_0_becomes_1, float prob_1_stays_1, float prob_rr,
     return false;
   }
   if (prob_1_stays_1 < 0.0 || prob_1_stays_1 > 1.0) {
+    return false;
+  }
+  if (prob_0_becomes_1 == prob_1_stays_1) {
     return false;
   }
   if (prob_rr != 0.0) {
@@ -52,7 +58,7 @@ class RapporConfigValidator {
       num_hashes_(config.num_hashes()),
       num_cohorts_(config.num_cohorts()) {
     valid_ = false;
-    if (!BasicValidate(prob_0_becomes_1_, prob_1_stays_1_, config.prob_rr(),
+    if (!CommonValidate(prob_0_becomes_1_, prob_1_stays_1_, config.prob_rr(),
                       client_secret)) {
       return;
     }
@@ -77,7 +83,7 @@ class RapporConfigValidator {
       num_hashes_(0),
       num_cohorts_(1) {
     valid_ = false;
-    if (!BasicValidate(prob_0_becomes_1_, prob_1_stays_1_, config.prob_rr(),
+    if (!CommonValidate(prob_0_becomes_1_, prob_1_stays_1_, config.prob_rr(),
                       client_secret)) {
       return;
     }
@@ -100,8 +106,31 @@ class RapporConfigValidator {
     valid_ = true;
   }
 
+  float prob_0_becomes_1() {
+    return prob_0_becomes_1_;
+  }
+
+  float prob_1_stays_1() {
+    return prob_1_stays_1_;
+  }
+
   bool valid() {
     return valid_;
+  }
+
+  size_t num_bits() {
+    return num_bits_;
+  }
+
+  // Returns the bit-index of |category| or -1 if |category| is not one of the
+  // basic RAPPOR categories (or if this object was not initialized with a
+  // BasicRapporConfig.)
+  size_t bit_index(const std::string& category) {
+    auto iterator = category_to_bit_index_.find(category);
+    if (iterator == category_to_bit_index_.end()) {
+      return -1;
+    }
+    return iterator->second;
   }
 
  private:
@@ -118,10 +147,10 @@ class RapporConfigValidator {
   std::map<std::string, size_t> category_to_bit_index_;
 };
 
-
 RapporEncoder::RapporEncoder(const RapporConfig& config,
                              ClientSecret client_secret) :
     config_(new RapporConfigValidator(config, client_secret)),
+    random_(new crypto::Random()),
     client_secret_(std::move(client_secret)) {}
 
 RapporEncoder::~RapporEncoder() {}
@@ -141,6 +170,7 @@ Status RapporEncoder::Encode(const std::string& value,
 BasicRapporEncoder::BasicRapporEncoder(const BasicRapporConfig& config,
                                       ClientSecret client_secret) :
     config_(new RapporConfigValidator(config, client_secret)),
+    random_(new crypto::Random()),
     client_secret_(std::move(client_secret)) {}
 
 BasicRapporEncoder::~BasicRapporEncoder() {}
@@ -150,9 +180,36 @@ Status BasicRapporEncoder::Encode(const std::string& value,
   if (!config_->valid()) {
     return kInvalidConfig;
   }
+  size_t bit_index = config_->bit_index(value);
+  if (bit_index == -1) {
+    return kInvalidInput;
+  }
 
-  // TODO(rudominer) Replace this with a real implementation.
-  observation_out->set_data(value);
+  uint32_t num_bits = config_->num_bits();
+  uint32_t num_bytes = num_bits/8 + (num_bits % 8 == 0 ? 0 : 1);
+
+  // Indexed from the right, i.e. the least-significant bit.
+  uint32_t byte_index = bit_index / 8;
+  uint32_t bit_in_byte_index = bit_index % 8;
+
+  // Initialize data to a string of all zero bytes.
+  std::string data(num_bytes, static_cast<char>(0));
+
+  // Set the appropriate bit.
+  data[num_bytes - (byte_index + 1)] = 1 << bit_in_byte_index;
+
+  // TODO(rudominer) We will not support RAPPOR PRR in version 0.1 of Cobalt but
+  // consider supporting in in future versions.
+
+  // Randomly flip some of the bits based on the probabilities p and q.
+  double p = config_->prob_0_becomes_1();
+  double q = config_->prob_1_stays_1();
+  for (int i = 0; i < num_bytes; i++) {
+    byte p_mask = random_->RandomBits(p);
+    byte q_mask = random_->RandomBits(q);
+    data[i] = (p_mask & ~data[i]) | (q_mask & data[i]);
+  }
+  observation_out->set_data(data);
   return kOK;
 }
 

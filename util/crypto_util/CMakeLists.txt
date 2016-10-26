@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+include_directories(BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/third_party/boringssl/src/include")
+
 add_library(cobalt_crypto base64.cc cipher.cc errors.cc mac.cc random.cc)
 target_link_libraries(cobalt_crypto crypto)
 

@@ -18,11 +18,11 @@
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 add_library(rappor_encoder rappor_encoder.cc ${COBALT_PROTO_SRCS})
-target_link_libraries(rappor_encoder client_secret ${PROTOBUF_LIBRARY})
+target_link_libraries(rappor_encoder
+                      client_secret cobalt_crypto ${PROTOBUF_LIBRARY})
 
-# Build an executable test binary. Include gtest headers at compile time
-# and gtest libraries at link time. Write the executable to the
-# out/gtests directory
+# The test depends directly on Boring SSL for the deterministic random.
+include_directories(BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/third_party/boringssl/src/include")
 add_executable(rappor_encoder_test rappor_encoder_test.cc)
 target_link_libraries(rappor_encoder_test rappor_encoder gtest gtest_main)
 set_target_properties(rappor_encoder_test PROPERTIES

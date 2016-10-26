@@ -22,6 +22,7 @@
 #include "./cobalt.pb.h"
 #include "./encodings.pb.h"
 #include "encoder/client_secret.h"
+#include "util/crypto_util/random.h"
 
 namespace cobalt {
 namespace rappor {
@@ -41,7 +42,7 @@ class RapporEncoder {
   // The |client_secret| is used to determine the cohort and the PRR.
   RapporEncoder(const RapporConfig& config,
                 encoder::ClientSecret client_secret);
-  ~RapporEncoder();
+  virtual ~RapporEncoder();
 
   // Encodes |value| using RAPPOR encoding. Returns kOK on success, or
   // kInvalidConfig if the |config| passed to the constructor is not valid.
@@ -49,7 +50,13 @@ class RapporEncoder {
                 RapporObservation *observation_out);
 
  private:
+  // Allows Friend classess to set a special RNG for use in tests.
+  void SetRandomForTesting(std::unique_ptr<crypto::Random> random) {
+    random_ = std::move(random);
+  }
+
   std::unique_ptr<RapporConfigValidator> config_;
+  std::unique_ptr<crypto::Random> random_;
   encoder::ClientSecret client_secret_;
 };
 
@@ -57,7 +64,7 @@ class RapporEncoder {
 // Performs encoding for Basic RAPPOR, a.k.a Categorical RAPPOR. No cohorts
 // are used and the list of all candidates must be pre-specified as part
 // of the BasicRapporConfig.
-// The |client_secret| is used to determine the cohort and the PRR.
+// The |client_secret| is used to determine the PRR.
 class BasicRapporEncoder {
  public:
   BasicRapporEncoder(const BasicRapporConfig& config,
@@ -73,7 +80,15 @@ class BasicRapporEncoder {
                 BasicRapporObservation *observation_out);
 
  private:
+  friend class BasicRapporDeterministicTest;
+
+  // Allows Friend classess to set a special RNG for use in tests.
+  void SetRandomForTesting(std::unique_ptr<crypto::Random> random) {
+    random_ = std::move(random);
+  }
+
   std::unique_ptr<RapporConfigValidator> config_;
+  std::unique_ptr<crypto::Random> random_;
   encoder::ClientSecret client_secret_;
 };
 

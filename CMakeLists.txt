@@ -52,9 +52,6 @@ add_subdirectory(encoder)
 add_subdirectory(functional_tests)
 add_subdirectory(shuffler)
 add_subdirectory(tools)
-
 add_subdirectory(third_party/boringssl/src)
-include_directories(BEFORE PRIVATE "${BoringSSL_SOURCE_DIR}/include")
-
 add_subdirectory(third_party/googletest)
 add_subdirectory(util)

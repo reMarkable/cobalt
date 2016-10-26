@@ -18,42 +18,11 @@
 #include <utility>
 #include <vector>
 
-#include "third_party/boringssl/src/include/openssl/chacha.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
+#include "util/crypto_util/random_test_utils.h"
 
 namespace cobalt {
 namespace crypto {
-
-
-// DeterministicRandom is a subclass of Random that overrides RandomBytes()
-// to use a deterministic PRNG.
-class DeterministicRandom : public Random {
- public:
-  DeterministicRandom() : num_calls_(0) {}
-
-  virtual ~DeterministicRandom() {}
-
-  // Implementes a deterministic PRNG by using chacha20 with a zero key and a
-  // counter for the nonce. This code was copied from
-  // crypto/rand/deteriministic.c in Boring SSL. We use this particular
-  // PRNG becuase it has some properties in common with the non-deterministic
-  // version of RandomBytes we use in production and so we are testing using
-  // a source of randomness that is similar to the production source of
-  // randomness.
-  void RandomBytes(byte *buf, std::size_t num) override {
-    static const uint8_t kZeroKey[32] = {};
-    uint8_t nonce[12];
-    memset(nonce, 0, sizeof(nonce));
-    memcpy(nonce, &num_calls_, sizeof(num_calls_));
-
-    memset(buf, 0, num);
-    CRYPTO_chacha_20(buf, buf, num, kZeroKey, nonce, 0);
-    num_calls_++;
-  }
-
- private:
-  uint64_t num_calls_;
-};
 
 // Returns the number of bits of the byte x that are set to one.
 int NumBitsSet(byte x) {
