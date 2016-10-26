@@ -28,13 +28,12 @@ import (
 	"fmt"
 	"net"
 
-	emptypb "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 
-	spb "shuffler"
+	spb "cobalt"
 )
 
 // shufflerServer is used to implement shuffler.ShufflerServer.
@@ -43,10 +42,10 @@ type shufflerServer struct{}
 // Process service saves the incoming request to a local database after removing
 // user identifiable fields such as IP addresses, timestamps etc and returns an
 // empty response along with an error code.
-func (s *shufflerServer) Process(ctx context.Context, encrypted_message *spb.EncryptedMessage) (*emptypb.Empty, error) {
+func (s *shufflerServer) Process(ctx context.Context, encrypted_message *spb.EncryptedMessage) (*spb.ShufflerResponse, error) {
 	// TODO(ukode): Add impl for decrypting the sealed envelope and then batch
 	// and shuffle the payloads.
-	return &emptypb.Empty{}, nil
+	return &spb.ShufflerResponse{}, nil
 }
 
 func newServer() *shufflerServer {

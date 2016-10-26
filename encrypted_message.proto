@@ -15,7 +15,7 @@ syntax = "proto3";
 
 package cobalt;
 
-option go_package = "shuffler";
+option go_package = "cobalt";
 
 // An EncryptedMessage is used for several purposes in Cobalt. It carries
 // the bytes of the ciphertext of the standard serialization of various

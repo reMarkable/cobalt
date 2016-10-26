@@ -23,17 +23,21 @@ syntax = "proto3";
 
 package cobalt.shuffler;
 
-option go_package = "shuffler";
+option go_package = "cobalt";
 
 import "encrypted_message.proto";
-
-import "github.com/golang/protobuf/ptypes/empty/empty.proto";
 
 // Interface exported by the Shuffler service.
 service Shuffler {
   // Processes an incoming Envelope from the encoder.
   // The EncryptedMessage should contain the encryption of an |Envelope|.
-  rpc Process(EncryptedMessage) returns (google.protobuf.Empty) {}
+  rpc Process(EncryptedMessage) returns (ShufflerResponse) {}
+}
+
+// Response from Shuffler service
+// TODO(ukode): Replace ShufflerResponse with built-in Empty proto, after
+// figuring out the same import from multiple packages issue.
+message ShufflerResponse {
 }
 
 // Recipient specifies analyzer's host and routing attributes for sending the

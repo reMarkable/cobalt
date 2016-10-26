@@ -18,17 +18,26 @@ set(PROTOC ${GO_PATH} protoc)
 file(MAKE_DIRECTORY ${GO_PROTO_GEN})
 
 # generate the go bindings for shuffler proto
-set(SHUFFLER_GEN_PROTO_FILE "${GO_PROTO_GEN}/shuffler/shuffler.pb.go")
-set(EM_GEN_PROTO_FILE "${GO_PROTO_GEN}/encrypted_message.pb.go")
-add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
+set(SHUFFLER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/shuffler.pb.go")
+set(ANALYZER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/analyzer.pb.go")
+add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
     COMMAND ${PROTOC} ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
             ${CMAKE_SOURCE_DIR}/encrypted_message.proto
+            ${CMAKE_SOURCE_DIR}/analyzer/analyzer.proto
             -I ${CMAKE_SOURCE_DIR}
             -I ${CMAKE_CURRENT_SOURCE_DIR}
             -I ${CMAKE_SOURCE_DIR}/third_party/go/src
-            --go_out=plugins=grpc:${GO_PROTO_GEN}
-    COMMAND mv ${EM_GEN_PROTO_FILE} ${GO_PROTO_GEN}/shuffler
-    DEPENDS shuffler.proto ${CMAKE_SOURCE_DIR}/encrypted_message.proto
+            --go_out=plugins=grpc:${GO_PROTO_GEN}/cobalt
+    # protoc-gen-go compiler automatically generates the files keeping the
+    # directory structure intact in the final output. But this causes runtime
+    # errors, so moving all generated files under cobalt package.
+    COMMAND mv ${GO_PROTO_GEN}/cobalt/shuffler/shuffler.pb.go ${SHUFFLER_GEN_PROTO_FILE}
+    COMMAND mv ${GO_PROTO_GEN}/cobalt/analyzer/analyzer.pb.go ${ANALYZER_GEN_PROTO_FILE}
+    COMMAND rmdir ${GO_PROTO_GEN}/cobalt/shuffler
+    COMMAND rmdir ${GO_PROTO_GEN}/cobalt/analyzer
+    DEPENDS shuffler.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/analyzer/analyzer.proto
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

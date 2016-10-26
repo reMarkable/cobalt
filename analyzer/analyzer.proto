@@ -19,6 +19,8 @@ import "google/protobuf/empty.proto";
 
 package cobalt.analyzer;
 
+option go_package = "cobalt";
+
 // A batch of encrypted Observations received from the Shuffler.
 message ObservationBatch {
   // The common Metadata for all of the encrypted observations in this batch.
