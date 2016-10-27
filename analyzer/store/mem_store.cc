@@ -19,7 +19,13 @@
 namespace cobalt {
 namespace analyzer {
 
-int MemStore::put(const std::string& key, const std::string& val) {
+MemStoreSingleton& MemStoreSingleton::instance() {
+  static MemStoreSingleton singleton;
+
+  return singleton;
+}
+
+int MemStoreSingleton::put(const std::string& key, const std::string& val) {
   data_[key] = val;
 
   VLOG(1) << "put: " << to_string(key, val);
@@ -27,7 +33,7 @@ int MemStore::put(const std::string& key, const std::string& val) {
   return 0;
 }
 
-int MemStore::get(const std::string& key, std::string* out) {
+int MemStoreSingleton::get(const std::string& key, std::string* out) {
   auto i = data_.find(key);
 
   if (i == data_.end())
@@ -38,8 +44,8 @@ int MemStore::get(const std::string& key, std::string* out) {
   return 0;
 }
 
-std::string MemStore::to_string(const std::string& key,
-                                const std::string& val) {
+std::string MemStoreSingleton::to_string(const std::string& key,
+                                         const std::string& val) {
   std::ostringstream oss;
 
   oss << "Key [" << key << "]";

@@ -15,12 +15,14 @@
 // The analyzer collector process receives reports via gRPC and stores them
 // persistently.
 
-#include "analyzer/analyzer.h"
+#include "analyzer/analyzer_service.h"
 
 #include <sys/time.h>
+#include <glog/logging.h>
 
 #include <string>
 
+#include "analyzer/store/store.h"
 #include "util/crypto_util/random.h"
 
 using google::protobuf::Empty;
@@ -31,10 +33,6 @@ using grpc::Status;
 
 namespace cobalt {
 namespace analyzer {
-
-AnalyzerServiceImpl::AnalyzerServiceImpl(Store* store)
-    : store_(*store) {
-}
 
 Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
                                             const ObservationBatch* request,
@@ -48,7 +46,7 @@ Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
 
     // TODO(bittau): need to store metadata somehow.  Right now it's implicit in
     // the row_key but that's bad design.
-    store_.put(key, val);
+    store_->put(key, val);
   }
 
   return Status::OK;
@@ -91,6 +89,14 @@ void AnalyzerServiceImpl::Shutdown() {
 
 void AnalyzerServiceImpl::Wait() {
   server_->Wait();
+}
+
+void analyzer_service_main() {
+  LOG(INFO) << "Starting Analyzer service";
+
+  AnalyzerServiceImpl analyzer(MakeStore());
+  analyzer.Start();
+  analyzer.Wait();
 }
 
 }  // namespace analyzer

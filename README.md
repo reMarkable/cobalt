@@ -78,9 +78,9 @@ Then start the Analyzer with the appropriate environment set:
 
 * $(gcloud beta emulators bigtable env-init)
 
-* analyzer projects/google.com:shuffler-test/instances/cobalt-analyzer/tables/observations
+* analyzer -table projects/google.com:shuffler-test/instances/cobalt-analyzer/tables/observations
 
-Note, you can run the analyzer using the "mem" table name to use an internal
+Note, you can run the analyzer using the -memstore option to use an internal
 in-memory database that doesn't even require Bigtable or its emulator.
 
 ## cgen: Cobalt gRPC generator

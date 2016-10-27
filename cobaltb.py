@@ -173,7 +173,7 @@ def _gce_start(args):
 
     if (i == "analyzer"):
       subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
-                             "--port=8080", "--", A_BT_TABLE_NAME])
+                             "--port=8080", "--", "-table", A_BT_TABLE_NAME])
     else:
       subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
                              "--port=8080"])

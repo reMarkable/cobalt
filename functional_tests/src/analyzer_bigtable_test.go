@@ -108,7 +108,7 @@ func NewAnalyzerFixture() (*AnalyzerFixture, error) {
 
 	table := fmt.Sprintf("projects/%v/instances/%v/tables/%v",
 		bigtable.project, bigtable.instance, bigtable.table)
-	f.cmd = exec.Command(abin, table)
+	f.cmd = exec.Command(abin, "-table", table)
 
 	os.Setenv("BIGTABLE_EMULATOR_HOST", bigtable.host)
 

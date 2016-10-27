@@ -30,7 +30,7 @@ GO_DIRS = [
 
 def main():
   for dir_path in GO_DIRS:
-    print "\nLinting go files in %s...\n" % dir_path
+    print "Linting go files in %s" % dir_path
     p = subprocess.Popen(['gofmt', '-l', dir_path], stdout=subprocess.PIPE)
     out = p.communicate()[0]
 

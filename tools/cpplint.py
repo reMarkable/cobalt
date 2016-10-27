@@ -36,13 +36,17 @@ SKIP_LINT_DIRS = [
 ]
 
 def main():
-  print "\nLinting C++ files...\n"
   for root, dirs, files in os.walk(SRC_ROOT_DIR):
+    print "Linting c++ files in %s" % root
     for f in files:
       if f.endswith('.h') or f.endswith('.cc'):
         full_path = os.path.join(root, f)
-        subprocess.call([CPP_LINT,  full_path])
-        print
+        cmd = subprocess.Popen([CPP_LINT,  full_path], stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+        out, err = cmd.communicate()
+
+        if cmd.returncode:
+          print "Error %s" % err
 
     # Before recursing into directories remove the ones we want to skip.
     dirs_to_skip = [dir for dir in dirs if dir.startswith(".") or

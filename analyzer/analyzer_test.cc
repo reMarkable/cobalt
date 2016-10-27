@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <string>
+#include <gflags/gflags.h>
 
-#include "analyzer/analyzer.h"
+#include <string>
+#include <map>
+
+#include "analyzer/analyzer_service.h"
 #include "analyzer/store/mem_store.h"
 
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
@@ -30,7 +33,13 @@ namespace analyzer {
 // Fixture to start and stop the analyzer
 class AnalyzerFunctionalTest : public ::testing::Test {
  public:
-  AnalyzerFunctionalTest() : analyzer_(&store_) { }
+  AnalyzerFunctionalTest()
+      : analyzer_(std::unique_ptr<Store>(new MemStore)) {}
+
+  // Raw data backed in the in-memory store
+  std::map<std::string, std::string>& store_data() {
+    return MemStoreSingleton::instance().data_;
+  }
 
  protected:
   virtual void SetUp() {
@@ -70,10 +79,10 @@ TEST_F(AnalyzerFunctionalTest, TestGRPC) {
   ASSERT_TRUE(status.ok());
 
   // Check that an item got inserted into the store
-  ASSERT_EQ(store_.data_.size(), 1);
+  ASSERT_EQ(store_data().size(), 1);
 
   // Grab the item that got inserted
-  std::string key = store_.data_.begin()->first;
+  std::string key = store_data().begin()->first;
   std::string val;
 
   ASSERT_EQ(store_.get(key, &val), 0);

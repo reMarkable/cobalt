@@ -5533,7 +5533,7 @@ def FlagCxx11Features(filename, clean_lines, linenum, error):
                                       'fenv.h',
                                       'future',
                                       'mutex',
-                                      'thread',
+#                                     'thread', # Allow threads in cobalt
                                       'chrono',
                                       'ratio',
                                       'regex',

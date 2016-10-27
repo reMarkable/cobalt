@@ -23,18 +23,35 @@
 namespace cobalt {
 namespace analyzer {
 
-// An in-memory key value store using std::map
-class MemStore : public Store {
+// A singleton in-memory key value store using std::map.
+class MemStoreSingleton {
  public:
-  int put(const std::string& key, const std::string& val) override;
-  int get(const std::string& key, std::string* out) override;
+  static MemStoreSingleton& instance();
+  int put(const std::string& key, const std::string& val);
+  int get(const std::string& key, std::string* out);
 
  private:
+  MemStoreSingleton() {}
+
   // Used for debugging.  Will return a formatted version of the key and value.
   std::string to_string(const std::string& key, const std::string& val);
 
- public:
   std::map<std::string, std::string> data_;
+
+  friend class AnalyzerFunctionalTest;
+};
+
+// An in-memory store.  The backing store is a singleton shared by all MemStore
+// instances.
+class MemStore : public Store {
+ public:
+  int put(const std::string& key, const std::string& val) override {
+    return MemStoreSingleton::instance().put(key, val);
+  }
+
+  int get(const std::string& key, std::string* out) override {
+    return MemStoreSingleton::instance().get(key, out);
+  }
 };
 
 }  // namespace analyzer

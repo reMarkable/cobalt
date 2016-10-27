@@ -13,9 +13,20 @@
 # limitations under the License.
 
 set(ANALYZER_SRCS
-    analyzer.cc
+    analyzer_service.cc
+    reporter.cc
     store/bigtable_store.cc
     store/mem_store.cc
+    store/store.cc
+    )
+
+set(ANALYZER_LIBS
+    ${PROTOBUF_LIBRARY}
+    ${COBALT_PROTO_SRCS}
+    googleapis
+    cobalt_crypto
+    glog
+    gflags
     )
 
 set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
@@ -35,12 +46,11 @@ set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 
 # Build the analyzer library
 add_library(cobalt_analyzer ${ANALYZER_SRCS} ${PROTO_SRCS})
-target_link_libraries(cobalt_analyzer ${PROTOBUF_LIBRARY} ${COBALT_PROTO_SRCS}
-                      googleapis cobalt_crypto glog)
+target_link_libraries(cobalt_analyzer ${ANALYZER_LIBS})
 
 # Build the analyzer executable
 add_executable(analyzer main.cc)
-target_link_libraries(analyzer cobalt_analyzer gflags)
+target_link_libraries(analyzer cobalt_analyzer)
 
 # Build the test
 add_executable(analyzer_test analyzer_test.cc)

@@ -6,4 +6,4 @@ An extensible, privacy-preserving, user-data analysis pipeline.
 * Local Modifications
   * Require "COBALT_" as a prefix in the header guard
 
-
+  * Allow `#include <thread>`

@@ -15,6 +15,7 @@
 #ifndef COBALT_ANALYZER_STORE_STORE_H_
 #define COBALT_ANALYZER_STORE_STORE_H_
 
+#include <memory>
 #include <string>
 
 namespace cobalt {
@@ -23,12 +24,20 @@ namespace analyzer {
 // Interface to a key value store.
 class Store {
  public:
+  virtual ~Store() = 0;
+
   // Returns 0 on success.
   virtual int put(const std::string& key, const std::string& val) = 0;
 
   // Returns 0 on success.
   virtual int get(const std::string& key, std::string* out) = 0;
 };
+
+// This is a factory method that'll create a Store based on command line flags.
+// By default a BigtableStore accessing the table name specified in the -table
+// command line argument will be constructed.  If the -memstore is passed on the
+// command line, a MemStore is created instead.
+std::unique_ptr<Store> MakeStore();
 
 }  // namespace analyzer
 }  // namespace cobalt

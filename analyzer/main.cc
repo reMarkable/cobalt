@@ -15,40 +15,23 @@
 #include <err.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <string>
+#include <thread>
 
-#include "analyzer/analyzer.h"
-#include "analyzer/store/bigtable_store.h"
-#include "analyzer/store/mem_store.h"
+#include "analyzer/analyzer_service.h"
+#include "analyzer/reporter.h"
 
 int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  if (argc < 2) {
-    errx(1, "Usage: %s <table_name>\n"
-            "E.g., projects/google.com:shuffler-test/instances/cobalt-analyzer/"
-            "tables/observations\n"
-            "Use the special \"mem\" tablename for an in-memory datastore"
-            , argv[0]);
-  }
+  // Right now we combine both the analyzer service and the reporter component
+  // into one process, using two threads.  Each component has its own _main
+  // method making it easy to speparate them into multiple programs in the
+  // future.  Their _main methods would be folded into the top-level main().
+  std::thread reporter(cobalt::analyzer::reporter_main);
+  cobalt::analyzer::analyzer_service_main();
+  reporter.join();
 
-  LOG(INFO) << "Starting analyzer";
-
-  cobalt::analyzer::BigtableStore bigtable(argv[1]);
-  cobalt::analyzer::MemStore mem;
-  cobalt::analyzer::Store* store;
-
-  if (strcmp(argv[1], "mem") == 0) {
-    LOG(INFO) << "Using a memory store";
-    store = &mem;
-  } else {
-    if (bigtable.initialize() < 0)
-      LOG(FATAL) << "Cannot initialzie Bigtable";
-
-    store = &bigtable;
-  }
-
-  cobalt::analyzer::AnalyzerServiceImpl analyzer(store);
-  analyzer.Start();
-  analyzer.Wait();
+  return 0;
 }

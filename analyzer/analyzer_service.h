@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef COBALT_ANALYZER_ANALYZER_H_
-#define COBALT_ANALYZER_ANALYZER_H_
+#ifndef COBALT_ANALYZER_ANALYZER_SERVICE_H_
+#define COBALT_ANALYZER_ANALYZER_SERVICE_H_
 
 #include <grpc++/grpc++.h>
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "analyzer/analyzer.grpc.pb.h"
 #include "analyzer/store/store.h"
@@ -28,11 +29,13 @@ namespace analyzer {
 
 const int kAnalyzerPort = 8080;
 
-// Main analyzer class
+// Implements the Analyzer gRPC service.  It will receive observations via gRPC
+// and store them in Bigtable.  No analysis is performed.  Analysis is
+// kicked-off and done by other components (i.e., the reporter)
 class AnalyzerServiceImpl final : public Analyzer::Service {
  public:
-  // Does not take ownership of |store|.
-  explicit AnalyzerServiceImpl(Store* store);
+  explicit AnalyzerServiceImpl(std::unique_ptr<Store>&& store)
+      : store_(std::move(store)) {}
 
   // Starts the analyzer service
   void Start();
@@ -57,10 +60,16 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
   std::string make_row_key(const ObservationMetadata& metadata);
 
   std::unique_ptr<grpc::Server> server_;
-  Store& store_;
+  std::unique_ptr<Store> store_;
 };
+
+// This is the main method for the analyzer service.  This call blocks forever.
+// Currently it is not folded into main() because we run both the
+// analyzer_service and the reporter in a single process and each have their own
+// "main()".
+void analyzer_service_main();
 
 }  // namespace analyzer
 }  // namespace cobalt
 
-#endif  // COBALT_ANALYZER_ANALYZER_H_
+#endif  // COBALT_ANALYZER_ANALYZER_SERVICE_H_
