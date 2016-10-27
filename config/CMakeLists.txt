@@ -17,6 +17,7 @@ set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
 protobuf_generate_cpp(CONFIG_PROTO_SRCS CONFIG_PROTO_HDRS
                       config.proto)
 
+set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 add_library(cobalt_config config.cc ${CONFIG_PROTO_SRCS} ${COBALT_PROTO_SRCS})
 target_link_libraries(cobalt_config  ${PROTOBUF_LIBRARY})
 
