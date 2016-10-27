@@ -39,7 +39,14 @@ message Metric {
   string name = 4;
   string description = 5;
 
-  repeated string parts = 6;
+  repeated string part = 6;
+}
+
+// Constains the list of all Metrics that are registered in the
+// Cobalt system. An instance of RegisteredMetrics is deserialized
+// from a text file.
+message RegisteredMetrics {
+  repeated Metric element = 1;
 }
 
 message DifferentialPrivacyConfig {
@@ -84,7 +91,7 @@ message ReportConfig {
   // indicates a univariate analysis of the specified variable.
   // If there are two values that specifies a Correlation Analysis between
   // the two variables.
-  repeated ReportVariable variables = 7;
+  repeated ReportVariable variable = 7;
 
   // The type of epoch to use when aggregating Observations for a report.
   // This also determines the frequency of generating reports.
@@ -98,5 +105,12 @@ message ReportConfig {
   uint32 report_delay_days = 9;
 
   DifferentialPrivacyConfig dp_config = 10;
+}
+
+// Constains the list of all ReportConfig that are registered in the
+// Cobalt system. An instance of RegisteredReports is deserialized
+// from a text file.
+message RegisteredReports {
+  repeated ReportConfig element = 1;
 }
 

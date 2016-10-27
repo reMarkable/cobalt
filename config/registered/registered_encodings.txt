@@ -9,7 +9,7 @@
 #
 # The format of this file is the textual representation of the
 # RegisteredEncodings Protocol Buffer message, which is defined in
-# config/config.proto.
+# encodings.proto
 ##########################################################################
 
 
@@ -20,7 +20,7 @@
 ## Project 1
 
 #### Encoding (1, 1, 1)
-encoding {
+element {
   customer_id: 1
   project_id: 1
   id: 1
@@ -31,7 +31,7 @@ encoding {
 }
 
 #### Encoding (1, 1, 2)
-encoding {
+element {
   customer_id: 1
   project_id: 1
   id: 2
@@ -51,7 +51,7 @@ encoding {
 ## Project 1
 
 #### Encoding (2, 1, 1)
-encoding {
+element {
   customer_id: 2
   project_id: 1
   id: 1
@@ -65,7 +65,7 @@ encoding {
 }
 
 #### Encoding (2, 1, 2)
-encoding {
+element {
   customer_id: 2
   project_id: 1
   id: 2

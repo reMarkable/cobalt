@@ -1,0 +1,68 @@
+
+###########################################################################
+# This file contains the source of truth for the set of Metrics
+# that are registered in version 0.1 of Cobalt.
+#
+# This file is maintained by hand. To add a new Metric or change
+# the definition of a Metric, manually edit this file and
+# commit the change to the Cobalt repo.
+#
+# The format of this file is the textual representation of the
+# RegisteredMetrics Protocol Buffer message, which is defined in
+# metrics.proto
+##########################################################################
+
+
+#########################
+# Customer 1 (Fuchsia)
+########################
+
+## Project 1
+
+#### Metric (1, 1, 1)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  name: "Fuschsia Rating and City"
+  description: "This is a fictional metric used for the development of Cobalt."
+  part: "city"
+  part: "rating"
+}
+
+#### Encoding (1, 1, 2)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  name: "Fuschsia Usage by Hour"
+  description: "This is a fictional metric used for the development of Cobalt."
+  part: "hour"
+}
+
+#########################
+# Customer 2 (Acme)
+########################
+
+## Project 1
+
+#### Metric (2, 1, 1)
+element {
+  customer_id: 2
+  project_id: 1
+  id: 1
+  name: "Acme Module name"
+  description: "This is a fictional metric used for the development of Cobalt."
+  part: "name"
+}
+
+#### Metric (2, 1, 2)
+element {
+  customer_id: 2
+  project_id: 1
+  id: 2
+  name: "Acme Popular URLs"
+  description: "This is a fictional metric used for the development of Cobalt."
+  part: "url"
+}
+

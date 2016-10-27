@@ -3,7 +3,7 @@
 # by config_test.cc to test that the function EncodingRegistry::FromFile
 # correctly detects the duplicate registration.
 
-encoding {
+element {
   customer_id: 1
   project_id: 1
   id: 1
@@ -13,7 +13,7 @@ encoding {
   }
 }
 
-encoding {
+element {
   customer_id: 1
   project_id: 1
   id: 1

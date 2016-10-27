@@ -25,8 +25,6 @@
 #include <google/protobuf/text_format.h>
 #include <iostream>
 
-#include "config/config.pb.h"
-#include "./cobalt.pb.h"
 #include "./encodings.pb.h"
 
 using cobalt::EncodingConfig;
@@ -39,7 +37,7 @@ int main(int argc, char *argv[]) {
   RegisteredEncodings registered_encodings;
 
   // (1, 1, 1) Forculus 20 with WEEK epoch
-  auto* encoding_config = registered_encodings.add_encoding();
+  auto* encoding_config = registered_encodings.add_element();
   encoding_config->set_customer_id(1);
   encoding_config->set_project_id(1);
   encoding_config->set_id(1);
@@ -48,7 +46,7 @@ int main(int argc, char *argv[]) {
   forculus_config->set_epoch_type(cobalt::WEEK);
 
   // (1, 1, 2) RAPPOR
-  encoding_config = registered_encodings.add_encoding();
+  encoding_config = registered_encodings.add_element();
   encoding_config->set_customer_id(1);
   encoding_config->set_project_id(1);
   encoding_config->set_id(2);
@@ -60,7 +58,7 @@ int main(int argc, char *argv[]) {
   rappor_config->set_prob_1_stays_1(0.8);
 
   // (2, 1, 1) Basic RAPPOR
-  encoding_config = registered_encodings.add_encoding();
+  encoding_config = registered_encodings.add_element();
   encoding_config->set_customer_id(2);
   encoding_config->set_project_id(1);
   encoding_config->set_id(1);
@@ -72,7 +70,7 @@ int main(int argc, char *argv[]) {
   basic_rappor_config->add_category("fish");
 
   // (2, 1, 2) Forculus 50 with DAY epoch
-  encoding_config = registered_encodings.add_encoding();
+  encoding_config = registered_encodings.add_element();
   encoding_config->set_customer_id(2);
   encoding_config->set_project_id(1);
   encoding_config->set_id(2);

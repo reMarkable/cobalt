@@ -111,3 +111,10 @@ message EncodingConfig {
     BasicRapporConfig basic_rappor = 6;
   }
 }
+
+// Constains the list of all EncodingConfigs that are registered in the
+// Cobalt system. An instance of RegisteredEncodings is deserialized
+// from a text file.
+message RegisteredEncodings {
+  repeated EncodingConfig element = 1;
+}

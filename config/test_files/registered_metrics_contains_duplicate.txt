@@ -1,0 +1,25 @@
+
+# This is a valid textual representation of the RegisteredMetrics message
+# but it contains two MetricConfigs with the same id. This file is used
+# by config_test.cc to test that the function MetricRegistry::FromFile
+# correctly detects the duplicate registration.
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  name: "Fuschsia Rating and City"
+  description: "This is a fictional metric used for the development of Cobalt."
+  part: "city"
+  part: "rating"
+}
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  name: "Fuschsia Usage by Hour"
+  description: "This is a fictional metric used for the development of Cobalt."
+  part: "hour"
+}
+
