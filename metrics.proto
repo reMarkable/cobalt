@@ -39,7 +39,26 @@ message Metric {
   string name = 4;
   string description = 5;
 
+  //
+  // The names of the parts of this metric.
   repeated string part = 6;
+
+  // A TimeZonePolicy specifies how the day_index of an Observation should
+  // be computed based on the actual time of encoding.
+  enum TimeZonePolicy {
+    // There is no default. Either LOCAL or UTC must be specified.
+    UNSET = 0;
+
+    // Use the local date at encoding time to compute the day_index.
+    LOCAL = 1;
+
+    // Use the date in UTC at encoding time to compute the day_index.
+    UTC = 2;
+  }
+
+  // Which TimeZonePolicy should Encoders use when encoding Observations for
+  // this metric?
+  TimeZonePolicy time_zone_policy = 7;
 }
 
 // Constains the list of all Metrics that are registered in the
