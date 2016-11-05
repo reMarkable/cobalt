@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "algorithms/encoder/rappor_encoder.h"
+#include "algorithms/rappor/rappor_encoder.h"
+
+#include <map>
 
 #include "util/crypto_util/random.h"
 

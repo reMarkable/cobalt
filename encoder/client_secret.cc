@@ -22,8 +22,6 @@
 namespace cobalt {
 namespace encoder {
 
-static const size_t kNumSecretBytes = 16;
-
   // static
   ClientSecret ClientSecret::GenerateNewSecret() {
     ClientSecret client_secret;

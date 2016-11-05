@@ -11,8 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "algorithms/rappor/rappor_encoder.h"
 
-#include "algorithms/encoder/rappor_encoder.h"
+#include <map>
+#include <vector>
 
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 #include "util/crypto_util/random_test_utils.h"

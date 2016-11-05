@@ -18,22 +18,31 @@
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
+add_library(forculus_utils
+            polynomial_computations.cc field_element.cc)
+
 add_library(forculus_encrypter forculus_encrypter.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
+
 target_link_libraries(forculus_encrypter
-                      client_secret datetime_util ${PROTOBUF_LIBRARY})
+                      forculus_utils client_secret
+                      datetime_util ${PROTOBUF_LIBRARY})
 
 add_library(forculus_decrypter forculus_decrypter.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
-target_link_libraries(forculus_decrypter ${PROTOBUF_LIBRARY})
+target_link_libraries(forculus_decrypter
+                      forculus_utils ${PROTOBUF_LIBRARY})
 
 # Build an executable test binary. Include gtest headers at compile time
 # and gtest libraries at link time. Write the executable to the
 # out/gtests directory
-add_executable(forculus_encrypter_decrypter_test
-               forculus_encrypter_decrypter_test.cc)
-target_link_libraries(forculus_encrypter_decrypter_test
+add_executable(forculus_tests
+               field_element_test.cc
+               polynomial_computation_test.cc
+               forculus_encrypter_test.cc
+               forculus_decrypter_test.cc)
+target_link_libraries(forculus_tests
                       forculus_encrypter forculus_decrypter
                       gtest gtest_main)
-set_target_properties(forculus_encrypter_decrypter_test PROPERTIES
+set_target_properties(forculus_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

@@ -1,0 +1,96 @@
+// Copyright 2016 The Fuchsia Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef COBALT_ALGORITHMS_FORCULUS_FORCULUS_ENCRYPTER_H_
+#define COBALT_ALGORITHMS_FORCULUS_FORCULUS_ENCRYPTER_H_
+
+#include <string>
+#include <memory>
+#include <utility>
+
+#include "./observation.pb.h"
+#include "config/encodings.pb.h"
+#include "encoder/client_secret.h"
+#include "util/datetime_util.h"
+
+namespace cobalt {
+namespace forculus {
+
+class ForculusConfigValidator;
+
+// Encrypts a string value using Forculus threshold encryption. This API
+// is intended for use in the Cobalt Encoder.
+class ForculusEncrypter {
+ public:
+  enum Status {
+    kOK = 0,
+    kInvalidConfig,
+    kEncryptionFailed
+  };
+
+  // Constructs a ForculusEncrypter with the given |config| for the specified
+  // metric part.
+  //
+  // The |client_secret| is the entropy used while deriving a point on
+  // the Forculus polynomial.
+  ForculusEncrypter(const ForculusConfig& config, uint32_t metric_id,
+                    std::string metric_part_name,
+                    encoder::ClientSecret client_secret);
+
+  ~ForculusEncrypter();
+
+  // Encrypts |plaintext| using Forculus threshold encryption and writes the
+  // output to |*observation_out|.
+  //
+  // Forculus encryption consists of the following steps:
+  //
+  // (1) Generate a polynomial f(x) over the Forculus field. The degree of
+  // the polynomial is |threshold| - 1.
+  //
+  // (2) Use the constant term from f(x) as the key with which to encrypt
+  // the plaintext and produce a ciphertext.
+  //
+  // (3) Generate a point x in the Forculus field and compute y = f(x)
+  //
+  // (4) Return the triple (ciphertext, x, y)
+  //
+  // |observation_date| is used to determine the observation epoch
+  //
+  // The generated polynomial and ciphertext are deteriministic functions of
+  // the following data: The plaintext, the epoch, the metric_id and
+  // metric_part_name and the threshold. They do not depend on client_secret
+  // and so are produced the same way by different clients.
+  //
+  // The generated x- and y-values are a deterministic function of all of the
+  // above plus the client_secret. They therfore will be different on different
+  // clients.
+  //
+  // Returns kOk on success, kInvalidConfig if the |config| passed to the
+  // constructor is not valid, or kEncryptionFailed if the encryption fails
+  // for any reason.
+  Status Encrypt(const std::string& plaintext,
+                 const util::CalendarDate& observation_date,
+                 ForculusObservation *observation_out);
+
+ private:
+  std::unique_ptr<ForculusConfigValidator> config_;
+  uint32_t metric_id_;
+  std::string metric_part_name_;
+  encoder::ClientSecret client_secret_;
+};
+
+}  // namespace forculus
+}  // namespace cobalt
+
+#endif  // COBALT_ALGORITHMS_FORCULUS_FORCULUS_ENCRYPTER_H_
