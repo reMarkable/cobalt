@@ -19,8 +19,8 @@
 #include <string>
 #include <vector>
 
-#include "./cobalt.pb.h"
 #include "./encrypted_message.pb.h"
+#include "./observation.pb.h"
 #include "config/config.h"
 #include "encoder/client_secret.h"
 #include "encoder/date_policy.h"

@@ -28,7 +28,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	cobaltpb "cobalt"
+	sufflerpb "cobalt"
 )
 
 // Policy defines instructions on how to route messages to Analyzers
@@ -84,7 +84,7 @@ func (s *BasicShuffler) shuffle() {
 
 // Dispatch function makes a grpc call to analyzer and forwards the request
 // from encoder to analyzer.
-func Dispatch(envelope *cobaltpb.Envelope) {
+func Dispatch(envelope *sufflerpb.Envelope) {
 	analyzerURL := envelope.GetManifest().RecipientUrl
 
 	if analyzerURL == "" {
@@ -101,11 +101,11 @@ func Dispatch(envelope *cobaltpb.Envelope) {
 	}
 
 	defer conn.Close()
-	c := cobaltpb.NewAnalyzerClient(conn)
+	c := sufflerpb.NewAnalyzerClient(conn)
 
-	_, err = c.AddObservations(context.Background(), &cobaltpb.ObservationBatch{
+	_, err = c.AddObservations(context.Background(), &sufflerpb.ObservationBatch{
 		MetaData:             envelope.GetManifest().GetObservationMetaData(),
-		EncryptedObservation: []*cobaltpb.EncryptedMessage{envelope.GetEncryptedMessage()}})
+		EncryptedObservation: []*sufflerpb.EncryptedMessage{envelope.GetEncryptedMessage()}})
 
 	if err != nil {
 		glog.V(2).Infoln("Error in sending shuffled reports:", err)

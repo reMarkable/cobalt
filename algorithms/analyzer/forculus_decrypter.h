@@ -19,8 +19,8 @@
 #include <utility>
 #include <vector>
 
-#include "./cobalt.pb.h"
 #include "./encodings.pb.h"
+#include "./observation.pb.h"
 
 namespace cobalt {
 namespace forculus {

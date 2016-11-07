@@ -26,7 +26,7 @@
 #include <gflags/gflags.h>
 
 #include "analyzer/analyzer_service.h"
-#include "./cobalt.pb.h"
+#include "./observation.pb.h"
 
 using cobalt::analyzer::kAnalyzerPort;
 using cobalt::analyzer::Analyzer;

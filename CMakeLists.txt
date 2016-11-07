@@ -33,7 +33,7 @@ include_directories(${CMAKE_BINARY_DIR})
 # Run protoc on the top-level protos in order to generate C++ files for them.
 find_package(Protobuf REQUIRED)
 protobuf_generate_cpp(COBALT_PROTO_SRCS COBALT_PROTO_HDRS
-                      cobalt.proto encrypted_message.proto encodings.proto
+                      encodings.proto encrypted_message.proto observation.proto
                       metrics.proto)
 add_custom_target(build_protos, DEPENDS ${COBALT_PROTO_SRCS})
 

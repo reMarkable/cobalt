@@ -35,9 +35,9 @@ enum EpochType {
 ///////////////////////////////////////////////////////////////
 // Messages that describe the configuration of an encoding.
 // These are registered in the Cobalt Config Database and consumed
-// by both the Encoder and the Analyzer. Each ObservationPart (see cobalt.proto)
-// contains the ID of an EncodingConfig describing how the data
-// was encoded.
+// by both the Encoder and the Analyzer. Each ObservationPart (see
+// observation.proto) contains the ID of an EncodingConfig describing how the
+// data was encoded.
 ///////////////////////////////////////////////////////////////
 
 message ForculusConfig {

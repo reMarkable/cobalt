@@ -19,8 +19,8 @@
 #include <memory>
 #include <utility>
 
-#include "./cobalt.pb.h"
 #include "./encodings.pb.h"
+#include "./observation.pb.h"
 #include "encoder/client_secret.h"
 #include "util/crypto_util/random.h"
 
