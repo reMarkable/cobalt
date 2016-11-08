@@ -16,12 +16,15 @@
 # and the ForculusDecoder.
 
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
-add_library(forculus_encrypter forculus_encrypter.cc ${COBALT_PROTO_SRCS})
+add_library(forculus_encrypter forculus_encrypter.cc
+            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 target_link_libraries(forculus_encrypter
                       client_secret datetime_util ${PROTOBUF_LIBRARY})
 
-add_library(forculus_decrypter forculus_decrypter.cc ${COBALT_PROTO_SRCS})
+add_library(forculus_decrypter forculus_decrypter.cc
+            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 target_link_libraries(forculus_decrypter ${PROTOBUF_LIBRARY})
 
 # Build an executable test binary. Include gtest headers at compile time

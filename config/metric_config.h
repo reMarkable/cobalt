@@ -15,8 +15,8 @@
 #ifndef COBALT_CONFIG_METRIC_CONFIG_H_
 #define COBALT_CONFIG_METRIC_CONFIG_H_
 
-#include "./metrics.pb.h"
 #include "config/config.h"
+#include "config/metrics.pb.h"
 
 namespace cobalt {
 namespace config {

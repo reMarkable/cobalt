@@ -30,12 +30,19 @@ set(PROTOBUF_LIBRARY /usr/lib/libprotobuf.so.10 grpc++ grpc)
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
 
-# Run protoc on the top-level protos in order to generate C++ files for them.
+# Defines a command to run protoc on the top-level .proto files.
 find_package(Protobuf REQUIRED)
 protobuf_generate_cpp(COBALT_PROTO_SRCS COBALT_PROTO_HDRS
-                      encodings.proto encrypted_message.proto observation.proto
-                      metrics.proto)
-add_custom_target(build_protos, DEPENDS ${COBALT_PROTO_SRCS})
+                      encrypted_message.proto observation.proto)
+
+# Defines the output of the command that runs protoc on the .proto files located
+# in the config directory.
+set(CONFIG_PROTO_SRCS
+    "${CMAKE_BINARY_DIR}/config/encodings.pb.cc" "${CMAKE_BINARY_DIR}/config/metrics.pb.cc")
+
+# Runs protoc proactively on the proto files in the top-level and config dirs.
+add_custom_target(build_protos,
+                  DEPENDS ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 
 # Go related defines
 set(GO_PATH env GOPATH="${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen:/usr/local/cobalt/go:${CMAKE_SOURCE_DIR}/shuffler")

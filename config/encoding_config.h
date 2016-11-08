@@ -15,8 +15,8 @@
 #ifndef COBALT_CONFIG_ENCODING_CONFIG_H_
 #define COBALT_CONFIG_ENCODING_CONFIG_H_
 
-#include "./encodings.pb.h"
 #include "config/config.h"
+#include "config/encodings.pb.h"
 
 namespace cobalt {
 namespace config {

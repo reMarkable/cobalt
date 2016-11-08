@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+find_package(Protobuf REQUIRED)
+set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
+protobuf_generate_cpp(CONFIG_PROTO_SRCS CONFIG_PROTO_HDRS
+                      encodings.proto metrics.proto)
 
 # Build the config_gen tool
-add_executable(config_gen config_gen.cc ${COBALT_PROTO_SRCS})
+add_executable(config_gen config_gen.cc ${CONFIG_PROTO_SRCS})
 target_link_libraries(config_gen ${PROTOBUF_LIBRARY})
 
 # Build the test
-add_executable(config_test config_test.cc ${COBALT_PROTO_SRCS})
+add_executable(config_test config_test.cc ${CONFIG_PROTO_SRCS})
 target_link_libraries(config_test gtest gtest_main ${PROTOBUF_LIBRARY})
 set_target_properties(config_test PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
