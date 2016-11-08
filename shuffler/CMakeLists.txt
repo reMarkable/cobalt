@@ -43,14 +43,20 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
 
 # Build shuffler executables
 set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
+set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
+set(RECEIVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/receiver/receiver.go")
+set(UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util.go")
+set(STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/store.go")
+set(MEM_STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store.go")
 add_custom_command(OUTPUT ${SHUFFLER_BIN}
-    COMMAND ${GO_BIN} build util
-    COMMAND ${GO_BIN} build dispatcher
-    COMMAND ${GO_BIN} build receiver
-    # Compiles all dependencies and installs main service package
+    # Compiles shuffler_main and all its dependencies
     COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN} shuffler_main.go
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
     DEPENDS ${ANALYZER_GEN_PROTO_FILE}
+    DEPENDS ${DISPATCHER_SRC}
+    DEPENDS ${RECEIVER_SRC}
+    DEPENDS ${UTIL_SRC}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shuffler_main.go
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -66,7 +72,6 @@ add_custom_command(OUTPUT ${TEST_CLIENT_BIN}
 )
 
 # Build dispatcher unit tests
-set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
 set(DISPATCHER_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher_test.go")
 set(DISPATCHER_TEST_BIN ${GO_TESTS}/dispatcher_test)
 add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
@@ -77,12 +82,20 @@ add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
 )
 
 # Build util functional tests
-set(UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util.go")
 set(UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util_test.go")
 set(UTIL_TEST_BIN ${GO_TESTS}/crypto_util_test)
 add_custom_command(OUTPUT ${UTIL_TEST_BIN}
     COMMAND ${GO_BIN} test -c -o ${UTIL_TEST_BIN} ${UTIL_TEST_SRC} ${UTIL_SRC}
     DEPENDS ${UTIL_SRC} ${UTIL_TEST_SRC}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Build storage functional tests
+set(STORAGE_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store_test.go")
+set(STORAGE_TEST_BIN ${GO_TESTS}/storage_test)
+add_custom_command(OUTPUT ${STORAGE_TEST_BIN}
+    COMMAND ${GO_BIN} test -c -o ${STORAGE_TEST_BIN} ${STORAGE_TEST_SRC} ${STORE_SRC} ${MEM_STORE_SRC}
+    DEPENDS ${STORE_SRC} ${MEM_STORE_SRC} ${STORAGE_TEST_SRC}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -92,4 +105,5 @@ add_custom_target(shuffler_all ALL
             ${TEST_CLIENT_BIN}
             ${DISPATCHER_TEST_BIN}
             ${UTIL_TEST_BIN}
+            ${STORAGE_TEST_BIN}
 )
