@@ -164,7 +164,7 @@ TEST(MetricRegistryFromFile, ValidFile) {
 
   // (1, 1, 1) Should have 2 parts
   auto* metric_config = registry->Get(1, 1, 1);
-  EXPECT_EQ(2, metric_config->part_size());
+  EXPECT_EQ(2, metric_config->parts_size());
 
   // (1, 1, 2) Should be "Fuschsia Usage by Hour"
   metric_config = registry->Get(1, 1, 2);

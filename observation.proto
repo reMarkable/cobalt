@@ -18,21 +18,46 @@ package cobalt;
 ///////////////////////////////////////////////////////////////
 // Messages created in the Encoder and consumed in the Analyzer
 ///////////////////////////////////////////////////////////////
+
+// A client-given value of a |MetricPart| to be encoded and collected by Cobalt.
+// An Encoder encodes a |ValuePart| and produces an |ObservationPart|. An
+// analyzer decodes an |ObservationPart| to recover the |ValuePart|. Cobalt
+// supports different types of values but the type must match the type declared
+// in the |MetricPart| definition.
+message ValuePart {
+  oneof data {
+    // A human-readable, UTF8 string.
+    string string_value = 1;
+
+    // An integer.
+    uint64 int_value = 2;
+
+    // An uninterpreted sequence of bytes.
+    bytes blob_value = 3;
+  }
+}
+
 message ForculusObservation {
+  // The encryption of a serialized ValuePart.
   bytes ciphertext = 1;
+
   bytes point_x = 2;
   bytes point_y = 3;
 }
 
 message RapporObservation {
   uint32 cohort = 1;
+
+  // The encoding of a serialized ValuePart.
   bytes data = 2;
 }
 
 message BasicRapporObservation {
+  // The encoding of a serialized ValuePart.
   bytes data = 1;
 }
 
+// The encoding of a ValuePart. This is produced by an Encoder.
 message ObservationPart {
   oneof value {
     ForculusObservation forculus = 1;

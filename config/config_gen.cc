@@ -26,15 +26,24 @@
 #include <iostream>
 
 #include "config/encodings.pb.h"
+#include "config/metrics.pb.h"
 
 using cobalt::EncodingConfig;
 using cobalt::ForculusConfig;
+using cobalt::MetricPart;
 using cobalt::RegisteredEncodings;
+using cobalt::RegisteredMetrics;
 using google::protobuf::TextFormat;
 
 int main(int argc, char *argv[]) {
   std::string out;
   RegisteredEncodings registered_encodings;
+  RegisteredMetrics registered_metrics;
+
+  std::cout << out;
+  std::cout << "------------------------------------\n";
+  std::cout << "Encodings:\n";
+  std::cout << "------------------------------------\n";
 
   // (1, 1, 1) Forculus 20 with WEEK epoch
   auto* encoding_config = registered_encodings.add_element();
@@ -80,5 +89,29 @@ int main(int argc, char *argv[]) {
 
   TextFormat::PrintToString(registered_encodings, &out);
   std::cout << out;
+  std::cout << "------------------------------------\n";
+  std::cout << "Metrics:\n";
+  std::cout << "------------------------------------\n";
+
+  auto* metric_config = registered_metrics.add_element();
+  // (1, 1, 1) Fuchsia Usage and Rating
+  metric_config->set_customer_id(1);
+  metric_config->set_project_id(1);
+  metric_config->set_id(1);
+  metric_config->set_name("Fuchsia Usage and Rating");
+  // City part
+  MetricPart city_part;
+  city_part.set_description("The name of a city");
+  city_part.set_data_type(MetricPart::STRING);
+  (*metric_config->mutable_parts())["city"] = city_part;
+  // Rating part
+  MetricPart rating_part;
+  rating_part.set_description("An integer from 0 to 10");
+  rating_part.set_data_type(MetricPart::INT);
+  (*metric_config->mutable_parts())["rating"] = rating_part;
+
+  TextFormat::PrintToString(registered_metrics, &out);
+  std::cout << out;
+
   exit(0);
 }

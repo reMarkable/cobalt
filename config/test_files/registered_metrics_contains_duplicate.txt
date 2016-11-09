@@ -10,8 +10,11 @@ element {
   id: 1
   name: "Fuschsia Rating and City"
   description: "This is a fictional metric used for the development of Cobalt."
-  part: "city"
-  part: "rating"
+  parts {
+    key: "city"
+    value {
+    }
+  }
 }
 
 element {
@@ -20,6 +23,10 @@ element {
   id: 1
   name: "Fuschsia Usage by Hour"
   description: "This is a fictional metric used for the development of Cobalt."
-  part: "hour"
+  parts {
+    key: "hour"
+    value {
+    }
+  }
 }
 
