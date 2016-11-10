@@ -12,16 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-Package implementing a simple gRPC server that performs unary RPC to
-implement shuffler service whose definition can be found in
-shuffler/service/shuffler.proto.
-
-A shuffler listens to incoming requests from Encoders (end users),
-strips the user metadata like IP-address, timestamps etc before buffering
-them locally based on the manifest information provided in the request.
-*/
-
 package main
 
 import (

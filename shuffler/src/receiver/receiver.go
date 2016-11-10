@@ -19,7 +19,7 @@ shuffler/shuffler.proto.
 
 A shuffler listens to incoming requests from Encoders (end users),
 strips the user metadata like IP-address, timestamps etc before buffering
-them locally based on the manifest information provided in the request.
+them locally based on the metadata information provided in the request.
 */
 
 package receiver

@@ -85,7 +85,7 @@ func (s *BasicShuffler) shuffle() {
 // Dispatch function makes a grpc call to analyzer and forwards the request
 // from encoder to analyzer.
 func Dispatch(envelope *shufflerpb.Envelope) {
-	analyzerURL := envelope.GetManifest().RecipientUrl
+	analyzerURL := envelope.RecipientUrl
 
 	if analyzerURL == "" {
 		glog.V(2).Infoln("Missing recipient.")
@@ -104,7 +104,7 @@ func Dispatch(envelope *shufflerpb.Envelope) {
 	c := shufflerpb.NewAnalyzerClient(conn)
 
 	_, err = c.AddObservations(context.Background(), &shufflerpb.ObservationBatch{
-		MetaData:             envelope.GetManifest().GetObservationMetaData(),
+		MetaData:             envelope.GetObservationMetaData(),
 		EncryptedObservation: []*shufflerpb.EncryptedMessage{envelope.GetEncryptedMessage()}})
 
 	if err != nil {

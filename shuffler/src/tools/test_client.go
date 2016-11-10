@@ -69,15 +69,12 @@ func grpcToShuffler() {
 	glog.V(2).Info("Processing a sample envelope...")
 	ciphertext := []byte("test cipher text")
 	env := &cobaltpb.Envelope{
-		Manifest: &cobaltpb.Manifest{
-			ShufflerPolicy: cobaltpb.Manifest_UNKNOWN_POLICY,
-			RecipientUrl:   strings.Join([]string{*aIP, ":", strconv.Itoa(int(*aPort))}, ""),
-			ObservationMetaData: &cobaltpb.ObservationMetadata{
-				CustomerId: uint32(123),
-				ProjectId:  uint32(456),
-				MetricId:   uint32(678),
-				DayIndex:   uint32(7),
-			},
+		RecipientUrl: strings.Join([]string{*aIP, ":", strconv.Itoa(int(*aPort))}, ""),
+		ObservationMetaData: &cobaltpb.ObservationMetadata{
+			CustomerId: uint32(123),
+			ProjectId:  uint32(456),
+			MetricId:   uint32(678),
+			DayIndex:   uint32(7),
 		},
 		EncryptedMessage: &cobaltpb.EncryptedMessage{
 			Scheme:     cobaltpb.EncryptedMessage_PK_SCHEME_1,
