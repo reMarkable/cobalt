@@ -20,10 +20,14 @@ file(MAKE_DIRECTORY ${GO_PROTO_GEN})
 # generate the go bindings for shuffler proto
 set(SHUFFLER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/shuffler.pb.go")
 set(ANALYZER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/analyzer.pb.go")
-add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
+set(CONFIG_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/config.pb.go")
+add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
+                          ${ANALYZER_GEN_PROTO_FILE}
+                          ${CONFIG_GEN_PROTO_FILE}
     COMMAND ${PROTOC} ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
             ${CMAKE_SOURCE_DIR}/encrypted_message.proto
             ${CMAKE_SOURCE_DIR}/analyzer/analyzer.proto
+            ${CMAKE_CURRENT_SOURCE_DIR}/config.proto
             -I ${CMAKE_SOURCE_DIR}
             -I ${CMAKE_CURRENT_SOURCE_DIR}
             -I ${CMAKE_SOURCE_DIR}/third_party/go/src
@@ -33,9 +37,11 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
     # errors, so moving all generated files under cobalt package.
     COMMAND mv ${GO_PROTO_GEN}/cobalt/shuffler/shuffler.pb.go ${SHUFFLER_GEN_PROTO_FILE}
     COMMAND mv ${GO_PROTO_GEN}/cobalt/analyzer/analyzer.pb.go ${ANALYZER_GEN_PROTO_FILE}
+    COMMAND mv ${GO_PROTO_GEN}/cobalt/shuffler/config.pb.go ${CONFIG_GEN_PROTO_FILE}
     COMMAND rmdir ${GO_PROTO_GEN}/cobalt/shuffler
     COMMAND rmdir ${GO_PROTO_GEN}/cobalt/analyzer
     DEPENDS shuffler.proto
+    DEPENDS config.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/analyzer/analyzer.proto
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -53,6 +59,7 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN} shuffler_main.go
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
     DEPENDS ${ANALYZER_GEN_PROTO_FILE}
+    DEPENDS ${CONFIG_GEN_PROTO_FILE}
     DEPENDS ${DISPATCHER_SRC}
     DEPENDS ${RECEIVER_SRC}
     DEPENDS ${UTIL_SRC}
@@ -68,6 +75,7 @@ add_custom_command(OUTPUT ${TEST_CLIENT_BIN}
     DEPENDS ${SHUFFLER_BIN}
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
     DEPENDS ${ANALYZER_GEN_PROTO_FILE}
+    DEPENDS ${CONFIG_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -79,6 +87,7 @@ add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
             ${DISPATCHER_SRC}
     DEPENDS ${DISPATCHER_SRC} ${DISPATCHER_TEST_SRC}
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
+    DEPENDS ${CONFIG_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -98,6 +107,7 @@ add_custom_command(OUTPUT ${STORAGE_TEST_BIN}
     COMMAND ${GO_BIN} test -c -o ${STORAGE_TEST_BIN} ${STORAGE_TEST_SRC} ${STORE_SRC} ${MEM_STORE_SRC}
     DEPENDS ${STORE_SRC} ${MEM_STORE_SRC} ${STORAGE_TEST_SRC}
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
+    DEPENDS ${CONFIG_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 

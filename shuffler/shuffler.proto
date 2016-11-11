@@ -13,11 +13,6 @@
 // limitations under the License.
 
 // Interface for shuffler service between encoders and analyzers.
-// Note: "If you change this file you must re-generate the shuffler.pb.go file
-// and check it in also". Pls use the following command to regenerate the
-// shuffler.pb.go file:
-// 1. From the parent shuffler dir, run
-//    'protoc -I service/ service/shuffler.proto  --go_out=plugins=grpc:proto'
 
 syntax = "proto3";
 
