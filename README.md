@@ -10,8 +10,8 @@ An extensible, privacy-preserving, user-data analysis pipeline.
   * This repo uses git modules. After pulling it you must do:
     * `git submodule init`
     * `git submodule update`
-  * You must install the following dependencies. Run setup.sh as root to install
-  all of them:
+  * You must install the following dependencies. Run setup.sh to install all of
+    them:
     * clang
     * cmake
     * golang

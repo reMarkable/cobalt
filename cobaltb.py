@@ -28,6 +28,7 @@ import tools.test_runner as test_runner
 
 THIS_DIR = os.path.dirname(__file__)
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
+SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
 
 IMAGES = ["analyzer", "shuffler"]
 
@@ -101,8 +102,7 @@ def _test(args):
 # Files and directories in the out directory to NOT delete when doing
 # a partial clean.
 TO_SKIP_ON_PARTIAL_CLEAN = [
-  'CMakeFiles', 'third_party', '.ninja_deps', '.ninja_log', 'CMakeCache.txt',
-  'build.ninja', 'cmake_install.cmake', 'rules.ninja'
+  'third_party'
 ]
 
 def _clean(args):
@@ -131,16 +131,14 @@ def _gce_build(args):
   if not os.path.exists(cobalt):
     os.mkdir(cobalt)
 
-  for dep in ["/usr/lib/libprotobuf.so.10",
-              "/usr/lib/libgoogleapis.so",
-              "/usr/lib/libgrpc++.so.1",
-              "/usr/lib/libgrpc.so.1",
-              "/usr/lib/x86_64-linux-gnu/libgflags.so.2",
-              "/usr/lib/x86_64-linux-gnu/libglog.so.0",
-              "/usr/lib/x86_64-linux-gnu/libunwind.so.8",
-              "/usr/share/grpc/roots.pem",
+  for dep in ["lib/libprotobuf.so.10",
+              "lib/libgoogleapis.so",
+              "lib/libgrpc++.so.1",
+              "lib/libgrpc.so.1",
+              "lib/libunwind.so.1",
+              "share/grpc/roots.pem",
              ]:
-    shutil.copy(dep, cobalt)
+    shutil.copy("%s/%s" % (SYSROOT_DIR, dep), cobalt)
 
   # Build all images
   for i in ["cobalt"] + IMAGES:
@@ -287,6 +285,14 @@ def main():
   global _verbose_count
   _verbose_count = args.verbose_count
   _initLogging(_verbose_count)
+
+  # Extend paths to include third-party dependencies
+  os.environ["PATH"] = \
+      "%s/bin" % SYSROOT_DIR \
+      + os.pathsep + "%s/gcloud/google-cloud-sdk/bin" % SYSROOT_DIR \
+      + os.pathsep + os.environ["PATH"]
+
+  os.environ["LD_LIBRARY_PATH"] = "%s/lib" % SYSROOT_DIR
 
   return args.func(args)
 

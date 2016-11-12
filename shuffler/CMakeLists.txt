@@ -119,3 +119,12 @@ add_custom_target(shuffler_all ALL
             ${UTIL_TEST_BIN}
             ${STORAGE_TEST_BIN}
 )
+
+# Generate protobuf files prior to compiling anything.  This is needed for
+# parallel builds to work.  Almost everything depends on the cobalt package
+# created by the shuffler_gen_pb target so do that first.
+add_custom_target(shuffler_gen_pb
+    DEPENDS ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
+)
+
+add_dependencies(shuffler_all shuffler_gen_pb)
