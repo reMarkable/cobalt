@@ -14,21 +14,37 @@
 
 cmake_minimum_required (VERSION 2.8.10)
 
+SET (CMAKE_C_COMPILER "clang")
+SET (CMAKE_CXX_COMPILER "clang++")
+
 project(cobalt)
 
-SET (CMAKE_C_COMPILER "/usr/bin/clang")
-SET (CMAKE_CXX_COMPILER "/usr/bin/clang++")
 SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
 
+enable_language(C)
+enable_language(CXX)
+
 SET (DIR_GTESTS "${CMAKE_BINARY_DIR}/gtests")
+SET (DIR_SYSROOT "${CMAKE_SOURCE_DIR}/sysroot")
 
 # Note - we specify the exact library version because dev environments have
 # protobuf.so.8 (v2) preinstalled in a higher priority search path.  Instead we
 # want to link against protobuf v3
-set(PROTOBUF_LIBRARY /usr/lib/libprotobuf.so.10 grpc++ grpc)
+set(PROTOBUF_LIBRARY ${DIR_SYSROOT}/lib/libprotobuf.so.10 grpc++ grpc)
+set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
+
+# If using protoc installed by setup.sh, cmake will warn us that it doesn't know
+# how to generate protoc (because it lives in the out directory).  Suppress that
+# warning.
+if(POLICY CMP0058)
+    cmake_policy(SET CMP0058 NEW)
+endif()
+
+link_directories(${DIR_SYSROOT}/lib)
 
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
+include_directories(${DIR_SYSROOT}/include)
 
 # Defines a command to run protoc on the top-level .proto files.
 find_package(Protobuf REQUIRED)
@@ -41,12 +57,12 @@ set(CONFIG_PROTO_SRCS
     "${CMAKE_BINARY_DIR}/config/encodings.pb.cc" "${CMAKE_BINARY_DIR}/config/metrics.pb.cc")
 
 # Runs protoc proactively on the proto files in the top-level and config dirs.
-add_custom_target(build_protos,
+add_custom_target(build_protos
                   DEPENDS ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 
 # Go related defines
-set(GO_PATH env GOPATH="${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen:/usr/local/cobalt/go:${CMAKE_SOURCE_DIR}/shuffler")
-set(GO_BIN ${GO_PATH} /usr/local/go/bin/go)
+set(GO_PATH env GOPATH="${DIR_SYSROOT}/go:${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen:${CMAKE_SOURCE_DIR}/shuffler")
+set(GO_BIN ${GO_PATH} go)
 set(GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
 
 file(MAKE_DIRECTORY ${GO_TESTS})
@@ -60,5 +76,7 @@ add_subdirectory(functional_tests)
 add_subdirectory(shuffler)
 add_subdirectory(tools)
 add_subdirectory(third_party/boringssl/src)
+add_subdirectory(third_party/gflags)
+add_subdirectory(third_party/glog)
 add_subdirectory(third_party/googletest)
 add_subdirectory(util)

@@ -29,7 +29,6 @@ set(ANALYZER_LIBS
     gflags
     )
 
-set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS analyzer.proto)
 
 # generate the gRPC service.  CMake doesn't support it by default.
