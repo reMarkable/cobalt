@@ -20,7 +20,7 @@ namespace cobalt {
 namespace crypto {
 
 namespace {
-  bool Base64Encode_(const byte *data, int len, std::string* encoded_out) {
+bool Base64Encode_(const byte *data, int len, std::string* encoded_out) {
   if (!data || !encoded_out) {
     return false;
   }
@@ -44,6 +44,11 @@ namespace {
 
 bool Base64Encode(const std::vector<byte>& data, std::string* encoded_out) {
   return Base64Encode_(data.data(), data.size(), encoded_out);
+}
+
+bool Base64Encode(const std::string& data, std::string* encoded_out) {
+  return Base64Encode_(reinterpret_cast<const byte*>(data.data()),
+      data.size(), encoded_out);
 }
 
 bool Base64Decode(const std::string& encoded_in,

@@ -40,6 +40,8 @@ namespace forculus {
 // metric part name, and the same epoch index.)
 //
 // After adding at least |threshold| distinct points invoke Decrypt().
+//
+// An instance of ForculusDecrypter is not thread-safe.
 class ForculusDecrypter {
  public:
   enum Status {
@@ -68,7 +70,9 @@ class ForculusDecrypter {
   ForculusDecrypter(uint32_t threshold, std::string ciphertext);
 
   // Adds an additional observation to the set of observations. If the
-  // observation's (x, y)-value has already been added then it will be ignored.
+  // observation's (x, y)-value has already been added then it will increment
+  // |num_seen| but not |size|.
+  //
   // Returns kInconsistentPoints if the observation has the same x-value as
   // a previous observation but a different y-value. Returns kWrongCiphertext
   // if the observation has the wrong ciphertext.
@@ -77,7 +81,17 @@ class ForculusDecrypter {
   // Returns the number of distinct (x, y) values that have been successfully
   // added. The Decrypt() method may only be invoked after the size is at
   // least the |threshold| passed to the constructor.
-  int size();
+  uint32_t size();
+
+  // Returns the number of times that AddObservation() was invoked and returned
+  // kOK. This value differs from the value returned by size() in that if
+  // the same (x, y)-value is added twice it will incrument |num_seen| but
+  // not |size|.
+  uint32_t num_seen() {
+    return num_seen_;
+  }
+
+
 
   // Decrypts the |ciphertext| that was passed to the constructor and writes
   // the plain text to *plain_text_out. Returns kOk on success. If there are
@@ -92,6 +106,8 @@ class ForculusDecrypter {
 
  private:
   uint32_t threshold_;
+  uint32_t num_seen_;
+
   std::string ciphertext_;
 
   // A map from x-values to y-values.

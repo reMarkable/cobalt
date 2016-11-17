@@ -28,10 +28,10 @@ target_link_libraries(forculus_encrypter
                       forculus_utils client_secret
                       datetime_util ${PROTOBUF_LIBRARY})
 
-add_library(forculus_decrypter forculus_decrypter.cc
+add_library(forculus_analyzer forculus_analyzer.cc forculus_decrypter.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
-target_link_libraries(forculus_decrypter
-                      forculus_utils ${PROTOBUF_LIBRARY})
+target_link_libraries(forculus_analyzer
+                      forculus_utils gflags glog ${PROTOBUF_LIBRARY})
 
 # Build an executable test binary. Include gtest headers at compile time
 # and gtest libraries at link time. Write the executable to the
@@ -40,9 +40,10 @@ add_executable(forculus_tests
                field_element_test.cc
                polynomial_computation_test.cc
                forculus_encrypter_test.cc
-               forculus_decrypter_test.cc)
+               forculus_decrypter_test.cc
+               forculus_analyzer_test.cc)
 target_link_libraries(forculus_tests
-                      forculus_encrypter forculus_decrypter
+                      forculus_encrypter forculus_analyzer
                       gtest gtest_main)
 set_target_properties(forculus_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

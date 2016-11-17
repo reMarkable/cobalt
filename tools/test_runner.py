@@ -38,7 +38,7 @@ def run_all_tests(dirs):
   for test_executable in os.listdir(tdir):
     print "Running %s..." % test_executable
     path = os.path.abspath(os.path.join(tdir, test_executable))
-    subprocess.check_call([path], shell=True)
+    subprocess.check_call([path, '--logtostderr=1'], shell=True)
     print "DONE!"
 
 

@@ -35,21 +35,30 @@ namespace {
 // Derives a master key for use in Forculus encryption by applying a slow
 // random oracle to the the input data. Returns the master key, or an empty
 // vector if the operation fails for any reason.
-std::vector<byte> DeriveMasterKey(uint32_t metric_id,
-    const std::string& metric_part_name, uint32_t epoch_index,
-    uint32_t threshold, const std::string& plaintext) {
+std::vector<byte> DeriveMasterKey(uint32_t customer_id, uint32_t project_id,
+    uint32_t metric_id, const std::string& metric_part_name,
+    uint32_t epoch_index, uint32_t threshold, const std::string& plaintext) {
   // First we build up a byte vector consisting of the concatenation of all of
   // the input material. This will be the input to the random oracle.
   // We prepend each string with its length.
   size_t part_name_size = metric_part_name.size();
   size_t plaintext_size = plaintext.size();
-  std::vector<byte> master_key_material(sizeof(metric_id) +
+  std::vector<byte> master_key_material(sizeof(customer_id) +
+      sizeof(project_id) + sizeof(metric_id) +
       sizeof(part_name_size) + part_name_size +
       sizeof(epoch_index) + sizeof(threshold) +
       sizeof(plaintext_size) + plaintext.size());
+  // Add customer_id
+  std::memcpy(master_key_material.data(), &customer_id, sizeof(customer_id));
+  size_t index = sizeof(customer_id);
+  // Add project_id
+  std::memcpy(master_key_material.data() + index, &project_id,
+      sizeof(project_id));
+  index += sizeof(project_id);
   // Add metric_id
-  std::memcpy(master_key_material.data(), &metric_id, sizeof(metric_id));
-  size_t index = sizeof(metric_id);
+  std::memcpy(master_key_material.data() + index, &metric_id,
+      sizeof(metric_id));
+  index += sizeof(metric_id);
   // Add part_name_size
   std::memcpy(master_key_material.data() + index,
       &part_name_size, sizeof(part_name_size));
@@ -122,10 +131,11 @@ class ForculusConfigValidator {
 };
 
 ForculusEncrypter::ForculusEncrypter(const ForculusConfig& config,
-    uint32_t metric_id, std::string metric_part_name,
-    ClientSecret client_secret) :
+    uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
+    std::string metric_part_name, ClientSecret client_secret) :
     config_(new ForculusConfigValidator(config, client_secret)),
-    metric_id_(metric_id), metric_part_name_(std::move(metric_part_name)),
+    customer_id_(customer_id), project_id_(project_id), metric_id_(metric_id),
+    metric_part_name_(std::move(metric_part_name)),
     client_secret_(std::move(client_secret)) {}
 
 ForculusEncrypter::~ForculusEncrypter() {}
@@ -148,10 +158,10 @@ ForculusEncrypter::Status ForculusEncrypter::Encrypt(
   const uint32_t& threshold = config_->threshold();
 
   // We now derive the Forculus master key by invoking a random oracle on
-  // all of the following data: metric_id, metric_part_name, epoch_index,
-  // threshold and plaintext.
-  std::vector<byte> master_key = DeriveMasterKey(metric_id_, metric_part_name_,
-      epoch_index, threshold, plaintext);
+  // all of the following data: customer_id, project_id, metric_id,
+  // metric_part_name, epoch_index, threshold and plaintext.
+  std::vector<byte> master_key = DeriveMasterKey(customer_id_, project_id_,
+      metric_id_, metric_part_name_, epoch_index, threshold, plaintext);
   if (master_key.empty()) {
     return kEncryptionFailed;
   }

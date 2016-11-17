@@ -27,7 +27,7 @@ using crypto::SymmetricCipher;
 
 ForculusDecrypter::ForculusDecrypter(uint32_t threshold,
                                      std::string ciphertext) :
-  threshold_(threshold), ciphertext_(std::move(ciphertext)) {}
+  threshold_(threshold), num_seen_(0), ciphertext_(std::move(ciphertext)) {}
 
 ForculusDecrypter::Status ForculusDecrypter::AddObservation(
     const ForculusObservation& obs) {
@@ -45,10 +45,11 @@ ForculusDecrypter::Status ForculusDecrypter::AddObservation(
       return kInconsistentPoints;
     }
   }
+  num_seen_++;
   return kOK;
 }
 
-int ForculusDecrypter::size() {
+uint32_t ForculusDecrypter::size() {
   return points_.size();
 }
 

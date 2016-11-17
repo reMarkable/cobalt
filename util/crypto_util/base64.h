@@ -28,6 +28,11 @@ namespace crypto {
 // Returns true on success and false on failure.
 bool Base64Encode(const std::vector<byte>& data, std::string* encoded_out);
 
+// Base64 encodes the bytes in |data| and writes the result into |encoded_out|.
+//
+// Returns true on success and false on failure.
+bool Base64Encode(const std::string& data, std::string* encoded_out);
+
 // Base64 decodes |encoded_in| and writes the results into decoded_out.
 //
 // Returns true on success and false if |encoded_in| could not be decoded.

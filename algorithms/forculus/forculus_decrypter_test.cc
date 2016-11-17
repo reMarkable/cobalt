@@ -17,7 +17,9 @@
 
 #include <map>
 
+#include "encoder/client_secret.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
+#include "util/datetime_util.h"
 
 namespace cobalt {
 namespace forculus {
@@ -36,7 +38,8 @@ ForculusObservation Encrypt(const std::string& plaintext) {
   config.set_threshold(kThreshold);
 
   // Construct an Encrypter.
-  ForculusEncrypter encrypter(config, 0, "", ClientSecret::GenerateNewSecret());
+  ForculusEncrypter encrypter(config, 0, 0, 0, "",
+      ClientSecret::GenerateNewSecret());
 
   // Invoke Encrypt() and check the status.
   ForculusObservation obs;
