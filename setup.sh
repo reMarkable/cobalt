@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Copyright 2016 The Fuchsia Authors
 #
@@ -15,50 +15,54 @@
 # limitations under the License.
 #
 # Installs cobalt dependencies.
+# Warning this will install packages globally
 
-set -e
+PREFIX=/usr
+COBALT=$PREFIX/local/cobalt
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly PREFIX="${SCRIPT_DIR}/sysroot"
-readonly WD="${PREFIX}/tmp"
-readonly GCLOUD_DIR=$PREFIX/gcloud
+if [ $(id -u) != "0" -o "$SUDO_USER" == "" ] ; then
+    echo run with sudo
+    exit 1
+fi
 
-export PATH=${PREFIX}/bin:${GCLOUD_DIR}/google-cloud-sdk/bin:${PATH}
+echo "This will install cobalt dependencies globally ($PREFIX)"
+echo "Enter y to proceed"
+
+read Y
+
+if [ "$Y" != 'y' ] ; then
+    echo Aborting...
+    exit 1
+fi
+
+# Current dir
+CD=$(pwd)
 
 # scratch dir (if needed)
+WD=/tmp/cobalt_setup
 rm -fr $WD
-mkdir -p $WD
+mkdir $WD
 
-function download_prebuilt() {
-    local name="${1}"
-    local sha="${2}"
-    local tarball="${name}.tar.bz2"
+# Install apt packages
+apt-get -y install clang cmake ninja-build libgflags-dev libgoogle-glog-dev
 
-    echo Downloading $name
+# Install golang 1.7.1
+GO_DIR=$PREFIX/local/go
+GO=$GO_DIR/bin/go
 
-    curl -o $tarball \
-        https://storage.googleapis.com/fuchsia-build/fuchsia/$name/linux64/$sha
-}
+if ls $GO_DIR > /dev/null ; then
+    GO_VERSION=$($GO version | awk '{print $3}')
+fi
 
-# Install build tools
-if ! which cmake > /dev/null ||
-   [ "$(cmake --version | awk '/version/ {print $3}')" != "3.6.0" ] ; then
+if [ "$GO_VERSION" != "go1.7.1" ] ; then
+    if [ -d $GO_DIR ] ; then
+        echo "Removing the incompatible golang package...: ${GO_VERSION}"
+        rm -rf $GO_DIR
+    fi
     cd $WD
-    download_prebuilt "cmake" "aac4acc2931bcc429f2781748077f017ec7f77e0"
-    tar xf cmake.tar.bz2 -C .. --strip-components 1
-
-    download_prebuilt "toolchain" "65755afbfd58811c1a478c1c199a7d146f5e79d1"
-    tar xf toolchain.tar.bz2 -C .. --strip-components 1
-
-    download_prebuilt "ninja" "cd193042581c22d1792af0a129581c6c03ee98b5"
-    mv ninja.tar.bz2 ../bin/ninja
-    chmod +x ../bin/ninja
-
-    download_prebuilt "go" "8fabd15119470eccd936d693e89b66ec4ed15b67"
-    mkdir ../golang
-    tar xf go.tar.bz2 -C ../golang --strip-components 1
-    ln -s ../golang/bin/go ../bin/go
-    ln -s ../golang/bin/gofmt ../bin/gofmt
+    wget https://storage.googleapis.com/golang/go1.7.1.linux-amd64.tar.gz
+    tar -C /usr/local -xvf go1.7.1.linux-amd64.tar.gz
+    export PATH=/usr/local/go/bin:$PATH
 fi
 
 # Install protobuf 3
@@ -82,11 +86,11 @@ if ! which grpc_cpp_plugin > /dev/null ; then
 fi
 
 # Install google APIs (C++ protobuf stubs)
-if [ ! -f $PREFIX/lib/libgoogleapis.so ] ; then
+if [ ! -f /usr/lib/libgoogleapis.so ] ; then
     cd $WD
     git clone https://github.com/googleapis/googleapis.git
     cd googleapis
-    git checkout 2360492797130743eb4c78951fbef6023c1504b8
+    git checkout 14263af2cbe711f2f2aa692da1b09a8311a2e45d
     make LANGUAGE=cpp GPRCPLUGIN=`which grpc_cpp_plugin`
 
     echo
@@ -95,45 +99,48 @@ if [ ! -f $PREFIX/lib/libgoogleapis.so ] ; then
     find . -name \*.cc \
       | xargs clang++ -o libgoogleapis.so -fPIC -shared --std=c++11 -I .
 
-    mv libgoogleapis.so $PREFIX/lib
+    mv libgoogleapis.so /usr/lib
+    ldconfig
 
     # copy headers
     cd google
-    find . -name \*.h -exec cp --parents {} $PREFIX/include/google/ \;
+    find . -name \*.h -exec cp --parents {} /usr/include/google/ \;
 fi
 
 # Build and install protoc-gen-go binary
-GOPATH=${SCRIPT_DIR}/third_party/go
+GOPATH=${CD}/third_party/go
 export GOPATH
 if ! which protoc-gen-go > /dev/null ; then
     cd $WD
-    go build -o $PREFIX/bin/protoc-gen-go github.com/golang/protobuf/protoc-gen-go
+    $GO build -o $PREFIX/bin/protoc-gen-go github.com/golang/protobuf/protoc-gen-go
 fi
 
 unset GOPATH
 
 # Install go dependencies
-export GOPATH=$PREFIX/go
+export GOPATH=$COBALT/go
 
 if [ ! -d $GOPATH/src/cloud.google.com/go/bigtable ] ; then
     echo Installing the bigtable client for go
     mkdir -p $GOPATH
-    go get cloud.google.com/go/bigtable
+    $GO get cloud.google.com/go/bigtable
 fi
 
 # Install gcloud
 if ! which gcloud > /dev/null ; then
     SDK=google-cloud-sdk-131.0.0-linux-x86_64.tar.gz
+    GCLOUD_DIR=$COBALT/gcloud
 
     cd $WD
     mkdir -p $GCLOUD_DIR
+    chown $SUDO_USER $GCLOUD_DIR
     wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$SDK
 
-    tar -f $SDK -C $GCLOUD_DIR -x
+    su -c "tar -f $SDK -C $GCLOUD_DIR -x" $SUDO_USER
     cd $GCLOUD_DIR
-    ./google-cloud-sdk/install.sh --quiet
-    ./google-cloud-sdk/bin/gcloud --quiet components update beta
-    ./google-cloud-sdk/bin/gcloud --quiet components install bigtable
+    su -c "./google-cloud-sdk/install.sh --quiet" $SUDO_USER
+    su -c "./google-cloud-sdk/bin/gcloud --quiet components update beta" $SUDO_USER
+    su -c "./google-cloud-sdk/bin/gcloud --quiet components install bigtable" $SUDO_USER
 
     echo Please restart your shell to get gcloud in your path
 fi
