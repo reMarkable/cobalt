@@ -19,6 +19,7 @@
 #include <google/bigtable/admin/v2/bigtable_table_admin.grpc.pb.h>
 #include <grpc++/grpc++.h>
 
+#include <map>
 #include <memory>
 #include <string>
 
@@ -35,11 +36,15 @@ class BigtableStore : public Store {
   explicit BigtableStore(const std::string& table_name);
 
   // Call prior to put/get.  Sets up needed state for connecting to bigtable.
+  // init_schema: whether or not to create tables.
   // Returns non-zero on error.
-  int initialize();
+  int initialize(bool init_schema);
 
   int put(const std::string& key, const std::string& val) override;
   int get(const std::string& key, std::string* out) override;
+
+  int get_range(const std::string& start, const std::string& end,
+                std::map<std::string, std::string>* out) override;
 
  private:
   int setup_connection();

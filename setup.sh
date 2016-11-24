@@ -16,14 +16,31 @@
 #
 # Installs cobalt dependencies.
 
-set -e
-
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PREFIX="${SCRIPT_DIR}/sysroot"
 readonly WD="${PREFIX}/tmp"
 readonly GCLOUD_DIR=$PREFIX/gcloud
 
 export PATH=${PREFIX}/bin:${GCLOUD_DIR}/google-cloud-sdk/bin:${PATH}
+export LD_LIBRARY_PATH=${PREFIX}/lib
+
+while getopts "eh" o; do
+    case "${o}" in
+      e)
+        return
+        ;;
+      h)
+        echo "Usage: $0 <opts>"
+        echo "-h    help"
+        echo "-e    setup environment (source script)"
+        exit 0
+        ;;
+      *)
+        ;;
+    esac
+done
+
+set -e
 
 # scratch dir (if needed)
 rm -fr $WD

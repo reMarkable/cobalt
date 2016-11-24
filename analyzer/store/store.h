@@ -15,6 +15,7 @@
 #ifndef COBALT_ANALYZER_STORE_STORE_H_
 #define COBALT_ANALYZER_STORE_STORE_H_
 
+#include <map>
 #include <memory>
 #include <string>
 
@@ -31,13 +32,28 @@ class Store {
 
   // Returns 0 on success.
   virtual int get(const std::string& key, std::string* out) = 0;
+
+  // if start or end are the empty string, then the range is unbounded (e.g.,
+  // starts at first element, or ends at the last element).
+  // out is a map containing key -> value.
+  //
+  // TODO(bittau): implement a streaming interface or pagination as needed.
+  // Right now the client has no way of controlling how many records are
+  // returned.
+  //
+  // Returns 0 on success
+  virtual int get_range(const std::string& start, const std::string& end,
+                        std::map<std::string, std::string>* out)
+                        = 0;
 };
 
 // This is a factory method that'll create a Store based on command line flags.
 // By default a BigtableStore accessing the table name specified in the -table
 // command line argument will be constructed.  If the -memstore is passed on the
 // command line, a MemStore is created instead.
-std::unique_ptr<Store> MakeStore();
+//
+// If init_schema is true, necessary tables will be created, if needed.
+std::unique_ptr<Store> MakeStore(bool init_schema);
 
 }  // namespace analyzer
 }  // namespace cobalt

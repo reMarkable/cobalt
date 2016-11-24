@@ -41,6 +41,10 @@ class ClientSecret {
     bytes_ = std::move(other.bytes_);
   }
 
+  ClientSecret(const ClientSecret& other) {
+    bytes_ = other.bytes_;
+  }
+
   bool operator==(const ClientSecret& other) const {
     if (!valid() || !other.valid()) {
       return false;

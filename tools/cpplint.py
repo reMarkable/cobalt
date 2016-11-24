@@ -32,6 +32,7 @@ SKIP_LINT_DIRS = [
     os.path.join(SRC_ROOT_DIR, 'out'),
     os.path.join(SRC_ROOT_DIR, 'prototype'),
     os.path.join(SRC_ROOT_DIR, 'shuffler'),
+    os.path.join(SRC_ROOT_DIR, 'sysroot'),
     os.path.join(SRC_ROOT_DIR, 'third_party'),
 ]
 

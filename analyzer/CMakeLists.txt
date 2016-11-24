@@ -22,12 +22,15 @@ set(ANALYZER_SRCS
 
 set(ANALYZER_LIBS
     ${PROTOBUF_LIBRARY}
-    ${COBALT_PROTO_SRCS}
     googleapis
+    forculus_analyzer
     cobalt_crypto
     glog
     gflags
     )
+
+set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS analyzer.proto)
 
@@ -44,7 +47,7 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
 set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 
 # Build the analyzer library
-add_library(cobalt_analyzer ${ANALYZER_SRCS} ${PROTO_SRCS})
+add_library(cobalt_analyzer ${ANALYZER_SRCS} ${PROTO_SRCS} ${COBALT_PROTO_SRCS})
 target_link_libraries(cobalt_analyzer ${ANALYZER_LIBS})
 
 # Build the analyzer executable

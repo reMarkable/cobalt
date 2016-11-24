@@ -28,3 +28,8 @@ add_custom_command(OUTPUT ${ANALYZER_BIGTABLE_TEST_BIN}
 add_custom_target(test_all ALL
       DEPENDS ${ANALYZER_BIGTABLE_TEST_BIN}
 )
+
+add_executable(bigtable_test ${FUNCTIONAL_TESTS_SRC}/bigtable_test.cc)
+target_link_libraries(bigtable_test gtest gtest_main cobalt_analyzer)
+set_target_properties(bigtable_test PROPERTIES
+                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

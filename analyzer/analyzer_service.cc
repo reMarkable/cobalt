@@ -94,7 +94,7 @@ void AnalyzerServiceImpl::Wait() {
 void analyzer_service_main() {
   LOG(INFO) << "Starting Analyzer service";
 
-  AnalyzerServiceImpl analyzer(MakeStore());
+  AnalyzerServiceImpl analyzer(MakeStore(true));
   analyzer.Start();
   analyzer.Wait();
 }

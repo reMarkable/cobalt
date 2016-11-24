@@ -15,19 +15,27 @@
 #include "analyzer/store/bigtable_store.h"
 
 #include <glog/logging.h>
+#include <google/bigtable/v2/data.pb.h>
 
+#include <map>
 #include <string>
 
 using google::bigtable::v2::Bigtable;
 using google::bigtable::v2::MutateRowRequest;
 using google::bigtable::v2::MutateRowResponse;
 using google::bigtable::v2::Mutation_SetCell;
+using google::bigtable::v2::ReadRowsRequest;
+using google::bigtable::v2::ReadRowsResponse;
+using google::bigtable::v2::ReadRowsResponse_CellChunk;
+using google::bigtable::v2::RowSet;
+using google::bigtable::v2::RowRange;
 using google::bigtable::admin::v2::BigtableTableAdmin;
 using google::bigtable::admin::v2::ColumnFamily;
 using google::bigtable::admin::v2::CreateTableRequest;
 using google::bigtable::admin::v2::GetTableRequest;
 using google::bigtable::admin::v2::Table;
 using grpc::ClientContext;
+using grpc::ClientReader;
 using grpc::Status;
 
 namespace cobalt {
@@ -36,13 +44,13 @@ namespace analyzer {
 BigtableStore::BigtableStore(const std::string& table_name)
     : table_name_(table_name) {}
 
-int BigtableStore::initialize() {
+int BigtableStore::initialize(bool should_init_schema) {
   int rc;
 
   if ((rc = setup_connection()))
     return rc;
 
-  if ((rc = init_schema()))
+  if (should_init_schema && (rc = init_schema()))
     return rc;
 
   return 0;
@@ -148,6 +156,41 @@ int BigtableStore::put(const std::string& key, const std::string& val) {
 
 int BigtableStore::get(const std::string& key, std::string* out) {
   return -1;
+}
+
+int BigtableStore::get_range(const std::string& start, const std::string& end,
+                             std::map<std::string, std::string>* out) {
+  ClientContext context;
+  ReadRowsRequest req;
+  ReadRowsResponse resp;
+
+  req.set_table_name(table_name_);
+
+  RowSet* rs = req.mutable_rows();
+  RowRange* rr = rs->add_row_ranges();
+
+  if (start != "")
+    rr->set_start_key_closed(start);
+
+  if (end != "")
+    rr->set_end_key_closed(end);
+
+  auto reader(data_->ReadRows(&context, req));
+
+  while (reader->Read(&resp)) {
+    for (const ReadRowsResponse_CellChunk& chunk : resp.chunks()) {
+      (*out)[chunk.row_key()] = chunk.value();
+    }
+  }
+
+  Status s = reader->Finish();
+
+  if (!s.ok()) {
+    LOG(ERROR) << "get_range failed: " << s.error_message();
+    return -1;
+  }
+
+  return 0;
 }
 
 }  // namespace analyzer

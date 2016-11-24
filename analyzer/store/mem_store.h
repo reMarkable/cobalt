@@ -52,6 +52,11 @@ class MemStore : public Store {
   int get(const std::string& key, std::string* out) override {
     return MemStoreSingleton::instance().get(key, out);
   }
+
+  int get_range(const std::string& start, const std::string& end,
+                std::map<std::string, std::string>* out) override {
+    return -1;  // TODO(bittau): implement this.
+  }
 };
 
 }  // namespace analyzer

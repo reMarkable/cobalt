@@ -24,13 +24,19 @@
 #include <assert.h>
 
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 
+#include "algorithms/forculus/forculus_encrypter.h"
 #include "analyzer/analyzer_service.h"
+#include "config/encodings.pb.h"
 #include "./observation.pb.h"
 
 using cobalt::analyzer::kAnalyzerPort;
 using cobalt::analyzer::Analyzer;
 using cobalt::analyzer::ObservationBatch;
+using cobalt::encoder::ClientSecret;
+using cobalt::forculus::ForculusEncrypter;
+using cobalt::util::CalendarDate;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -42,6 +48,7 @@ namespace cgen {
 DEFINE_string(analyzer, "", "Analyzer IP");
 DEFINE_int32(num_rpcs, 1, "Number of RPCs to send");
 DEFINE_int32(num_observations, 1, "Number of Observations per RPC");
+DEFINE_string(payload, "hello", "Observation payload");
 
 // Measures time between start and stop.  Useful for benchmarking.
 class Timer {
@@ -80,6 +87,9 @@ class Timer {
 // Generates observations and RPCs to Cobalt components
 class CGen {
  public:
+  CGen() : customer_id_(1), project_id_(2), metric_id_(3), part_name_("DEFAULT")
+           {}
+
   void setup(int argc, char *argv[]) {
     google::SetUsageMessage("Cobalt gRPC generator");
     google::ParseCommandLineFlags(&argc, &argv, true);
@@ -96,18 +106,31 @@ class CGen {
   // Creates a bunch of fake observations that can be sent to shufflers or
   // analyzers.
   void generate_observations() {
+    ForculusConfig config;
+    ClientSecret client_secret = ClientSecret::GenerateNewSecret();
+
+    config.set_threshold(10);
+
+    ForculusEncrypter forculus(config, customer_id_, project_id_, metric_id_,
+                               part_name_, client_secret);
+
     for (int i = 0; i < FLAGS_num_observations; i++) {
       Observation obs;
       ObservationPart part;
 
       part.set_encoding_config_id(1);
 
-      BasicRapporObservation* rappor = part.mutable_basic_rappor();
-      rappor->set_data("basic rappor");
+      ForculusObservation* forc_obs = part.mutable_forculus();
+      CalendarDate dt;
+
+      if (forculus.Encrypt(FLAGS_payload, dt, forc_obs)
+          != forculus::ForculusEncrypter::kOK) {
+        LOG(FATAL) << "Forculus encryption failed";
+      }
 
       // TODO(bittau): need to specify what key-value to use for
       // single-dimension metrics.  Using DEFAULT for now.
-      (*obs.mutable_parts())["DEFAULT"] = part;
+      (*obs.mutable_parts())[part_name_] = part;
 
       observations_.push_back(obs);
     }
@@ -129,9 +152,9 @@ class CGen {
     ObservationBatch req;
     ObservationMetadata* metadata = req.mutable_meta_data();
 
-    metadata->set_customer_id(1);
-    metadata->set_project_id(2);
-    metadata->set_metric_id(3);
+    metadata->set_customer_id(customer_id_);
+    metadata->set_project_id(project_id_);
+    metadata->set_metric_id(metric_id_);
     metadata->set_day_index(4);
 
     for (const Observation& observation : observations_) {
@@ -169,6 +192,10 @@ class CGen {
     *out = in;
   }
 
+  int customer_id_;
+  int project_id_;
+  int metric_id_;
+  std::string part_name_;
   std::vector<Observation> observations_;
 };  // class CGen
 

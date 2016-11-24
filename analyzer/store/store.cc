@@ -31,14 +31,14 @@ DEFINE_bool(memstore, false, "Use an in-memory datastore instead of Bigtable");
 
 Store::~Store() {}
 
-std::unique_ptr<Store> MakeStore() {
+std::unique_ptr<Store> MakeStore(bool init_schema) {
   if (FLAGS_memstore)
     return std::unique_ptr<Store>(new MemStore);
 
   // Otherwise, it's bigtable.
   BigtableStore* store = new BigtableStore(FLAGS_table);
 
-  if (store->initialize() < 0)
+  if (store->initialize(init_schema) < 0)
     LOG(FATAL) << "Cannot initialzie Bigtable";
 
   return std::unique_ptr<Store>(store);
