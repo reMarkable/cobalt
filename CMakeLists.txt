@@ -14,6 +14,11 @@
 
 cmake_minimum_required (VERSION 2.8.10)
 
+# The only way we found to override the compiler is setting these variables
+# prior to the project definition.  Otherwise enable_language() sets these
+# variables and gcc will be picked up instead.  Also, new versions of cmake will
+# complain if one compiler is first set (say to gcc via enable_language), and
+# then we later switch it to (say) clang.
 SET (CMAKE_C_COMPILER "clang")
 SET (CMAKE_CXX_COMPILER "clang++")
 
