@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-package cobalt.shuffler.config;
+package cobalt.shuffler;
 
 option go_package = "cobalt";
 

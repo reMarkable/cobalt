@@ -55,6 +55,7 @@ set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
 set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
 set(RECEIVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/receiver/receiver.go")
 set(UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util.go")
+set(CONFIG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_util.go")
 set(STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/store.go")
 set(MEM_STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store.go")
 add_custom_command(OUTPUT ${SHUFFLER_BIN}
@@ -66,6 +67,7 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     DEPENDS ${DISPATCHER_SRC}
     DEPENDS ${RECEIVER_SRC}
     DEPENDS ${UTIL_SRC}
+    DEPENDS ${CONFIG_SRC}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shuffler_main.go
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
@@ -100,7 +102,7 @@ add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Build util functional tests
+# Build util unit tests
 set(UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util_test.go")
 set(UTIL_TEST_BIN ${GO_TESTS}/crypto_util_test)
 add_custom_command(OUTPUT ${UTIL_TEST_BIN}
@@ -109,7 +111,16 @@ add_custom_command(OUTPUT ${UTIL_TEST_BIN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Build storage functional tests
+# Build config unit tests
+set(CONFIG_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_util_test.go")
+set(CONFIG_TEST_BIN ${GO_TESTS}/config_test)
+add_custom_command(OUTPUT ${CONFIG_TEST_BIN}
+    COMMAND ${GO_BIN} test -c -o ${CONFIG_TEST_BIN} ${CONFIG_TEST_SRC} ${CONFIG_SRC}
+    DEPENDS ${CONFIG_SRC} ${CONFIG_TEST_SRC}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Build storage unit tests
 set(STORAGE_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store_test.go")
 set(STORAGE_TEST_BIN ${GO_TESTS}/storage_test)
 add_custom_command(OUTPUT ${STORAGE_TEST_BIN}
@@ -126,6 +137,7 @@ add_custom_target(shuffler_all ALL
             ${TEST_CLIENT_BIN}
             ${DISPATCHER_TEST_BIN}
             ${UTIL_TEST_BIN}
+            ${CONFIG_TEST_BIN}
             ${STORAGE_TEST_BIN}
 )
 
