@@ -137,7 +137,7 @@ TEST(FieldElementTest, TestArithmetic) {
 
   // Test that -1 + 1 = 0 with +=.
   x = kMinusOne;
-  x+= FieldElement({true});
+  x+= FieldElement(true);
   EXPECT_EQ(FieldElement(false), x);
 
   // Test that 5 - 2 = 3

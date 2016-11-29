@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-find_package(Protobuf REQUIRED)
 set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
 protobuf_generate_cpp(CONFIG_PROTO_SRCS CONFIG_PROTO_HDRS
                       encodings.proto metrics.proto)

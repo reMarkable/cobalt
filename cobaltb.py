@@ -102,7 +102,8 @@ def _test(args):
 # Files and directories in the out directory to NOT delete when doing
 # a partial clean.
 TO_SKIP_ON_PARTIAL_CLEAN = [
-  'third_party'
+  'CMakeFiles', 'third_party', '.ninja_deps', '.ninja_log', 'CMakeCache.txt',
+  'build.ninja', 'cmake_install.cmake', 'rules.ninja'
 ]
 
 def _clean(args):

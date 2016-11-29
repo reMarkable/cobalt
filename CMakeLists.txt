@@ -52,7 +52,7 @@ include_directories(${CMAKE_BINARY_DIR})
 include_directories(${DIR_SYSROOT}/include)
 
 # Defines a command to run protoc on the top-level .proto files.
-find_package(Protobuf REQUIRED)
+find_package(Protobuf REQUIRED QUIET)
 protobuf_generate_cpp(COBALT_PROTO_SRCS COBALT_PROTO_HDRS
                       encrypted_message.proto observation.proto)
 
