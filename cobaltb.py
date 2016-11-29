@@ -153,7 +153,7 @@ def _gce_push(args):
 
   for i in IMAGES:
     tag = "%s/%s" % (GCE_TAG, i)
-    subprocess.check_call(["docker", "tag", "-f", i, tag])
+    subprocess.check_call(["docker", "tag", i, tag])
     subprocess.check_call(["gcloud", "docker", "--", "push", tag])
 
 def kube_setup():

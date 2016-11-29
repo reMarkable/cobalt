@@ -23,4 +23,6 @@ COPY libprotobuf.so.10 /usr/lib/
 COPY libunwind.so.1 /usr/lib/
 COPY roots.pem /usr/share/grpc/
 
+ENV GRPC_DEFAULT_SSL_ROOTS_FILE_PATH /usr/share/grpc/roots.pem
+
 RUN ldconfig

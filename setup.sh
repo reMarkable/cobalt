@@ -162,7 +162,8 @@ if [ ! -f $GCLOUD_DIR/google-cloud-sdk/bin/gcloud ] ; then
     ./google-cloud-sdk/install.sh --quiet --command-completion false \
                                   --path-update false
     ./google-cloud-sdk/bin/gcloud --quiet components update beta
-    ./google-cloud-sdk/bin/gcloud --quiet components install bigtable
+    ./google-cloud-sdk/bin/gcloud --quiet components install bigtable \
+                                  kubectl
 fi
 
 rm -fr $WD
