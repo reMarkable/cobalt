@@ -36,7 +36,9 @@ void TestRapporConfig(const RapporConfig& config,
   // Each time this function is invoked reconstitute the secret from the token.
   RapporEncoder encoder(config, ClientSecret::FromToken(kClientSecretToken));
   RapporObservation obs;
-  EXPECT_EQ(expected_status, encoder.Encode("dummy", &obs))
+  ValuePart value;
+  value.set_string_value("dummy");
+  EXPECT_EQ(expected_status, encoder.Encode(value, &obs))
       << "Invoked from line number: " << caller_line_number;
 }
 
@@ -158,7 +160,9 @@ TEST(RapporEncoderTest, StringRapporConfigValidation) {
   // Test with an invalid ClientSecret
   RapporEncoder encoder(config, ClientSecret::FromToken("Invalid Token"));
   RapporObservation obs;
-  EXPECT_EQ(kInvalidConfig, encoder.Encode("dummy", &obs));
+  ValuePart value;
+  value.set_string_value("dummy");
+  EXPECT_EQ(kInvalidConfig, encoder.Encode(value, &obs));
 }
 
 // Constructs a BasicRapporEncoder with the given |config|, invokes
@@ -174,7 +178,9 @@ void TestBasicRapporConfig(const BasicRapporConfig& config,
   BasicRapporEncoder encoder(config,
       ClientSecret::FromToken(kClientSecretToken));
   BasicRapporObservation obs;
-  EXPECT_EQ(expected_status, encoder.Encode("cat", &obs))
+  ValuePart value;
+  value.set_string_value("cat");
+  EXPECT_EQ(expected_status, encoder.Encode(value, &obs))
       << "Invoked from line number: " << caller_line_number;
 }
 
@@ -193,13 +199,13 @@ TEST(RapporEncoderTest, BasicRapporConfigValidation) {
   config.set_prob_1_stays_1(0.7);
   TEST_BASIC_RAPPOR_CONFIG(config, kInvalidConfig);
 
-  // Add one category: Valid.
-  config.add_category("cat");
-  TEST_BASIC_RAPPOR_CONFIG(config, kOK);
+  // Add one category: Invalid.
+  config.mutable_string_categories()->add_category("cat");
+  TEST_BASIC_RAPPOR_CONFIG(config, kInvalidConfig);
 
   // Add two more categories: Valid.
-  config.add_category("dog");
-  config.add_category("fish");
+  config.mutable_string_categories()->add_category("dog");
+  config.mutable_string_categories()->add_category("fish");
   TEST_BASIC_RAPPOR_CONFIG(config, kOK);
 
   // Explicitly set PRR to 0: Valid.
@@ -239,13 +245,38 @@ TEST(RapporEncoderTest, BasicRapporConfigValidation) {
   TEST_BASIC_RAPPOR_CONFIG(config, kOK);
 
   // Add an empty category: Invalid
-  config.add_category("");
+  config.mutable_string_categories()->add_category("");
   TEST_BASIC_RAPPOR_CONFIG(config, kInvalidConfig);
 
   // Test with an invalid ClientSecret
   BasicRapporEncoder encoder(config, ClientSecret::FromToken("Invalid Token"));
   BasicRapporObservation obs;
-  EXPECT_EQ(kInvalidConfig, encoder.Encode("dummy", &obs));
+  ValuePart value;
+  value.set_string_value("dummy");
+  EXPECT_EQ(kInvalidConfig, encoder.Encode(value, &obs));
+}
+
+// Test Config Validation with integer categories
+TEST(RapporEncoderTest, BasicRapporWithIntsConfigValidation) {
+  // Create a config with three integer categories.
+  BasicRapporConfig config;
+  config.set_prob_0_becomes_1(0.3);
+  config.set_prob_1_stays_1(0.7);
+  config.mutable_int_range_categories()->set_first(-1);
+  config.mutable_int_range_categories()->set_last(1);
+
+  // Construct the encoder
+  BasicRapporEncoder encoder(config, ClientSecret::GenerateNewSecret());
+
+  // Perform an encode with a value equal to one of the listed categories
+  BasicRapporObservation obs;
+  ValuePart value;
+  value.set_int_value(-1);
+  EXPECT_EQ(kOK, encoder.Encode(value, &obs));
+
+  // Perform an encode with a value not equal to one of the listed categories
+  value.set_int_value(2);
+  EXPECT_EQ(kInvalidInput, encoder.Encode(value, &obs));
 }
 
 // Returns whether or not the bit with the given |bit_index| is set in
@@ -359,7 +390,7 @@ void DoBasicRapporNoRandomnessTest(int num_categories, bool q_is_one) {
   config.set_prob_0_becomes_1(p);
   config.set_prob_1_stays_1(q);
   for (int i = 0; i < num_categories; i++) {
-    config.add_category(CategoryName(i));
+    config.mutable_string_categories()->add_category(CategoryName(i));
   }
 
   // Construct a BasicRapporEncoder.
@@ -377,7 +408,9 @@ void DoBasicRapporNoRandomnessTest(int num_categories, bool q_is_one) {
   BasicRapporObservation obs;
   for (int i = 0; i < num_categories; i++) {
     auto category_name = CategoryName(i);
-    ASSERT_EQ(kOK, encoder.Encode(category_name, &obs)) << category_name;
+    ValuePart value;
+    value.set_string_value(category_name);
+    ASSERT_EQ(kOK, encoder.Encode(value, &obs)) << category_name;
     auto expected_pattern = BuildBitPatternString(expected_num_bits, i,
         index_char, other_char);
     EXPECT_EQ(DataToBinaryString(obs.data()), expected_pattern);
@@ -388,9 +421,9 @@ void DoBasicRapporNoRandomnessTest(int num_categories, bool q_is_one) {
 // the values of p and q are either 0 or 1 so that there is no randomness
 // involved in the encoded string.
 TEST(BasicRapporEncoderTest, NoRandomness) {
-  // We test with between 1 and 50 categories.
-  for (int num_categories = 1; num_categories <=50; num_categories++) {
-    // We test all 4 modes. See comments at DoBasicRapporNoRandomnessTest.
+  // We test with between 2 and 50 categories.
+  for (int num_categories = 2; num_categories <=50; num_categories++) {
+    // See comments at DoBasicRapporNoRandomnessTest.
     DoBasicRapporNoRandomnessTest(num_categories, true);
     DoBasicRapporNoRandomnessTest(num_categories, false);
   }
@@ -406,7 +439,7 @@ class BasicRapporDeterministicTest : public ::testing::Test {
     config.set_prob_0_becomes_1(prob_0_becomes_1);
     config.set_prob_1_stays_1(prob_1_stays_1);
     for (int i = 0; i < num_categories; i++) {
-      config.add_category(CategoryName(i));
+      config.mutable_string_categories()->add_category(CategoryName(i));
     }
 
     // Construct a BasicRapporEncoder.
@@ -448,7 +481,9 @@ class BasicRapporDeterministicTest : public ::testing::Test {
     std::vector<int> counts(num_categories, 0);
     for (size_t i = 0; i < kNumTrials; i++) {
       obs.Clear();
-      EXPECT_EQ(kOK, encoder->Encode(category_name, &obs));
+      ValuePart value;
+      value.set_string_value(category_name);
+      EXPECT_EQ(kOK, encoder->Encode(value, &obs));
       for (int bit_index = 0; bit_index < num_categories; bit_index++) {
         if (IsSet(obs.data(), bit_index)) {
           counts[bit_index]++;
@@ -513,7 +548,7 @@ TEST_F(BasicRapporDeterministicTest, ChiSquaredTest) {
   // keep the testing time reasonable we don't test every combination but
   // rather step through the num_categories by 7 and use at most 3 selected
   // categories for each num_categories.
-  for (int num_categories = 1; num_categories < 40; num_categories+=7) {
+  for (int num_categories = 2; num_categories < 40; num_categories+=7) {
     for (int selected_category = 0; selected_category < num_categories;
         selected_category+=(num_categories/3 + 1)) {
       // The first two parameters are p and q.
@@ -538,8 +573,8 @@ TEST(BasicRapporEncoderTest, BadCategory) {
   BasicRapporConfig config;
   config.set_prob_0_becomes_1(0.3);
   config.set_prob_1_stays_1(0.7);
-  config.add_category("dog");
-  config.add_category("cat");
+  config.mutable_string_categories()->add_category("dog");
+  config.mutable_string_categories()->add_category("cat");
 
   // Construct a BasicRapporEncoder.
   static const std::string kClientSecretToken =
@@ -550,7 +585,9 @@ TEST(BasicRapporEncoderTest, BadCategory) {
   // Attempt to encode a string that is not one of the categories. Expect
   // to receive kInvalidInput.
   BasicRapporObservation obs;
-  EXPECT_EQ(kInvalidInput, encoder.Encode("fish", &obs));
+  ValuePart value;
+  value.set_string_value("fish");
+  EXPECT_EQ(kInvalidInput, encoder.Encode(value, &obs));
 }
 
 }  // namespace rappor

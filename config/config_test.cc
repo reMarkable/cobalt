@@ -136,7 +136,7 @@ TEST(EncodingRegistryFromFile, ValidFile) {
       "config/test_files/registered_encodings_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(4, registry->size());
+  EXPECT_EQ(5, registry->size());
 
   // (1, 1, 1) Should be Forculus 20
   auto* encoding_config = registry->Get(1, 1, 1);
@@ -146,12 +146,21 @@ TEST(EncodingRegistryFromFile, ValidFile) {
   encoding_config = registry->Get(1, 1, 2);
   EXPECT_FLOAT_EQ(0.8, encoding_config->rappor().prob_1_stays_1());
 
-  // (1, 1, 3) Should be not present
-  EXPECT_EQ(nullptr, registry->Get(1, 1, 3));
+  // (1, 1, 3) Should be Basic RAPPOR with integer categories
+  encoding_config = registry->Get(1, 1, 3);
+  int64_t num_categories =
+      encoding_config->basic_rappor().int_range_categories().last() -
+      encoding_config->basic_rappor().int_range_categories().first() + 1;
+  EXPECT_EQ(3, num_categories);
 
-  // (2, 1, 1) Should be Basic RAPPOR
+
+  // (1, 1, 4) Should be not present
+  EXPECT_EQ(nullptr, registry->Get(1, 1, 4));
+
+  // (2, 1, 1) Should be Basic RAPPOR with string categories
   encoding_config = registry->Get(2, 1, 1);
-  EXPECT_EQ(3, encoding_config->basic_rappor().category_size());
+  EXPECT_EQ(3,
+      encoding_config->basic_rappor().string_categories().category_size());
 }
 
 // Tests MetricRegistry::FromFile() on a fully valid file.

@@ -15,6 +15,7 @@
 #include "algorithms/rappor/rappor_encoder.h"
 
 #include <map>
+#include <vector>
 
 #include "util/crypto_util/random.h"
 
@@ -46,6 +47,58 @@ bool CommonValidate(float prob_0_becomes_1, float prob_1_stays_1, float prob_rr,
     return false;
   }
   return true;
+}
+
+// Extracts the categories from |config|. We support both string and integer
+// categories. In order to handle these two cases uniformly, we use as the
+// canonical identifier for a category a std::string containing the serialized
+// bytes of a |ValuePart| that contains the string or int value of the category.
+// There is one exception to this: If a category is the empty string then we
+// represent that category as the empty string. This is so that we can easily
+// identify the empty string which we want to do because it is invalid as
+// a category. Returns an empty vector if |config| does not contain either
+// string or int categories.
+std::vector<std::string> Categories(const BasicRapporConfig& config) {
+  std::vector<std::string> categories;
+  switch (config.categories_case()) {
+    case BasicRapporConfig::kStringCategories: {
+      size_t num_categories = config.string_categories().category_size();
+      if (num_categories <=1 || num_categories >= 1024) {
+        // Return an empty vector to indicate an error.
+        return categories;
+      }
+      for (auto category : config.string_categories().category()) {
+        if (category.empty()) {
+          categories.push_back("");
+        } else {
+          ValuePart value_part;
+          value_part.set_string_value(category);
+          std::string serialized_value_part;
+          value_part.SerializeToString(&serialized_value_part);
+          categories.push_back(serialized_value_part);
+        }
+      }
+    } break;
+    case BasicRapporConfig::kIntRangeCategories: {
+      int64_t first = config.int_range_categories().first();
+      int64_t last = config.int_range_categories().last();
+      int64_t num_categories = last - first + 1;
+      if (last <= first || num_categories >= 1024) {
+        // Return an empty vector to indicate an error.
+        return categories;
+      }
+      for (int64_t category = first; category <= last; category++) {
+        ValuePart value_part;
+        value_part.set_int_value(category);
+        std::string serialized_value_part;
+        value_part.SerializeToString(&serialized_value_part);
+        categories.push_back(serialized_value_part);
+      }
+    } break;
+    default:
+      break;
+  }
+  return categories;
 }
 }  // namespace
 
@@ -81,7 +134,7 @@ class RapporConfigValidator {
                                  const ClientSecret& client_secret) :
       prob_0_becomes_1_(config.prob_0_becomes_1()),
       prob_1_stays_1_(config.prob_1_stays_1()),
-      num_bits_(config.category_size()),
+      num_bits_(0),
       num_hashes_(0),
       num_cohorts_(1) {
     valid_ = false;
@@ -89,13 +142,15 @@ class RapporConfigValidator {
                       client_secret)) {
       return;
     }
+    std::vector<std::string> categories = Categories(config);
+    num_bits_ = categories.size();
     if (num_bits_ < 1) {
       return;
     }
 
     // Insert all of the categories into the map.
     size_t index = 0;
-    for (auto category : config.category()) {
+    for (auto category : categories) {
       if (category.empty()) {
         return;
       }
@@ -127,7 +182,7 @@ class RapporConfigValidator {
   // Returns the bit-index of |category| or -1 if |category| is not one of the
   // basic RAPPOR categories (or if this object was not initialized with a
   // BasicRapporConfig.)
-  size_t bit_index(const std::string& category) {
+  int bit_index(const std::string& category) {
     auto iterator = category_to_bit_index_.find(category);
     if (iterator == category_to_bit_index_.end()) {
       return -1;
@@ -157,7 +212,7 @@ RapporEncoder::RapporEncoder(const RapporConfig& config,
 
 RapporEncoder::~RapporEncoder() {}
 
-Status RapporEncoder::Encode(const std::string& value,
+Status RapporEncoder::Encode(const ValuePart& value,
                              RapporObservation *observation_out) {
   if (!config_->valid()) {
     return kInvalidConfig;
@@ -165,7 +220,7 @@ Status RapporEncoder::Encode(const std::string& value,
 
   // TODO(rudominer) Replace this with a real implementation.
   observation_out->set_cohort(42);
-  observation_out->set_data(value);
+  observation_out->set_data(value.string_value());
   return kOK;
 }
 
@@ -177,24 +232,27 @@ BasicRapporEncoder::BasicRapporEncoder(const BasicRapporConfig& config,
 
 BasicRapporEncoder::~BasicRapporEncoder() {}
 
-Status BasicRapporEncoder::Encode(const std::string& value,
+Status BasicRapporEncoder::Encode(const ValuePart& value,
     BasicRapporObservation *observation_out) {
   if (!config_->valid()) {
     return kInvalidConfig;
   }
-  size_t bit_index = config_->bit_index(value);
+  std::string serialized_value;
+  value.SerializeToString(&serialized_value);
+  size_t bit_index = config_->bit_index(serialized_value);
   if (bit_index == -1) {
     return kInvalidInput;
   }
 
   uint32_t num_bits = config_->num_bits();
-  uint32_t num_bytes = num_bits/8 + (num_bits % 8 == 0 ? 0 : 1);
+  uint32_t num_bytes = (num_bits + 7) / 8;
 
   // Indexed from the right, i.e. the least-significant bit.
   uint32_t byte_index = bit_index / 8;
   uint32_t bit_in_byte_index = bit_index % 8;
 
   // Initialize data to a string of all zero bytes.
+  // (The C++ Protocol Buffer API uses string to represent an array of bytes.)
   std::string data(num_bytes, static_cast<char>(0));
 
   // Set the appropriate bit.

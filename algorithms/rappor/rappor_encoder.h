@@ -46,7 +46,7 @@ class RapporEncoder {
 
   // Encodes |value| using RAPPOR encoding. Returns kOK on success, or
   // kInvalidConfig if the |config| passed to the constructor is not valid.
-  Status Encode(const std::string& value,
+  Status Encode(const ValuePart& value,
                 RapporObservation *observation_out);
 
  private:
@@ -76,7 +76,7 @@ class BasicRapporEncoder {
   // that was passed to the constructor. Returns kOK on success, kInvalidConfig
   // if the |config| passed to the constructor is not valid, and kInvalidInput
   // if |value| is not one of the |categories|.
-  Status Encode(const std::string& value,
+  Status Encode(const ValuePart& value,
                 BasicRapporObservation *observation_out);
 
  private:

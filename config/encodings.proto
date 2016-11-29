@@ -81,6 +81,24 @@ message RapporConfig {
   float prob_rr = 6;
 }
 
+// A list of categories to be used in Basic RAPPOR for a metric part of
+// type STRING. They must be distinct, non-empty strings and the number
+// of categories, k, must satisfy 1 < k < 1024. The zero-based index of a
+// category in the list is its bit position in the encoding.
+message StringCategories {
+  repeated string category = 1;
+}
+
+// A range of integer categories to be used in Basic RAPPOR for a metric part of
+// type INT. The categories are those integers in the range [first, last].
+// The number of categories, k = last - first + 1, must satisfy
+// 1 < k < 1024. If i is an integer in the range [first, last] then the bit
+// position of category i in the encoding is i - first.
+message IntRangeCategories {
+  int64 first = 1;
+  int64 last = 2;
+}
+
 message BasicRapporConfig {
   // All probabilities below must be in the range [0.0, 1.0].
 
@@ -98,11 +116,13 @@ message BasicRapporConfig {
   float prob_rr = 3;
 
   // For basic RAPPOR the Encoder needs to know the list of categories.
-  // The categories are indexed from 0 to n - 1 where n is the number
-  // of categories. The index of a category determines its bit position in
-  // the encoding. The categories are listed here in index order.
-  // They must be distinct, non-empty strings.
-  repeated string category= 7;
+  // For encoding metric parts of type STRING |string_categories| should be used
+  // and for encoding metric parts of type INT |int_range_categories| should be
+  // used.
+  oneof categories {
+    StringCategories string_categories = 7;
+    IntRangeCategories int_range_categories = 8;
+  }
 }
 
 message EncodingConfig {

@@ -74,9 +74,9 @@ int main(int argc, char *argv[]) {
   auto* basic_rappor_config = encoding_config->mutable_basic_rappor();
   basic_rappor_config->set_prob_0_becomes_1(0.1);
   basic_rappor_config->set_prob_1_stays_1(0.9);
-  basic_rappor_config->add_category("dog");
-  basic_rappor_config->add_category("cat");
-  basic_rappor_config->add_category("fish");
+  basic_rappor_config->mutable_string_categories()->add_category("dog");
+  basic_rappor_config->mutable_string_categories()->add_category("cat");
+  basic_rappor_config->mutable_string_categories()->add_category("fish");
 
   // (2, 1, 2) Forculus 50 with DAY epoch
   encoding_config = registered_encodings.add_element();
