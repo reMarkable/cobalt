@@ -17,7 +17,7 @@ set(PROTOC ${GO_PATH} protoc)
 
 file(MAKE_DIRECTORY ${GO_PROTO_GEN})
 
-# generate the go bindings for shuffler proto
+# generate the bindings for shuffler proto
 set(SHUFFLER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/shuffler.pb.go")
 set(ANALYZER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/analyzer.pb.go")
 set(CONFIG_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/config.pb.go")
@@ -32,6 +32,9 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
             -I ${CMAKE_CURRENT_SOURCE_DIR}
             -I ${CMAKE_SOURCE_DIR}/third_party/go/src
             --go_out=plugins=grpc:${GO_PROTO_GEN}/cobalt
+            --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
+            --grpc_out=${CMAKE_BINARY_DIR}
+            --cpp_out=${CMAKE_BINARY_DIR}
     # protoc-gen-go compiler automatically generates the files keeping the
     # directory structure intact in the final output. But this causes runtime
     # errors, so moving all generated files under cobalt package.
@@ -66,6 +69,12 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shuffler_main.go
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+# Build the protobuf/gRPC c++ library for accessing the shuffler
+set_source_files_properties(shuffler.grpc.pb.cc shuffler.pb.cc
+                            PROPERTIES GENERATED TRUE)
+
+add_library(cobalt_shuffler shuffler.grpc.pb.cc shuffler.pb.cc)
 
 # Build shuffler test tools
 set(TEST_CLIENT_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler_test_client")

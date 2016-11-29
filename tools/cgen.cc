@@ -28,6 +28,7 @@
 
 #include "algorithms/forculus/forculus_encrypter.h"
 #include "analyzer/analyzer_service.h"
+#include "shuffler/shuffler.grpc.pb.h"
 #include "config/encodings.pb.h"
 #include "./observation.pb.h"
 
@@ -36,6 +37,9 @@ using cobalt::analyzer::Analyzer;
 using cobalt::analyzer::ObservationBatch;
 using cobalt::encoder::ClientSecret;
 using cobalt::forculus::ForculusEncrypter;
+using cobalt::shuffler::Envelope;
+using cobalt::shuffler::Shuffler;
+using cobalt::shuffler::ShufflerResponse;
 using cobalt::util::CalendarDate;
 using grpc::Channel;
 using grpc::ClientContext;
@@ -45,9 +49,12 @@ using google::protobuf::Empty;
 namespace cobalt {
 namespace cgen {
 
+const int kShufflerPort = 50051;
+
 DEFINE_string(analyzer, "", "Analyzer IP");
+DEFINE_string(shuffler, "", "Shuffler IP");
 DEFINE_int32(num_rpcs, 1, "Number of RPCs to send");
-DEFINE_int32(num_observations, 1, "Number of Observations per RPC");
+DEFINE_int32(num_observations, 1, "Number of Observations to generate");
 DEFINE_string(payload, "hello", "Observation payload");
 
 // Measures time between start and stop.  Useful for benchmarking.
@@ -84,6 +91,13 @@ class Timer {
   uint64_t stop_;
 };  // class Timer
 
+// Encapsulates Observations.
+struct GenObservation {
+  Observation observation;
+  EncryptedMessage encrypted;
+  ObservationMetadata metadata;
+};
+
 // Generates observations and RPCs to Cobalt components
 class CGen {
  public:
@@ -98,7 +112,9 @@ class CGen {
   void start() {
     generate_observations();
 
-    if (FLAGS_analyzer != "")
+    if (FLAGS_shuffler != "")
+      send_shuffler();
+    else if (FLAGS_analyzer != "")
       send_analyzer();
   }
 
@@ -106,6 +122,15 @@ class CGen {
   // Creates a bunch of fake observations that can be sent to shufflers or
   // analyzers.
   void generate_observations() {
+    // Metadata setup.
+    ObservationMetadata metadata;
+
+    metadata.set_customer_id(customer_id_);
+    metadata.set_project_id(project_id_);
+    metadata.set_metric_id(metric_id_);
+    metadata.set_day_index(4);
+
+    // Forculus encode the observations.
     ForculusConfig config;
     ClientSecret client_secret = ClientSecret::GenerateNewSecret();
 
@@ -132,7 +157,23 @@ class CGen {
       // single-dimension metrics.  Using DEFAULT for now.
       (*obs.mutable_parts())[part_name_] = part;
 
-      observations_.push_back(obs);
+      // Encrypt the observation.
+      std::string cleartext, encrypted;
+
+      obs.SerializeToString(&cleartext);
+      encrypt(cleartext, &encrypted);
+
+      EncryptedMessage em;
+
+      em.set_ciphertext(encrypted);
+
+      // Add this to the list of fake observations.
+      GenObservation o;
+      o.observation = obs;
+      o.encrypted = em;
+      o.metadata = metadata;
+
+      observations_.push_back(o);
     }
   }
 
@@ -152,19 +193,12 @@ class CGen {
     ObservationBatch req;
     ObservationMetadata* metadata = req.mutable_meta_data();
 
-    metadata->set_customer_id(customer_id_);
-    metadata->set_project_id(project_id_);
-    metadata->set_metric_id(metric_id_);
-    metadata->set_day_index(4);
-
-    for (const Observation& observation : observations_) {
-      std::string cleartext, encrypted;
-
-      observation.SerializeToString(&cleartext);
-      encrypt(cleartext, &encrypted);
+    for (const GenObservation& observation : observations_) {
+      // Assume all observations have the same metadata.
+      *metadata = observation.metadata;
 
       EncryptedMessage* msg = req.add_encrypted_observation();
-      msg->set_ciphertext(encrypted);
+      *msg = observation.encrypted;
     }
 
     // send RPCs
@@ -187,6 +221,73 @@ class CGen {
            t.elapsed() / 1000UL, FLAGS_num_rpcs);
   }
 
+  void send_shuffler() {
+    char dst[1024];
+
+    snprintf(dst, sizeof(dst), "%s:%d", FLAGS_shuffler.c_str(), kShufflerPort);
+
+    std::shared_ptr<Channel> chan =
+        grpc::CreateChannel(dst, grpc::InsecureChannelCredentials());
+
+    std::unique_ptr<Shuffler::Stub> shuffler(Shuffler::NewStub(chan));
+
+    // Build analyzer URL.
+    snprintf(dst, sizeof(dst), "%s:%d", FLAGS_analyzer.c_str(), kAnalyzerPort);
+
+    // Build the messages to send to the shuffler.
+    std::vector<EncryptedMessage> messages;
+
+    for (const GenObservation& observation : observations_) {
+      Envelope envelope;
+
+      envelope.set_allocated_observation_meta_data(
+          new ObservationMetadata(observation.metadata));
+
+      envelope.set_allocated_encrypted_message(
+          new EncryptedMessage(observation.encrypted));
+
+      envelope.set_recipient_url(dst);
+
+      // Encrypt the envelope.
+      std::string cleartext, encrypted;
+
+      envelope.SerializeToString(&cleartext);
+      encrypt(cleartext, &encrypted);
+
+      EncryptedMessage em;
+      em.set_ciphertext(encrypted);
+
+      messages.push_back(em);
+    }
+
+    // send RPCs.
+    Timer t;
+    t.start();
+
+    auto msg_iter = messages.begin();
+
+    if (msg_iter == messages.end())
+      LOG(FATAL) << "Need messags";
+
+    for (int i = 0; i < FLAGS_num_rpcs; i++) {
+      ClientContext context;
+      ShufflerResponse resp;
+
+      Status status = shuffler->Process(&context, *msg_iter, &resp);
+
+      if (!status.ok())
+        errx(1, "error sending RPC: %s", status.error_message().c_str());
+
+      if (++msg_iter == messages.end())
+        msg_iter = messages.begin();
+    }
+
+    t.stop();
+
+    printf("Took %lu ms for %d requests\n",
+           t.elapsed() / 1000UL, FLAGS_num_rpcs);
+  }
+
   void encrypt(const std::string& in, std::string* out) {
     // TODO(pseudorandom): please implement
     *out = in;
@@ -196,7 +297,7 @@ class CGen {
   int project_id_;
   int metric_id_;
   std::string part_name_;
-  std::vector<Observation> observations_;
+  std::vector<GenObservation> observations_;
 };  // class CGen
 
 }  // namespace cgen

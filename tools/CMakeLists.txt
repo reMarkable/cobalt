@@ -13,4 +13,6 @@
 # limitations under the License.
 
 add_executable(cgen cgen.cc)
-target_link_libraries(cgen cobalt_analyzer forculus_encrypter gflags)
+
+target_link_libraries(cgen cobalt_analyzer cobalt_shuffler forculus_encrypter
+                      gflags)

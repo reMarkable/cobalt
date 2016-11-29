@@ -14,19 +14,19 @@
 
 # Build functional tests
 set(FUNCTIONAL_TESTS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-set(ANALYZER_BIGTABLE_TEST_SRC
-    "${FUNCTIONAL_TESTS_SRC}/analyzer_bigtable_test.go")
-set(ANALYZER_BIGTABLE_TEST_BIN ${GO_TESTS}/analyzer_bigtable_test)
+set(COBALT_TEST_SRC
+    "${FUNCTIONAL_TESTS_SRC}/cobalt_test.go")
+set(COBALT_TEST_BIN ${GO_TESTS}/cobalt_test)
 
-add_custom_command(OUTPUT ${ANALYZER_BIGTABLE_TEST_BIN}
-    COMMAND ${GO_BIN} test -c -o ${ANALYZER_BIGTABLE_TEST_BIN}
-            ${ANALYZER_BIGTABLE_TEST_SRC}
-    DEPENDS ${ANALYZER_BIGTABLE_TEST_SRC}
+add_custom_command(OUTPUT ${COBALT_TEST_BIN}
+    COMMAND ${GO_BIN} test -c -o ${COBALT_TEST_BIN}
+            ${COBALT_TEST_SRC}
+    DEPENDS ${COBALT_TEST_SRC}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 add_custom_target(test_all ALL
-      DEPENDS ${ANALYZER_BIGTABLE_TEST_BIN}
+      DEPENDS ${COBALT_TEST_BIN}
 )
 
 add_executable(bigtable_test ${FUNCTIONAL_TESTS_SRC}/bigtable_test.cc)

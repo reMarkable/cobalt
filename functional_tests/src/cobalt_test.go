@@ -85,11 +85,44 @@ func (f *BigtableFixture) Close() {
 	f.cmd.Wait()
 }
 
+func (f *BigtableFixture) CountRows() int {
+	ctx := context.Background()
+	client, _ := bigtable.NewClient(ctx, f.project, f.instance)
+	defer client.Close()
+	tbl := client.Open(f.table)
+
+	count := 0
+	err := tbl.ReadRows(ctx, bigtable.InfiniteRange(""),
+		func(row bigtable.Row) bool {
+			count++
+			return true
+		})
+	if err != nil {
+		return -1
+	}
+
+	return count
+}
+
 // This fixture stands up the Analyzer.  It depends on Bigtable being up.
 type AnalyzerFixture struct {
 	cmd      *exec.Cmd
 	cgen     string
+	outdir   string
 	bigtable *BigtableFixture
+}
+
+func DaemonStarted(dst string) bool {
+	for i := 0; i < 10; i++ {
+		conn, err := net.Dial("tcp", dst)
+		if err == nil {
+			conn.Close()
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	return false
 }
 
 func NewAnalyzerFixture() (*AnalyzerFixture, error) {
@@ -103,8 +136,8 @@ func NewAnalyzerFixture() (*AnalyzerFixture, error) {
 	f := new(AnalyzerFixture)
 	f.bigtable = bigtable
 
-	out := filepath.Join(filepath.Dir(os.Args[0]), "../../out")
-	abin := filepath.Join(out, "/analyzer/analyzer")
+	f.outdir = filepath.Join(filepath.Dir(os.Args[0]), "../../out")
+	abin := filepath.Join(f.outdir, "/analyzer/analyzer")
 
 	table := fmt.Sprintf("projects/%v/instances/%v/tables/%v",
 		bigtable.project, bigtable.instance, bigtable.table)
@@ -115,24 +148,13 @@ func NewAnalyzerFixture() (*AnalyzerFixture, error) {
 	f.cmd.Start()
 
 	// Wait for it to start
-	success := false
-	for i := 0; i < 10; i++ {
-		conn, err := net.Dial("tcp", "127.0.0.1:8080")
-		if err == nil {
-			success = true
-			conn.Close()
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	if !success {
+	if !DaemonStarted("127.0.0.1:8080") {
 		f.Close()
-		return nil, errors.New("Can't connect")
+		return nil, errors.New("Unable to start the analyzer")
 	}
 
 	// get path to cgen
-	f.cgen = filepath.Join(out, "/tools/cgen")
+	f.cgen = filepath.Join(f.outdir, "/tools/cgen")
 
 	return f, nil
 }
@@ -141,6 +163,44 @@ func (f *AnalyzerFixture) Close() {
 	f.cmd.Process.Kill()
 	f.cmd.Wait()
 	f.bigtable.Close()
+}
+
+// Fixture to start the Shuffler.  It depends on the Analyzer fixture, which in
+// turn depends on the Bigtable fixture.  The Shuffler fixture will start the
+// entire backend system.
+type ShufflerFixture struct {
+	cmd      *exec.Cmd
+	analyzer *AnalyzerFixture
+}
+
+func NewShufflerFixture() (*ShufflerFixture, error) {
+	// Create Analyzer first
+	analyzer, err := NewAnalyzerFixture()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the Shuffler
+	f := new(ShufflerFixture)
+	f.analyzer = analyzer
+
+	bin := filepath.Join(f.analyzer.outdir, "shuffler/shuffler")
+
+	f.cmd = exec.Command(bin)
+	f.cmd.Start()
+
+	if !DaemonStarted("127.0.0.1:50051") {
+		f.Close()
+		return nil, errors.New("Unable to start the shuffler")
+	}
+
+	return f, nil
+}
+
+func (f *ShufflerFixture) Close() {
+	f.cmd.Process.Kill()
+	f.cmd.Wait()
+	f.analyzer.Close()
 }
 
 // This test depends on the AnalyzerFixture.
@@ -167,23 +227,63 @@ func TestAnalyzerAddObservations(t *testing.T) {
 	}
 
 	// Grab the observations from bigtable
-	ctx := context.Background()
-	client, _ := bigtable.NewClient(ctx, f.bigtable.project, f.bigtable.instance)
-	defer client.Close()
-	tbl := client.Open(f.bigtable.table)
-
-	count := 0
-	err = tbl.ReadRows(ctx, bigtable.InfiniteRange(""), func(row bigtable.Row) bool {
-		count++
-		return true
-	})
-	if err != nil {
-		t.Error("Can't read rows %v", err)
+	count := f.bigtable.CountRows()
+	if count == -1 {
+		t.Error("Can't read rows")
 		return
 	}
 
 	if count != num {
-		t.Error("Unexpected number of rows")
+		t.Errorf("Unexpected number of rows got %v want %v", count, num)
+		return
+	}
+}
+
+// This test depends on the ShufflerFixture.
+//
+// It uses cgen to create 2 fake reports.
+// It then asserts that 2 reports exist in Bigtable.
+func TestShufflerProcess(t *testing.T) {
+	// Start the entire system.
+	f, err := NewShufflerFixture()
+	if err != nil {
+		t.Error("Fixture failed:", err)
+		return
+	}
+	defer f.Close()
+
+	// Run cgen on the analyzer to create 2 observations
+	num := 2
+	cmd := exec.Command(f.analyzer.cgen,
+		"-shuffler", "127.0.0.1",
+		"-analyzer", "127.0.0.1",
+		"-num_observations", strconv.Itoa(num),
+		"-num_rpcs", strconv.Itoa(num))
+	if cmd.Run() != nil {
+		t.Error("cgen failed")
+		return
+	}
+
+	var rows int = 0
+
+	// The shuffler RPC is async so it could take a while before the data
+	// reaches bigtable.  Try multiple times.
+	for i := 0; i < 3; i++ {
+		rows = f.analyzer.bigtable.CountRows()
+		if rows == -1 {
+			t.Error("Can't read rows")
+			return
+		}
+
+		if rows == num {
+			break
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if rows != num {
+		t.Errorf("Unexpected number of rows got %v want %v", rows, num)
 		return
 	}
 }
