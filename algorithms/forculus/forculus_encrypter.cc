@@ -140,6 +140,14 @@ ForculusEncrypter::ForculusEncrypter(const ForculusConfig& config,
 
 ForculusEncrypter::~ForculusEncrypter() {}
 
+ForculusEncrypter::Status ForculusEncrypter::EncryptValue(
+    const ValuePart& value, const util::CalendarDate& observation_date,
+    ForculusObservation *observation_out) {
+  std::string serialized_value;
+  value.SerializeToString(&serialized_value);
+  return Encrypt(serialized_value, observation_date, observation_out);
+}
+
 ForculusEncrypter::Status ForculusEncrypter::Encrypt(
     const std::string& plaintext, const CalendarDate& observation_date,
     ForculusObservation *observation_out) {

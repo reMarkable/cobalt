@@ -48,6 +48,25 @@ ForculusObservation Encrypt(const std::string& plaintext) {
   return obs;
 }
 
+// This function is similar to the function Encrypt() above except that this
+// function invokes ForculusEncrypter::EncryptValue() instead of
+// ForculusEncrypter::Encrypt().
+ForculusObservation EncryptValue(const ValuePart& value) {
+  // Make a config with the given threshold
+  ForculusConfig config;
+  config.set_threshold(kThreshold);
+
+  // Construct an Encrypter.
+  ForculusEncrypter encrypter(config, 0, 0, 0, "",
+      ClientSecret::GenerateNewSecret());
+
+  // Invoke EncryptValue() and check the status.
+  ForculusObservation obs;
+  EXPECT_EQ(ForculusEncrypter::kOK,
+      encrypter.EncryptValue(value, CalendarDate(), &obs));
+  return obs;
+}
+
 // Simulates kThreshold different clients generating ciphertexts for the
 // same plaintext. Verifies that the plaintext will be properly decrypted.
 TEST(ForculusDecrypterTest, TestSuccessfulDecryption) {
@@ -65,6 +84,59 @@ TEST(ForculusDecrypterTest, TestSuccessfulDecryption) {
   std::string recovered_text;
   EXPECT_EQ(ForculusDecrypter::kOK, decrypter->Decrypt(&recovered_text));
   EXPECT_EQ(plaintext, recovered_text);
+}
+
+// This function is similar to TestSuccesfulDecryption above except that it
+// invokes EncryptValue() instead of Encrypt(). It is used in
+// TestValueDecryption below.
+void DoDecryptValueTest(const ValuePart& value) {
+  ForculusDecrypter* decrypter = nullptr;
+  for (int i = 0; i < kThreshold; i++) {
+    auto observation = EncryptValue(value);
+    if (!decrypter) {
+      decrypter = new ForculusDecrypter(kThreshold, observation.ciphertext());
+    } else {
+      EXPECT_EQ(decrypter->ciphertext(), observation.ciphertext());
+    }
+    decrypter->AddObservation(observation);
+  }
+  std::string recovered_text;
+  EXPECT_EQ(ForculusDecrypter::kOK, decrypter->Decrypt(&recovered_text));
+  ValuePart recovered_value;
+  recovered_value.ParseFromString(recovered_text);
+  switch (value.data_case()) {
+    case ValuePart::kStringValue:
+    EXPECT_EQ(value.string_value(), recovered_value.string_value());
+    break;
+
+    case ValuePart::kIntValue:
+    EXPECT_EQ(value.int_value(), recovered_value.int_value());
+    break;
+
+    case ValuePart::kBlobValue:
+    EXPECT_EQ(value.blob_value(), recovered_value.blob_value());
+    break;
+
+    default:
+    EXPECT_TRUE(false) << "unexpected case";
+  }
+}
+
+// This test is similar to TestSuccessfulDecryption but it uses the function
+// EncryptValue() instead of the function Encrypt()
+TEST(ForculusDecrypterTest, TestValueDecryption) {
+  ValuePart value;
+  // Test with a string value.
+  value.set_string_value("42");
+  DoDecryptValueTest(value);
+
+  // Test with an int value.
+  value.set_int_value(42);
+  DoDecryptValueTest(value);
+
+  // Test with a blob value.
+  value.set_blob_value("42");
+  DoDecryptValueTest(value);
 }
 
 // Verifies that ForculusDecrypter returns appropriate error statuses.

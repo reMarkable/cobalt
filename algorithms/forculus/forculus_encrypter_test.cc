@@ -187,6 +187,37 @@ TEST(ForculusEncrypterTest, SanityTest) {
   EXPECT_NE(obs1.point_y(), obs2.point_y());
 }
 
+
+// We sanity test the function EncryptValue().
+// See forculus_decrypter_test.cc for tests that involve decryption.
+TEST(ForculusEncrypterTest, EncryptValue) {
+  // Construct an Encrypter.
+  ForculusConfig config;
+  config.set_threshold(20);
+  ForculusEncrypter encrypter(config, 1, 1, 1, "",
+      ClientSecret::GenerateNewSecret());
+
+  // Construct three values.
+  ValuePart value1, value2, value3;
+  value1.set_int_value(42);
+  value2.set_string_value("42");
+  value3.set_blob_value("42");
+
+  // Invoke EncryptValue() three times.
+  ForculusObservation obs1, obs2, obs3;
+  EXPECT_EQ(ForculusEncrypter::kOK,
+    encrypter.EncryptValue(value1, CalendarDate(), &obs1));
+  EXPECT_EQ(ForculusEncrypter::kOK,
+    encrypter.EncryptValue(value2, CalendarDate(), &obs2));
+  EXPECT_EQ(ForculusEncrypter::kOK,
+    encrypter.EncryptValue(value3, CalendarDate(), &obs3));
+
+  // Check that the three observations have different ciphertexts.
+  EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());
+  EXPECT_NE(obs1.ciphertext(), obs3.ciphertext());
+  EXPECT_NE(obs2.ciphertext(), obs3.ciphertext());
+}
+
 }  // namespace forculus
 
 }  // namespace cobalt

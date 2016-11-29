@@ -84,6 +84,15 @@ class ForculusEncrypter {
                  const util::CalendarDate& observation_date,
                  ForculusObservation *observation_out);
 
+  // Serializes |value| into a plaintext string using standard protocol buffer
+  // serialization and then invokes Encrypt() on the serialized bytes.
+  //
+  // The Cobalt Encoder invokes this method rather than directly invoking
+  // Encrypt() in order to uniformly handle values of different data types.
+  Status EncryptValue(const ValuePart& value,
+                      const util::CalendarDate& observation_date,
+                      ForculusObservation *observation_out);
+
  private:
   std::unique_ptr<ForculusConfigValidator> config_;
   uint32_t customer_id_, project_id_, metric_id_;
