@@ -73,6 +73,19 @@ template<class RT> class Registry {
       FromFile(const std::string& file_path,
                google::protobuf::io::ErrorCollector* error_collector);
 
+  // Populates a new instance of Registry<T> by reading and parsing the
+  // specified string. Returns a pair consisting of a pointer to the result and
+  // a Status.
+  //
+  // If the operation is successful then the status is kOK. Otherwise the
+  // Status indicates the error.
+  //
+  // If |error_collector| is not null then it will be notified of any parsing
+  // errors or warnings.
+  static std::pair<std::unique_ptr<Registry<RT>>, Status>
+      FromString(const std::string& contents,
+                 google::protobuf::io::ErrorCollector* error_collector);
+
   // Returns the number of |T| in this registry.
   size_t size();
 
@@ -131,7 +144,7 @@ std::pair<std::unique_ptr<Registry<RT>>, Status>
     Registry<RT>::FromFile(const std::string& file_path,
         google::protobuf::io::ErrorCollector* error_collector) {
   // Make an empty registry to return;
-  auto registry = std::unique_ptr<Registry<RT>>(new Registry<RT>());
+  std::unique_ptr<Registry<RT>> registry(new Registry<RT>());
 
   // Try to open the specified file.
   int fd = open(file_path.c_str(), O_RDONLY);
@@ -149,6 +162,44 @@ std::pair<std::unique_ptr<Registry<RT>>, Status>
     parser.RecordErrorsTo(error_collector);
   }
   if (!parser.Parse(&file_input_stream, &registered_configs)) {
+    return std::make_pair(std::move(registry), kParsingError);
+  }
+
+  // Put all of the T's into the map, ensuring that the id triples
+  // are unique.
+  int num_configs = registered_configs.element_size();
+  for (int i = 0; i < num_configs; i++) {
+    T* config_proto = registered_configs.mutable_element(i);
+    // First build the key and insert an empty Tg into the map
+    // at that key.
+    auto pair = registry->map_.insert(std::make_pair(MakeKey(*config_proto),
+        std::unique_ptr<T>(new T())));
+    const bool& success = pair.second;
+    auto& inserted_pair = pair.first;
+    if (!success) {
+      return std::make_pair(std::move(registry), kDuplicateRegistration);
+    }
+    // Then swap in the data from the T;
+    inserted_pair->second->Swap(config_proto);
+  }
+  return std::make_pair(std::move(registry), kOK);
+}
+
+template<class RT>
+std::pair<std::unique_ptr<Registry<RT>>, Status>
+    Registry<RT>::FromString(const std::string& input,
+        google::protobuf::io::ErrorCollector* error_collector) {
+  // Make an empty registry to return;
+  std::unique_ptr<Registry<RT>> registry(new Registry<RT>());
+
+  // Try to parse the specified string
+  // The contents of the string should be a serialized |RT|.
+  RT registered_configs;
+  google::protobuf::TextFormat::Parser parser;
+  if (error_collector) {
+    parser.RecordErrorsTo(error_collector);
+  }
+  if (!parser.ParseFromString(input, &registered_configs)) {
     return std::make_pair(std::move(registry), kParsingError);
   }
 

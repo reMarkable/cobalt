@@ -49,15 +49,28 @@ class MetricRegistry {
       FromFile(const std::string& file_path,
                google::protobuf::io::ErrorCollector* error_collector);
 
+  // Populates a new instance of MetricRegistry by reading and parsing the
+  // specified string. Returns a pair consisting of a pointer to the result and
+  // a Status.
+  //
+  // If the operation is successful then the status is kOK. Otherwise the
+  // Status indicates the error.
+  //
+  // If |error_collector| is not null then it will be notified of any parsing
+  // errors or warnings.
+  static std::pair<std::unique_ptr<MetricRegistry>, Status>
+      FromString(const std::string& input,
+                 google::protobuf::io::ErrorCollector* error_collector);
+
   // Returns the number of Metrics in this registry.
   size_t size();
 
-  // Returns the MetricConfig with the given ID triple, or nullptr if there is
-  // no such MetricConfig. The caller does not take ownership of the returned
+  // Returns the Metric with the given ID triple, or nullptr if there is
+  // no such Metric. The caller does not take ownership of the returned
   // pointer.
-  const MetricConfig* const Get(uint32_t customer_id,
-                                uint32_t project_id,
-                                uint32_t id);
+  const Metric* const Get(uint32_t customer_id,
+                          uint32_t project_id,
+                          uint32_t id);
 };
 
 class ReportRegistry {
@@ -74,6 +87,19 @@ class ReportRegistry {
   static std::pair<std::unique_ptr<ReportRegistry>, Status>
       FromFile(const std::string& file_path,
                google::protobuf::io::ErrorCollector* error_collector);
+
+  // Populates a new instance of ReportRegistry by reading and parsing the
+  // specified string. Returns a pair consisting of a pointer to the result and a
+  // Status.
+  //
+  // If the operation is successful then the status is kOK. Otherwise the
+  // Status indicates the error.
+  //
+  // If |error_collector| is not null then it will be notified of any parsing
+  // errors or warnings.
+  static std::pair<std::unique_ptr<ReportRegistry>, Status>
+      FromString(const std::string& input,
+                 google::protobuf::io::ErrorCollector* error_collector);
 
   // Returns the number of Reports in this registry.
   size_t size();

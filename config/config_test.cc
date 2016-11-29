@@ -218,6 +218,79 @@ TEST(ReportRegistryFromFile, CheckRegisteredReports) {
   EXPECT_EQ(kOK, result.second);
 }
 
+//////////////  Tests of the FromString() functions. //////////////
+
+const char* kEncodingConfigText = R"(
+# EncodingConfig 1 is Forculus.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  forculus {
+    threshold: 20
+  }
+}
+
+# EncodingConfig 2 is String RAPPOR.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  rappor {
+    num_bloom_bits: 8
+    num_hashes: 2
+    num_cohorts: 20
+    prob_0_becomes_1: 0.25
+    prob_1_stays_1: 0.75
+  }
+}
+)";
+TEST(EncodingRegistryFromString, ValidString) {
+  auto result = EncodingRegistry::FromString(kEncodingConfigText, nullptr);
+  EXPECT_EQ(kOK, result.second);
+  auto& registry = result.first;
+  EXPECT_EQ(2, registry->size());
+}
+
+
+const char* kMetricConfigText = R"(
+# Metric 1 has one string part.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  parts {
+    key: "Part1"
+    value {
+    }
+  }
+}
+
+# Metric 2 has one String part and one int part.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  parts {
+    key: "city"
+    value {
+    }
+  }
+  parts {
+    key: "rating"
+    value {
+      data_type: INT
+    }
+  }
+}
+)";
+TEST(MetricRegistryFromString, ValidString) {
+  auto result = MetricRegistry::FromString(kMetricConfigText, nullptr);
+  EXPECT_EQ(kOK, result.second);
+  auto& registry = result.first;
+  EXPECT_EQ(2, registry->size());
+}
+
 }  // namespace config
 }  // namespace cobalt
 
