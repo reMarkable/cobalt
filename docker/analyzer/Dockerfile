@@ -15,6 +15,9 @@
 FROM cobalt
 
 COPY analyzer /usr/local/bin/
+COPY registered_encodings.txt /etc/cobalt/
+COPY registered_metrics.txt /etc/cobalt/
+COPY registered_reports.txt /etc/cobalt/
 
 ENTRYPOINT ["analyzer"]
 EXPOSE 8080

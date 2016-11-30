@@ -39,7 +39,8 @@ Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
                                             Empty* response) {
   // Add a row for every observation
   for (const EncryptedMessage& em : request->encrypted_observation()) {
-    std::string key = make_row_key(request->meta_data());
+    ObservationKey obs_key(request->meta_data());
+    std::string key = obs_key.MakeKey();
     std::string val;
 
     em.SerializeToString(&val);
@@ -50,25 +51,6 @@ Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
   }
 
   return Status::OK;
-}
-
-std::string AnalyzerServiceImpl::make_row_key(const ObservationMetadata& meta) {
-  char out[128];
-  cobalt::crypto::Random random;
-  uint64_t rnd = random.RandomUint64();
-  struct timeval tv;
-
-  gettimeofday(&tv, NULL);
-
-  snprintf(out, sizeof(out), "%.10u:%.10u:%.10u:%.10u:%.20lu:%.20lu",
-           meta.customer_id(),
-           meta.project_id(),
-           meta.metric_id(),
-           meta.day_index(),
-           tv.tv_sec * 1000000UL + tv.tv_usec,
-           rnd);
-
-  return std::string(out);
 }
 
 void AnalyzerServiceImpl::Start() {
@@ -91,6 +73,43 @@ void AnalyzerServiceImpl::Wait() {
   server_->Wait();
 }
 
+//
+// ObservationKey implementation
+//
+ObservationKey::ObservationKey(const ObservationMetadata& meta) {
+  customer_ = meta.customer_id();
+  project_ = meta.project_id();
+  metric_ = meta.metric_id();
+  day_ = meta.day_index();
+
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  rx_time_ = tv.tv_sec * 1000000UL + tv.tv_usec;
+
+  cobalt::crypto::Random random;
+  rnd_ = random.RandomUint64();
+}
+
+std::string ObservationKey::MakeKey() {
+  char out[128];
+
+  // TODO(bittau): the key should be binary (e.g., a big-endian encoding of the
+  // struct representing the key).  Right now it's human readable for easy
+  // debugging.
+  snprintf(out, sizeof(out), "%.10u:%.10u:%.10u:%.10u:%.20lu:%.20lu",
+           customer_,
+           project_,
+           metric_,
+           day_,
+           rx_time_,
+           rnd_);
+
+  return std::string(out);
+}
+
+//
+// Main entry point of the analyzer servie.
+//
 void analyzer_service_main() {
   LOG(INFO) << "Starting Analyzer service";
 

@@ -53,14 +53,42 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
                                google::protobuf::Empty* response) override;
 
  private:
-  // The row key is currently defined as:
-  // customer:project:metric:day:random
-  // Random is 64bit to try and avoid collisions on observations for the same
-  // day.
-  std::string make_row_key(const ObservationMetadata& metadata);
-
   std::unique_ptr<grpc::Server> server_;
   std::unique_ptr<Store> store_;
+};
+
+// The Observations table row key is currently defined as:
+// customer:project:metric:day:receive_time:random
+// Random is 64bit to try and avoid collisions on observations for the same
+// day received at the same time.
+class ObservationKey {
+ public:
+  ObservationKey() : customer_(0), project_(0), metric_(0), day_(0),
+                     rx_time_(0), rnd_(0) {}
+
+  explicit ObservationKey(const ObservationMetadata& metadata);
+
+  // This will initialize the key and all its parts to the maximum value.
+  // Individual parts can subsequently be set using the set_* calls.  This is
+  // useful for calculating the upperbound of a range.
+  void set_max() {
+    customer_ = project_ = metric_ = day_ = UINT32_MAX;
+    rx_time_ = rnd_ = UINT64_MAX;
+  }
+
+  void set_customer(uint32_t id) { customer_ = id; }
+  void set_project(uint32_t id) { project_ = id; }
+  void set_metric(uint32_t id) { metric_ = id; }
+
+  std::string MakeKey();
+
+ private:
+  uint32_t customer_;
+  uint32_t project_;
+  uint32_t metric_;
+  uint32_t day_;
+  uint64_t rx_time_;
+  uint64_t rnd_;
 };
 
 // This is the main method for the analyzer service.  This call blocks forever.

@@ -60,6 +60,35 @@ template<class RT> class Registry {
   typedef typename std::remove_pointer<decltype(
       (reinterpret_cast<RT*>(0))->mutable_element(0))>::type T;
 
+ private:
+  // The container for the registry.  The keys in this map are strings that
+  // encode ID triples of the form (customer_id, project_id, id).
+  typedef std::unordered_map<std::string, std::unique_ptr<T>> Map;
+
+ public:
+  // Iterator for going through registry items.  We just use the Map iterator
+  // but return only values (without keys).
+  class RegistryIterator {
+   public:
+    explicit RegistryIterator(const typename Map::iterator& iter)
+        : iter_(iter) {}
+
+    const T& operator*() const { return *iter_->second; }
+
+    bool operator!=(const RegistryIterator& rhs) const {
+      return iter_ != rhs.iter_;
+    }
+
+    const RegistryIterator& operator++() {
+      ++iter_;
+      return *this;
+    }
+
+   private:
+    typename Map::iterator iter_;
+  };
+  typedef RegistryIterator iterator;
+
   // Populates a new instance of Registry<T> by reading and parsing the
   // specified file. Returns a pair consisting of a pointer to the result and a
   // Status.
@@ -102,6 +131,10 @@ template<class RT> class Registry {
     return iterator->second.get();
   }
 
+  // Provide a mechansim to iterate through all registry items.
+  RegistryIterator begin() { return RegistryIterator(map_.begin()); }
+  RegistryIterator end() { return RegistryIterator(map_.end()); }
+
  private:
   // Builds a map key that encodes the triple (customer_id, project_id, id)
   static std::string MakeKey(uint32_t customer_id, uint32_t project_id,
@@ -112,7 +145,7 @@ template<class RT> class Registry {
 
   // The keys in this map are strings that encode ID triples of the form
   // (customer_id, project_id, id)
-  std::unordered_map<std::string, std::unique_ptr<T>> map_;
+  Map map_;
 };
 
 //////////////////////////////////////////////////////////////////

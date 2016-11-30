@@ -141,6 +141,14 @@ def _gce_build(args):
              ]:
     shutil.copy("%s/%s" % (SYSROOT_DIR, dep), cobalt)
 
+  # Copy configuration files
+  for conf in ["registered_metrics.txt",
+               "registered_encodings.txt",
+               "registered_reports.txt"
+              ]:
+    shutil.copy("%s/config/registered/%s" % (THIS_DIR, conf),
+                "%s/analyzer/" % OUT_DIR)
+
   # Build all images
   for i in ["cobalt"] + IMAGES:
     # copy over the dockerfile
@@ -171,8 +179,13 @@ def _gce_start(args):
     print("Starting %s" % i)
 
     if (i == "analyzer"):
+      args = ["-table", A_BT_TABLE_NAME,
+              "-metrics", "/etc/cobalt/registered_metrics.txt",
+              "-reports", "/etc/cobalt/registered_reports.txt",
+              "-encodings", "/etc/cobalt/registered_encodings.txt"]
+
       subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
-                             "--port=8080", "--", "-table", A_BT_TABLE_NAME])
+                             "--port=8080", "--"] + args)
     else:
       subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
                              "--port=50051"])

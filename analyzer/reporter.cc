@@ -26,13 +26,22 @@
 #include "analyzer/analyzer_service.h"
 #include "analyzer/reporter.h"
 #include "analyzer/store/store.h"
+#include "config/metric_config.h"
+#include "config/encoding_config.h"
 
 #include "./observation.pb.h"
 
 using cobalt::forculus::ForculusAnalyzer;
+using cobalt::config::EncodingRegistry;
+using cobalt::config::MetricRegistry;
+using cobalt::config::ReportRegistry;
 
 namespace cobalt {
 namespace analyzer {
+
+DEFINE_string(metrics, "", "Metrics definition file");
+DEFINE_string(reports, "", "Reports definition file");
+DEFINE_string(encodings, "", "Encodings definition file");
 
 // XXX TODO(bittau):
 //
@@ -50,33 +59,85 @@ namespace analyzer {
 class Reporter {
  public:
   explicit Reporter(std::unique_ptr<Store>&& store)
-      : store_(std::move(store)) {}
+      : metrics_(new MetricRegistry),
+        reports_(new ReportRegistry),
+        encodings_(new EncodingRegistry),
+        store_(std::move(store))
+        {}
 
   void Start() {
+    load_configuration();
+
     while (1) {
-      run_report();
+      run_reports();
       sleep(10);
     }
   }
 
  private:
-  void run_report() {
-      LOG(INFO) << "Report cycle";
+  void run_reports() {
+    LOG(INFO) << "Report cycle";
 
-      // Just dump the db for now
+    for (const ReportConfig& config : *reports_) {
+      run_report(config);
+    }
+  }
+
+  void load_configuration() {
+    if (FLAGS_metrics != "") {
+      auto metrics = MetricRegistry::FromFile(FLAGS_metrics, nullptr);
+      if (metrics.second != config::kOK)
+        LOG(FATAL) << "Can't load metrics configuration";
+
+      metrics_ = std::move(metrics.first);
+    }
+
+    if (FLAGS_reports != "") {
+      auto reports = ReportRegistry::FromFile(FLAGS_reports, nullptr);
+      if (reports.second != config::kOK)
+        LOG(FATAL) << "Can't load reports configuration";
+
+      reports_ = std::move(reports.first);
+    }
+
+    if (FLAGS_encodings != "") {
+      auto encodings = EncodingRegistry::FromFile(FLAGS_encodings, nullptr);
+      if (encodings.second != config::kOK)
+        LOG(FATAL) << "Can't load encodings configuration";
+
+      encodings_ = std::move(encodings.first);
+    }
+  }
+
+  void run_report(const ReportConfig& config) {
+      LOG(INFO) << "Running report " << config.name();
+
+      // Read the part of the DB pertinent to this report.
+      ObservationKey keys[2];  // start, end keys.
+
+      keys[1].set_max();
+
+      for (ObservationKey& key : keys) {
+        key.set_customer(config.customer_id());
+        key.set_project(config.project_id());
+        key.set_metric(config.metric_id());
+      }
+
       std::map<std::string, std::string> db;
-      int rc = store_->get_range("", "", &db);
+      int rc = store_->get_range(keys[0].MakeKey(), keys[1].MakeKey(), &db);
 
       if (rc != 0) {
         LOG(ERROR) << "get_range() error: " << rc;
         return;
       }
 
-      // Try to decode forculus strings
-      ForculusConfig config;
-      config.set_threshold(10);
+      LOG(INFO) << "Observations found: " << db.size();
 
-      ForculusAnalyzer forculus(config);
+      // Try to decode forculus strings
+      ForculusConfig forculus_conf;
+      forculus_conf.set_threshold(10);
+
+      ForculusAnalyzer forculus(forculus_conf);
 
       for (auto& i : db) {
         EncryptedMessage em;
@@ -128,6 +189,9 @@ class Reporter {
     return true;
   }
 
+  std::unique_ptr<MetricRegistry> metrics_;
+  std::unique_ptr<ReportRegistry> reports_;
+  std::unique_ptr<EncodingRegistry> encodings_;
   std::unique_ptr<Store> store_;
 };
 

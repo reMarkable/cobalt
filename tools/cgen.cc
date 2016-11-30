@@ -54,6 +54,9 @@ DEFINE_string(analyzer, "", "Analyzer IP");
 DEFINE_string(shuffler, "", "Shuffler IP");
 DEFINE_int32(num_rpcs, 1, "Number of RPCs to send");
 DEFINE_int32(num_observations, 1, "Number of Observations to generate");
+DEFINE_uint32(customer, 1, "Customer ID");
+DEFINE_uint32(project, 1, "Project ID");
+DEFINE_uint32(metric, 1, "Metric ID");
 DEFINE_string(payload, "hello", "Observation payload");
 
 // Measures time between start and stop.  Useful for benchmarking.
@@ -100,12 +103,16 @@ struct GenObservation {
 // Generates observations and RPCs to Cobalt components
 class CGen {
  public:
-  CGen() : customer_id_(1), project_id_(2), metric_id_(3), part_name_("DEFAULT")
+  CGen() : part_name_("DEFAULT")
            {}
 
   void setup(int argc, char *argv[]) {
     google::SetUsageMessage("Cobalt gRPC generator");
     google::ParseCommandLineFlags(&argc, &argv, true);
+
+    customer_id_ = FLAGS_customer;
+    project_id_ = FLAGS_project;
+    metric_id_ = FLAGS_metric;
   }
 
   void start() {
