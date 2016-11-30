@@ -22,7 +22,6 @@
 #include "./observation.pb.h"
 #include "config/encodings.pb.h"
 #include "encoder/client_secret.h"
-#include "util/datetime_util.h"
 
 namespace cobalt {
 namespace forculus {
@@ -66,7 +65,7 @@ class ForculusEncrypter {
   //
   // (4) Return the triple (ciphertext, x, y)
   //
-  // |observation_date| is used to determine the observation epoch
+  // |observation_day_index| is used to determine the observation epoch
   //
   // The generated polynomial and ciphertext are deteriministic functions of
   // the following data: The plaintext, the epoch, the metric_id and
@@ -81,7 +80,7 @@ class ForculusEncrypter {
   // constructor is not valid, or kEncryptionFailed if the encryption fails
   // for any reason.
   Status Encrypt(const std::string& plaintext,
-                 const util::CalendarDate& observation_date,
+                 uint32_t observation_day_index,
                  ForculusObservation *observation_out);
 
   // Serializes |value| into a plaintext string using standard protocol buffer
@@ -90,7 +89,7 @@ class ForculusEncrypter {
   // The Cobalt Encoder invokes this method rather than directly invoking
   // Encrypt() in order to uniformly handle values of different data types.
   Status EncryptValue(const ValuePart& value,
-                      const util::CalendarDate& observation_date,
+                      uint32_t observation_day_index,
                       ForculusObservation *observation_out);
 
  private:

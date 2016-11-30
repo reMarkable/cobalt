@@ -40,7 +40,6 @@ using cobalt::forculus::ForculusEncrypter;
 using cobalt::shuffler::Envelope;
 using cobalt::shuffler::Shuffler;
 using cobalt::shuffler::ShufflerResponse;
-using cobalt::util::CalendarDate;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -146,9 +145,9 @@ class CGen {
       part.set_encoding_config_id(1);
 
       ForculusObservation* forc_obs = part.mutable_forculus();
-      CalendarDate dt;
+      uint32_t day_index = 0;
 
-      if (forculus.Encrypt(FLAGS_payload, dt, forc_obs)
+      if (forculus.Encrypt(FLAGS_payload, day_index, forc_obs)
           != forculus::ForculusEncrypter::kOK) {
         LOG(FATAL) << "Forculus encryption failed";
       }

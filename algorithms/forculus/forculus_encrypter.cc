@@ -28,8 +28,6 @@ namespace forculus {
 using crypto::hmac::HMAC;
 using crypto::SymmetricCipher;
 using encoder::ClientSecret;
-using util::CalendarDate;
-using util::kInvalidDayIndex;
 
 namespace {
 // Derives a master key for use in Forculus encryption by applying a slow
@@ -141,27 +139,22 @@ ForculusEncrypter::ForculusEncrypter(const ForculusConfig& config,
 ForculusEncrypter::~ForculusEncrypter() {}
 
 ForculusEncrypter::Status ForculusEncrypter::EncryptValue(
-    const ValuePart& value, const util::CalendarDate& observation_date,
+    const ValuePart& value, uint32_t observation_day_index,
     ForculusObservation *observation_out) {
   std::string serialized_value;
   value.SerializeToString(&serialized_value);
-  return Encrypt(serialized_value, observation_date, observation_out);
+  return Encrypt(serialized_value, observation_day_index, observation_out);
 }
 
 ForculusEncrypter::Status ForculusEncrypter::Encrypt(
-    const std::string& plaintext, const CalendarDate& observation_date,
+    const std::string& plaintext, uint32_t observation_day_index,
     ForculusObservation *observation_out) {
   if (!config_->valid()) {
     return kInvalidConfig;
   }
-  uint32_t day_index = util::CalendarDateToDayIndex(observation_date);
-  if (day_index == kInvalidDayIndex) {
-    // TODO(rudominer) Accept a day_index instead of a CalendarDate.
-    return kInvalidConfig;
-  }
 
   // TODO(rudominer) Compute the epoch_index from the day_index
-  uint32_t epoch_index = day_index;
+  uint32_t epoch_index = observation_day_index;
 
   const uint32_t& threshold = config_->threshold();
 

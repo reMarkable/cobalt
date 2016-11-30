@@ -20,7 +20,8 @@ namespace cobalt {
 namespace forculus {
 
 using encoder::ClientSecret;
-using util::CalendarDate;
+
+static const uint32_t kDayIndex = 12345;
 
 void TestEncrypterValidation(uint32_t threshold, bool use_valid_token,
     ForculusEncrypter::Status expected_status,
@@ -43,7 +44,7 @@ void TestEncrypterValidation(uint32_t threshold, bool use_valid_token,
   // Invoke Encrypt() and check the status.
   ForculusObservation obs;
   EXPECT_EQ(expected_status,
-    encrypter.Encrypt("hello", CalendarDate(), &obs))
+    encrypter.Encrypt("hello", kDayIndex, &obs))
      << "Invoked from line number: " << caller_line_number;
 }
 
@@ -86,7 +87,7 @@ TEST(ForculusEncrypterTest, Validation) {
 ForculusObservation Encrypt(const std::string& plaintext, uint32_t threshold,
   uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
   std::string metric_part_name, const std::string& secret_token,
-  const CalendarDate& calendar_date) {
+  uint32_t day_index) {
   // Make a config with the given threshold
   ForculusConfig config;
   config.set_threshold(threshold);
@@ -98,7 +99,7 @@ ForculusObservation Encrypt(const std::string& plaintext, uint32_t threshold,
   // Invoke Encrypt() and check the status.
   ForculusObservation obs;
   EXPECT_EQ(ForculusEncrypter::kOK,
-      encrypter.Encrypt(plaintext, calendar_date, &obs));
+      encrypter.Encrypt(plaintext, day_index, &obs));
   return obs;
 }
 
@@ -110,78 +111,72 @@ TEST(ForculusEncrypterTest, SanityTest) {
       ClientSecret::GenerateNewSecret().GetToken();
   static const std::string kToken2 =
       ClientSecret::GenerateNewSecret().GetToken();
-  CalendarDate date1;
-  date1.month = 1;
-  date1.day_of_month = 1;
-  date1.year = 2016;
-  CalendarDate date2;
-  date2.month = 1;
-  date2.day_of_month = 2;
-  date2.year = 2016;
+  uint32_t day_index1 = kDayIndex;
+  uint32_t day_index2 = day_index1 + 1;
 
   // The encryption and points should be deterministic as a function of
   // the inputs.
   ForculusObservation obs1 =
-      Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
+      Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
   ForculusObservation obs2 =
-      Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
+      Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
   EXPECT_EQ(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_EQ(obs1.point_x(), obs2.point_x());
   EXPECT_EQ(obs1.point_y(), obs2.point_y());
 
   // Different epochs should yield different ciphertexts and points.
-  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
-  obs2 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date2);
+  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
+  obs2 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index2);
   EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_NE(obs1.point_x(), obs2.point_x());
   EXPECT_NE(obs1.point_y(), obs2.point_y());
 
   // Different tokens should yield the same ciphertexts but different points.
   // This represents different clients doing the same threshold encryption.
-  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
-  obs2 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken2, date1);
+  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
+  obs2 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken2, day_index1);
   EXPECT_EQ(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_NE(obs1.point_x(), obs2.point_x());
   EXPECT_NE(obs1.point_y(), obs2.point_y());
 
   // Different metric parts should yield different ciphertexts and points.
-  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
-  obs2 = Encrypt("Message 1", 20, 1, 1, 1, "part2", kToken1, date1);
+  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
+  obs2 = Encrypt("Message 1", 20, 1, 1, 1, "part2", kToken1, day_index1);
   EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_NE(obs1.point_x(), obs2.point_x());
   EXPECT_NE(obs1.point_y(), obs2.point_y());
 
   // Different customer_ids should yield different ciphertexts and points.
-  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
-  obs2 = Encrypt("Message 1", 20, 2, 1, 1, "part1", kToken1, date1);
+  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
+  obs2 = Encrypt("Message 1", 20, 2, 1, 1, "part1", kToken1, day_index1);
   EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_NE(obs1.point_x(), obs2.point_x());
   EXPECT_NE(obs1.point_y(), obs2.point_y());
 
   // Different project_ids should yield different ciphertexts and points.
-  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
-  obs2 = Encrypt("Message 1", 20, 1, 2, 1, "part1", kToken1, date1);
+  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
+  obs2 = Encrypt("Message 1", 20, 1, 2, 1, "part1", kToken1, day_index1);
   EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_NE(obs1.point_x(), obs2.point_x());
   EXPECT_NE(obs1.point_y(), obs2.point_y());
 
   // Different metric_ids should yield different ciphertexts and points.
-  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
-  obs2 = Encrypt("Message 1", 20, 1, 1, 2, "part1", kToken1, date1);
+  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
+  obs2 = Encrypt("Message 1", 20, 1, 1, 2, "part1", kToken1, day_index1);
   EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_NE(obs1.point_x(), obs2.point_x());
   EXPECT_NE(obs1.point_y(), obs2.point_y());
 
   // Different thresholds should yield different ciphertexts and points.
-  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
-  obs2 = Encrypt("Message 1", 21, 1, 1, 1, "part1", kToken1, date1);
+  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
+  obs2 = Encrypt("Message 1", 21, 1, 1, 1, "part1", kToken1, day_index1);
   EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_NE(obs1.point_x(), obs2.point_x());
   EXPECT_NE(obs1.point_y(), obs2.point_y());
 
   // Different plaintexts should yield different ciphertexts and points.
-  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, date1);
-  obs2 = Encrypt("Message 2", 20, 1, 1, 1, "part1", kToken1, date1);
+  obs1 = Encrypt("Message 1", 20, 1, 1, 1, "part1", kToken1, day_index1);
+  obs2 = Encrypt("Message 2", 20, 1, 1, 1, "part1", kToken1, day_index1);
   EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());
   EXPECT_NE(obs1.point_x(), obs2.point_x());
   EXPECT_NE(obs1.point_y(), obs2.point_y());
@@ -206,11 +201,11 @@ TEST(ForculusEncrypterTest, EncryptValue) {
   // Invoke EncryptValue() three times.
   ForculusObservation obs1, obs2, obs3;
   EXPECT_EQ(ForculusEncrypter::kOK,
-    encrypter.EncryptValue(value1, CalendarDate(), &obs1));
+    encrypter.EncryptValue(value1, kDayIndex, &obs1));
   EXPECT_EQ(ForculusEncrypter::kOK,
-    encrypter.EncryptValue(value2, CalendarDate(), &obs2));
+    encrypter.EncryptValue(value2, kDayIndex, &obs2));
   EXPECT_EQ(ForculusEncrypter::kOK,
-    encrypter.EncryptValue(value3, CalendarDate(), &obs3));
+    encrypter.EncryptValue(value3, kDayIndex, &obs3));
 
   // Check that the three observations have different ciphertexts.
   EXPECT_NE(obs1.ciphertext(), obs2.ciphertext());

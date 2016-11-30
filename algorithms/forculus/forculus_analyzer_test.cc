@@ -20,13 +20,11 @@
 #include "algorithms/forculus/forculus_encrypter.h"
 #include "encoder/client_secret.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
-#include "util/datetime_util.h"
 
 namespace cobalt {
 namespace forculus {
 
 using encoder::ClientSecret;
-using util::CalendarDate;
 
 static const uint32_t kThreshold = 20;
 
@@ -48,7 +46,7 @@ ForculusObservation Encrypt(uint32_t day_index,
   // Invoke Encrypt() and check the status.
   ForculusObservation obs;
   EXPECT_EQ(ForculusEncrypter::kOK,
-      encrypter.Encrypt(plaintext, util::DayIndexToCalendarDate(day_index),
+      encrypter.Encrypt(plaintext, day_index,
                         &obs));
   return obs;
 }

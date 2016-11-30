@@ -19,15 +19,14 @@
 
 #include "encoder/client_secret.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
-#include "util/datetime_util.h"
 
 namespace cobalt {
 namespace forculus {
 
 using encoder::ClientSecret;
-using util::CalendarDate;
 
 static const uint32_t kThreshold = 20;
+static const uint32_t kDayIndex = 12345;
 
 // Encrypts the plaintext using Forculus encryption with threshold = kThreshold
 // and default values for the other parameters and a fresh ClientSecret will
@@ -44,7 +43,7 @@ ForculusObservation Encrypt(const std::string& plaintext) {
   // Invoke Encrypt() and check the status.
   ForculusObservation obs;
   EXPECT_EQ(ForculusEncrypter::kOK,
-      encrypter.Encrypt(plaintext, CalendarDate(), &obs));
+      encrypter.Encrypt(plaintext, kDayIndex, &obs));
   return obs;
 }
 
@@ -63,7 +62,7 @@ ForculusObservation EncryptValue(const ValuePart& value) {
   // Invoke EncryptValue() and check the status.
   ForculusObservation obs;
   EXPECT_EQ(ForculusEncrypter::kOK,
-      encrypter.EncryptValue(value, CalendarDate(), &obs));
+      encrypter.EncryptValue(value, kDayIndex, &obs));
   return obs;
 }
 
