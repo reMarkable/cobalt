@@ -16,6 +16,7 @@
 #include <map>
 
 #include "analyzer/analyzer_service.h"
+#include "analyzer/schema.pb.h"
 #include "analyzer/store/mem_store.h"
 #include "analyzer/store/bigtable_store.h"
 
@@ -25,6 +26,7 @@ using google::protobuf::Empty;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
+using cobalt::analyzer::schema::ObservationValue;
 
 namespace cobalt {
 namespace analyzer {
@@ -87,11 +89,14 @@ TEST_F(AnalyzerFunctionalTest, TestGRPC) {
   ASSERT_EQ(store_.get(key, &val), 0);
 
   // check that the item matches the observation
-  std::string obs;
+  std::string serialized_entry;
 
-  encrypted_observation->SerializeToString(&obs);
+  ObservationValue entry;
+  entry.set_allocated_metadata(new ObservationMetadata());
+  entry.set_allocated_observation(new EncryptedMessage(*encrypted_observation));
+  entry.SerializeToString(&serialized_entry);
 
-  ASSERT_EQ(val, obs);
+  ASSERT_EQ(val, serialized_entry);
 }
 
 }  // namespace analyzer

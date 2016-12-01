@@ -20,6 +20,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <err.h>
+#include <limits.h>
+#include <libgen.h>
 #include <stdlib.h>
 #include <assert.h>
 
@@ -30,11 +32,13 @@
 #include "analyzer/analyzer_service.h"
 #include "shuffler/shuffler.grpc.pb.h"
 #include "config/encodings.pb.h"
+#include "config/encoding_config.h"
 #include "./observation.pb.h"
 
 using cobalt::analyzer::kAnalyzerPort;
 using cobalt::analyzer::Analyzer;
 using cobalt::analyzer::ObservationBatch;
+using cobalt::config::EncodingRegistry;
 using cobalt::encoder::ClientSecret;
 using cobalt::forculus::ForculusEncrypter;
 using cobalt::shuffler::Envelope;
@@ -57,6 +61,9 @@ DEFINE_int32(num_observations, 1, "Number of Observations to generate");
 DEFINE_uint32(customer, 1, "Customer ID");
 DEFINE_uint32(project, 1, "Project ID");
 DEFINE_uint32(metric, 1, "Metric ID");
+DEFINE_uint32(encoding, 1, "Encoding ID");
+DEFINE_string(registry, "", "Registry path for registered_encodings.txt etc.");
+DEFINE_string(part, "", "Observation part name");
 DEFINE_string(payload, "hello", "Observation payload");
 
 // Measures time between start and stop.  Useful for benchmarking.
@@ -103,9 +110,6 @@ struct GenObservation {
 // Generates observations and RPCs to Cobalt components
 class CGen {
  public:
-  CGen() : part_name_("DEFAULT")
-           {}
-
   void setup(int argc, char *argv[]) {
     google::SetUsageMessage("Cobalt gRPC generator");
     google::ParseCommandLineFlags(&argc, &argv, true);
@@ -113,6 +117,43 @@ class CGen {
     customer_id_ = FLAGS_customer;
     project_id_ = FLAGS_project;
     metric_id_ = FLAGS_metric;
+    part_name_ = FLAGS_part;
+
+    std::string registry_path = FLAGS_registry;
+
+    // If no path is given, try to deduce it from the cgen location.
+    if (registry_path == "") {
+      char path[PATH_MAX], path2[PATH_MAX];
+
+      // Get the directory of cgen.
+      if (!realpath(argv[0], path))
+        LOG(FATAL) << "realpath(): " << argv[0];
+
+      char* dir = dirname(path);
+
+      // Set the relative path to the registry.
+      snprintf(path2, sizeof(path2), "%s/../../config/registered", dir);
+
+      // Get the absolute path to the registry.
+      if (!realpath(path2, path))
+        LOG(FATAL) << "realpath(): " << path2;
+
+      registry_path = path;
+    }
+
+    load_registries(registry_path);
+  }
+
+  void load_registries(const std::string& path) {
+    char fname[PATH_MAX];
+
+    snprintf(fname, sizeof(fname), "%s/registered_encodings.txt", path.c_str());
+
+    auto encodings = EncodingRegistry::FromFile(fname, nullptr);
+    if (encodings.second != config::kOK)
+      LOG(FATAL) << "Can't load encodings configuration";
+
+    encodings_ = std::move(encodings.first);
   }
 
   void start() {
@@ -136,11 +177,21 @@ class CGen {
     metadata.set_metric_id(metric_id_);
     metadata.set_day_index(4);
 
-    // Forculus encode the observations.
+    // encode the observation.
+    const EncodingConfig* const enc = encodings_->Get(
+        customer_id_, project_id_, FLAGS_encoding);
+
+    if (!enc)
+      LOG(FATAL) << "Unkown encoding: " << FLAGS_encoding;
+
+    // TODO(bittau): add support for algorithms other than forculus.
+    if (!enc->has_forculus())
+      LOG(FATAL) << "Unsupported encoding";
+
     ForculusConfig config;
     ClientSecret client_secret = ClientSecret::GenerateNewSecret();
 
-    config.set_threshold(10);
+    config.set_threshold(enc->forculus().threshold());
 
     ForculusEncrypter forculus(config, customer_id_, project_id_, metric_id_,
                                part_name_, client_secret);
@@ -149,7 +200,7 @@ class CGen {
       Observation obs;
       ObservationPart part;
 
-      part.set_encoding_config_id(1);
+      part.set_encoding_config_id(FLAGS_encoding);
 
       ForculusObservation* forc_obs = part.mutable_forculus();
       uint32_t day_index = 0;
@@ -304,6 +355,7 @@ class CGen {
   int metric_id_;
   std::string part_name_;
   std::vector<GenObservation> observations_;
+  std::unique_ptr<EncodingRegistry> encodings_;
 };  // class CGen
 
 }  // namespace cgen

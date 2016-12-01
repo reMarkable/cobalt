@@ -26,15 +26,17 @@
 #include "analyzer/analyzer_service.h"
 #include "analyzer/reporter.h"
 #include "analyzer/store/store.h"
+#include "analyzer/schema.pb.h"
 #include "config/metric_config.h"
 #include "config/encoding_config.h"
 
 #include "./observation.pb.h"
 
-using cobalt::forculus::ForculusAnalyzer;
 using cobalt::config::EncodingRegistry;
 using cobalt::config::MetricRegistry;
 using cobalt::config::ReportRegistry;
+using cobalt::forculus::ForculusAnalyzer;
+using cobalt::analyzer::schema::ObservationValue;
 
 namespace cobalt {
 namespace analyzer {
@@ -75,14 +77,6 @@ class Reporter {
   }
 
  private:
-  void run_reports() {
-    LOG(INFO) << "Report cycle";
-
-    for (const ReportConfig& config : *reports_) {
-      run_report(config);
-    }
-  }
-
   void load_configuration() {
     if (FLAGS_metrics != "") {
       auto metrics = MetricRegistry::FromFile(FLAGS_metrics, nullptr);
@@ -109,77 +103,147 @@ class Reporter {
     }
   }
 
+  void run_reports() {
+    LOG(INFO) << "Report cycle";
+
+    for (const ReportConfig& config : *reports_) {
+      run_report(config);
+    }
+  }
+
   void run_report(const ReportConfig& config) {
-      LOG(INFO) << "Running report " << config.name();
+    LOG(INFO) << "Running report " << config.name();
 
-      // Read the part of the DB pertinent to this report.
-      ObservationKey keys[2];  // start, end keys.
+    // Read the part of the DB pertinent to this report.
+    ObservationKey keys[2];  // start, end keys.
 
-      keys[1].set_max();
+    keys[1].set_max();
 
-      for (ObservationKey& key : keys) {
-        key.set_customer(config.customer_id());
-        key.set_project(config.project_id());
-        key.set_metric(config.metric_id());
+    for (ObservationKey& key : keys) {
+      key.set_customer(config.customer_id());
+      key.set_project(config.project_id());
+      key.set_metric(config.metric_id());
+    }
+
+    std::map<std::string, std::string> db;
+    int rc = store_->get_range(keys[0].MakeKey(), keys[1].MakeKey(), &db);
+
+    if (rc != 0) {
+      LOG(ERROR) << "get_range() error: " << rc;
+      return;
+    }
+
+    LOG(INFO) << "Observations found: " << db.size();
+
+    // As we process observations, we store results in analyzers_
+    analyzers_.clear();
+
+    // Try to decode all observations.
+    for (const auto& i : db) {
+      // Parse the database entry.
+      ObservationValue entry;
+
+      if (!entry.ParseFromString(i.second)) {
+        LOG(ERROR) << "Can't parse ObservationValue.  Key: " << i.first;
+        continue;
       }
 
-      std::map<std::string, std::string> db;
-      int rc = store_->get_range(keys[0].MakeKey(), keys[1].MakeKey(), &db);
+      // Decrypt the observation.
+      Observation obs;
 
-      if (rc != 0) {
-        LOG(ERROR) << "get_range() error: " << rc;
-        return;
+      std::string cleartext;
+
+      if (!decrypt(entry.observation().ciphertext(), &cleartext)) {
+        LOG(ERROR) << "Can't decrypt";
+        continue;
       }
 
-      LOG(INFO) << "Observations found: " << db.size();
-
-      // Try to decode forculus strings
-      ForculusConfig forculus_conf;
-      forculus_conf.set_threshold(10);
-
-      ForculusAnalyzer forculus(forculus_conf);
-
-      for (auto& i : db) {
-        EncryptedMessage em;
-        Observation obs;
-
-        if (!em.ParseFromString(i.second)) {
-          LOG(ERROR) << "Can't parse EncryptedMessage.  Key: " << i.first;
-          continue;
-        }
-
-        std::string cleartext;
-
-        if (!decrypt(em.ciphertext(), &cleartext)) {
-          LOG(ERROR) << "Can't decrypt";
-          continue;
-        }
-
-        if (!obs.ParseFromString(cleartext)) {
-          LOG(ERROR) << "Can't parse Observation.  Key: " << i.first;
-          continue;
-        }
-
-        if (obs.parts_size() < 1) {
-          LOG(ERROR) << "Not enough parts: " << obs.parts_size();
-          continue;
-        }
-
-        const ObservationPart& part = obs.parts().begin()->second;
-        const ForculusObservation& forc_obs = part.forculus();
-
-        if (!forculus.AddObservation(0, forc_obs)) {
-          LOG(ERROR) << "Can't add observation";
-          continue;
-        }
+      if (!obs.ParseFromString(cleartext)) {
+        LOG(ERROR) << "Can't parse Observation.  Key: " << i.first;
+        continue;
       }
 
-      // check forculus results
+      // Process the observation.  This will populate analyzers_.
+      process_observation(config, entry.metadata(), obs);
+    }
+
+    // See what results are available.
+    for (auto& analyzer : analyzers_) {
+      ForculusAnalyzer& forculus = *analyzer.second;
       auto results = forculus.TakeResults();
 
-      for (auto& i : results) {
-        LOG(INFO) << "Found plain-text:" << i.first;
+      for (auto& result : results) {
+        LOG(INFO) << "Found plain-text:" << result.first;
       }
+    }
+  }
+
+  void process_observation(const ReportConfig& config,
+                           const ObservationMetadata& metadata,
+                           const Observation& observation) {
+    // Figure out which metric we're dealing with.
+    const Metric* const metric = metrics_->Get(config.customer_id(),
+                                               config.project_id(),
+                                               metadata.metric_id());
+
+    if (!metric) {
+      LOG(ERROR) << "Can't find metric ID " << metadata.metric_id()
+                 << " for customer " << config.customer_id()
+                 << " project " << config.project_id();
+      return;
+    }
+
+    // Process all the parts.
+    for (const auto& i : observation.parts()) {
+      const std::string& name = i.first;
+      const ObservationPart& part = i.second;
+
+      // Check that the part name is expected.
+      if (metric->parts().find(name) == metric->parts().end()) {
+        LOG(ERROR) << "Unknown part name: " << name;
+        continue;
+      }
+
+      // Figure out how the part is encoded.
+      uint32_t eid = part.encoding_config_id();
+      const EncodingConfig* const enc = encodings_->Get(
+          config.customer_id(), config.project_id(), eid);
+
+      if (!enc) {
+        LOG(ERROR) << "Unknown encoding: " << eid;
+        continue;
+      }
+
+      // XXX only support forculus for now.
+      if (!enc->has_forculus()) {
+        LOG(ERROR) << "Unsupported encoding: " << eid;
+        continue;
+      }
+
+      // Grab the decoder.
+      ForculusAnalyzer* forculus;
+      auto iter = analyzers_.find(eid);
+
+      if (iter != analyzers_.end()) {
+        forculus = iter->second.get();
+      } else {
+        ForculusConfig forculus_conf;
+
+        forculus_conf.set_threshold(enc->forculus().threshold());
+
+        forculus = new ForculusAnalyzer(forculus_conf);
+        analyzers_[eid] = std::unique_ptr<ForculusAnalyzer>(forculus);
+      }
+
+      if (!forculus->AddObservation(metadata.day_index(), part.forculus())) {
+        LOG(ERROR) << "Can't add observation";
+        continue;
+      }
+    }
+
+    if (observation.parts().size() != metric->parts().size()) {
+      VLOG(1) << "Not all parts present in observation";
+    }
   }
 
   // TODO(pseudorandom): implement
@@ -193,6 +257,13 @@ class Reporter {
   std::unique_ptr<ReportRegistry> reports_;
   std::unique_ptr<EncodingRegistry> encodings_;
   std::unique_ptr<Store> store_;
+
+  // Reports are run serially per (customer, project, metric) triple.  Each
+  // observation though can be encoded using different encodings.  We keep track
+  // of all these encodings here.
+  // key: id of encoding ; value: analyzer.
+  // For now, only forculus is supported.
+  std::map<uint32_t, std::unique_ptr<ForculusAnalyzer>> analyzers_;
 };
 
 void reporter_main() {

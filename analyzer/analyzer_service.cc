@@ -22,9 +22,11 @@
 
 #include <string>
 
+#include "analyzer/schema.pb.h"
 #include "analyzer/store/store.h"
 #include "util/crypto_util/random.h"
 
+using cobalt::analyzer::schema::ObservationValue;
 using google::protobuf::Empty;
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -43,10 +45,12 @@ Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
     std::string key = obs_key.MakeKey();
     std::string val;
 
-    em.SerializeToString(&val);
+    ObservationValue value;
+    value.set_allocated_metadata(new ObservationMetadata(request->meta_data()));
+    value.set_allocated_observation(new EncryptedMessage(em));
 
-    // TODO(bittau): need to store metadata somehow.  Right now it's implicit in
-    // the row_key but that's bad design.
+    value.SerializeToString(&val);
+
     store_->put(key, val);
   }
 

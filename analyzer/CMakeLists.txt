@@ -33,6 +33,7 @@ set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS analyzer.proto)
+protobuf_generate_cpp(PROTO_SCHEMA_SRCS PROTO_SCHEMA_HDRS schema.proto)
 
 # generate the gRPC service.  CMake doesn't support it by default.
 set(PROTO_GRPC "${CMAKE_CURRENT_BINARY_DIR}/analyzer.grpc.pb.cc")
@@ -47,7 +48,8 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
 set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 
 # Build the analyzer library
-add_library(cobalt_analyzer ${ANALYZER_SRCS} ${PROTO_SRCS} ${COBALT_PROTO_SRCS})
+add_library(cobalt_analyzer ${ANALYZER_SRCS} ${PROTO_SRCS} ${COBALT_PROTO_SRCS}
+            ${PROTO_SCHEMA_SRCS})
 target_link_libraries(cobalt_analyzer ${ANALYZER_LIBS})
 
 # Build the analyzer executable
