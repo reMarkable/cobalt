@@ -21,7 +21,7 @@ set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 add_library(rappor_encoder rappor_encoder.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 target_link_libraries(rappor_encoder
-                      client_secret cobalt_crypto ${PROTOBUF_LIBRARY})
+                      client_secret cobalt_crypto glog ${PROTOBUF_LIBRARY})
 
 # The test depends directly on Boring SSL for the deterministic random.
 include_directories(BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/third_party/boringssl/src/include")

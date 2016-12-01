@@ -14,6 +14,7 @@
 
 #include "algorithms/rappor/rappor_encoder.h"
 
+#include <glog/logging.h>
 #include <map>
 #include <vector>
 
@@ -100,6 +101,24 @@ std::vector<std::string> Categories(const BasicRapporConfig& config) {
   }
   return categories;
 }
+
+// Returns a human-readable string representation of |value| appropriate
+// for debug messages.
+std::string DebugString(const ValuePart& value) {
+  std::ostringstream stream;
+  switch (value.data_case()) {
+    case ValuePart::kStringValue:
+      stream << "'" << value.string_value() << "'";
+      break;
+    case ValuePart::kIntValue:
+      stream << value.int_value();
+      break;
+    default:
+      stream << "unexpected value type";
+  }
+  return stream.str();
+}
+
 }  // namespace
 
 class RapporConfigValidator {
@@ -241,6 +260,8 @@ Status BasicRapporEncoder::Encode(const ValuePart& value,
   value.SerializeToString(&serialized_value);
   size_t bit_index = config_->bit_index(serialized_value);
   if (bit_index == -1) {
+    VLOG(3) << "BasicRapporEncoder::Encode(): The given value was not one of "
+        << "the categories: " << DebugString(value);
     return kInvalidInput;
   }
 

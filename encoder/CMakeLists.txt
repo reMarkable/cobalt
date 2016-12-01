@@ -12,12 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+
 # client_secret library
 add_library(client_secret client_secret.cc)
 target_link_libraries(client_secret cobalt_crypto)
 
+# encoder library
+add_library(encoder
+            encoder.cc ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
+target_link_libraries(encoder
+                      client_secret forculus_encrypter glog rappor_encoder)
 
-add_executable(client_secret_test client_secret_test.cc)
-target_link_libraries(client_secret_test gtest gtest_main client_secret)
-set_target_properties(client_secret_test PROPERTIES
+add_executable(encoder_tests
+               client_secret_test.cc encoder_test.cc)
+target_link_libraries(encoder_tests
+                      gflags gtest gtest_main client_secret encoder
+                      ${PROTOBUF_LIBRARY})
+set_target_properties(encoder_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

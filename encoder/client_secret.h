@@ -27,7 +27,7 @@ namespace encoder {
 using crypto::byte;
 
 
-// A ClientSecret is a move-only wrapper around an array of bytes containing
+// A ClientSecret is a wrapper around an array of bytes containing
 // random bytes from a CSPRNG. Clients should invoke GenerateNewSecret()
 // once, and then permanently and securely save the token returned by
 // GetToken(). After that clients should reconstruct the token using
@@ -41,6 +41,7 @@ class ClientSecret {
     bytes_ = std::move(other.bytes_);
   }
 
+  // Copy constructor
   ClientSecret(const ClientSecret& other) {
     bytes_ = other.bytes_;
   }
