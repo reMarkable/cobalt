@@ -190,6 +190,15 @@ class Encoder {
   // result contains an error status.
   Result Encode(uint32_t metric_id, const Value& value);
 
+  // Sets a static value to use for the current time when computing the
+  // day index. By default an Encoder uses the real system clock to determine
+  // the current time. But this function may be invoked to override that
+  // behavior. This is useful for example in tests. Invoke this function with
+  // zero or a negative number to restore the default behavior.
+  void set_current_time(time_t time) {
+    current_time_ = time;
+  }
+
  private:
   // Helper function that performs Forculus encoding on |value| using the
   // given metadata and writes the result into |observation_part|.
@@ -219,6 +228,7 @@ class Encoder {
   uint32_t customer_id_, project_id_;
   std::shared_ptr<ProjectContext> project_;
   ClientSecret client_secret_;
+  time_t current_time_ = 0;
 };
 
 }  // namespace encoder

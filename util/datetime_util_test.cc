@@ -349,6 +349,28 @@ TEST(DatetimeUtilTest, MonthIndexCalendarDateInversesTest) {
   }
 }
 
+TEST(DatetimeUtilTest, TimeToDayIndexTest) {
+  // This unix timestamp corresponds to Friday Dec 2, 2016 in UTC
+  // and Thursday Dec 1, 2016 in Pacific time.
+  static const time_t kSomeTimestamp = 1480647356;
+
+  // This is the day index for Friday Dec 2, 2016
+  static const uint32_t kUtcDayIndex = 17137;
+
+  // This is the day index for Thurs Dec 1, 2016
+  static const uint32_t kPacificDayIndex = 17136;
+
+  EXPECT_EQ(kUtcDayIndex, TimeToDayIndex(kSomeTimestamp, Metric::UTC));
+  // Only perform the following check when running this test in the Pacific
+  // timezone. Note that |timezone| is a global variable defined in <ctime>
+  // that stores difference between UTC and the latest local standard time, in
+  // seconds west of UTC. This value is not adjusted for daylight saving.
+  // See https://www.gnu.org/software/libc/manual/html_node/ \
+  //                              Time-Zone-Functions.html#Time-Zone-Functions
+  if (timezone/3600 == 8) {
+     EXPECT_EQ(kPacificDayIndex, TimeToDayIndex(kSomeTimestamp, Metric::LOCAL));
+  }
+}
 
 }  // namespace util
 }  // namespace cobalt

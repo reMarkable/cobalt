@@ -57,6 +57,8 @@
 
 #include <cstdint>
 
+#include "config/metrics.pb.h"
+
 namespace cobalt {
 namespace util {
 
@@ -84,6 +86,11 @@ struct CalendarDate {
         && other.month == month && other.year == year);
   }
 };
+
+// Returns the day index corresponding to |time| in the given |time_zone|
+// or UINT32_MAX if |time_zone| is not valid. |time| must be a Unix timestamp,
+// that is a number of Unix seconds since the Unix epoch.
+uint32_t TimeToDayIndex(time_t time, Metric::TimeZonePolicy time_zone);
 
 // Converts the given CalendarDate to a Cobalt Day Index. If the fields of
 // calendar_date do not make sense as a real day of the calendar

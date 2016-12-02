@@ -15,12 +15,15 @@
 #include "encoder/encoder.h"
 
 #include <glog/logging.h>
+
+#include <ctime>
 #include <utility>
 
 #include "algorithms/forculus/forculus_encrypter.h"
 #include "algorithms/rappor/rappor_encoder.h"
 #include "config/encodings.pb.h"
 #include "config/metrics.pb.h"
+#include "util/datetime_util.h"
 
 namespace cobalt {
 namespace encoder {
@@ -28,6 +31,7 @@ namespace encoder {
 using forculus::ForculusEncrypter;
 using rappor::BasicRapporEncoder;
 using rappor::RapporEncoder;
+using util::TimeToDayIndex;
 
 Encoder::Encoder(std::shared_ptr<ProjectContext> project,
                  ClientSecret client_secret)
@@ -36,14 +40,11 @@ Encoder::Encoder(std::shared_ptr<ProjectContext> project,
       project_(project),
       client_secret_(std::move(client_secret)) {}
 
-Encoder::Status Encoder::EncodeForculus(uint32_t metric_id,
-                                        uint32_t encoding_config_id,
-                                        MetricPart::DataType data_type,
-                                        const ValuePart& value,
-                                        const EncodingConfig* encoding_config,
-                                        const std::string& part_name,
-                                        uint32_t day_index,
-                                        ObservationPart* observation_part) {
+Encoder::Status Encoder::EncodeForculus(
+    uint32_t metric_id, uint32_t encoding_config_id,
+    MetricPart::DataType data_type, const ValuePart& value,
+    const EncodingConfig* encoding_config, const std::string& part_name,
+    uint32_t day_index, ObservationPart* observation_part) {
   switch (data_type) {
     case MetricPart::INT: {
       VLOG(3) << "Forculus doesn't support INTs: (" << customer_id_ << ", "
@@ -59,8 +60,8 @@ Encoder::Status Encoder::EncodeForculus(uint32_t metric_id,
                                        customer_id_, project_id_, metric_id,
                                        part_name, client_secret_);
 
-  switch (forculus_encrypter.EncryptValue(value, day_index,
-                                          forculus_observation)) {
+  switch (
+      forculus_encrypter.EncryptValue(value, day_index, forculus_observation)) {
     case ForculusEncrypter::kOK:
       return kOK;
 
@@ -146,8 +147,8 @@ Encoder::Status Encoder::EncodeBasicRappor(
 }
 
 Encoder::Result Encoder::EncodeString(uint32_t metric_id,
-                                            uint32_t encoding_config_id,
-                                            const std::string& string_value) {
+                                      uint32_t encoding_config_id,
+                                      const std::string& string_value) {
   Value value;
   // An empty part name is a signal to the function Encoder::Encode() that
   // the metric has only a single part whose name should be looked up.
@@ -156,8 +157,8 @@ Encoder::Result Encoder::EncodeString(uint32_t metric_id,
 }
 
 Encoder::Result Encoder::EncodeInt(uint32_t metric_id,
-                                         uint32_t encoding_config_id,
-                                         int64_t int_value) {
+                                   uint32_t encoding_config_id,
+                                   int64_t int_value) {
   Value value;
   // An empty part name means the metric has only a single part.
   value.AddIntPart(encoding_config_id, "", int_value);
@@ -165,8 +166,8 @@ Encoder::Result Encoder::EncodeInt(uint32_t metric_id,
 }
 
 Encoder::Result Encoder::EncodeBlob(uint32_t metric_id,
-                                          uint32_t encoding_config_id,
-                                          const void* data, size_t num_bytes) {
+                                    uint32_t encoding_config_id,
+                                    const void* data, size_t num_bytes) {
   Value value;
   // An empty part name means the metric has only a single part.
   value.AddBlobPart(encoding_config_id, "", data, num_bytes);
@@ -196,8 +197,21 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
     return result;
   }
 
-  // TODO(rudominer) Compute the day_index
-  uint32_t day_index = 0;
+  // Compute the day_index.
+  time_t current_time = current_time_;
+  if (current_time <= 0) {
+    // Use the real clock if we have not been given a static value for
+    // current_time.
+    current_time = std::time(nullptr);
+  }
+  uint32_t day_index = TimeToDayIndex(current_time, metric->time_zone_policy());
+  if (day_index == UINT32_MAX) {
+    // Invalid Metric: No time_zone_policy.
+    VLOG(3) << "TimeZonePolicy unset for metric: (" << customer_id_ << ", "
+            << project_id_ << ", " << metric_id << ")";
+    result.status = kInvalidConfig;
+    return result;
+  }
 
   // Create a new Observation and ObservationMetadata.
   result.observation.reset(new Observation());

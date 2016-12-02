@@ -19,6 +19,8 @@
 namespace cobalt {
 namespace util {
 
+namespace {
+
 // The algorithm in this file was copied from
 // http://howardhinnant.github.io/date_algorithms.html
 // See that site for further explanation.
@@ -43,6 +45,33 @@ static const uint32_t kNumDaysPerEra = 146097;
 // The number of days from 1970-1-1 to 1970-3-1 is 59.
 static const uint32_t kEpochOffset =
     kNumDaysPerEra * 5L - 30L * 365L - 8L - 59L;
+
+typedef struct tm TimeInfo;
+
+CalendarDate TimeInfoToCalendarDate(const TimeInfo& time_info) {
+  CalendarDate calendar_date;
+  calendar_date.day_of_month = time_info.tm_mday;
+  calendar_date.month = time_info.tm_mon + 1;
+  calendar_date.year = time_info.tm_year + 1900;
+  return calendar_date;
+}
+
+}  // namespace
+
+uint32_t TimeToDayIndex(time_t time, Metric::TimeZonePolicy time_zone) {
+  TimeInfo time_info;
+  switch (time_zone) {
+    case Metric::LOCAL:
+      localtime_r(&time, &time_info);
+      break;
+    case Metric::UTC:
+      gmtime_r(&time, &time_info);
+      break;
+    default:
+      return UINT32_MAX;
+  }
+  return CalendarDateToDayIndex(TimeInfoToCalendarDate(time_info));
+}
 
 uint32_t CalendarDateToDayIndex(const CalendarDate& calendar_date) {
   // This implementation was copied from
@@ -104,13 +133,9 @@ CalendarDate DayIndexToCalendarDate(uint32_t day_index) {
   // But because gmtime_r is a standard function unlike timegm, we
   // use the more straightforward implementation in this direction.
   time_t unix_time = day_index * kNumUnixSecondsPerDay;
-  struct tm time_info;
+  TimeInfo time_info;
   gmtime_r(&unix_time, &time_info);
-  CalendarDate calendar_date;
-  calendar_date.day_of_month = time_info.tm_mday;
-  calendar_date.month = time_info.tm_mon + 1;
-  calendar_date.year = time_info.tm_year + 1900;
-  return calendar_date;
+  return TimeInfoToCalendarDate(time_info);
 }
 
 uint32_t CalendarDateToWeekIndex(const CalendarDate& calendar_date) {

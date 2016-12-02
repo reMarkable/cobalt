@@ -33,12 +33,21 @@ namespace {
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
 
+// This unix timestamp corresponds to Friday Dec 2, 2016 in UTC
+// and Thursday Dec 1, 2016 in Pacific time.
+const time_t kSomeTimestamp = 1480647356;
+// This is the day index for Friday Dec 2, 2016
+const uint32_t kUtcDayIndex = 17137;
+// This is the day index for Thurs Dec 1, 2016
+const uint32_t kPacificDayIndex = 17136;
+
 const char* kMetricConfigText = R"(
-# Metric 1 has one string part.
+# Metric 1 has one string part, and local time_zone_policy.
 element {
   customer_id: 1
   project_id: 1
   id: 1
+  time_zone_policy: LOCAL
   parts {
     key: "Part1"
     value {
@@ -46,11 +55,12 @@ element {
   }
 }
 
-# Metric 2 has one integer part.
+# Metric 2 has one integer part, and UTC time_zone_policy.
 element {
   customer_id: 1
   project_id: 1
   id: 2
+  time_zone_policy: UTC
   parts {
     key: "Part1"
     value {
@@ -60,11 +70,12 @@ element {
 }
 
 
-# Metric 3 has one blob part.
+# Metric 3 has one blob part, and local time_zone_policy.
 element {
   customer_id: 1
   project_id: 1
   id: 3
+  time_zone_policy: LOCAL
   parts {
     key: "Part1"
     value {
@@ -73,11 +84,12 @@ element {
   }
 }
 
-# Metric 4 has one String part and one int part.
+# Metric 4 has one String part and one int part, and UTC time_zone_policy.
 element {
   customer_id: 1
   project_id: 1
   id: 4
+  time_zone_policy: UTC
   parts {
     key: "city"
     value {
@@ -87,6 +99,18 @@ element {
     key: "rating"
     value {
       data_type: INT
+    }
+  }
+}
+
+# Metric 5 is missing a time_zone_policy
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  parts {
+    key: "Part1"
+    value {
     }
   }
 }
@@ -194,17 +218,32 @@ std::shared_ptr<ProjectContext> GetTestProject() {
 // Checks |result|: Checks that the status is kOK, that the observation and
 // metadata are not null, that the observation has a single part named
 // "Part1", that it uses the expected encoding and that it is not empty.
+// |expect_utc| should be true to indicate that it is expected that the
+// day index was computed using UTC.
 void CheckSinglePartResult(
     const Encoder::Result& result, uint32_t expected_metric_id,
-    uint32_t expected_encoding_config_id,
+    uint32_t expected_encoding_config_id, bool expect_utc,
     const ObservationPart::ValueCase& expected_encoding) {
   ASSERT_EQ(Encoder::kOK, result.status);
   ASSERT_NE(nullptr, result.observation);
   ASSERT_NE(nullptr, result.metadata);
-  // TODO(rudomier) Check result.metadata->day_index()
   EXPECT_EQ(kCustomerId, result.metadata->customer_id());
   EXPECT_EQ(kProjectId, result.metadata->project_id());
   EXPECT_EQ(expected_metric_id, result.metadata->metric_id());
+  if (expect_utc) {
+    EXPECT_EQ(kUtcDayIndex, result.metadata->day_index());
+  } else {
+    // Only perform the following check when running this test in the Pacific
+    // timezone. Note that |timezone| is a global variable defined in <ctime>
+    // that stores difference between UTC and the latest local standard time, in
+    // seconds west of UTC. This value is not adjusted for daylight saving.
+    // See https://www.gnu.org/software/libc/manual/html_node/ \
+    //                              Time-Zone-Functions.html#Time-Zone-Functions
+    if (timezone / 3600 == 8) {
+      EXPECT_EQ(kPacificDayIndex, result.metadata->day_index());
+    }
+  }
+
   const Observation& observation = *result.observation;
   // The Metric specified has only one part named "Part1" so the encoded
   // observation should have one part named "Part1".
@@ -239,20 +278,22 @@ void CheckSinglePartResult(
 // "Part1". We validate that there are no errors and that the
 // produced Observation has the |expected_type| and is non-empty.
 void DoEncodeStringTest(std::string value, uint32_t metric_id,
-                        uint32_t encoding_config_id,
+                        uint32_t encoding_config_id, bool expect_utc,
                         const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
 
   // Construct the Encoder.
   Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  // Set a static current time so we can test the day_index computation.
+  encoder.set_current_time(kSomeTimestamp);
 
   // Encode an observation for the given metric and encoding. The metric is
   // expected to have a single part.
   Encoder::Result result =
       encoder.EncodeString(metric_id, encoding_config_id, value);
 
-  CheckSinglePartResult(result, metric_id, encoding_config_id,
+  CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
 }
 
@@ -262,20 +303,22 @@ void DoEncodeStringTest(std::string value, uint32_t metric_id,
 // We validate that there are no errors and that the
 // produced Observation has the |expected_type| and is non-empty.
 void DoEncodeIntTest(int64_t value, uint32_t metric_id,
-                     uint32_t encoding_config_id,
+                     uint32_t encoding_config_id, bool expect_utc,
                      const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
 
   // Construct the Encoder.
   Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  // Set a static current time so we can test the day_index computation.
+  encoder.set_current_time(kSomeTimestamp);
 
   // Encode an observation for the given metric and encoding. The metric is
   // expected to have a single part.
   Encoder::Result result =
       encoder.EncodeInt(metric_id, encoding_config_id, value);
 
-  CheckSinglePartResult(result, metric_id, encoding_config_id,
+  CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
 }
 
@@ -285,20 +328,22 @@ void DoEncodeIntTest(int64_t value, uint32_t metric_id,
 // We validate that there are no errors and that the
 // produced Observation has the |expected_type| and is non-empty.
 void DoEncodeBlobTest(const void* data, size_t num_bytes, uint32_t metric_id,
-                      uint32_t encoding_config_id,
+                      uint32_t encoding_config_id, bool expect_utc,
                       const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
 
   // Construct the Encoder.
   Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  // Set a static current time so we can test the day_index computation.
+  encoder.set_current_time(kSomeTimestamp);
 
   // Encode an observation for the given metric and encoding. The metric is
   // expected to have a single part.
   Encoder::Result result =
       encoder.EncodeBlob(metric_id, encoding_config_id, data, num_bytes);
 
-  CheckSinglePartResult(result, metric_id, encoding_config_id,
+  CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
 }
 
@@ -306,14 +351,14 @@ void DoEncodeBlobTest(const void* data, size_t num_bytes, uint32_t metric_id,
 TEST(EncoderTest, EncodeStringForculus) {
   // Metric 1 has a single string part.
   // EncodingConfig 1 is Forculus.
-  DoEncodeStringTest("some value", 1, 1, ObservationPart::kForculus);
+  DoEncodeStringTest("some value", 1, 1, false, ObservationPart::kForculus);
 }
 
 // Tests EncodeString() with String RAPPOR as the specified encoding.
 TEST(EncoderTest, EncodeStringRappor) {
   // Metric 1 has a single string part.
   // EncodingConfig 2 is String RAPPOR
-  DoEncodeStringTest("some value", 1, 2, ObservationPart::kRappor);
+  DoEncodeStringTest("some value", 1, 2, false, ObservationPart::kRappor);
 }
 
 // Tests EncodeString() with Basic RAPPOR as the specified encoding.
@@ -321,7 +366,7 @@ TEST(EncoderTest, EncodeStringBasicRappor) {
   // Metric 1 has a single string part.
   // EncodingConfig 3 is Basic RAPPOR with string values. Here we need the
   // value to be one of the categories.
-  DoEncodeStringTest("Apple", 1, 3, ObservationPart::kBasicRappor);
+  DoEncodeStringTest("Apple", 1, 3, false, ObservationPart::kBasicRappor);
 }
 
 // Tests EncodeInt() with Basic RAPPOR as the specified encoding.
@@ -329,7 +374,7 @@ TEST(EncoderTest, EncodeIntBasicRappor) {
   // Metric 2 has a single integer part.
   // EncodingConfig 4 is Basic RAPPOR with int values. Here we need the value
   // to be one of the categories.
-  DoEncodeIntTest(125, 2, 4, ObservationPart::kBasicRappor);
+  DoEncodeIntTest(125, 2, 4, true, ObservationPart::kBasicRappor);
 }
 
 // Tests EncodeBlob() with Forculus as the specified encoding.
@@ -337,7 +382,7 @@ TEST(EncoderTest, EncodeBlobForculus) {
   // Metric 3 has a single blob part.
   // EncodingConfig 1 is Forculus.
   std::string a_blob("This is a blob");
-  DoEncodeBlobTest((const void*)a_blob.data(), a_blob.size(), 3, 1,
+  DoEncodeBlobTest((const void*)a_blob.data(), a_blob.size(), 3, 1, false,
                    ObservationPart::kForculus);
 }
 
@@ -358,7 +403,20 @@ TEST(EncoderTest, AdvancedApiNoErrors) {
   // Metric 4 has a "city" part of type STRING and
   // a "rating" part of type INT.
   Encoder::Result result = encoder.Encode(4, value);
-  EXPECT_EQ(Encoder::kOK, result.status);
+
+  // Check the result
+  ASSERT_EQ(Encoder::kOK, result.status);
+  ASSERT_NE(nullptr, result.observation);
+  ASSERT_NE(nullptr, result.metadata);
+  EXPECT_EQ(kCustomerId, result.metadata->customer_id());
+  EXPECT_EQ(kProjectId, result.metadata->project_id());
+  EXPECT_EQ(4, result.metadata->metric_id());
+  // We did not set the current time to a static value but rather used the
+  // real time that the test was run. Sanity test the day index: It should
+  // be at least the day on which this test was written and less than
+  // 20 years in the future from that.
+  EXPECT_TRUE(result.metadata->day_index() >= kPacificDayIndex);
+  EXPECT_TRUE(result.metadata->day_index() < kPacificDayIndex + 365 * 20);
 
   EXPECT_NE("", result.observation->parts().at("city").rappor().data());
   EXPECT_NE("", result.observation->parts().at("rating").basic_rappor().data());
@@ -376,8 +434,8 @@ TEST(EncoderTest, AdvancedApiWithErrors) {
   // EncodingConfig 2 is String RAPPOR
   value->AddStringPart(2, "city", "San Francisco");
 
-  // There is no metric 5.
-  EXPECT_EQ(Encoder::kInvalidArguments, encoder.Encode(5, *value).status);
+  // There is no metric 99.
+  EXPECT_EQ(Encoder::kInvalidArguments, encoder.Encode(99, *value).status);
 
   // Metric 4 has two parts but value has only one part.
   EXPECT_EQ(Encoder::kInvalidArguments, encoder.Encode(4, *value).status);
@@ -441,6 +499,11 @@ TEST(EncoderTest, AdvancedApiWithErrors) {
   value.reset(new Encoder::Value());
   value->AddStringPart(6, "Part1", "dummy");
   EXPECT_EQ(Encoder::kInvalidConfig, encoder.Encode(1, *value).status);
+
+  // Metric 5 is missing a time_zone_policy.
+  value.reset(new Encoder::Value());
+  value->AddStringPart(1, "Part1", "dummy");
+  EXPECT_EQ(Encoder::kInvalidConfig, encoder.Encode(5, *value).status);
 }
 
 }  // namespace encoder

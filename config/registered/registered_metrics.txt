@@ -26,6 +26,7 @@ element {
   id: 1
   name: "Fuschsia Rating and City"
   description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
   parts {
     key: "rating"
     value {
@@ -41,13 +42,14 @@ element {
   }
 }
 
-#### Encoding (1, 1, 2)
+#### Metric (1, 1, 2)
 element {
   customer_id: 1
   project_id: 1
   id: 2
   name: "Fuschsia Usage by Hour"
   description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: UTC
   parts {
     key: "hour"
     value {
@@ -70,6 +72,7 @@ element {
   id: 1
   name: "Acme Module name"
   description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
   parts {
     key: "name"
     value {
@@ -86,6 +89,7 @@ element {
   id: 2
   name: "Acme Popular URLs"
   description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: UTC
   parts {
     key: "url"
     value {
