@@ -1,24 +1,24 @@
 [submodule "third_party/boringssl/src"]
 	path = third_party/boringssl/src
-	url = https://boringssl.googlesource.com/boringssl
+	url = https://fuchsia.googlesource.com/third_party/boringssl
 [submodule "third_party/googletest"]
 	path = third_party/googletest
-	url = https://github.com/google/googletest
+	url = https://fuchsia.googlesource.com/third_party/googletest/
 [submodule "third_party/go/src/github.com/golang/protobuf"]
 	path = third_party/go/src/github.com/golang/protobuf
-	url = https://github.com/golang/protobuf
+	url = https://fuchsia.googlesource.com/third_party/golang/protobuf/
 [submodule "third_party/go/src/golang.org/x/net"]
 	path = third_party/go/src/golang.org/x/net
-	url = https://github.com/golang/net
+	url = https://fuchsia.googlesource.com/third_party/golang/net
 [submodule "third_party/go/src/google.golang.org/grpc"]
 	path = third_party/go/src/google.golang.org/grpc
-	url = https://github.com/grpc/grpc-go
+	url = https://fuchsia.googlesource.com/third_party/grpc/grpc-go
 [submodule "third_party/go/src/github.com/golang/glog"]
 	path = third_party/go/src/github.com/golang/glog
-	url = https://github.com/golang/glog
+	url = https://fuchsia.googlesource.com/third_party/golang/glog
 [submodule "third_party/gflags"]
 	path = third_party/gflags
 	url = https://github.com/gflags/gflags.git
 [submodule "third_party/glog"]
 	path = third_party/glog
-	url = https://github.com/google/glog.git
+	url = https://fuchsia.googlesource.com/third_party/glog
