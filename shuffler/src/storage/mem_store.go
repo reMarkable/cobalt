@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -9,12 +8,12 @@ import (
 	shufflerpb "cobalt"
 )
 
-// The MemStore struct is a valid in-memory implementation of the Shuffler Data
-// Layer indexed by unique ObservationMetadata key.
+// MemStore is an in-memory implementation of the Store interface.
 type MemStore struct {
 	// ObservationsMap is a map indexed by ObersvationMetadata to a list of
-	// sealed EncryptedMessages.
-	observationsMap map[shufflerpb.ObservationMetadata][]*shufflerpb.EncryptedMessage
+	// ObservationInfo that contains sealed EncryptedMessages along with creation
+	// timestamp.
+	observationsMap map[shufflerpb.ObservationMetadata][]*ObservationInfo
 
 	// mu is the global mutex that protects all elements of the store
 	mu sync.RWMutex
@@ -23,22 +22,23 @@ type MemStore struct {
 // NewMemStore creates an empty MemStore.
 func NewMemStore() *MemStore {
 	return &MemStore{
-		observationsMap: make(map[shufflerpb.ObservationMetadata][]*shufflerpb.EncryptedMessage),
+		observationsMap: make(map[shufflerpb.ObservationMetadata][]*ObservationInfo),
 	}
 }
 
-// AddObservation inserts an encrypted message for a given ObservationMetadata.
-func (store *MemStore) AddObservation(ctx context.Context, om shufflerpb.ObservationMetadata, em *shufflerpb.EncryptedMessage) error {
+// AddObservation inserts |observationInfo| into MemStore under the key
+// |metadata|.
+func (store *MemStore) AddObservation(om shufflerpb.ObservationMetadata, obInfo *ObservationInfo) error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	store.observationsMap[om] = append(store.observationsMap[om], em)
+	store.observationsMap[om] = append(store.observationsMap[om], obInfo)
 	return nil
 }
 
-// GetObservations retrieves the list of EncryptedMessages from the store
-// corresponding to a given ObservationMetadata key.
-func (store *MemStore) GetObservations(_ context.Context, om shufflerpb.ObservationMetadata) ([]*shufflerpb.EncryptedMessage, error) {
+// GetObservations retrieves the list of ObservationInfos from MemStore
+// for the given |metadata| key.
+func (store *MemStore) GetObservations(om shufflerpb.ObservationMetadata) ([]*ObservationInfo, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
@@ -52,8 +52,8 @@ func (store *MemStore) GetObservations(_ context.Context, om shufflerpb.Observat
 }
 
 // GetKeys returns the list of unique ObservationMetadata keys stored in
-// shuffler datastore.
-func (store *MemStore) GetKeys(_ context.Context) []shufflerpb.ObservationMetadata {
+// MemStore.
+func (store *MemStore) GetKeys() []shufflerpb.ObservationMetadata {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
@@ -64,9 +64,9 @@ func (store *MemStore) GetKeys(_ context.Context) []shufflerpb.ObservationMetada
 	return keys
 }
 
-// EraseAll deletes both the ObservationMetadata key and all its
-// EncryptedMessages.
-func (store *MemStore) EraseAll(_ context.Context, om shufflerpb.ObservationMetadata) error {
+// EraseAll deletes both the |metadata| key and all it's ObservationInfos from
+// MemStore.
+func (store *MemStore) EraseAll(om shufflerpb.ObservationMetadata) error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 

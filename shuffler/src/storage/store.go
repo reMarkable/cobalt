@@ -14,28 +14,34 @@
 
 package storage
 
-import (
-	shufflerpb "cobalt"
-	"context"
-)
+import shufflerpb "cobalt"
+
+// ObservationInfo is the value stored in the Shuffler data store. It contains
+// the sealed encrypted message blob and the timestamp when it was added to the
+// store.
+type ObservationInfo struct {
+	creationTimestamp uint32
+	encryptedMessage  *shufflerpb.EncryptedMessage
+}
 
 // Store is a generic Shuffler data store interface to store and retrieve data
-// from a local in-memory or persistent data store. All the methods take context
-// as an argument, that is propagated to backends for persistent data stores.
+// from a local in-memory or persistent data store. Data store contains
+// ObservationMetadata as keys and the corresponding list of ObservationInfos
+// as values.
 type Store interface {
-	// AddObservation inserts an encrypted message for a given
-	// ObservationMetadata.
-	AddObservation(context.Context, shufflerpb.ObservationMetadata, *shufflerpb.EncryptedMessage) error
+	// AddObservation inserts |observationInfo| into the data store under the key
+	// |metadata|.
+	AddObservation(metadata shufflerpb.ObservationMetadata, observationInfo *ObservationInfo) error
 
-	// GetObservations retrieves the list of EncryptedMessages from the
-	// shuffler datastore corresponding to a given ObservationMetadata key.
-	GetObservations(context.Context, shufflerpb.ObservationMetadata) ([]*shufflerpb.EncryptedMessage, error)
+	// GetObservations retrieves the list of ObservationInfos from the data store
+	// for the given |metadata| key.
+	GetObservations(metadata shufflerpb.ObservationMetadata) ([]*ObservationInfo, error)
 
-	// GetKeys returns the list of unique ObservationMetadata keys stored
-	// in shuffler datastore.
-	GetKeys(context.Context) []shufflerpb.ObservationMetadata
+	// GetKeys returns the list of unique ObservationMetadata keys stored in the
+	// data store.
+	GetKeys() []shufflerpb.ObservationMetadata
 
-	// EraseAll deletes both the ObservationMetadata key and all its
-	// EncryptedMessages.
-	EraseAll(context.Context, shufflerpb.ObservationMetadata) error
+	// EraseAll deletes both the |metadata| key and all it's ObservationInfos
+	// from the data store.
+	EraseAll(metadata shufflerpb.ObservationMetadata) error
 }
