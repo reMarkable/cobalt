@@ -18,7 +18,7 @@
 	url = https://fuchsia.googlesource.com/third_party/golang/glog
 [submodule "third_party/gflags"]
 	path = third_party/gflags
-	url = https://github.com/gflags/gflags.git
+	url = https://fuchsia.googlesource.com/third_party/gflags
 [submodule "third_party/glog"]
 	path = third_party/glog
 	url = https://fuchsia.googlesource.com/third_party/glog
