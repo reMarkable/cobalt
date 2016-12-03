@@ -83,6 +83,11 @@ def setGCEImages(args):
   elif args.analyzer_gce:
     IMAGES = ["analyzer"]
 
+def _setup(args):
+  subprocess.check_call(["git", "submodule", "init"])
+  subprocess.check_call(["git", "submodule", "update"])
+  subprocess.check_call(["./setup.sh", "-d"])
+
 def _build(args):
   ensureDir(OUT_DIR)
   savedir = os.getcwd()
@@ -235,6 +240,10 @@ def main():
     default=0, dest='verbose_count', action='count')
 
   subparsers = parser.add_subparsers()
+
+  sub_parser = subparsers.add_parser('setup', parents=[parent_parser],
+    help='Sets up the build environment.')
+  sub_parser.set_defaults(func=_setup)
 
   sub_parser = subparsers.add_parser('build', parents=[parent_parser],
     help='Builds Cobalt.')

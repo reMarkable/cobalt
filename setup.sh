@@ -16,31 +16,87 @@
 #
 # Installs cobalt dependencies.
 
+set -e
+
+# Latest version of sysroot.  Update it after uploading.
+readonly VERSION="53a836c2ac7140f1b72933eac0abcf70b1a4dbdf"
+
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PREFIX="${SCRIPT_DIR}/sysroot"
 readonly WD="${PREFIX}/tmp"
 readonly GCLOUD_DIR=$PREFIX/gcloud
+readonly OLDWD=$(pwd)
+readonly FUSCHIA_URL="https://storage.googleapis.com/fuchsia-build"
 
 export PATH=${PREFIX}/bin:${GCLOUD_DIR}/google-cloud-sdk/bin:${PATH}
 export LD_LIBRARY_PATH=${PREFIX}/lib
 
-while getopts "eh" o; do
+UPLOAD=false
+
+# Downloads a sysroot version if it's not already installed.
+function download_sysroot() {
+    cd $SCRIPT_DIR
+
+    # Check if it's already installed.  If so, we're done.
+    INSTALLED_VER=$(cat sysroot/VERSION 2> /dev/null || echo)
+
+    if [ "$INSTALLED_VER" == "$VERSION" ] ; then
+        exit 0
+    fi
+
+    # Download.
+    echo Downloading sysroot $VERSION
+
+    curl -o sysroot.tgz \
+        $FUSCHIA_URL/cobalt/sysroot/sysroot_$VERSION.tgz
+
+    SHA=$(sha1sum sysroot.tgz | awk '{print$ 1}')
+
+    # Check the SHA.
+    if [ "$SHA" != "$VERSION" ] ; then
+      echo Bad SHA.  Got $SHA expected $VERSION
+      echo This could be a corrupt file or an attack.  Please investigate.
+      echo Aborting.
+      exit 1
+    fi
+
+    # Extract sysroot and record its SHA.
+    echo Extracting sysroot
+    rm -fr sysroot
+    tar zxf sysroot.tgz
+    rm -f sysroot.tgz
+
+    printf "$SHA" > sysroot/VERSION
+
+    echo Done
+
+    exit 0
+}
+
+# Main entry point.
+while getopts "ehud" o; do
     case "${o}" in
+      d)
+        download_sysroot
+        ;;
+      u)
+        UPLOAD=true
+        ;;
       e)
-        return
+        exec /bin/bash
         ;;
       h)
         echo "Usage: $0 <opts>"
         echo "-h    help"
-        echo "-e    setup environment (source script)"
+        echo "-e    launch a shell with PATHs set"
+        echo "-u    build and upload sysroot.tgz"
+        echo "-d    download sysroot"
         exit 0
         ;;
       *)
         ;;
     esac
 done
-
-set -e
 
 # scratch dir (if needed)
 rm -fr $WD
@@ -54,7 +110,7 @@ function download_prebuilt() {
     echo Downloading $name
 
     curl -o $tarball \
-        https://storage.googleapis.com/fuchsia-build/fuchsia/$name/linux64/$sha
+        $FUSCHIA_URL/fuchsia/$name/linux64/$sha
 }
 
 # Install build tools
@@ -167,3 +223,20 @@ if [ ! -f $GCLOUD_DIR/google-cloud-sdk/bin/gcloud ] ; then
 fi
 
 rm -fr $WD
+
+if $UPLOAD ; then
+  cd $OLDWD
+
+  echo Tarring up sysroot.tgz
+  rm -f sysroot.tgz
+  tar zcf sysroot.tgz -C $SCRIPT_DIR sysroot
+  SHA=$(sha1sum sysroot.tgz | awk '{print$ 1}')
+
+  mv sysroot.tgz sysroot_$SHA.tgz
+  ls -lh sysroot_$SHA.tgz
+
+  echo Uploading it to the cloud
+  gsutil cp -a public-read sysroot_$SHA.tgz gs://fuchsia-build/cobalt/sysroot/
+
+  rm -f sysroot_$SHA.tgz
+fi

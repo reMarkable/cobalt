@@ -7,11 +7,9 @@ An extensible, privacy-preserving, user-data analysis pipeline.
   * Currently this repo has only been tested on Goobuntu.
 
 * One-time setup:
-  * This repo uses git modules. After pulling it you must do:
-    * `git submodule init`
-    * `git submodule update`
-  * You must install the following dependencies. Run setup.sh to install all of
-    them:
+  * `cobaltb.py setup`
+  * It will setup the git submodules and will install the following
+    dependencies:
     * clang
     * cmake
     * golang
@@ -89,3 +87,17 @@ The following example sends a single RPC containing an ObservationBatch with two
 Observations to an Analyzer running locally:
 
 * cgen -analyzer 127.0.0.1 -num\_observations 2
+
+## sysroot (Cobalt's dependencies)
+
+All of Cobalt's dependencies (both compile and run-time) are installed in the
+sysroot directory using the `setup.sh` script.  To avoid having to compile the
+dependencies every time, a packaged binary version of sysroot is stored on
+Google storage.  `cobaltb.py setup` will download the pre-built sysroot from
+Google storage.
+
+To upload a new version of sysroot on Google storage do the following:
+
+* `rm -fr sysroot`
+* `./setup.sh -u`
+* Edit setup.sh and modify VERSION to have the SHA of the new sysroot.
