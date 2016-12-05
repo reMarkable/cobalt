@@ -30,21 +30,24 @@ namespace {
 // Factors out some common validation logic.
 bool CommonValidate(float prob_0_becomes_1, float prob_1_stays_1, float prob_rr,
                    const ClientSecret& client_secret) {
-  // TODO(rudominer) Consider adding logging statements here to help
-  // debug an invalid config.
   if (!client_secret.valid()) {
+    VLOG(3) << "client_secret is not valid";
     return false;
   }
   if (prob_0_becomes_1 < 0.0 || prob_0_becomes_1 > 1.0) {
+    VLOG(3) << "prob_0_becomes_1 is not valid";
     return false;
   }
   if (prob_1_stays_1 < 0.0 || prob_1_stays_1 > 1.0) {
+    VLOG(3) << "prob_1_stays_1 < 0.0  is not valid";
     return false;
   }
   if (prob_0_becomes_1 == prob_1_stays_1) {
+    VLOG(3) << "prob_0_becomes_1 == prob_1_stays_1";
     return false;
   }
   if (prob_rr != 0.0) {
+    VLOG(3) << "prob_rr not supported";
     return false;
   }
   return true;
@@ -279,8 +282,7 @@ Status BasicRapporEncoder::Encode(const ValuePart& value,
   // Set the appropriate bit.
   data[num_bytes - (byte_index + 1)] = 1 << bit_in_byte_index;
 
-  // TODO(rudominer) We will not support RAPPOR PRR in version 0.1 of Cobalt but
-  // consider supporting in in future versions.
+  // TODO(rudominer) Consider supporting prr in future versions of Cobalt.
 
   // Randomly flip some of the bits based on the probabilities p and q.
   double p = config_->prob_0_becomes_1();
