@@ -16,6 +16,7 @@
 
 #include <glog/logging.h>
 
+#include "algorithms/forculus/forculus_utils.h"
 #include "util/crypto_util/base64.h"
 
 namespace cobalt {
@@ -40,9 +41,9 @@ ForculusAnalyzer::ForculusAnalyzer(const cobalt::ForculusConfig& config) :
 
 bool ForculusAnalyzer::AddObservation(uint32_t day_index,
     const ForculusObservation& obs) {
-
-  // TUODO(rudominer) Compute epoch_index based on day_index.
-  uint32_t epoch_index = day_index;
+  // Compute the epoch_index from the day_index.
+  uint32_t epoch_index =
+      EpochIndexFromDayIndex(day_index, config_.epoch_type());
 
   // Look in decryption_map for our (day_index, obs) pair.
   DecrypterGroupKey group_key(epoch_index, obs.ciphertext());

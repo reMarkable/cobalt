@@ -67,7 +67,7 @@ class ForculusAnalyzer {
   //
   // |day_index| is the index of the day that the observation was encoded at
   // the client. It is used to compute an epoch_index. The observations are
-  // grouped into epoch indexes before Forculus decryption is applied.
+  // grouped by (epoch_index, ciphertext) before Forculus decryption is applied.
   //
   // Returns true to indicate the observation was added without error and
   // so num_observations() was incremented or false to indicate there was

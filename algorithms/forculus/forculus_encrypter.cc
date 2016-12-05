@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "algorithms/forculus/field_element.h"
+#include "algorithms/forculus/forculus_utils.h"
 #include "algorithms/forculus/polynomial_computations.h"
 #include "util/crypto_util/cipher.h"
 #include "util/crypto_util/mac.h"
@@ -153,8 +154,9 @@ ForculusEncrypter::Status ForculusEncrypter::Encrypt(
     return kInvalidConfig;
   }
 
-  // TODO(rudominer) Compute the epoch_index from the day_index
-  uint32_t epoch_index = observation_day_index;
+  // Compute the epoch_index from the day_index.
+  uint32_t epoch_index =
+      EpochIndexFromDayIndex(observation_day_index, config_->epoch_type());
 
   const uint32_t& threshold = config_->threshold();
 

@@ -189,6 +189,14 @@ TEST(DatetimeUtilTest, DayIndexCalendarDateInversesTest) {
   }
 }
 
+TEST(DatetimeUtilTest, DayIndexToWeekIndex) {
+  // This is the day index for Friday Dec 2, 2016
+  static const uint32_t kSomeDayIndex = 17137;
+  // The week index for the week containing that day.
+  static const uint32_t kSomeWeekIndex = 2448;
+  EXPECT_EQ(kSomeWeekIndex, DayIndexToWeekIndex(kSomeDayIndex));
+}
+
 TEST(DatetimeUtilTest, CalendarDateToWeekIndex) {
   CalendarDate calendar_date;
 
@@ -315,6 +323,14 @@ TEST(DatetimeUtilTest, CalendarDateToMonthIndex) {
   calendar_date.day_of_month = 4;
   calendar_date.year = 1976;
   EXPECT_EQ(74, CalendarDateToMonthIndex(calendar_date));
+}
+
+TEST(DatetimeUtilTest, DayIndexToMonthIndex) {
+  // This is the day index for Friday Dec 2, 2016
+  static const uint32_t kSomeDayIndex = 17137;
+  // The month index for December, 2016.
+  static const uint32_t kSomeMonthIndex = 563;
+  EXPECT_EQ(kSomeMonthIndex, DayIndexToMonthIndex(kSomeDayIndex));
 }
 
 void doMonthIndexToCalendarDateTest(uint32_t month_index,

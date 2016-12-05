@@ -29,15 +29,16 @@ using encoder::ClientSecret;
 static const uint32_t kThreshold = 20;
 
 namespace {
-// Encrypts the plaintext using Forculus encryption with the given day_index,
-// threshold = kThreshold and default values for the other parameters.
-// A fresh ClientSecret will be generated each time this function is invoked.
-// Returns a ForculusObservation containing the ciphertext.
-ForculusObservation Encrypt(uint32_t day_index,
+// Encrypts the plaintext using Forculus encryption with the given day_index
+// and EpochType and threshold = kThreshold and default values for the other
+// parameters. A fresh ClientSecret will be generated each time this function
+// is invoked. Returns a ForculusObservation containing the ciphertext.
+ForculusObservation Encrypt(uint32_t day_index, const EpochType& epoch_type,
     const std::string& plaintext) {
   // Make a config with the given threshold
   ForculusConfig config;
   config.set_threshold(kThreshold);
+  config.set_epoch_type(epoch_type);
 
   // Construct an Encrypter.
   ForculusEncrypter encrypter(config, 0, 0, 0, "",
@@ -51,12 +52,13 @@ ForculusObservation Encrypt(uint32_t day_index,
   return obs;
 }
 
-// Adds observations to |forculus_analyzer| based on the parameters.
+// Creates and adds observations to |forculus_analyzer| based on the parameters.
 void AddObservations(ForculusAnalyzer* forculus_analyzer, uint32_t day_index,
-    const std::string& plaintext, int num_clients, int num_copies_per_client) {
+    const EpochType& epoch_type, const std::string& plaintext, int num_clients,
+    int num_copies_per_client) {
   // Simulate num_clients different clients.
   for (int i = 0; i < num_clients; i++) {
-    auto observation = Encrypt(day_index, plaintext);
+    auto observation = Encrypt(day_index, epoch_type, plaintext);
     // Each client adds the same observation |num_copies_per_client| times.
     for (int i = 0; i < num_copies_per_client; i++) {
        EXPECT_TRUE(forculus_analyzer->AddObservation(day_index, observation));
@@ -82,22 +84,22 @@ TEST(ForculusAnalyzerTest, NoErrors) {
 
   // 20 * 5 observations of plaintext1 on day 0. (This means 20 different
   // clients each encrypting plaintext1 5 times on day 0.)
-  AddObservations(&forculus_analyzer, 0, plaintext1, kThreshold, 5);
+  AddObservations(&forculus_analyzer, 0, DAY, plaintext1, kThreshold, 5);
   // 20 * 5 observations of plaintext1 on day 1.
-  AddObservations(&forculus_analyzer, 1, plaintext1, kThreshold, 5);
+  AddObservations(&forculus_analyzer, 1, DAY, plaintext1, kThreshold, 5);
 
   // 21 * 6 observations of plaintext2 on day 0.
-  AddObservations(&forculus_analyzer, 0, plaintext2, kThreshold + 1, 6);
+  AddObservations(&forculus_analyzer, 0, DAY, plaintext2, kThreshold + 1, 6);
   // 19 * 6 observations of plaintext2 on day 1. These will not be decrypted.
-  AddObservations(&forculus_analyzer, 1, plaintext2, kThreshold - 1, 6);
+  AddObservations(&forculus_analyzer, 1, DAY, plaintext2, kThreshold - 1, 6);
 
   // 19 * 7 observations of plaintext3 on day 0. These will not be decrypted.
-  AddObservations(&forculus_analyzer, 0,  plaintext3, kThreshold - 1, 7);
+  AddObservations(&forculus_analyzer, 0,  DAY, plaintext3, kThreshold - 1, 7);
   // 19 * 7 observations of plaintext3 on day 1. These will not be decrypted.
-  AddObservations(&forculus_analyzer, 1,  plaintext3, kThreshold - 1, 7);
+  AddObservations(&forculus_analyzer, 1,  DAY, plaintext3, kThreshold - 1, 7);
 
   // 22 * 8 observations of plaintext4 on day 3.
-  AddObservations(&forculus_analyzer, 3, plaintext4, kThreshold + 2, 8);
+  AddObservations(&forculus_analyzer, 3, DAY, plaintext4, kThreshold + 2, 8);
 
   EXPECT_EQ(0, forculus_analyzer.observation_errors());
   static const int kExpectedNumObservations =
@@ -125,6 +127,88 @@ TEST(ForculusAnalyzerTest, NoErrors) {
 
   // Plaintext3 should not be decrypted.
   EXPECT_EQ(nullptr, results[plaintext3]);
+}
+
+// We test Forculus encryption and analysis using DAY, WEEK and MONTH epochs.
+TEST(ForculusAnalyzerTest, TestEpochTypes) {
+  ForculusConfig forculus_config;
+  forculus_config.set_threshold(kThreshold);
+  std::unique_ptr<ForculusAnalyzer> forculus_analyzer(
+      new ForculusAnalyzer(forculus_config));
+
+  const std::string plaintext("Some text");
+
+  // First we test with a DAY epoch, the default.
+
+  // Add 10 observations on day 0,
+  AddObservations(forculus_analyzer.get(), 0, DAY, plaintext, kThreshold - 10,
+                  1);
+  // and 10 observations on day 1.
+  AddObservations(forculus_analyzer.get(), 1, DAY, plaintext, 10, 1);
+
+  // Since day 0 and day 1 are different epochs we should not have decrypted the
+  // plaintext.
+  auto results = forculus_analyzer->TakeResults();
+  EXPECT_EQ(0, results.size());
+
+  // Next we test with a WEEK epoch
+  forculus_config.set_epoch_type(WEEK);
+  forculus_analyzer.reset(new ForculusAnalyzer(forculus_config));
+
+  // Add 10 observations on day 0,
+  AddObservations(forculus_analyzer.get(), 0, WEEK, plaintext, kThreshold - 10,
+                  1);
+  // and 10 observations on day 1.
+  AddObservations(forculus_analyzer.get(), 1, WEEK, plaintext, 10, 1);
+
+  // Since day 0 and day 1 are in the same epoch we should have decrypted the
+  // plaintext.
+  results = forculus_analyzer->TakeResults();
+  EXPECT_EQ(1, results.size());
+
+  // Next we test with a WEEK epoch but two days in different weeks.
+  forculus_analyzer.reset(new ForculusAnalyzer(forculus_config));
+
+  // Add 10 observations on day 0,
+  AddObservations(forculus_analyzer.get(), 0, WEEK, plaintext, kThreshold - 10,
+                  1);
+  // and 10 observations on day 7.
+  AddObservations(forculus_analyzer.get(), 7, WEEK, plaintext, 10, 1);
+
+  // Since day 0 and day 7 are different epochs we should not have decrypted the
+  // plaintext.
+  results = forculus_analyzer->TakeResults();
+  EXPECT_EQ(0, results.size());
+
+  // Next we test with a MONTH epoch
+  forculus_config.set_epoch_type(MONTH);
+  forculus_analyzer.reset(new ForculusAnalyzer(forculus_config));
+
+  // Add 10 observations on day 0,
+  AddObservations(forculus_analyzer.get(), 0, MONTH, plaintext, kThreshold - 10,
+                  1);
+  // and 10 observations on day 7.
+  AddObservations(forculus_analyzer.get(), 7, MONTH, plaintext, 10, 1);
+
+  // Since day 0 and day 7 are in the same epoch we should have decrypted the
+  // plaintext.
+  results = forculus_analyzer->TakeResults();
+  EXPECT_EQ(1, results.size());
+
+  // Finally we test with a MONTH epoch but two days in different months.
+  forculus_config.set_epoch_type(MONTH);
+  forculus_analyzer.reset(new ForculusAnalyzer(forculus_config));
+
+  // Add 10 observations on day 0,
+  AddObservations(forculus_analyzer.get(), 0, MONTH, plaintext, kThreshold - 10,
+                  1);
+  // and 10 observations on day 31.
+  AddObservations(forculus_analyzer.get(), 31, MONTH, plaintext, 10, 1);
+
+  // Since day 0 and day 31 are in different epochs we should not have decrypted
+  // the  plaintext.
+  results = forculus_analyzer->TakeResults();
+  EXPECT_EQ(0, results.size());
 }
 
 // Tests the use of a ForculusAnalyzer when fed observations with errors.

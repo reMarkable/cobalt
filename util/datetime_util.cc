@@ -86,7 +86,7 @@ uint32_t CalendarDateToDayIndex(const CalendarDate& calendar_date) {
   if (calendar_date.year < 1970 || calendar_date.year >= 10000 ||
     calendar_date.month < 1 || calendar_date.month > 12 ||
     calendar_date.day_of_month < 1 || calendar_date.day_of_month > 31) {
-    return kInvalidDayIndex;
+    return kInvalidIndex;
   }
 
   // This algorithm counts years as beginning on March 1. Convert to that now.
@@ -138,14 +138,22 @@ CalendarDate DayIndexToCalendarDate(uint32_t day_index) {
   return TimeInfoToCalendarDate(time_info);
 }
 
-uint32_t CalendarDateToWeekIndex(const CalendarDate& calendar_date) {
+uint32_t DayIndexToWeekIndex(uint32_t day_index) {
   // Day zero was a Thursday which is 4 days after Sunday.
-  return (CalendarDateToDayIndex(calendar_date) + 4) / 7;
+  return (day_index + 4) / 7;
+}
+
+uint32_t CalendarDateToWeekIndex(const CalendarDate& calendar_date) {
+  return DayIndexToWeekIndex(CalendarDateToDayIndex(calendar_date));
 }
 
 CalendarDate WeekIndexToCalendarDate(uint32_t week_index) {
   // Day zero was a Thursday which is 4 days after Sunday.
   return DayIndexToCalendarDate(week_index * 7 - (week_index > 0 ? 4 : 0));
+}
+
+uint32_t DayIndexToMonthIndex(uint32_t day_index) {
+  return CalendarDateToMonthIndex(DayIndexToCalendarDate(day_index));
 }
 
 uint32_t CalendarDateToMonthIndex(const CalendarDate& calendar_date) {

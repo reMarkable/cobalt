@@ -66,7 +66,7 @@ namespace util {
 // a leap second.
 static const uint32_t kNumUnixSecondsPerDay = 60L * 60L * 24L;
 
-static const uint32_t kInvalidDayIndex = UINT32_MAX;
+static const uint32_t kInvalidIndex = UINT32_MAX;
 
 // A CalendarDate represents a day on the calendar using normal human-readable
 // indexing. Just as with day-index there is no well-defined mapping from an
@@ -75,7 +75,7 @@ struct CalendarDate {
   // A number from 1 to 31.
   uint32_t day_of_month = 1;
 
-  // 1 = January, 2 = February, ..., 3 = December
+  // 1 = January, 2 = February, ..., 12 = December
   uint32_t month = 1;
 
   // Calendar year e.g. 2016.
@@ -103,6 +103,10 @@ uint32_t CalendarDateToDayIndex(const CalendarDate& calendar_date);
 // after January 1, 1970.
 CalendarDate DayIndexToCalendarDate(uint32_t day_index);
 
+// Given a day_index returns the index of the Cobalt week epoch
+// containing that date.
+uint32_t DayIndexToWeekIndex(uint32_t day_index);
+
 // Given a CalendarDate returns the index of the Cobalt week epoch
 // containing that date. If the fields of calendar_date do not make sense as a
 // real day of the calendar (for example if month=13) then the result is
@@ -115,6 +119,10 @@ uint32_t CalendarDateToWeekIndex(const CalendarDate& calendar_date);
 // returned date will be a Sunday. If week_index=0 the returned date will
 // be day zero: Thu 1970-1-1.
 CalendarDate WeekIndexToCalendarDate(uint32_t week_index);
+
+// Given a day_index returns the index of the Cobalt month epoch
+// containing that date.
+uint32_t DayIndexToMonthIndex(uint32_t day_index);
 
 // Given a CalendarDate returns the index of the Cobalt month epoch
 // containing that date. If the fields of

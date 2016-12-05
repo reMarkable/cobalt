@@ -18,15 +18,14 @@
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
-add_library(forculus_utils
-            polynomial_computations.cc field_element.cc)
+add_library(forculus_utils ${CONFIG_PROTO_SRCS}
+            forculus_utils.cc polynomial_computations.cc field_element.cc)
+target_link_libraries(forculus_utils datetime_util ${PROTOBUF_LIBRARY})
 
 add_library(forculus_encrypter forculus_encrypter.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
-
 target_link_libraries(forculus_encrypter
-                      forculus_utils client_secret
-                      datetime_util ${PROTOBUF_LIBRARY})
+                      client_secret forculus_utils ${PROTOBUF_LIBRARY})
 
 add_library(forculus_analyzer forculus_analyzer.cc forculus_decrypter.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
