@@ -13,8 +13,8 @@ import (
 )
 
 // createObservationMetaData constructs fake observation metadata for testing.
-func createObservationMetaData(customerID int, projectID int, metricID int, dayIndex int) shufflerpb.ObservationMetadata {
-	return shufflerpb.ObservationMetadata{
+func createObservationMetaData(customerID int, projectID int, metricID int, dayIndex int) *shufflerpb.ObservationMetadata {
+	return &shufflerpb.ObservationMetadata{
 		CustomerId: uint32(customerID),
 		ProjectId:  uint32(projectID),
 		MetricId:   uint32(metricID),
@@ -27,8 +27,8 @@ func createRandomObservationInfo(pubKey string) *ObservationInfo {
 	var bytes = make([]byte, 20)
 	rand.Read(bytes)
 	return &ObservationInfo{
-		creationTimestamp: uint32(time.Now().UnixNano()),
-		encryptedMessage: &shufflerpb.EncryptedMessage{
+		CreationTimestamp: time.Now(),
+		EncryptedMessage: &shufflerpb.EncryptedMessage{
 			Scheme:     shufflerpb.EncryptedMessage_PK_SCHEME_1,
 			PubKey:     pubKey,
 			Ciphertext: bytes},
@@ -66,6 +66,15 @@ func TestAddGetAndDeleteForSingleObservation(t *testing.T) {
 	obInfo := createRandomObservationInfo("pkey1")
 	if err := store.AddObservation(om, obInfo); err != nil {
 		t.Errorf("got error %v, expected success", err)
+	}
+
+	// Validate the size of observations
+	if obInfoSize, err := store.GetNumObservations(om); err != nil {
+		t.Errorf("got error %v, expected atleast one observation", err)
+	} else {
+		if obInfoSize != 1 {
+			t.Errorf("got observation count [%d], expected only one observation", obInfoSize)
+		}
 	}
 
 	// Retrieve and validate stored observation contents
@@ -141,14 +150,21 @@ func TestAddGetAndDeleteForMultipleObservations(t *testing.T) {
 
 	// Retrieve stored observation contents for a key with different msgs
 	om = createObservationMetaData(randIndex, 500+randIndex, 1000+randIndex, randIndex%7)
-	obInfosLen := 0
+
+	var obInfosLen int
+	var err error
+	if obInfosLen, err = store.GetNumObservations(om); err != nil {
+		t.Errorf("got error [%v], expected multiple observations", err)
+	} else {
+		if obInfosLen <= 1 {
+			t.Errorf("got [%d] ObservationInfos, expected more than one ObservationInfo per metric", obInfosLen)
+		}
+	}
+
 	if obInfos, err := store.GetObservations(om); err != nil {
 		t.Errorf("got error [%v], expected a non-zero list of observations", err)
-	} else if len(obInfos) <= 1 {
-		t.Errorf("got [%d] ObservationInfos, expected more than one ObservationInfo per metric", len(obInfos))
-	} else {
-		obInfosLen = len(obInfos)
-		t.Logf("got [%d] observations", obInfosLen)
+	} else if obInfosLen != len(obInfos) {
+		t.Errorf("got [%d] observations, expected [%d] observations", len(obInfos), obInfosLen)
 	}
 
 	// Remove a metric and its associated list of observations
@@ -234,5 +250,35 @@ func TestMemStoreConcurrency(t *testing.T) {
 	// Verify count of saved metrics after concurrent deletion
 	if metrics := store.GetKeys(); len(metrics) != 95 {
 		t.Errorf("got [%d] metrics, expected [95]", len(metrics))
+	}
+}
+
+// TestShuffle validates the shuffling functionality.
+func TestShuffle(t *testing.T) {
+	// Make test deterministic
+	rand.Seed(1)
+
+	num := 10
+	// Create the input test ObservationInfos.
+	testObInfos := make([][]*ObservationInfo, 2)
+	// empty list
+	testObInfos[0] = append(testObInfos[0], &ObservationInfo{})
+	// list with 10 items
+	for i := 0; i < num; i++ {
+		testObInfos[1] = append(testObInfos[1], createRandomObservationInfo(strings.Join([]string{"pubkey", strconv.Itoa(i)}, "-")))
+	}
+
+	for _, testObInfo := range testObInfos {
+		shuffledObInfo := shuffle(testObInfo)
+
+		// Check that basic shuffling occurred
+		// TODO(bittau) define the acceptance criteria for how good a shuffle is
+		// and assert them.
+		if reflect.DeepEqual(shuffledObInfo, testObInfo) {
+			// Skip empty lists
+			if len(testObInfo) >= 1 && testObInfo[0].EncryptedMessage != nil {
+				t.Error("Error in shuffling Observations")
+			}
+		}
 	}
 }

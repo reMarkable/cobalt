@@ -34,47 +34,78 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	cobaltpb "cobalt"
-	"dispatcher"
+	shufflerpb "cobalt"
+	"storage"
 	util "util"
+)
+
+var (
+	store storage.Store
 )
 
 // shufflerServer is used to implement shuffler.ShufflerServer.
 type shufflerServer struct{}
 
-// Process() function processes the incoming encoder requests and sends it to
-// analyzer.
+// Process() function processes the incoming encoder requests and stores them
+// locally in a random order. During dispatch event, the records get sent to
+// Analyzer and deleted from Shuffler.
 func (s *shufflerServer) Process(ctx context.Context,
-	encryptedMessage *cobaltpb.EncryptedMessage) (*cobaltpb.ShufflerResponse, error) {
-	// TODO(ukode): Add impl for decrypting the sealed envelope and then batch
-	// and shuffle the payloads.
+	encryptedMessage *shufflerpb.EncryptedMessage) (*shufflerpb.ShufflerResponse, error) {
+	// TODO(ukode): Add impl for decrypting the sealed envelope.
 	glog.V(2).Infoln("Function Process() is invoked.")
 	pubKey := encryptedMessage.PubKey
 	ciphertext := encryptedMessage.Ciphertext
 
 	c := util.NoOpCrypter{}
 
-	envelope := &cobaltpb.Envelope{}
+	envelope := &shufflerpb.Envelope{}
 	err := proto.Unmarshal(c.Decrypt(ciphertext, pubKey), envelope)
 	if err != nil {
 		return nil, fmt.Errorf("Error in unmarshalling ciphertext: %v", err)
 	}
 
-	// TODO(ukode): Replace this test code that talks to analyzer by dispatching
-	// instantaneously with real impl in the following cls.
-	go dispatcher.Dispatch(envelope)
+	// Check the recipient first. If the request is intended for another Shuffler
+	// do not open the envelope and route it to the next Shuffler directly using
+	// a forwarder thread.
+	if envelope.RecipientUrl != "" {
+		// TODO(ukode): Forward the request to the next Shuffler in chain for
+		// further processing. This will be implemented by queueing the request in
+		// a channel that the forwarder can consume and dispatch to the next
+		// Shuffler |envelope.RecipientUrl|.
+	}
 
-	// TODO(ukode): Replace ShufflerResponse with Empty proto.
-	return &cobaltpb.ShufflerResponse{}, nil
+	encryptedMessageBlob := envelope.GetEncryptedMessage()
+	if encryptedMessageBlob == nil {
+		return nil, fmt.Errorf("Received empty encrypted message for key [%v]", envelope.GetObservationMetaData())
+	}
+
+	// Extract the Observation from the sealed envelope, save it in Shuffler data
+	// store for dispatcher to consume and forward to Analyzer based on some
+	// dispatch criteria. The data store shuffles the order of the Observation
+	// before persisting.
+	if err := store.AddObservation(envelope.GetObservationMetaData(), storage.MakeObservationInfo(encryptedMessageBlob)); err != nil {
+		return nil, fmt.Errorf("Error in saving observation: %v", envelope.GetObservationMetaData())
+	}
+
+	glog.V(2).Infoln("Process() done, returning OK.")
+	return &shufflerpb.ShufflerResponse{Status: shufflerpb.ShufflerResponse_OK}, nil
 }
 
 func newServer() *shufflerServer {
-	s := new(shufflerServer)
-	return s
+	server := new(shufflerServer)
+	return server
 }
 
 // ReceiveAndStore serves incoming requests from encoders.
-func ReceiveAndStore(tls bool, certFile string, keyFile string, port int) {
+func ReceiveAndStore(tls bool, certFile string, keyFile string, port int, config *shufflerpb.ShufflerConfig, dataStore storage.Store) {
+	if config == nil || dataStore == nil {
+		glog.Fatal("Invalid config or data store handles, exiting.")
+	}
+
+	// Initialize data store handle
+	store = dataStore
+
+	// Start the grpc receiver and start listening for requests from Encoders
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		glog.V(2).Info("Grpc: Failed to accept connections:", err)
@@ -89,7 +120,8 @@ func ReceiveAndStore(tls bool, certFile string, keyFile string, port int) {
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
+	glog.V(2).Info("Starting Shuffler:", err)
 	grpcServer := grpc.NewServer(opts...)
-	cobaltpb.RegisterShufflerServer(grpcServer, newServer())
+	shufflerpb.RegisterShufflerServer(grpcServer, newServer())
 	grpcServer.Serve(lis)
 }

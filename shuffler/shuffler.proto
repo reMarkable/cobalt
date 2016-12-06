@@ -33,6 +33,11 @@ service Shuffler {
 // TODO(ukode): Replace ShufflerResponse with built-in Empty proto, after
 // figuring out the same import from multiple packages issue.
 message ShufflerResponse {
+  enum Status {
+    OK = 0;
+    ERROR = 1;
+  }
+  Status status = 1;
 }
 
 // Shuffler receives an |encrypted_message| either from another Shuffler or

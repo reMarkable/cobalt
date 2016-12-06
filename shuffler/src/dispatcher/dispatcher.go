@@ -21,7 +21,8 @@
 package dispatcher
 
 import (
-	"math/rand"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -29,88 +30,221 @@ import (
 	"google.golang.org/grpc"
 
 	shufflerpb "cobalt"
+	"storage"
 )
 
-// Policy defines instructions on how to route messages to Analyzers
-type Policy struct{}
-
-// Shuffler interface provides functionality to add a policy to a ciphertext.
-// It will eventually be sent out to an Analyzer according to a policy.
-// TODO(bittau) use cobaltprotobuf directly once they are defined and committed
-type Shuffler interface {
-	add(policy Policy, ciphertext []byte)
-}
-
-// An Analyzer object knows how to send data to a specific Analyzer
+// Analyzer where the observations get collected, analyzed and reported.
 type Analyzer interface {
-	send(ciphertexts [][]byte)
+	send(obBatch *shufflerpb.ObservationBatch) error
 }
 
-// BasicShuffler is An implementation of a basic shuffler.  It will wait until
-// batchsize ciphertexts are received, and then send them in a random order to
-// anaylzer
-type BasicShuffler struct {
-	analyzer  Analyzer
-	batchsize int
-	// TODO(bittau): NB ciphertexts will go away (or have a different type)
-	// once cobaltprotobufs are defined.  cobaltprotobufs will be stored directly.
-	ciphertexts [][]byte
+// GrpcAnalyzer sends data to Analyzer specified by |URL| using Grpc transport.
+type GrpcAnalyzer struct {
+	URL string
 }
 
-func (s *BasicShuffler) add(policy Policy, ciphertext []byte) {
-	s.ciphertexts = append(s.ciphertexts, ciphertext)
+var lastTime time.Time
 
-	if len(s.ciphertexts) >= s.batchsize {
-		s.shuffle()
+// Dispatch function either routes the incoming request from Encoder to next
+// Shuffler or to the Analyzer, if the dispatch criteria is met. If the
+// dispatch criteria is not met, the incoming Observation is buffered locally
+// for the next dispatch attempt.
+func Dispatch(config *shufflerpb.ShufflerConfig, store storage.Store, batchSize int, analyzer Analyzer) {
+	lastTime = time.Now()
+
+	if config == nil {
+		glog.Fatal("Invalid config handle")
+	}
+
+	if store == nil {
+		glog.Fatal("Invalid datastore handle")
+	}
+
+	if analyzer == nil {
+		glog.Fatal("Invalid Analyzer handle")
+	}
+
+	if batchSize == 0 {
+		glog.Fatal("Invalid batch size")
+	}
+
+	for {
+		dispatchInternal(config, store, batchSize, analyzer)
 	}
 }
 
-func (s *BasicShuffler) shuffle() {
-	num := len(s.ciphertexts)
-	shuffled := make([][]byte, num)
-
-	// Get a random ordering for all messages.  We assume that the random
-	// number generator is appropriately seeded.
-	perm := rand.Perm(num)
-
-	for i, rnd := range perm {
-		shuffled[i] = s.ciphertexts[rnd]
+// Shuffler dispatches data to the Analyzer based on time and volume as
+// follows:
+// 1. The dispatch interval between attempts should be atleast
+//    |frequency_in_hours| as specified in the Shuffler configuration.
+// 2. If eligible, Shuffler sends |ObservationBatch| to the Analyzer for
+//    each |ObservationMetadata| key only if:
+//    - The batch contains atleast |threshold| number of Observations, and
+//    - For each eligible batch, the Observations in that batch will be
+//      dispatched to the Analyzer and deleted from the Shuffler, and
+//    - For each batch whose Observations are not dispatched to the Analyzer
+//      because the batch size is too small, the Shuffler will delete those
+//      Observations from the batch whose age is at least
+//      |disposal_age_days| specified in the configuration.
+func dispatchInternal(config *shufflerpb.ShufflerConfig, store storage.Store, batchSize int, analyzer Analyzer) {
+	dispatchIntervalInHours := config.GetGlobalConfig().FrequencyInHours
+	glog.V(2).Infoln("Dispatch interval from config: [%d]", dispatchIntervalInHours)
+	if !readyToDispatch(dispatchIntervalInHours, &lastTime) {
+		time.Sleep(time.Duration(dispatchIntervalInHours*3600) * time.Second)
 	}
 
-	// Send to analyzer and clear buffer
-	s.analyzer.send(shuffled)
-	s.ciphertexts = [][]byte{}
+	// Send ObservationBatch per key separately to Analyzer
+	glog.V(2).Infoln("Start dispatching...")
+	for _, key := range store.GetKeys() {
+		// Get list of Observations for each key.
+		bucketSize, err := store.GetNumObservations(key)
+		glog.V(2).Infoln("Bucket size from store: [%d]", bucketSize)
+		if err != nil {
+			glog.V(2).Infoln(fmt.Sprintf("GetNumObservations call failed for key: %v with error: %v", key, err))
+			return
+		}
+
+		// Compare bucket size to the configured limit.
+		if uint32(bucketSize) >= config.GetGlobalConfig().Threshold {
+			// Send the shuffled bucket to Analyzer in chunks. If the bucket is too
+			// big, send it in multiple chunks of size |batchSize|.
+			obInfos, err := store.GetObservations(key)
+			glog.V(2).Infoln("Threshold met, processing further...")
+			if err != nil {
+				glog.V(2).Infoln(fmt.Sprintf("GetObservation call failed for key: %v with error: %v", key, err))
+				return
+			}
+
+			var batchID int
+			for i := 0; i < bucketSize; i += batchSize {
+				batchID++
+				var end int
+				if (i + batchSize) <= bucketSize {
+					end = i + batchSize
+				} else {
+					end = bucketSize
+				}
+				glog.V(2).Infoln("Sending observations to Analyzer in chunks, batch [%d] in progress...", batchID)
+				err = analyzer.send(getObservationBatchChunk(key, obInfos, i, end))
+				if err != nil {
+					// TODO(ukode): Add retry behaviour for 3 or more attempts or use
+					// exponential backoff for errors relating to network issues.
+					glog.V(2).Infoln(fmt.Sprintf("Error in transmitting data to Analyzer for key [%v]: %v", key, err))
+					return
+				}
+
+				// After successful send, remove the Observations from the local
+				// datastore.
+				if err := store.EraseAll(key); err != nil {
+					glog.Fatal(fmt.Sprintf("Error in deleting dispatched observations from the store for key: %v", key))
+				}
+			}
+		} else {
+			// If threshold policy is not met, loop through the messages and check
+			// if any messages are in the queue for more than the allowed duration
+			// |dispage_age_days|. If found, discard them, otherwise queue it back
+			// in the store for the next dispatch event.
+			obInfos, err := store.GetObservations(key)
+			if err != nil {
+				glog.V(2).Infoln(fmt.Sprintf("GetObservation call failed for key: %v with error: %v", key, err))
+				return
+			}
+
+			err = updateObservations(store, key, obInfos, config.GetGlobalConfig().DisposalAgeDays)
+			if err != nil {
+				glog.V(2).Infoln(fmt.Sprintf("Error in filtering Observations for key [%v]: %v", key, err))
+				return
+			}
+		}
+	}
 }
 
-// Dispatch function makes a grpc call to analyzer and forwards the request
-// from encoder to analyzer.
-func Dispatch(envelope *shufflerpb.Envelope) {
-	analyzerURL := envelope.RecipientUrl
-
-	if analyzerURL == "" {
-		glog.V(2).Infoln("Missing recipient.")
-		return
+// readyToDispatch determines if the Shuffler is eligible for sending
+// requests to the Analyzer based on the |frequency_in_hours| interval
+// configuration between the dispatch attempts.
+func readyToDispatch(frequencyInHours uint32, lastTime *time.Time) bool {
+	if lastTime == nil {
+		return false
 	}
 
-	glog.V(2).Infoln("Connecting to analyzer:", analyzerURL)
-	conn, err := grpc.Dial(analyzerURL, grpc.WithInsecure(), grpc.WithTimeout(time.Second*30))
+	now := time.Now()
+	elapsedHours := uint32(now.Sub(*lastTime).Hours())
+	glog.V(2).Infoln(fmt.Sprintf("Dispatch time interval: %v", elapsedHours))
+	if elapsedHours < frequencyInHours {
+		return false
+	}
+	// lastTime is updated both at system startup and when the time elapsed
+	// between the dispatch attempts is greater than |frequencyInHours|.
+	*lastTime = now
+	return true
+}
+
+// getObservationBatchChunk returns the chunk of Observations starting from
+// index |start| to index |end| from the given list.
+func getObservationBatchChunk(key *shufflerpb.ObservationMetadata, obInfos []*storage.ObservationInfo, start int, end int) *shufflerpb.ObservationBatch {
+	var encryptedMessages []*shufflerpb.EncryptedMessage
+	for i := start; i < end; i++ {
+		encryptedMessages = append(encryptedMessages, obInfos[i].EncryptedMessage)
+	}
+
+	return &shufflerpb.ObservationBatch{
+		MetaData:             key,
+		EncryptedObservation: encryptedMessages,
+	}
+}
+
+// updateObservations resets the Observations list based on the age of the
+// Observation, and persists the valid ones back to the dispatch queue.
+func updateObservations(store storage.Store, key *shufflerpb.ObservationMetadata, obInfos []*storage.ObservationInfo, disposalAgeInDays uint32) error {
+	now := time.Now()
+	var filteredObInfos []*storage.ObservationInfo
+	for _, obInfo := range obInfos {
+		if uint32(now.Sub(obInfo.CreationTimestamp).Hours()) < disposalAgeInDays*24 {
+			filteredObInfos = append(filteredObInfos, obInfo)
+		}
+	}
+	// TODO(ukode): Add an optimized version for filtering Observations.
+	if err := store.EraseAll(key); err != nil {
+		return fmt.Errorf("Error in removing unfiltered observations: %v", key)
+	}
+	for _, filteredObInfo := range filteredObInfos {
+		if err := store.AddObservation(key, filteredObInfo); err != nil {
+			return fmt.Errorf("Error in saving filtered observations: %v", key)
+		}
+	}
+	return nil
+}
+
+// forwardToAnalyzer sends Observations for a given ObservationMetadata key to
+// Analyzer using the AddObservations grpc call.
+func (a *GrpcAnalyzer) send(obBatch *shufflerpb.ObservationBatch) error {
+	if a.URL == "" {
+		return errors.New("Invalid analyzer")
+	}
+
+	if obBatch == nil {
+		return errors.New("Empty ObservationBatch")
+	}
+
+	glog.V(2).Infoln("Connecting to recipient: %s", a.URL)
+	conn, err := grpc.Dial(a.URL, grpc.WithInsecure(), grpc.WithTimeout(time.Second*30))
 
 	if err != nil {
-		glog.V(2).Infoln("Unable to connect to analyzer:", analyzerURL, " with error:", err)
-		return
+		return fmt.Errorf("Connection failed for: %v with error: %v", a.URL, err)
 	}
 
 	defer conn.Close()
 	c := shufflerpb.NewAnalyzerClient(conn)
 
-	_, err = c.AddObservations(context.Background(), &shufflerpb.ObservationBatch{
-		MetaData:             envelope.GetObservationMetaData(),
-		EncryptedObservation: []*shufflerpb.EncryptedMessage{envelope.GetEncryptedMessage()}})
+	// Analyzer forwards a new context, so as to break the context correlation
+	// between originating request and the shuffled request that is being
+	// forwarded.
+	_, err = c.AddObservations(context.Background(), obBatch)
 
 	if err != nil {
-		glog.V(2).Infoln("Error in sending shuffled reports:", err)
-		return
+		return fmt.Errorf("AddObservations call failed with error: %v", err)
 	}
 
 	glog.V(2).Infoln("Shuffler to Analyzer grpc call executed successfully")
+	return nil
 }

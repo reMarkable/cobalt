@@ -14,14 +14,28 @@
 
 package storage
 
-import shufflerpb "cobalt"
+import (
+	shufflerpb "cobalt"
+	"time"
+)
 
 // ObservationInfo is the value stored in the Shuffler data store. It contains
 // the sealed encrypted message blob and the timestamp when it was added to the
 // store.
 type ObservationInfo struct {
-	creationTimestamp uint32
-	encryptedMessage  *shufflerpb.EncryptedMessage
+	CreationTimestamp time.Time
+	EncryptedMessage  *shufflerpb.EncryptedMessage
+}
+
+// MakeObservationInfo constructs ObservationInfo from the |encryptedMessage|.
+func MakeObservationInfo(encryptedMessage *shufflerpb.EncryptedMessage) *ObservationInfo {
+	if encryptedMessage == nil {
+		return nil
+	}
+	return &ObservationInfo{
+		CreationTimestamp: time.Now(),
+		EncryptedMessage:  encryptedMessage,
+	}
 }
 
 // Store is a generic Shuffler data store interface to store and retrieve data
@@ -31,17 +45,21 @@ type ObservationInfo struct {
 type Store interface {
 	// AddObservation inserts |observationInfo| into the data store under the key
 	// |metadata|.
-	AddObservation(metadata shufflerpb.ObservationMetadata, observationInfo *ObservationInfo) error
+	AddObservation(metadata *shufflerpb.ObservationMetadata, observationInfo *ObservationInfo) error
 
-	// GetObservations retrieves the list of ObservationInfos from the data store
-	// for the given |metadata| key.
-	GetObservations(metadata shufflerpb.ObservationMetadata) ([]*ObservationInfo, error)
+	// GetObservations retrieves the shuffled list of ObservationInfos from the
+	// data store for the given |metadata| key.
+	GetObservations(metadata *shufflerpb.ObservationMetadata) ([]*ObservationInfo, error)
+
+	// GetObservationsSize returns the count of ObservationInfos for a given
+	// |metadata| key.
+	GetNumObservations(metadata *shufflerpb.ObservationMetadata) (int, error)
 
 	// GetKeys returns the list of unique ObservationMetadata keys stored in the
 	// data store.
-	GetKeys() []shufflerpb.ObservationMetadata
+	GetKeys() []*shufflerpb.ObservationMetadata
 
 	// EraseAll deletes both the |metadata| key and all it's ObservationInfos
 	// from the data store.
-	EraseAll(metadata shufflerpb.ObservationMetadata) error
+	EraseAll(metadata *shufflerpb.ObservationMetadata) error
 }

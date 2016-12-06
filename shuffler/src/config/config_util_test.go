@@ -117,7 +117,6 @@ func TestLoadConfigWithRegisteredConfig(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error loading the config file: %v", err)
 	}
-
 }
 
 // TestLoadConfigWithValidTestConfig validates both the format and the contents

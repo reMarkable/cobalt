@@ -50,6 +50,16 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# Deploy shuffler config
+set(SHUFFLER_CONF "${CMAKE_BINARY_DIR}/shuffler/conf/config_v0.txt")
+set(SHUFFLER_CONF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_v0.txt")
+
+add_custom_command(OUTPUT ${SHUFFLER_CONF}
+    COMMAND cp ${SHUFFLER_CONF_SRC} ${SHUFFLER_CONF}
+    DEPENDS ${SHUFFLER_CONF_SRC}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 # Build shuffler executables
 set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
 set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
@@ -67,8 +77,10 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     DEPENDS ${DISPATCHER_SRC}
     DEPENDS ${RECEIVER_SRC}
     DEPENDS ${UTIL_SRC}
+    DEPENDS ${STORE_SRC}
     DEPENDS ${CONFIG_SRC}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shuffler_main.go
+    DEPENDS ${SHUFFLER_CONF}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -134,6 +146,7 @@ add_custom_command(OUTPUT ${STORAGE_TEST_BIN}
 # Build shuffler target
 add_custom_target(shuffler_all ALL
     DEPENDS ${SHUFFLER_BIN}
+            ${SHUFFLER_CONF}
             ${TEST_CLIENT_BIN}
             ${DISPATCHER_TEST_BIN}
             ${UTIL_TEST_BIN}

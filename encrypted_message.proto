@@ -26,7 +26,6 @@ message EncryptedMessage {
     // TODO(pseudorandom) Change this to the name of an actual scheme
     // we will use such as PKCSV_1_5 or something.
     PK_SCHEME_1 = 1;
-
   }
   EncryptionScheme scheme = 1;
   string pub_key = 2;   // Fingerprint (SHA256) of the recipient’s key. This is

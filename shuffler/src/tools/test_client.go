@@ -23,6 +23,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -91,11 +92,12 @@ func grpcToShuffler() {
 		PubKey:     testPubKey,
 		Ciphertext: c.Encrypt(data, testPubKey)}
 
-	_, err = sc.Process(context.Background(), sendMsg)
+	resp, err := sc.Process(context.Background(), sendMsg)
 	if err != nil {
 		glog.Fatalf("Could not send encoded reports: %v", err)
 	}
 
+	fmt.Printf("Shuffler Response: [%v]", resp)
 	glog.Info("Success: Grpc to Shuffler service was successfully completed.")
 }
 
