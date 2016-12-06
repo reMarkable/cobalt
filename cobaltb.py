@@ -317,6 +317,8 @@ def main():
 
   os.environ["LD_LIBRARY_PATH"] = "%s/lib" % SYSROOT_DIR
 
+  os.environ["GOROOT"] = "%s/golang" % SYSROOT_DIR
+
   return args.func(args)
 
 
