@@ -48,12 +48,10 @@ message ForculusObservation {
 message RapporObservation {
   uint32 cohort = 1;
 
-  // The encoding of a serialized ValuePart.
   bytes data = 2;
 }
 
 message BasicRapporObservation {
-  // The encoding of a serialized ValuePart.
   bytes data = 1;
 }
 

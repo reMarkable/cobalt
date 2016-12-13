@@ -15,11 +15,12 @@
 #ifndef COBALT_ALGORITHMS_RAPPOR_RAPPOR_ENCODER_H_
 #define COBALT_ALGORITHMS_RAPPOR_RAPPOR_ENCODER_H_
 
-#include <string>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "./observation.pb.h"
+#include "algorithms/rappor/rappor_config_validator.h"
 #include "config/encodings.pb.h"
 #include "encoder/client_secret.h"
 #include "util/crypto_util/random.h"
@@ -27,7 +28,11 @@
 namespace cobalt {
 namespace rappor {
 
-class RapporConfigValidator;
+namespace testing {
+// Forward declaration of a test in another namespace is necessary in order
+// to make the test a friend class.
+class BasicRapporDeterministicTest;
+}  // namespace testing
 
 enum Status {
   kOK = 0,
@@ -46,8 +51,7 @@ class RapporEncoder {
 
   // Encodes |value| using RAPPOR encoding. Returns kOK on success, or
   // kInvalidConfig if the |config| passed to the constructor is not valid.
-  Status Encode(const ValuePart& value,
-                RapporObservation *observation_out);
+  Status Encode(const ValuePart& value, RapporObservation* observation_out);
 
  private:
   // Allows Friend classess to set a special RNG for use in tests.
@@ -59,7 +63,6 @@ class RapporEncoder {
   std::unique_ptr<crypto::Random> random_;
   encoder::ClientSecret client_secret_;
 };
-
 
 // Performs encoding for Basic RAPPOR, a.k.a Categorical RAPPOR. No cohorts
 // are used and the list of all candidates must be pre-specified as part
@@ -77,10 +80,10 @@ class BasicRapporEncoder {
   // if the |config| passed to the constructor is not valid, and kInvalidInput
   // if |value| is not one of the |categories|.
   Status Encode(const ValuePart& value,
-                BasicRapporObservation *observation_out);
+                BasicRapporObservation* observation_out);
 
  private:
-  friend class BasicRapporDeterministicTest;
+  friend class testing::BasicRapporDeterministicTest;
 
   // Allows Friend classess to set a special RNG for use in tests.
   void SetRandomForTesting(std::unique_ptr<crypto::Random> random) {
@@ -91,7 +94,6 @@ class BasicRapporEncoder {
   std::unique_ptr<crypto::Random> random_;
   encoder::ClientSecret client_secret_;
 };
-
 
 }  // namespace rappor
 }  // namespace cobalt

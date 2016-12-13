@@ -16,11 +16,13 @@
 #include <map>
 #include <vector>
 
+#include "algorithms/rappor/rappor_test_utils.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 #include "util/crypto_util/random_test_utils.h"
 
 namespace cobalt {
 namespace rappor {
+namespace testing {
 
 using encoder::ClientSecret;
 
@@ -279,81 +281,6 @@ TEST(RapporEncoderTest, BasicRapporWithIntsConfigValidation) {
   EXPECT_EQ(kInvalidInput, encoder.Encode(value, &obs));
 }
 
-// Returns whether or not the bit with the given |bit_index| is set in
-// |data|. The bits are indexed "from right-to-left", i.e. from least
-// significant to most significant. The least significant bit has index 0.
-bool IsSet(const std::string& data, int bit_index) {
-  uint32_t num_bytes = data.size();
-  uint32_t byte_index = bit_index / 8;
-  uint32_t bit_in_byte_index = bit_index % 8;
-  return data[num_bytes - byte_index - 1] & (1 << bit_in_byte_index);
-}
-
-// Returns a string of "0"s and "1"s that gives the binary representation of the
-// bytes in |data|.
-std::string DataToBinaryString(const std::string& data) {
-  size_t num_bits = data.size() * 8;
-  // Initialize output to a string of all zeroes.
-  std::string output(num_bits, '0');
-  size_t output_index = 0;
-  for (int bit_index = num_bits - 1; bit_index >= 0; bit_index--) {
-    if (IsSet(data, bit_index)) {
-      output[output_index] = '1';
-    }
-    output_index++;
-  }
-  return output;
-}
-
-// Tests the function DataToBinaryString().
-TEST(UtilityTest, DataToBinaryString) {
-  // One byte
-  EXPECT_EQ(DataToBinaryString(std::string("\0", 1)),   "00000000");
-  EXPECT_EQ(DataToBinaryString(std::string("\x1", 1)),  "00000001");
-  EXPECT_EQ(DataToBinaryString(std::string("\x2", 1)),  "00000010");
-  EXPECT_EQ(DataToBinaryString(std::string("\x3", 1)),  "00000011");
-  EXPECT_EQ(DataToBinaryString(std::string("\xFE", 1)), "11111110");
-
-  // Two bytes
-  EXPECT_EQ(DataToBinaryString(std::string("\0\0", 2)),
-      "0000000000000000");
-  EXPECT_EQ(DataToBinaryString(std::string("\0\1", 2)),
-      "0000000000000001");
-  EXPECT_EQ(DataToBinaryString(std::string("\1\0", 2)),
-      "0000000100000000");
-  EXPECT_EQ(DataToBinaryString(std::string("\0\1", 2)),
-      "0000000000000001");
-  EXPECT_EQ(DataToBinaryString(std::string("\1\xFE", 2)),
-      "0000000111111110");
-
-  // Three bytes
-  EXPECT_EQ(DataToBinaryString(std::string("\0\0\0", 3)),
-      "000000000000000000000000");
-  EXPECT_EQ(DataToBinaryString(std::string("\0\0\1", 3)),
-      "000000000000000000000001");
-  EXPECT_EQ(DataToBinaryString(std::string("\0\1\0", 3)),
-      "000000000000000100000000");
-  EXPECT_EQ(DataToBinaryString(std::string("\1\1\0", 3)),
-      "000000010000000100000000");
-}
-
-// Builds the string "category<x><y>" where <x> and <y> are the two-digit
-// representation of |index| which must be less than 100.
-std::string CategoryName(int index) {
-  char buffer[11];
-  snprintf(buffer, sizeof(buffer), "category%02u", index);
-  return std::string(buffer, 10);
-}
-
-// Returns a string of characters of length |num_bits| with |index_char| in
-// position |index| and |other_char| in all other positions.
-// REQUIRES: 0 <= index < num_bits.
-std::string BuildBitPatternString(int num_bits, int index, char index_char,
-    char other_char ) {
-  return std::string(num_bits - 1 - index, other_char) + index_char +
-      std::string(index, other_char);
-}
-
 // Performs a test of BasicRepporEncoder::Encode() in the two special cases that
 // that there is no randomness involved in the encoded string, namely
 // (a) p = 0, q = 1
@@ -590,6 +517,7 @@ TEST(BasicRapporEncoderTest, BadCategory) {
   EXPECT_EQ(kInvalidInput, encoder.Encode(value, &obs));
 }
 
+}  // namespace testing
 }  // namespace rappor
 }  // namespace cobalt
 
