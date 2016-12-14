@@ -49,16 +49,16 @@ void doSymmetricCipherTest(SymmetricCipher* cipher,
   Random rand;
   rand.RandomBytes(key, SymmetricCipher::KEY_SIZE);
   rand.RandomBytes(nonce, SymmetricCipher::NONCE_SIZE);
-  EXPECT_TRUE(cipher->setKey(key)) << GetLastErrorMessage();
+  EXPECT_TRUE(cipher->set_key(key)) << GetLastErrorMessage();
 
   // Encrypt
   std::vector<byte> cipher_text;
-  EXPECT_TRUE(cipher->encrypt(nonce, plain_text, ptext_len, &cipher_text))
+  EXPECT_TRUE(cipher->Encrypt(nonce, plain_text, ptext_len, &cipher_text))
       << GetLastErrorMessage();
 
   // Decrypt
   std::vector<byte> recovered_text;
-  EXPECT_TRUE(cipher->decrypt(nonce, cipher_text.data(), cipher_text.size(),
+  EXPECT_TRUE(cipher->Decrypt(nonce, cipher_text.data(), cipher_text.size(),
       &recovered_text)) << GetLastErrorMessage();
 
   // Compare
@@ -105,14 +105,14 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher,
   byte salt[HybridCipher::SALT_SIZE];
   byte nonce[HybridCipher::NONCE_SIZE];
   std::vector<byte> cipher_text;
-  ASSERT_TRUE(hybrid_cipher->SetPublicKey(public_key)) << GetLastErrorMessage();
+  ASSERT_TRUE(hybrid_cipher->set_public_key(public_key)) << GetLastErrorMessage();
   EXPECT_TRUE(hybrid_cipher->Encrypt(plain_text, ptext_len, public_key_part,
                                      salt, nonce, &cipher_text))
       << GetLastErrorMessage();
 
   // Decrypt
   std::vector<byte> recovered_text;
-  ASSERT_TRUE(hybrid_cipher->SetPrivateKey(private_key))
+  ASSERT_TRUE(hybrid_cipher->set_private_key(private_key))
       << GetLastErrorMessage();
   ASSERT_TRUE(hybrid_cipher->Decrypt(public_key_part, salt, nonce,
                                      cipher_text.data(), cipher_text.size(),

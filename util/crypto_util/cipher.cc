@@ -88,12 +88,12 @@ SymmetricCipher::SymmetricCipher() : context_(new CipherContext()) {}
 
 SymmetricCipher::~SymmetricCipher() {}
 
-bool SymmetricCipher::setKey(const byte key[KEY_SIZE]) {
+bool SymmetricCipher::set_key(const byte key[KEY_SIZE]) {
   return EVP_AEAD_CTX_init(context_->get(), GetAEAD(), key,
                            KEY_SIZE, EVP_AEAD_DEFAULT_TAG_LENGTH, NULL);
 }
 
-bool SymmetricCipher::encrypt(const byte nonce[NONCE_SIZE], const byte *ptext,
+bool SymmetricCipher::Encrypt(const byte nonce[NONCE_SIZE], const byte *ptext,
     int ptext_len, std::vector<byte>* ctext) {
 
   int max_out_len = EVP_AEAD_max_overhead(GetAEAD()) + ptext_len;
@@ -105,7 +105,7 @@ bool SymmetricCipher::encrypt(const byte nonce[NONCE_SIZE], const byte *ptext,
   return rc;
 }
 
-bool SymmetricCipher::decrypt(const byte nonce[NONCE_SIZE], const byte *ctext,
+bool SymmetricCipher::Decrypt(const byte nonce[NONCE_SIZE], const byte *ctext,
   int ctext_len, std::vector<byte>* ptext) {
   ptext->resize(ctext_len);
   size_t out_len;
@@ -122,7 +122,7 @@ HybridCipher::HybridCipher() : context_(new HybridCipherContext()),
 
 HybridCipher::~HybridCipher() {}
 
-bool HybridCipher::SetPublicKey(const byte public_key[PUBLIC_KEY_SIZE]) {
+bool HybridCipher::set_public_key(const byte public_key[PUBLIC_KEY_SIZE]) {
   std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
       EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
   if (!eckey) {
@@ -156,7 +156,7 @@ bool HybridCipher::SetPublicKey(const byte public_key[PUBLIC_KEY_SIZE]) {
   return true;
 }
 
-bool HybridCipher::SetPrivateKey(const byte private_key[PRIVATE_KEY_SIZE]) {
+bool HybridCipher::set_private_key(const byte private_key[PRIVATE_KEY_SIZE]) {
   std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
       EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
   if (!eckey) {
@@ -239,10 +239,10 @@ bool HybridCipher::Encrypt(const byte *ptext, int ptext_len,
   rand.RandomBytes(nonce_out, NONCE_SIZE);
 
   // Do symmetric encryption with hkdf_derived_key
-  if (!symm_cipher_->setKey(hkdf_derived_key)) {
+  if (!symm_cipher_->set_key(hkdf_derived_key)) {
     return false;
   }
-  if (!symm_cipher_->encrypt(nonce_out, ptext, ptext_len, ctext)) {
+  if (!symm_cipher_->Encrypt(nonce_out, ptext, ptext_len, ctext)) {
     return false;
   }
 
@@ -295,10 +295,10 @@ bool HybridCipher::Decrypt(const byte public_key_part[PUBLIC_KEY_SIZE],
   }
 
   // Now decrypt using symm_cipher_ interface
-  if (!symm_cipher_->setKey(hkdf_derived_key)) {
+  if (!symm_cipher_->set_key(hkdf_derived_key)) {
     return false;
   }
-  if (!symm_cipher_->decrypt(nonce, ctext, ctext_len, ptext)) {
+  if (!symm_cipher_->Decrypt(nonce, ctext, ctext_len, ptext)) {
     return false;
   }
 

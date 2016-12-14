@@ -31,7 +31,7 @@ class HybridCipherContext;
 // Provides a C++ interface to an AEAD implementation.
 //
 // An instance of SymmetricCipher may be used repeatedly for multiple
-// encryptions or decryptions. The method setKey() must be invoked before
+// encryptions or decryptions. The method set_key() must be invoked before
 // any other methods or the other operations will fail or crash.
 class SymmetricCipher {
  public:
@@ -47,8 +47,7 @@ class SymmetricCipher {
   // in errors.h to obtain error information upon failure.
   // |key| Must have length |KEY_SIZE|.
   //
-  // TODO(rudominer): setKey --> SetKey everywhere.
-  bool setKey(const byte key[KEY_SIZE]);
+  bool set_key(const byte key[KEY_SIZE]);
 
   // Performs AEAD encryption.
   //
@@ -66,7 +65,7 @@ class SymmetricCipher {
   //
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  bool encrypt(const byte nonce[NONCE_SIZE], const byte *ptext, int ptext_len,
+  bool Encrypt(const byte nonce[NONCE_SIZE], const byte *ptext, int ptext_len,
       std::vector<byte>* ctext);
 
   // Performs AEAD decryption.
@@ -82,7 +81,7 @@ class SymmetricCipher {
   //
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  bool decrypt(const byte nonce[NONCE_SIZE], const byte *ctext, int ctext_len,
+  bool Decrypt(const byte nonce[NONCE_SIZE], const byte *ctext, int ctext_len,
       std::vector<byte>* ptext);
 
  private:
@@ -119,8 +118,8 @@ class SymmetricCipher {
 //    key and nonce
 //
 // An instance of HybridCipher may be used repeatedly for multiple
-// encryptions or decryptions. The method SetPublicKey() must be used before
-// encryptions and SetPrivateKey() must be used before decryptions.
+// encryptions or decryptions. The method set_public_key() must be used before
+// encryptions and set_private_key() must be used before decryptions.
 //
 // TODO(pseudorandom): Can we eliminate salt and save space without
 // compromising security?
@@ -137,23 +136,23 @@ class HybridCipher {
 
   // Sets the public key for encryption. This must be invoked
   // at least once before encrypt is called. Using decryption after
-  // SetPublicKey is undefined behavior.
+  // set_public_key is undefined behavior.
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
   //
   // |key| must have length |PUBLIC_KEY_SIZE| and be
   // X9.62 serialized
-  bool SetPublicKey(const byte key[PUBLIC_KEY_SIZE]);
+  bool set_public_key(const byte key[PUBLIC_KEY_SIZE]);
 
   // Sets the private key for decryption. This must be invoked
   // at least once before decrypt is called. Using encryption after
-  // SetPrivateKey is undefined behavior.
+  // set_private_key is undefined behavior.
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
   //
   // |key| must have length |PRIVATE_KEY_SIZE| and will be
   // interpreted as big-endian big integer.
-  bool SetPrivateKey(const byte key[PRIVATE_KEY_SIZE]);
+  bool set_private_key(const byte key[PRIVATE_KEY_SIZE]);
 
   // Performs ECDH-based hybrid encryption
   //

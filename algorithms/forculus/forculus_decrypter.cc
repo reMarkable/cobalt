@@ -78,12 +78,12 @@ ForculusDecrypter::Status ForculusDecrypter::Decrypt(
 
   // Now we have the key, decrypt.
   SymmetricCipher cipher;
-  cipher.setKey(c0.KeyBytes());
+  cipher.set_key(c0.KeyBytes());
   std::vector<byte> recoverd_text;
   // Our encryption scheme uses a zero nonce. (Note that C++11 initializes
   // the entire array to 0 with this syntax.)
   static const byte kZeroNonce[SymmetricCipher::NONCE_SIZE] = {0};
-  if (!cipher.decrypt(kZeroNonce,
+  if (!cipher.Decrypt(kZeroNonce,
                      reinterpret_cast<const byte*>(ciphertext_.data()),
                      ciphertext_.size(), &recoverd_text)) {
     // TODO(pseudorandom, rudominer) One reason that decryption might fail

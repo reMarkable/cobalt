@@ -187,11 +187,11 @@ ForculusEncrypter::Status ForculusEncrypter::Encrypt(
   // We use coefficients[0] as the symmetric key to perform deterministic
   // encryption of the plaintext.
   SymmetricCipher cipher;
-  cipher.setKey(coefficients[0].KeyBytes());
+  cipher.set_key(coefficients[0].KeyBytes());
   // We use a zero-nonce to achieve deterministic encryption.
   static const byte kZeroNonce[SymmetricCipher::NONCE_SIZE] = {0};
   std::vector<byte> ciphertext;
-  if (!cipher.encrypt(kZeroNonce,
+  if (!cipher.Encrypt(kZeroNonce,
       reinterpret_cast<const byte*>(plaintext.data()),
       plaintext.size(), &ciphertext)) {
     return kEncryptionFailed;
