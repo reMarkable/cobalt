@@ -105,7 +105,8 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher,
   byte salt[HybridCipher::SALT_SIZE];
   byte nonce[HybridCipher::NONCE_SIZE];
   std::vector<byte> cipher_text;
-  ASSERT_TRUE(hybrid_cipher->set_public_key(public_key)) << GetLastErrorMessage();
+  ASSERT_TRUE(hybrid_cipher->set_public_key(public_key))
+      << GetLastErrorMessage();
   EXPECT_TRUE(hybrid_cipher->Encrypt(plain_text, ptext_len, public_key_part,
                                      salt, nonce, &cipher_text))
       << GetLastErrorMessage();

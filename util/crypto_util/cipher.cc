@@ -53,15 +53,22 @@ namespace {
 
 class CipherContext {
  public:
-  CipherContext()
-      : impl_(new EVP_AEAD_CTX(), ::EVP_AEAD_CTX_cleanup) {}
+  ~CipherContext() {
+    EVP_AEAD_CTX_cleanup(&impl_);
+  }
+
+  bool SetKey(const byte key[SymmetricCipher::KEY_SIZE]) {
+    EVP_AEAD_CTX_cleanup(&impl_);
+    return EVP_AEAD_CTX_init(&impl_, GetAEAD(), key, SymmetricCipher::KEY_SIZE,
+                             EVP_AEAD_DEFAULT_TAG_LENGTH, NULL);
+  }
 
   EVP_AEAD_CTX* get() {
-    return impl_.get();
+    return &impl_;
   }
 
  private:
-  std::unique_ptr<EVP_AEAD_CTX, decltype(&::EVP_AEAD_CTX_cleanup)> impl_;
+  EVP_AEAD_CTX impl_;
 };
 
 class HybridCipherContext {
@@ -89,8 +96,7 @@ SymmetricCipher::SymmetricCipher() : context_(new CipherContext()) {}
 SymmetricCipher::~SymmetricCipher() {}
 
 bool SymmetricCipher::set_key(const byte key[KEY_SIZE]) {
-  return EVP_AEAD_CTX_init(context_->get(), GetAEAD(), key,
-                           KEY_SIZE, EVP_AEAD_DEFAULT_TAG_LENGTH, NULL);
+  return context_->SetKey(key);
 }
 
 bool SymmetricCipher::Encrypt(const byte nonce[NONCE_SIZE], const byte *ptext,
