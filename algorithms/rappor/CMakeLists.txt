@@ -27,10 +27,16 @@ add_library(rappor_encoder rappor_encoder.cc
 target_link_libraries(rappor_encoder
                       client_secret cobalt_crypto glog ${PROTOBUF_LIBRARY} rappor_config_validator)
 
+add_library(rappor_analyzer basic_rappor_analyzer.cc
+            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
+target_link_libraries(rappor_analyzer
+                      cobalt_crypto glog ${PROTOBUF_LIBRARY} rappor_config_validator)
+
 # The test depends directly on Boring SSL for the deterministic random.
 include_directories(BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/third_party/boringssl/src/include")
-add_executable(rappor_tests rappor_encoder_test.cc
+add_executable(rappor_tests
+               basic_rappor_analyzer_test.cc rappor_encoder_test.cc
                rappor_test_utils.cc rappor_test_utils_test.cc)
-target_link_libraries(rappor_tests rappor_encoder gtest gtest_main)
+target_link_libraries(rappor_tests rappor_encoder rappor_analyzer rappor_analyzer gtest gtest_main)
 set_target_properties(rappor_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

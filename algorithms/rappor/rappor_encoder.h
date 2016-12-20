@@ -83,6 +83,7 @@ class BasicRapporEncoder {
                 BasicRapporObservation* observation_out);
 
  private:
+  friend class BasicRapporAnalyzerTest;
   friend class testing::BasicRapporDeterministicTest;
 
   // Allows Friend classess to set a special RNG for use in tests.
