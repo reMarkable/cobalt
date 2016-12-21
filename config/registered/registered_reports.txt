@@ -9,7 +9,7 @@
 #
 # The format of this file is the textual representation of the
 # RegisteredReports Protocol Buffer message, which is defined in
-# metrics.proto.
+# reports.proto.
 ##########################################################################
 
 

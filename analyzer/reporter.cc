@@ -27,8 +27,9 @@
 #include "analyzer/reporter.h"
 #include "analyzer/store/store.h"
 #include "analyzer/schema.pb.h"
-#include "config/metric_config.h"
 #include "config/encoding_config.h"
+#include "config/metric_config.h"
+#include "config/report_config.h"
 
 #include "./observation.pb.h"
 

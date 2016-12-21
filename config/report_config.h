@@ -12,26 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef COBALT_CONFIG_METRIC_CONFIG_H_
-#define COBALT_CONFIG_METRIC_CONFIG_H_
+#ifndef COBALT_CONFIG_REPORT_CONFIG_H_
+#define COBALT_CONFIG_REPORT_CONFIG_H_
 
 #include "config/config.h"
-#include "config/metrics.pb.h"
+#include "config/reports.pb.h"
 
 namespace cobalt {
 namespace config {
 
-// A container for all of the Metrics registered in Cobalt. This
+// A container for all of the ReportConfigs registered in Cobalt. This
 // is used only on the Analyzer.
-typedef Registry<RegisteredMetrics> MetricRegistry;
+typedef Registry<RegisteredReports> ReportRegistry;
 
 // For ease of understanding we specify the interfaces below as if
-// MetricRegistry were not a template specializations but astand-alone classe.
+// ReportRegistry were not a template specialization but a
+// stand-alone classe.
 
 /*
-class MetricRegistry {
+class ReportRegistry {
  public:
-  // Populates a new instance of MetricRegistry by reading and parsing the
+  // Populates a new instance of ReportRegistry by reading and parsing the
   // specified file. Returns a pair consisting of a pointer to the result and a
   // Status.
   //
@@ -40,36 +41,36 @@ class MetricRegistry {
   //
   // If |error_collector| is not null then it will be notified of any parsing
   // errors or warnings.
-  static std::pair<std::unique_ptr<MetricRegistry>, Status>
+  static std::pair<std::unique_ptr<ReportRegistry>, Status>
       FromFile(const std::string& file_path,
                google::protobuf::io::ErrorCollector* error_collector);
 
-  // Populates a new instance of MetricRegistry by reading and parsing the
-  // specified string. Returns a pair consisting of a pointer to the result and
-  // a Status.
+  // Populates a new instance of ReportRegistry by reading and parsing the
+  // specified string. Returns a pair consisting of a pointer to the result and a
+  // Status.
   //
   // If the operation is successful then the status is kOK. Otherwise the
   // Status indicates the error.
   //
   // If |error_collector| is not null then it will be notified of any parsing
   // errors or warnings.
-  static std::pair<std::unique_ptr<MetricRegistry>, Status>
+  static std::pair<std::unique_ptr<ReportRegistry>, Status>
       FromString(const std::string& input,
                  google::protobuf::io::ErrorCollector* error_collector);
 
-  // Returns the number of Metrics in this registry.
+  // Returns the number of Reports in this registry.
   size_t size();
 
-  // Returns the Metric with the given ID triple, or nullptr if there is
-  // no such Metric. The caller does not take ownership of the returned
+  // Returns the ReportConfig with the given ID triple, or nullptr if there is
+  // no such ReportConfig. The caller does not take ownership of the returned
   // pointer.
-  const Metric* const Get(uint32_t customer_id,
-                          uint32_t project_id,
-                          uint32_t id);
+  const ReportConfig* const Get(uint32_t customer_id,
+                                uint32_t project_id,
+                                uint32_t id);
 };
 */
 
 }  // namespace config
 }  // namespace cobalt
 
-#endif  // COBALT_CONFIG_METRIC_CONFIG_H_
+#endif  // COBALT_CONFIG_REPORT_CONFIG_H_

@@ -18,6 +18,7 @@
 
 #include "config/encoding_config.h"
 #include "config/metric_config.h"
+#include "config/report_config.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
 namespace cobalt {

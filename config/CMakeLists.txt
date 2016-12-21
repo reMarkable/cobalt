@@ -14,7 +14,7 @@
 
 set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
 protobuf_generate_cpp(CONFIG_PROTO_SRCS CONFIG_PROTO_HDRS
-                      encodings.proto metrics.proto)
+                      encodings.proto metrics.proto reports.proto)
 
 # Build the config_gen tool
 add_executable(config_gen config_gen.cc ${CONFIG_PROTO_SRCS})
