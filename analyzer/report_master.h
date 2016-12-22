@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef COBALT_ANALYZER_REPORTER_H_
-#define COBALT_ANALYZER_REPORTER_H_
+#ifndef COBALT_ANALYZER_REPORT_MASTER_H_
+#define COBALT_ANALYZER_REPORT_MASTER_H_
 
 namespace cobalt {
 namespace analyzer {
 
-// This is the main method for the reporter component.  This call blocks
+// This is the main method for the report master.  This call blocks
 // forever.  Currently it is not folded into main() because we run both the
-// analyzer_service and the reporter in a single process and each have their own
-// "main()".
-void reporter_main();
+// analyzer_service and the report master in a single process and each have
+// their own "main()".
+void report_master_main();
 
 }  // namespace analyzer
 }  // namespace cobalt
 
-#endif  // COBALT_ANALYZER_REPORTER_H_
+#endif  // COBALT_ANALYZER_REPORT_MASTER_H_

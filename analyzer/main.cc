@@ -19,7 +19,7 @@
 #include <thread>
 
 #include "analyzer/analyzer_service.h"
-#include "analyzer/reporter.h"
+#include "analyzer/report_master.h"
 
 int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
   // into one process, using two threads.  Each component has its own _main
   // method making it easy to speparate them into multiple programs in the
   // future.  Their _main methods would be folded into the top-level main().
-  std::thread reporter(cobalt::analyzer::reporter_main);
+  std::thread reporter(cobalt::analyzer::report_master_main);
   cobalt::analyzer::analyzer_service_main();
   reporter.join();
 

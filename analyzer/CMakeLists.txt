@@ -14,7 +14,8 @@
 
 set(ANALYZER_SRCS
     analyzer_service.cc
-    reporter.cc
+    report_generator.cc
+    report_master.cc
     store/bigtable_store.cc
     store/mem_store.cc
     store/store.cc
