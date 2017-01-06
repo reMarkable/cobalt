@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(store)
+
 set(ANALYZER_SRCS
     analyzer_service.cc
     report_generator.cc
     report_master.cc
-    store/bigtable_store.cc
-    store/mem_store.cc
-    store/store.cc
     )
 
 set(ANALYZER_LIBS
     ${PROTOBUF_LIBRARY}
+    analyzer_store
     googleapis
     forculus_analyzer
     cobalt_crypto
