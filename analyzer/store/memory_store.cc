@@ -16,6 +16,8 @@
 
 #include <glog/logging.h>
 
+#include <set>
+
 namespace cobalt {
 namespace analyzer {
 namespace store {
@@ -69,6 +71,9 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
   ReadResponse read_response;
   read_response.more_available = false;
 
+  // Make a set of the requested columns
+  std::set<std::string> requested_columns(columns.begin(), columns.end());
+
   // Iterate through the rows of the range.
   for (ImplMapType::iterator row_iterator = start_iterator;
        row_iterator != limit_iterator; row_iterator++) {
@@ -85,7 +90,10 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     // Iterate through this sub-map.
     for (const auto& pair : row_iterator->second) {
       // For each element of the sub-map add a ColumnValue to column_values.
-      column_values.emplace_back(pair.first, pair.second);
+      if (requested_columns.empty() ||
+          requested_columns.find(pair.first) != requested_columns.end()) {
+        column_values.emplace_back(pair.first, pair.second);
+      }
     }
   }
 

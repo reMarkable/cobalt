@@ -21,6 +21,7 @@ add_library(analyzer_store
             data_store.cc
             mem_store.cc
             memory_store.cc
+            observation_store.cc
             store.cc
             ${PROTO_SRCS} ${COBALT_PROTO_SRCS})
 
@@ -33,7 +34,7 @@ target_link_libraries(analyzer_store
 
 # Build the test
 add_executable(analyzer_store_tests
-               memory_store_test.cc)
+               memory_store_test.cc observation_store_test.cc)
 target_link_libraries(analyzer_store_tests gtest gtest_main analyzer_store)
 set_target_properties(analyzer_store_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
