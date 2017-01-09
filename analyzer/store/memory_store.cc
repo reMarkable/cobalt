@@ -34,16 +34,13 @@ Status MemoryStoreSingleton::WriteRow(Table table, Row row) {
   ImplMapType& rows =
       (table == kObservations ? observation_rows_ : report_rows_);
   rows[row.key].clear();
-  for (int i = 0; i < row.column_values.size(); i++) {
-    rows[row.key][row.column_values[i].name] =
-        std::move(row.column_values[i].value);
-  }
+  rows[row.key] = std::move(row.column_values);
   return kOK;
 }
 
 DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
-    std::string limit_row_key, std::vector<std::string> columns,
+    std::string limit_row_key, std::vector<std::string> column_names,
     size_t max_rows) {
   if (max_rows == 0 || max_rows > 100) {
     max_rows = 100;
@@ -71,8 +68,9 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
   ReadResponse read_response;
   read_response.more_available = false;
 
-  // Make a set of the requested columns
-  std::set<std::string> requested_columns(columns.begin(), columns.end());
+  // Make a set of the requested column_names
+  std::set<std::string> requested_column_names(column_names.begin(),
+                                               column_names.end());
 
   // Iterate through the rows of the range.
   for (ImplMapType::iterator row_iterator = start_iterator;
@@ -90,9 +88,10 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     // Iterate through this sub-map.
     for (const auto& pair : row_iterator->second) {
       // For each element of the sub-map add a ColumnValue to column_values.
-      if (requested_columns.empty() ||
-          requested_columns.find(pair.first) != requested_columns.end()) {
-        column_values.emplace_back(pair.first, pair.second);
+      if (requested_column_names.empty() ||
+          requested_column_names.find(pair.first) !=
+              requested_column_names.end()) {
+        column_values[pair.first] = pair.second;
       }
     }
   }

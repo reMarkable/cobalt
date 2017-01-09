@@ -127,8 +127,7 @@ Status ObservationStore::AddObservation(const ObservationMetadata& metadata,
     pair.second.SerializeToString(&serialized_observation_part);
     // TODO(rudominer) Consider ways to avoid having so many copies of the
     // part names.
-    row.column_values.emplace_back(pair.first,
-                                   std::move(serialized_observation_part));
+    row.column_values[pair.first] = std::move(serialized_observation_part);
   }
   return store_->WriteRow(DataStore::kObservations, std::move(row));
 }
@@ -179,14 +178,17 @@ ObservationStore::QueryResponse ObservationStore::QueryObservations(
     query_response.results.emplace_back();
     auto& query_result = query_response.results.back();
     query_result.day_index = DayIndexFromRowKey(row.key);
-    for (const DataStore::ColumnValue& column_value : row.column_values) {
+
+    for (auto& pair : row.column_values) {
+      const std::string& column_name = pair.first;
+      const std::string& column_value = pair.second;
       // For each column_value in the row we add an ObservationPart.
       // The column_name is the part name and so the key to the map. The
       // The insert_result is a pair of the form < <key, value>, bool> where
       // the bool indicates whether or not the key was newly added to the map.
       auto insert_result = query_result.observation.mutable_parts()->insert(
           google::protobuf::Map<std::string, ObservationPart>::value_type(
-              column_value.name, ObservationPart()));
+              column_name, ObservationPart()));
       // The column names should all be unique so each insert should return
       // true.
       DCHECK(insert_result.second);
@@ -194,8 +196,7 @@ ObservationStore::QueryResponse ObservationStore::QueryObservations(
       // first element of insert_result.
       auto& observation_part = insert_result.first->second;
       // We deserialize the ObservationPart from the column value.
-      if (!ParseEncryptedObservationPart(&observation_part,
-                                         column_value.value)) {
+      if (!ParseEncryptedObservationPart(&observation_part, column_value)) {
         query_response.status = kOperationFailed;
         return query_response;
       }

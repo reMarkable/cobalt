@@ -45,9 +45,9 @@ enum Status {
 // The Cobalt data store is a key-multi-value store. There are
 // two tables: Observations and Reports. Each table is organized into
 // rows identified by a unique string row key. Each row has multiple values
-// organized into columns. A single column value has a column_name and a
-// column_value, both of which are strings. Different rows may have different
-// numbers of columns and different column names.
+// organized into columns. Each column has a string name and a string value.
+// Different rows may have different numbers of columns and different column
+// names.
 //
 // The rows are ordered lexicographically by row_key.
 class DataStore {
@@ -63,16 +63,6 @@ class DataStore {
 
   virtual ~DataStore() = 0;
 
-  // The value of a column contained in a |Row|.
-  struct ColumnValue {
-    // Constructor
-    ColumnValue(std::string name, std::string value)
-        : name(std::move(name)), value(std::move(value)) {}
-
-    std::string name;
-    std::string value;
-  };
-
   // A row of the data store. A move-only type.
   struct Row {
     // Default constructor
@@ -83,8 +73,12 @@ class DataStore {
         : key(std::move(other.key)),
           column_values(std::move(other.column_values)) {}
 
+    // The row key
     std::string key;
-    std::vector<ColumnValue> column_values;
+
+    // The column values. The keys of the map are the column names and the
+    // values of the map are the column values.
+    std::map<std::string, std::string> column_values;
   };
 
   // Writes a row of |table|. The operation may be an insert of a new row
@@ -122,14 +116,15 @@ class DataStore {
   //                interval does not include |limit_row_key|.
   //                If |limit_row_key| is empty it is interpreted as the
   //                infinite row key.
-  // columns: If non-empty then the read will only return data from the
-  //          specified columns. Otherwise there will be no restriction.
+  // column_names: If non-empty then the read will only return data from the
+  //               columns with the specified names. Otherwise there will be no
+  //               restriction.
   // max_rows: If positive then at most |max_rows| rows will be returned.
   //           Use zero to indicate no desired maximum. The number of
   //           returned rows may be less than max_rows for several reasons
   virtual ReadResponse ReadRows(Table table, std::string start_row_key,
                                 bool inclusive, std::string limit_row_key,
-                                std::vector<std::string> columns,
+                                std::vector<std::string> column_names,
                                 size_t max_rows) = 0;
 };
 

@@ -62,8 +62,8 @@ void AddRows(int num_columns, int num_rows) {
     DataStore::Row row;
     row.key = RowKeyString(row_index);
     for (int column_index = 0; column_index < num_columns; column_index++) {
-      row.column_values.emplace_back(column_names[column_index],
-                                     ValueString(row_index, column_index));
+      row.column_values[column_names[column_index]] =
+          ValueString(row_index, column_index);
     }
     mem_store.WriteRow(DataStore::kObservations, std::move(row));
   }
@@ -92,11 +92,9 @@ void ReadRowsAndCheck(int num_columns, int start_row, bool inclusive,
   for (const DataStore::Row& row : read_response.rows) {
     EXPECT_EQ(RowKeyString(row_index), row.key);
     EXPECT_EQ(num_columns, row.column_values.size());
-    int column_index = 0;
-    for (const DataStore::ColumnValue& column_value : row.column_values) {
-      EXPECT_EQ(ColumnNameString(column_index), column_value.name);
-      EXPECT_EQ(ValueString(row_index, column_index), column_value.value);
-      column_index++;
+    for (int column_index = 0; column_index < num_columns; column_index++) {
+      EXPECT_EQ(ValueString(row_index, column_index),
+                row.column_values.at(ColumnNameString(column_index)));
     }
     row_index++;
   }
