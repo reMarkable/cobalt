@@ -94,7 +94,8 @@ class DataStore {
     // should be ignored.
     Status status;
 
-    // If status is kOK then this is the list of returned rows.
+    // If status is kOK then this is the list of returned rows. If
+    // |more_available| is true then there will be at least one row.
     std::vector<Row> rows;
 
     // If status is kOK, indicates whether or not there were more rows available
@@ -103,8 +104,9 @@ class DataStore {
     // returned row from |rows| and passing |inclusive| = false. Note that it
     // is possible that more_available = true even if rows.size() < max_rows.
     // In other words fewer than max_rows might be returned even if there are
-    // more rows available.
-    bool more_available;
+    // more rows available. However if |more_availabe| is true then it
+    // is guaranteed that |rows| will not be empty.
+    bool more_available = false;
   };
 
   // Read a range of rows from the store.
@@ -126,6 +128,26 @@ class DataStore {
                                 bool inclusive, std::string limit_row_key,
                                 std::vector<std::string> column_names,
                                 size_t max_rows) = 0;
+
+  // Deletes the given row from the given table, if it exists.
+  virtual Status DeleteRow(Table table, std::string row_key) = 0;
+
+  // Deletes a range of rows from the store.
+  // table: Which table to delete from.
+  // start_row_key: The start of the interval to be deleted.
+  // inclusive: Whether or not the interval to be deleted includes the
+  //            |start_row_key|.
+  // limit_row_key: The *exclusive* end of the interval to be deleted. That is,
+  //                interval does not include |limit_row_key|.
+  //                If |limit_row_key| is empty it is interpreted as the
+  //                infinite row key.
+  virtual Status DeleteRows(Table table, std::string start_row_key,
+                            bool inclusive, std::string limit_row_key);
+
+  // Deletes all of the rows of the given table.
+  virtual Status DeleteAllRows(Table table) {
+    return DeleteRows(table, "", true, "");
+  }
 };
 
 }  // namespace store

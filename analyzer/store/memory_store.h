@@ -38,11 +38,12 @@ class MemoryStoreSingleton : public DataStore {
                         std::vector<std::string> column_names,
                         size_t max_rows) override;
 
-  // Deletes all data from the store.
-  void Clear() {
-    observation_rows_.clear();
-    report_rows_.clear();
-  }
+  Status DeleteRow(Table table, std::string row_key) override;
+
+  Status DeleteRows(Table table, std::string start_row_key, bool inclusive,
+                    std::string limit_row_key) override;
+
+  Status DeleteAllRows(Table table) override;
 
  private:
   MemoryStoreSingleton() {}
@@ -67,8 +68,19 @@ class MemoryStore : public DataStore {
         table, start_row_key, inclusive, limit_row_key, column_names, max_rows);
   }
 
-  // Deletes all data from the store.
-  void Clear() { MemoryStoreSingleton::Instance().Clear(); }
+  Status DeleteRow(Table table, std::string row_key) override {
+    return MemoryStoreSingleton::Instance().DeleteRow(table, row_key);
+  }
+
+  Status DeleteRows(Table table, std::string start_row_key, bool inclusive,
+                    std::string limit_row_key) override {
+    return MemoryStoreSingleton::Instance().DeleteRows(
+        table, start_row_key, inclusive, limit_row_key);
+  }
+
+  Status DeleteAllRows(Table table) override {
+    return MemoryStoreSingleton::Instance().DeleteAllRows(table);
+  }
 };
 
 }  // namespace store

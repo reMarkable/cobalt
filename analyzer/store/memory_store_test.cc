@@ -56,7 +56,7 @@ std::vector<std::string> MakeColumnNames(int num_columns) {
 
 void AddRows(int num_columns, int num_rows) {
   MemoryStore mem_store;
-  mem_store.Clear();
+  mem_store.DeleteAllRows(DataStore::kObservations);
   std::vector<std::string> column_names = MakeColumnNames(num_columns);
   for (int row_index = 0; row_index < num_rows; row_index++) {
     DataStore::Row row;
@@ -67,6 +67,29 @@ void AddRows(int num_columns, int num_rows) {
     }
     mem_store.WriteRow(DataStore::kObservations, std::move(row));
   }
+}
+
+// Counts the total number of rows in the store.
+void CheckNumRows(int expected_num_rows) {
+  MemoryStore mem_store;
+  std::vector<std::string> column_names;
+
+  size_t num_rows_counted = 0;
+  std::string first_row = "";
+  while (true) {
+    DataStore::ReadResponse read_response =
+        mem_store.ReadRows(DataStore::kObservations, first_row, false, "",
+                           column_names, UINT32_MAX);
+    EXPECT_EQ(kOK, read_response.status);
+    size_t num_rows_read = read_response.rows.size();
+    num_rows_counted += num_rows_read;
+    if (!read_response.more_available) {
+      break;
+    }
+    first_row = read_response.rows[num_rows_read - 1].key;
+  }
+
+  EXPECT_EQ(expected_num_rows, num_rows_counted);
 }
 
 // set limit_row = -1 to indicate an unbounded range.
@@ -99,6 +122,21 @@ void ReadRowsAndCheck(int num_columns, int start_row, bool inclusive,
     row_index++;
   }
   EXPECT_EQ(expect_more_available, read_response.more_available);
+}
+
+void DeleteRows(int start_row, bool inclusive, int limit_row) {
+  MemoryStore mem_store;
+  std::string limit_row_key;
+  if (limit_row < 0) {
+    limit_row_key = "";
+  } else {
+    limit_row_key = RowKeyString(limit_row);
+  }
+  Status status =
+      mem_store.DeleteRows(DataStore::kObservations, RowKeyString(start_row),
+                           inclusive, limit_row_key);
+
+  EXPECT_EQ(kOK, status);
 }
 
 }  // namespace
@@ -168,6 +206,36 @@ TEST(MemoryStoreTest, UnboundedRange) {
   // Read rows (950, infinity) with max_rows not specified. Expect 49 rows with
   // no more  available.
   ReadRowsAndCheck(3, 950, false, -1, 0, 49, false);
+}
+
+// Tests deleting ranges of rows.
+TEST(MemoryStoreTest, DeleteRanges) {
+  MemoryStore mem_store;
+  mem_store.DeleteAllRows(DataStore::kObservations);
+
+  // Initially there should be no rows.
+  CheckNumRows(0);
+
+  // Add 1000 rows of 1 column each.
+  AddRows(1, 1000);
+  // Now there should be 1000 rows.
+  CheckNumRows(1000);
+
+  // Delete rows [100, 200)
+  DeleteRows(100, true, 200);
+  CheckNumRows(900);
+
+  // Delete rows (500, 700)
+  DeleteRows(500, false, 700);
+  CheckNumRows(701);
+
+  // Delete rows [0, 1)
+  DeleteRows(0, true, 1);
+  CheckNumRows(700);
+
+  // Delete rows [0, 10000)
+  DeleteRows(0, true, 10000);
+  CheckNumRows(0);
 }
 
 }  // namespace store

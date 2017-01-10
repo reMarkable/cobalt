@@ -99,7 +99,7 @@ class ObservationStoreTest : public ::testing::Test {
   ObservationStoreTest()
       : mem_store_(new MemoryStore()),
         observation_store_(new ObservationStore(mem_store_)) {
-    mem_store_->Clear();
+    mem_store_->DeleteAllRows(DataStore::kObservations);
   }
 
   void AddObservation(uint32_t metric_id, uint32_t day_index, int num_parts) {

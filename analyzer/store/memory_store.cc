@@ -100,6 +100,46 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
   return read_response;
 }
 
+Status MemoryStoreSingleton::DeleteRow(Table table, std::string row_key) {
+  ImplMapType& rows =
+      (table == kObservations ? observation_rows_ : report_rows_);
+  rows.erase(row_key);
+  return kOK;
+}
+
+Status MemoryStoreSingleton::DeleteRows(Table table, std::string start_row_key,
+                                        bool inclusive,
+                                        std::string limit_row_key) {
+  ImplMapType& rows =
+      (table == kObservations ? observation_rows_ : report_rows_);
+
+  // Find the first row of the range (inclusive or exclusive)
+  ImplMapType::iterator start_iterator;
+  if (inclusive) {
+    start_iterator = rows.lower_bound(start_row_key);
+  } else {
+    start_iterator = rows.upper_bound(start_row_key);
+  }
+
+  ImplMapType::iterator limit_iterator;
+  if (limit_row_key.empty()) {
+    limit_iterator = rows.end();
+  } else {
+    // Find the least row greater than or equal to limit_row_key.
+    limit_iterator = rows.lower_bound(limit_row_key);
+  }
+
+  rows.erase(start_iterator, limit_iterator);
+  return kOK;
+}
+
+Status MemoryStoreSingleton::DeleteAllRows(Table table) {
+  ImplMapType& rows =
+      (table == kObservations ? observation_rows_ : report_rows_);
+  rows.clear();
+  return kOK;
+}
+
 }  // namespace store
 }  // namespace analyzer
 }  // namespace cobalt
