@@ -94,8 +94,7 @@ class ObservationStore {
   // the specified parts. If |parts| is empty there will be no restriction
   // on observation parts.
   //
-  // If |max_results| > 0 then at most |max_results| will be returned.
-  // Otherwise no restriction on the number of results is imposed.
+  // |max_results| must be positive and at most |max_results| will be returned.
   // The number of returned results may be less than |max_results| for
   // several reasons. The caller must look at whether or not the
   // |pagination_token| in the returned QueryResponse is empty in order to

@@ -161,21 +161,13 @@ TEST(MemoryStoreTest, WriteAndReadRows) {
   // available.
   ReadRowsAndCheck(3, 100, false, 175, 80, 74, false);
 
-  // Read rows [100, 175) with max_rows not specified. Expect 75 rows with no
+  // Read rows [100, 300) with max_rows = 100. Expect 100 rows with
   // more  available.
-  ReadRowsAndCheck(3, 100, true, 175, 0, 75, false);
+  ReadRowsAndCheck(3, 100, true, 300, 100, 100, true);
 
-  // Read rows (100, 175) with max_rows not specified. Expect 74 rows with no
+  // Read rows (100, 300) with max_rows=100. Expect 100 rows with
   // more  available.
-  ReadRowsAndCheck(3, 100, false, 175, 0, 74, false);
-
-  // Read rows [100, 300) with max_rows not specified. Expect 100 rows with
-  // more  available.
-  ReadRowsAndCheck(3, 100, true, 300, 0, 100, true);
-
-  // Read rows (100, 300) with max_rows not specified. Expect 100 rows with
-  // more  available.
-  ReadRowsAndCheck(3, 100, false, 300, 0, 100, true);
+  ReadRowsAndCheck(3, 100, false, 300, 100, 100, true);
 }
 
 // Tests reading an unbounded range.
@@ -191,21 +183,13 @@ TEST(MemoryStoreTest, UnboundedRange) {
   // available.
   ReadRowsAndCheck(3, 100, false, -1, 50, 50, true);
 
-  // Read rows [100, infinity) with max_rows not specified. Expect 100 rows with
-  // more  available.
-  ReadRowsAndCheck(3, 100, true, -1, 0, 100, true);
-
-  // Read rows (100, infinity) with max_rows not specified. Expect 100 rows with
-  // more  available.
-  ReadRowsAndCheck(3, 100, false, -1, 0, 100, true);
-
-  // Read rows [950, infinity) with max_rows not specified. Expect 50 rows with
+  // Read rows [950, infinity) with max_rows=100. Expect 50 rows with
   // no more  available.
-  ReadRowsAndCheck(3, 950, true, -1, 0, 50, false);
+  ReadRowsAndCheck(3, 950, true, -1, 100, 50, false);
 
-  // Read rows (950, infinity) with max_rows not specified. Expect 49 rows with
+  // Read rows (950, infinity) with max_rows=100. Expect 49 rows with
   // no more  available.
-  ReadRowsAndCheck(3, 950, false, -1, 0, 49, false);
+  ReadRowsAndCheck(3, 950, false, -1, 100, 49, false);
 }
 
 // Tests deleting ranges of rows.

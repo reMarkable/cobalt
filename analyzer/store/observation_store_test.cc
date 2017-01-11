@@ -220,10 +220,10 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
 
   // Query for observations for days in the range [50, 150].
   // Ask for 2 parts.
-  // Don't impose a maximum number of results.
+  // Impose a maximum of 100 results.
   int requested_num_parts = 2;
   std::vector<ObservationStore::QueryResult> full_results =
-      QueryFullResults(metric_id, 50, 150, requested_num_parts, 0);
+      QueryFullResults(metric_id, 50, 150, requested_num_parts, 100);
 
   // Expect to find 1000 results as 100 results per day for 10 days starting
   // with day 100.
@@ -240,7 +240,7 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
 
   // Query for observations for days in the range [0, UINT32_MAX].
   full_results =
-      QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts, 0);
+      QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts, 100);
 
   // Expect the same results as above.
   CheckFullResults(full_results, expected_num_results,
@@ -250,7 +250,8 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   //------------------------------------------------------------
 
   // Query for observations for days in the range [100, 105].
-  full_results = QueryFullResults(metric_id, 100, 105, requested_num_parts, 0);
+  full_results =
+      QueryFullResults(metric_id, 100, 105, requested_num_parts, 100);
 
   // Expect to find 600 results as 100 results per day for 6 days.
   expected_num_results = 600;
@@ -261,7 +262,8 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   //------------------------------------------------------------
 
   // Query for observations for days in the range [105, 110].
-  full_results = QueryFullResults(metric_id, 105, 110, requested_num_parts, 0);
+  full_results =
+      QueryFullResults(metric_id, 105, 110, requested_num_parts, 100);
 
   // Expect to find 500 results as 100 results per day for 5 days starting
   // with day 105.
@@ -278,7 +280,8 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   requested_num_parts = 0;
 
   // Query for observations for days in the range [105, 110].
-  full_results = QueryFullResults(metric_id, 105, 110, requested_num_parts, 0);
+  full_results =
+      QueryFullResults(metric_id, 105, 110, requested_num_parts, 100);
 
   // Expect to find 500 results as 100 results per day for 5 days starting
   // with day 105.
@@ -296,7 +299,8 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   expected_num_parts = 1;
 
   // Query for observations for days in the range [105, 110].
-  full_results = QueryFullResults(metric_id, 105, 110, requested_num_parts, 0);
+  full_results =
+      QueryFullResults(metric_id, 105, 110, requested_num_parts, 100);
 
   // Expect to find 500 results as 100 results per day for 5 days starting
   // with day 105.
@@ -312,7 +316,7 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   metric_id = 2;
 
   // Query for observations for days in the range [50, 150].
-  full_results = QueryFullResults(metric_id, 50, 150, requested_num_parts, 0);
+  full_results = QueryFullResults(metric_id, 50, 150, requested_num_parts, 100);
 
   // Expect to find 2000 results as 200 results per day for 10 days starting
   // with day 101.
@@ -329,7 +333,7 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
 
   // Query for observations for days in the range [0, UINT32_MAX].
   full_results =
-      QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts, 0);
+      QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts, 100);
 
   // Expect the same results as above.
   CheckFullResults(full_results, expected_num_results,
@@ -339,7 +343,8 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   //------------------------------------------------------------
 
   // Query for observations for days in the range [100, 105].
-  full_results = QueryFullResults(metric_id, 100, 105, requested_num_parts, 0);
+  full_results =
+      QueryFullResults(metric_id, 100, 105, requested_num_parts, 100);
 
   // Expect to find 1000 results as 200 results per day for 5 days.
   expected_num_results = 1000;
@@ -350,7 +355,8 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   //------------------------------------------------------------
 
   // Query for observations for days in the range [105, 110].
-  full_results = QueryFullResults(metric_id, 105, 110, requested_num_parts, 0);
+  full_results =
+      QueryFullResults(metric_id, 105, 110, requested_num_parts, 100);
 
   // Expect to find 1200 results as 200 results per day for 6 days starting
   // with day 105.
@@ -367,7 +373,8 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   requested_num_parts = 0;
 
   // Query for observations for days in the range [105, 110].
-  full_results = QueryFullResults(metric_id, 105, 110, requested_num_parts, 0);
+  full_results =
+      QueryFullResults(metric_id, 105, 110, requested_num_parts, 100);
 
   // Expect to find 1200 results as 200 results per day for 6 days starting
   // with day 105.
@@ -383,7 +390,8 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   requested_num_parts = 1;
 
   // Query for observations for days in the range [105, 110].
-  full_results = QueryFullResults(metric_id, 105, 110, requested_num_parts, 0);
+  full_results =
+      QueryFullResults(metric_id, 105, 110, requested_num_parts, 100);
 
   // Expect to find 1200 results as 200 results per day for 6 days starting
   // with day 105.
@@ -400,7 +408,7 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   // For metric 3 expect to find 0 results.
   metric_id = 3;
   full_results =
-      QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts, 0);
+      QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts, 100);
   EXPECT_EQ(0, full_results.size());
 
   /////////////////////////////////////////////////////////////////
@@ -410,7 +418,7 @@ TEST_F(ObservationStoreTest, AddAndQuery) {
   // For metric 0 expect to find 0 results.
   metric_id = 0;
   full_results =
-      QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts, 0);
+      QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts, 100);
   EXPECT_EQ(0, full_results.size());
 }
 
@@ -428,7 +436,7 @@ TEST_F(ObservationStoreTest, QueryWithInvalidArguments) {
   ObservationStore::QueryResponse query_response =
       observation_store_->QueryObservations(kCustomerId, kProjectId, metric_id,
                                             first_day_index, last_day_index,
-                                            parts, 0, pagination_token);
+                                            parts, 100, pagination_token);
 
   EXPECT_EQ(kInvalidArguments, query_response.status);
 
@@ -438,21 +446,21 @@ TEST_F(ObservationStoreTest, QueryWithInvalidArguments) {
                                                  metric_id, first_day_index);
   query_response = observation_store_->QueryObservations(
       kCustomerId, kProjectId, metric_id, first_day_index, last_day_index,
-      parts, 0, pagination_token);
+      parts, 100, pagination_token);
   EXPECT_EQ(kOK, query_response.status);
 
   // Try to use a last_day_index < first_day_index. Expect kInvalidArguments.
   last_day_index = first_day_index - 1;
   query_response = observation_store_->QueryObservations(
       kCustomerId, kProjectId, metric_id, first_day_index, last_day_index,
-      parts, 0, "");
+      parts, 100, "");
   EXPECT_EQ(kInvalidArguments, query_response.status);
 
   // Switch to last_day_index = first_day_index. Expect kOK.
   last_day_index = first_day_index;
   query_response = observation_store_->QueryObservations(
       kCustomerId, kProjectId, metric_id, first_day_index, last_day_index,
-      parts, 0, "");
+      parts, 100, "");
   EXPECT_EQ(kOK, query_response.status);
 }
 

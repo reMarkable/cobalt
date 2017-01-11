@@ -121,9 +121,9 @@ class DataStore {
   // column_names: If non-empty then the read will only return data from the
   //               columns with the specified names. Otherwise there will be no
   //               restriction.
-  // max_rows: If positive then at most |max_rows| rows will be returned.
-  //           Use zero to indicate no desired maximum. The number of
-  //           returned rows may be less than max_rows for several reasons
+  // max_rows: At most |max_rows| rows will be returned. The number of
+  //           returned rows may be less than max_rows for several reasons.
+  //           Must be positive or kInvalidArguments will be returned.
   virtual ReadResponse ReadRows(Table table, std::string start_row_key,
                                 bool inclusive, std::string limit_row_key,
                                 std::vector<std::string> column_names,

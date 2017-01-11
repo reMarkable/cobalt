@@ -42,8 +42,11 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
     std::string limit_row_key, std::vector<std::string> column_names,
     size_t max_rows) {
-  if (max_rows == 0 || max_rows > 100) {
-    max_rows = 100;
+  ReadResponse read_response;
+  read_response.status = kOK;
+  if (max_rows == 0) {
+    read_response.status = kInvalidArguments;
+    return read_response;
   }
 
   ImplMapType& rows =
@@ -64,9 +67,6 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     // Find the least row greater than or equal to limit_row_key.
     limit_iterator = rows.lower_bound(limit_row_key);
   }
-
-  ReadResponse read_response;
-  read_response.more_available = false;
 
   // Make a set of the requested column_names
   std::set<std::string> requested_column_names(column_names.begin(),
