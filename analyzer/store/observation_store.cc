@@ -23,8 +23,8 @@
 #include <vector>
 
 #include "./observation.pb.h"
+#include "analyzer/store/data_store.h"
 #include "analyzer/store/observation_store_internal.h"
-#include "analyzer/store/store.h"
 #include "util/crypto_util/random.h"
 
 namespace cobalt {
