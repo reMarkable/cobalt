@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "analyzer/store/bigtable_store.h"
+#include "analyzer/store/bigtable_store_old.h"
 
 #include <glog/logging.h>
 #include <google/bigtable/v2/data.pb.h>
@@ -41,10 +41,10 @@ using grpc::Status;
 namespace cobalt {
 namespace analyzer {
 
-BigtableStore::BigtableStore(const std::string& table_name)
+BigtableStoreOld::BigtableStoreOld(const std::string& table_name)
     : table_name_(table_name) {}
 
-int BigtableStore::initialize(bool should_init_schema) {
+int BigtableStoreOld::initialize(bool should_init_schema) {
   int rc;
 
   if ((rc = setup_connection()))
@@ -57,7 +57,7 @@ int BigtableStore::initialize(bool should_init_schema) {
 }
 
 // Connects to bigtable or the emulator.
-int BigtableStore::setup_connection() {
+int BigtableStoreOld::setup_connection() {
   std::shared_ptr<grpc::ChannelCredentials> creds;
   const char* host_data = "bigtable.googleapis.com";
   const char* host_admin = "bigtableadmin.googleapis.com";
@@ -82,7 +82,7 @@ int BigtableStore::setup_connection() {
 }
 
 // Sets up tables if they do not exist.
-int BigtableStore::init_schema() {
+int BigtableStoreOld::init_schema() {
   ClientContext get_ctx;
 
   GetTableRequest get_req;
@@ -132,7 +132,7 @@ int BigtableStore::init_schema() {
   return 0;
 }
 
-int BigtableStore::put(const std::string& key, const std::string& val) {
+int BigtableStoreOld::put(const std::string& key, const std::string& val) {
   ClientContext context;
   MutateRowRequest req;
   MutateRowResponse resp;
@@ -154,12 +154,13 @@ int BigtableStore::put(const std::string& key, const std::string& val) {
   return 0;
 }
 
-int BigtableStore::get(const std::string& key, std::string* out) {
+int BigtableStoreOld::get(const std::string& key, std::string* out) {
   return -1;
 }
 
-int BigtableStore::get_range(const std::string& start, const std::string& end,
-                             std::map<std::string, std::string>* out) {
+int BigtableStoreOld::get_range(const std::string& start,
+                                const std::string& end,
+                                std::map<std::string, std::string>* out) {
   ClientContext context;
   ReadRowsRequest req;
   ReadRowsResponse resp;

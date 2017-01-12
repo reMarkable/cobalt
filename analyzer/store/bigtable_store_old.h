@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef COBALT_ANALYZER_STORE_BIGTABLE_STORE_H_
-#define COBALT_ANALYZER_STORE_BIGTABLE_STORE_H_
+#ifndef COBALT_ANALYZER_STORE_BIGTABLE_STORE_OLD_H_
+#define COBALT_ANALYZER_STORE_BIGTABLE_STORE_OLD_H_
 
 #include <google/bigtable/v2/bigtable.grpc.pb.h>
 #include <google/bigtable/admin/v2/bigtable_table_admin.grpc.pb.h>
@@ -29,11 +29,11 @@ namespace cobalt {
 namespace analyzer {
 
 // A key value store implemented on Google Cloud Bigtable
-class BigtableStore : public Store {
+class BigtableStoreOld : public Store {
  public:
   // table_name format:
   //   "projects/PROJECT_NAME/instances/INSTANCE_NAME/tables/TABLE_NAME"
-  explicit BigtableStore(const std::string& table_name);
+  explicit BigtableStoreOld(const std::string& table_name);
 
   // Call prior to put/get.  Sets up needed state for connecting to bigtable.
   // init_schema: whether or not to create tables.
@@ -58,4 +58,4 @@ class BigtableStore : public Store {
 }  // namespace analyzer
 }  // namespace cobalt
 
-#endif  // COBALT_ANALYZER_STORE_BIGTABLE_STORE_H_
+#endif  // COBALT_ANALYZER_STORE_BIGTABLE_STORE_OLD_H_

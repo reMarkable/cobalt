@@ -18,7 +18,6 @@
 #include "analyzer/analyzer_service.h"
 #include "analyzer/schema.pb.h"
 #include "analyzer/store/mem_store.h"
-#include "analyzer/store/bigtable_store.h"
 
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 

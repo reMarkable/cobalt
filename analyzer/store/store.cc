@@ -15,7 +15,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "analyzer/store/bigtable_store.h"
+#include "analyzer/store/bigtable_store_old.h"
 #include "analyzer/store/mem_store.h"
 #include "analyzer/store/store.h"
 
@@ -36,7 +36,7 @@ std::unique_ptr<Store> MakeStore(bool init_schema) {
     return std::unique_ptr<Store>(new MemStore);
 
   // Otherwise, it's bigtable.
-  BigtableStore* store = new BigtableStore(FLAGS_table);
+  BigtableStoreOld* store = new BigtableStoreOld(FLAGS_table);
 
   if (store->initialize(init_schema) < 0)
     LOG(FATAL) << "Cannot initialzie Bigtable";

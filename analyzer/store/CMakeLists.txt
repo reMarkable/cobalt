@@ -17,7 +17,7 @@ set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 # Build the analyzer store library
 add_library(analyzer_store
-            bigtable_store.cc
+            bigtable_store_old.cc
             data_store.cc
             mem_store.cc
             memory_store.cc

@@ -20,7 +20,7 @@
 
 #include "analyzer/analyzer_service.h"
 #include "analyzer/store/mem_store.h"
-#include "analyzer/store/bigtable_store.h"
+#include "analyzer/store/bigtable_store_old.h"
 
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
@@ -92,7 +92,8 @@ class BigtableFunctionalTest : public ::testing::Test {
     snprintf(buf, sizeof(buf), "%s:%d", host, port);
     ASSERT_NE(setenv("BIGTABLE_EMULATOR_HOST", buf, 1), -1);
 
-    BigtableStore* store = new BigtableStore("projects/p/instances/i/tables/t");
+    BigtableStoreOld* store =
+        new BigtableStoreOld("projects/p/instances/i/tables/t");
     store_.reset(store);
     store->initialize(true);
   }
