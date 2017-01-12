@@ -26,31 +26,32 @@ PROPERTIES = {
 def RunSteps(api, patch_gerrit_url, patch_ref, manifest, remote):
     api.jiri.ensure_jiri()
 
-    api.jiri.set_config('fuchsia')
-
     api.jiri.init()
     api.jiri.clean_project()
-    api.jiri.import_manifest(manifest, remote, overwrite=True)
-    api.jiri.update(gc=True)
+    api.jiri.import_manifest(manifest, remote)
+    api.jiri.update()
     step_result = api.jiri.snapshot(api.raw_io.output())
     snapshot = step_result.raw_io.output
     step_result.presentation.logs['jiri.snapshot'] = snapshot.splitlines()
 
     if patch_ref is not None:
-        api.jiri.patch(patch_ref, host=patch_gerrit_url, delete=True, force=True)
+        api.jiri.patch(patch_ref, host=patch_gerrit_url)
 
     # Start the cobalt build process.
-    cwd = api.path['slave_build'].join('cobalt')
+    api.path['checkout'] = api.path['start_dir'].join('cobalt')
 
     for step in ["setup", "build", "test"]:
-        api.step(step, ["./cobaltb.py", step], cwd=cwd)
+        api.step(step, ["./cobaltb.py", step], cwd=api.path['checkout'])
+
 
 def GenTests(api):
     yield api.test('ci') + api.properties(
         manifest='cobalt',
         remote='https://fuchsia.googlesource.com/manifest'
     )
-    yield api.test('cq') + api.properties.tryserver(
+    yield api.test('cq_try') + api.properties.tryserver(
         gerrit_project='cobalt',
         patch_gerrit_url='fuchsia-review.googlesource.com',
+        manifest='cobalt',
+        remote='https://fuchsia.googlesource.com/manifest',
     )

@@ -1,5 +1,9 @@
 [
   {
+    "cmd": [],
+    "name": "ensure_jiri"
+  },
+  {
     "cmd": [
       "python",
       "-u",
@@ -7,33 +11,35 @@
       "--platform",
       "linux-amd64",
       "--dest-directory",
-      "[SLAVE_BUILD]/cipd",
+      "[START_DIR]/cipd",
       "--json-output",
       "/path/to/tmp/json"
     ],
-    "name": "install cipd",
+    "name": "ensure_jiri.install cipd",
     "~followup_annotations": [
-      "@@@STEP_TEXT@cipd instance_id: 40-chars-fake-of-the-package-instance_id@@@",
+      "@@@STEP_NEST_LEVEL@1@@@",
+      "@@@STEP_TEXT@cipd version: git_revision:05844bd9d1200cba8449b936b76e25eb90eabe25@@@",
       "@@@STEP_LOG_LINE@json.output@{@@@",
-      "@@@STEP_LOG_LINE@json.output@  \"executable\": \"[SLAVE_BUILD]/cipd/cipd\", @@@",
-      "@@@STEP_LOG_LINE@json.output@  \"instance_id\": \"40-chars-fake-of-the-package-instance_id\"@@@",
+      "@@@STEP_LOG_LINE@json.output@  \"executable\": \"[START_DIR]/cipd/cipd\", @@@",
+      "@@@STEP_LOG_LINE@json.output@  \"version\": \"git_revision:05844bd9d1200cba8449b936b76e25eb90eabe25\"@@@",
       "@@@STEP_LOG_LINE@json.output@}@@@",
       "@@@STEP_LOG_END@json.output@@@"
     ]
   },
   {
     "cmd": [
-      "[SLAVE_BUILD]/cipd/cipd",
+      "[START_DIR]/cipd/cipd",
       "ensure",
       "--root",
-      "[CACHE]/cipd",
+      "[START_DIR]/cipd/jiri",
       "--list",
       "fuchsia/tools/jiri/linux-amd64 latest",
       "--json-output",
       "/path/to/tmp/json"
     ],
-    "name": "ensure_installed",
+    "name": "ensure_jiri.ensure_installed",
     "~followup_annotations": [
+      "@@@STEP_NEST_LEVEL@1@@@",
       "@@@STEP_LOG_LINE@json.output@{@@@",
       "@@@STEP_LOG_LINE@json.output@  \"result\": [@@@",
       "@@@STEP_LOG_LINE@json.output@    {@@@",
@@ -47,7 +53,7 @@
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "init",
       "-cache",
       "[CACHE]/jiri"
@@ -56,7 +62,7 @@
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "project",
       "clean"
     ],
@@ -64,9 +70,8 @@
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "import",
-      "-overwrite=true",
       "cobalt",
       "https://fuchsia.googlesource.com/manifest"
     ],
@@ -74,16 +79,15 @@
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "update",
-      "-autoupdate=false",
-      "-gc=true"
+      "-autoupdate=false"
     ],
     "name": "jiri update"
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "snapshot",
       "/path/to/tmp/"
     ],
@@ -100,12 +104,10 @@
   },
   {
     "cmd": [
-      "[CACHE]/cipd/jiri",
+      "[START_DIR]/cipd/jiri/jiri",
       "patch",
       "-host",
       "fuchsia-review.googlesource.com",
-      "-delete=true",
-      "-force=true",
       "refs/changes/89/456789/12"
     ],
     "name": "jiri patch"
@@ -115,7 +117,7 @@
       "./cobaltb.py",
       "setup"
     ],
-    "cwd": "[SLAVE_BUILD]/cobalt",
+    "cwd": "[START_DIR]/cobalt",
     "name": "setup"
   },
   {
@@ -123,7 +125,7 @@
       "./cobaltb.py",
       "build"
     ],
-    "cwd": "[SLAVE_BUILD]/cobalt",
+    "cwd": "[START_DIR]/cobalt",
     "name": "build"
   },
   {
@@ -131,7 +133,7 @@
       "./cobaltb.py",
       "test"
     ],
-    "cwd": "[SLAVE_BUILD]/cobalt",
+    "cwd": "[START_DIR]/cobalt",
     "name": "test"
   },
   {
