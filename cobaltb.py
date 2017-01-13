@@ -100,9 +100,41 @@ def _lint(args):
   cpplint.main()
   golint.main()
 
+# Specifiers of subsets of tests to run
+TEST_FILTERS =['all', 'gtests', 'nogtests',
+    'gotests', 'nogotests', 'btemulator', 'nobtemulator']
+
+# Returns 0 if all tests return 0, otherwise returns 1.
 def _test(args):
-  test_runner.run_all_tests(['gtests'])
-  test_runner.run_all_tests(['go_tests'])
+  # A map from positive filter specifiers to the list of test directories
+  # it represents.
+  FILTER_MAP = {
+    'all': ['gtests', 'go_tests', 'gtests_btemulator'],
+    'gtests': ['gtests'],
+    'gotests' : ['go_tests'],
+    'btemulator': ['gtests_btemulator'],
+  }
+
+  # Get the list of test directories we should run.
+  if args.tests.startswith('no'):
+    test_dirs = [test_dir for test_dir in FILTER_MAP['all']
+        if test_dir not in FILTER_MAP[args.tests[2:]]]
+  else:
+    test_dirs = FILTER_MAP[args.tests]
+
+  success = True
+  for test_dir in test_dirs:
+    use_bt_emulator = (test_dir == 'gtests_btemulator')
+    success = (success and
+        test_runner.run_all_tests(test_dir, use_bt_emulator) == 0)
+
+  print
+  if success:
+    print '******************* ALL TESTS PASSED *******************'
+    return 0
+  else:
+    print '******************* SOME TESTS FAILED *******************'
+    return 1
 
 # Files and directories in the out directory to NOT delete when doing
 # a partial clean.
@@ -256,6 +288,8 @@ def main():
   sub_parser = subparsers.add_parser('test', parents=[parent_parser],
     help='Runs Cobalt tests. You must build first.')
   sub_parser.set_defaults(func=_test)
+  sub_parser.add_argument('--tests', choices=TEST_FILTERS,
+      help='Specify a subset of tests to run',  default='nobtemulator')
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')
