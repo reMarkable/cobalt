@@ -35,6 +35,21 @@ TEST(Base64Test, BasicFunctionality) {
   EXPECT_EQ(data, decoded);
 }
 
+// Tests the function RegexEncode and RegexDecode.
+TEST(Base64Test, RegexEncode) {
+  // Encode
+  std::vector<byte> data = {0, 1, 2, 3, 4, 5, 6, 255, 254, 253, 252, 251, 250};
+  std::string data_str(data.begin(), data.end());
+  std::string encoded;
+  EXPECT_TRUE(RegexEncode(data_str, &encoded));
+
+  EXPECT_EQ(std::string("AAECAwQFBv/_/fz7_g=="), encoded);
+  // Decode
+  std::string decoded;
+  EXPECT_TRUE(RegexDecode(encoded, &decoded));
+  EXPECT_EQ(data_str, decoded);
+}
+
 }  // namespace crypto
 
 }  // namespace cobalt

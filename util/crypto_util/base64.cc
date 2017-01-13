@@ -14,6 +14,8 @@
 
 #include "util/crypto_util/base64.h"
 
+#include <algorithm>
+
 #include "third_party/boringssl/src/include/openssl/base64.h"
 
 namespace cobalt {
@@ -65,6 +67,39 @@ bool Base64Decode(const std::string& encoded_in,
   }
   decoded_out->resize(actual_size);
   return true;
+}
+
+bool Base64Decode(const std::string& encoded_in, std::string* decoded_out) {
+  if (!decoded_out) {
+    return false;
+  }
+  size_t required_length;
+  if (!EVP_DecodedLength(&required_length, encoded_in.size())) {
+    return false;
+  }
+  decoded_out->resize(required_length);
+  size_t actual_size;
+  if (!EVP_DecodeBase64(reinterpret_cast<byte*>(&(*decoded_out)[0]),
+                        &actual_size, decoded_out->size(),
+                        reinterpret_cast<const byte*>(encoded_in.data()),
+                        encoded_in.size())) {
+    return false;
+  }
+  decoded_out->resize(actual_size);
+  return true;
+}
+
+bool RegexEncode(const std::string& data, std::string* encoded_out) {
+  if (!Base64Encode(data, encoded_out)) {
+    return false;
+  }
+  std::replace(encoded_out->begin(), encoded_out->end(), '+', '_');
+  return true;
+}
+
+bool RegexDecode(std::string encoded_in, std::string* decoded_out) {
+  std::replace(encoded_in.begin(), encoded_in.end(), '_', '+');
+  return Base64Decode(encoded_in, decoded_out);
 }
 
 }  // namespace crypto

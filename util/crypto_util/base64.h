@@ -39,6 +39,27 @@ bool Base64Encode(const std::string& data, std::string* encoded_out);
 bool Base64Decode(const std::string& encoded_in,
                   std::vector<byte>* decoded_out);
 
+// Base64 decodes |encoded_in| and writes the results into decoded_out.
+//
+// Returns true on success and false if |encoded_in| could not be decoded.
+bool Base64Decode(const std::string& encoded_in, std::string* decoded_out);
+
+// Encodes the bytes in |data| and writes the result into |encoded_out|.
+// The encoding is identical to Base64Encode except that instead of using
+// the character '+' the character "_" is used. This yields a string that
+// does not contain any characters that have a special meaning in regular
+// expressions.
+//
+// Returns true on success and false on failure.
+bool RegexEncode(const std::string& data, std::string* encoded_out);
+
+// Decodes |encoded_in| and writes the results into decoded_out. The decoding
+// is the inverse of the encoding performed by RegexEncode(). Note that
+// unlike the other functions in this file |encoded_in| is not a reference.
+//
+// Returns true on success and false if |encoded_in| could not be decoded.
+bool RegexDecode(std::string encoded_in, std::string* decoded_out);
+
 }  // namespace crypto
 }  // namespace cobalt
 

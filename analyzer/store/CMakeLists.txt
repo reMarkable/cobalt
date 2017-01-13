@@ -17,6 +17,8 @@ set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 # Build the analyzer store library
 add_library(analyzer_store
+            bigtable_admin.cc
+            bigtable_store.cc
             bigtable_store_old.cc
             data_store.cc
             mem_store.cc
@@ -32,9 +34,18 @@ target_link_libraries(analyzer_store
                       googleapis
                       ${PROTOBUF_LIBRARY})
 
-# Build the test
+# Build the tests
 add_executable(analyzer_store_tests
                memory_store_test.cc observation_store_test.cc)
 target_link_libraries(analyzer_store_tests gtest gtest_main analyzer_store)
 set_target_properties(analyzer_store_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+
+# Versions of our tests that expect the existence of a running local instance of
+# the Bigtable Emulator process.
+add_executable(bigtable_emulator_tests
+               bigtable_store_emulator_test.cc
+               observation_store_emulator_test.cc)
+target_link_libraries(bigtable_emulator_tests gtest gtest_main cobalt_analyzer)
+set_target_properties(bigtable_emulator_tests PROPERTIES
+                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})

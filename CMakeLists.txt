@@ -32,6 +32,7 @@ enable_language(CXX)
 SET (DIR_GTESTS "${CMAKE_BINARY_DIR}/gtests")
 SET (DIR_SYSROOT "${CMAKE_SOURCE_DIR}/sysroot")
 SET (DIR_END_TO_END_TESTS "${CMAKE_BINARY_DIR}/e2e_tests")
+SET (DIR_GTESTS_BT_EMULATOR "${CMAKE_BINARY_DIR}/gtests_btemulator")
 
 # Note - we specify the exact library version because dev environments have
 # protobuf.so.8 (v2) preinstalled in a higher priority search path.  Instead we

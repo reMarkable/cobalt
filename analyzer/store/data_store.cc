@@ -27,13 +27,9 @@ Status DataStore::DeleteRows(DataStore::Table table, std::string start_row_key,
   std::string interval_start_row = std::move(start_row_key);
   ReadResponse read_response;
   do {
-    // We specify a single empty column name. This is a trick that will cause
-    // ReadRows to return a ReadResponse that contains no columns. If we
-    // instead specified the empty vector then the ReadResponse would contain
-    // all columns.
-    std::vector<std::string> column_names = {""};
+    std::vector<std::string> column_names;
     read_response = ReadRows(table, std::move(interval_start_row), inclusive,
-                             std::move(limit_row_key), column_names, 1000);
+                             limit_row_key, column_names, 1000);
     if (read_response.status != kOK) {
       return read_response.status;
     }

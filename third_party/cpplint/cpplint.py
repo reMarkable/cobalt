@@ -5534,7 +5534,7 @@ def FlagCxx11Features(filename, clean_lines, linenum, error):
                                       'future',
                                       'mutex',
 #                                     'thread', # Allow threads in cobalt
-                                      'chrono',
+#                                     'chrono', # Allow chrono in cobalt
                                       'ratio',
                                       'regex',
                                       'system_error',
