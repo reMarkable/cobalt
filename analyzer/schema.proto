@@ -17,6 +17,7 @@
 syntax = "proto3";
 
 import "encrypted_message.proto";
+import "observation.proto";
 
 package cobalt.analyzer.schema;
 

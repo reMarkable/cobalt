@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -50,7 +51,7 @@ type shufflerServer struct{}
 // locally in a random order. During dispatch event, the records get sent to
 // Analyzer and deleted from Shuffler.
 func (s *shufflerServer) Process(ctx context.Context,
-	encryptedMessage *shufflerpb.EncryptedMessage) (*shufflerpb.ShufflerResponse, error) {
+	encryptedMessage *shufflerpb.EncryptedMessage) (*empty.Empty, error) {
 	// TODO(ukode): Add impl for decrypting the sealed envelope.
 	glog.V(2).Infoln("Function Process() is invoked.")
 	pubKey := encryptedMessage.PubKey
@@ -64,31 +65,32 @@ func (s *shufflerServer) Process(ctx context.Context,
 		return nil, fmt.Errorf("Error in unmarshalling ciphertext: %v", err)
 	}
 
+	// TODO(ukode): Some notes here for future development:
 	// Check the recipient first. If the request is intended for another Shuffler
 	// do not open the envelope and route it to the next Shuffler directly using
-	// a forwarder thread.
-	if envelope.RecipientUrl != "" {
-		// TODO(ukode): Forward the request to the next Shuffler in chain for
-		// further processing. This will be implemented by queueing the request in
-		// a channel that the forwarder can consume and dispatch to the next
-		// Shuffler |envelope.RecipientUrl|.
-	}
+	// a forwarder thread. Forward the request to the next Shuffler in chain for
+	// further processing. This will be implemented by queueing the request in
+	// a channel that the forwarder can consume and dispatch to the next
+	// Shuffler |envelope.RecipientUrl|.
 
-	encryptedMessageBlob := envelope.GetEncryptedMessage()
-	if encryptedMessageBlob == nil {
-		return nil, fmt.Errorf("Received empty encrypted message for key [%v]", envelope.GetObservationMetaData())
-	}
+	for _, batch := range envelope.GetBatch() {
+		for _, encrypted_observation := range batch.GetEncryptedObservation() {
+			if encrypted_observation == nil {
+				return nil, fmt.Errorf("Received empty encrypted message for key [%v]", batch.GetMetaData())
+			}
 
-	// Extract the Observation from the sealed envelope, save it in Shuffler data
-	// store for dispatcher to consume and forward to Analyzer based on some
-	// dispatch criteria. The data store shuffles the order of the Observation
-	// before persisting.
-	if err := store.AddObservation(envelope.GetObservationMetaData(), storage.MakeObservationInfo(encryptedMessageBlob)); err != nil {
-		return nil, fmt.Errorf("Error in saving observation: %v", envelope.GetObservationMetaData())
+			// Extract the Observation from the sealed envelope, save it in Shuffler data
+			// store for dispatcher to consume and forward to Analyzer based on some
+			// dispatch criteria. The data store shuffles the order of the Observation
+			// before persisting.
+			if err := store.AddObservation(batch.GetMetaData(), storage.MakeObservationInfo(encrypted_observation)); err != nil {
+				return nil, fmt.Errorf("Error in saving observation: %v", batch.GetMetaData())
+			}
+		}
 	}
 
 	glog.V(2).Infoln("Process() done, returning OK.")
-	return &shufflerpb.ShufflerResponse{Status: shufflerpb.ShufflerResponse_OK}, nil
+	return &empty.Empty{}, nil
 }
 
 func newServer() *shufflerServer {

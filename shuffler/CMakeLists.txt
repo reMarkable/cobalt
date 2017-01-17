@@ -26,6 +26,7 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
                           ${CONFIG_GEN_PROTO_FILE}
     COMMAND ${PROTOC} ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
             ${CMAKE_SOURCE_DIR}/encrypted_message.proto
+            ${CMAKE_SOURCE_DIR}/observation.proto
             ${CMAKE_SOURCE_DIR}/analyzer/analyzer.proto
             ${CMAKE_CURRENT_SOURCE_DIR}/config.proto
             -I ${CMAKE_SOURCE_DIR}
@@ -46,6 +47,7 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
     DEPENDS shuffler.proto
     DEPENDS config.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/observation.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/analyzer/analyzer.proto
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )

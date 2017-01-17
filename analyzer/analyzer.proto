@@ -14,25 +14,12 @@
 
 syntax = "proto3";
 
-import "encrypted_message.proto";
+import "observation.proto";
 import "google/protobuf/empty.proto";
 
 package cobalt.analyzer;
 
 option go_package = "cobalt";
-
-// A batch of encrypted Observations received from the Shuffler.
-message ObservationBatch {
-  // The common Metadata for all of the encrypted observations in this batch.
-  //
-  // This field is authenticated by virtue of being included in the
-  // "associated data" part of the AEAD encryption of each
-  // |encryped_observation|.
-  ObservationMetadata meta_data = 1;
-
-  // A batch of encrypted observations with common metadata.
-  repeated EncryptedMessage encrypted_observation = 2;
-}
 
 // The Analyzer receives observations from the shufflers.  Reports based on
 // these observations are periodically generated and published.

@@ -35,26 +35,3 @@ message EncryptedMessage {
                         // proto message. Which message is determined by
                         // context.
 }
-
-// ObservationMetadata describes the parts of an observation other than the
-// secret payload.
-message ObservationMetadata {
-  // An Observation is for a particular metric.
-  // The following three values together specify that metric.
-  uint32 customer_id = 1;
-  uint32 project_id = 2;
-  uint32 metric_id = 3;  // e.g. 7 = City-And-Rating
-
-  // The day on which the observation occurred, expressed as the zero-based
-  // index relative to January 1, 1970.
-  // i.e. 0 = January 1, 1970
-  //      1 = January 2, 1970
-  //      etc.
-  //
-  // We intentionally leave the meaning of this vague and leave it to each
-  // Encoder Client to define how to make it precise. Which day it is depends on
-  // time zone. The Encoder client is free to use the local time zone or a
-  // different time zone. The Encoder client is free to add some random noise to
-  // the time at which an event occurred and this might change the day.
-  uint32 day_index = 4;
-}

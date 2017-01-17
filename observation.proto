@@ -15,6 +15,10 @@ syntax = "proto3";
 
 package cobalt;
 
+option go_package = "cobalt";
+
+import "encrypted_message.proto";
+
 ///////////////////////////////////////////////////////////////
 // Messages created in the Encoder and consumed in the Analyzer
 ///////////////////////////////////////////////////////////////
@@ -76,4 +80,49 @@ message Observation {
   // The keys are the names of the metric parts to which each ObservationPart
   // is associated.
   map<string, ObservationPart> parts = 1;
+}
+
+// ObservationMetadata describes the parts of an observation other than the
+// secret payload.
+message ObservationMetadata {
+  // An Observation is for a particular metric.
+  // The following three values together specify that metric.
+  uint32 customer_id = 1;
+  uint32 project_id = 2;
+  uint32 metric_id = 3;  // e.g. 7 = City-And-Rating
+
+  // The day on which the observation occurred, expressed as the zero-based
+  // index relative to January 1, 1970.
+  // i.e. 0 = January 1, 1970
+  //      1 = January 2, 1970
+  //      etc.
+  //
+  // We intentionally leave the meaning of this vague and leave it to each
+  // Encoder Client to define how to make it precise. Which day it is depends on
+  // time zone. The Encoder client is free to use the local time zone or a
+  // different time zone. The Encoder client is free to add some random noise to
+  // the time at which an event occurred and this might change the day.
+  uint32 day_index = 4;
+}
+
+// A batch of encrypted Observations with common metadata. This is the unit
+// sent from a Shuffler to an Analyzer. The Observations are encrypted to
+// the public key of the Analyzer so the Shuffler cannot read them.
+message ObservationBatch {
+  // The common Metadata for all of the encrypted observations in this batch.
+  //
+  // This field is authenticated by virtue of being included in the
+  // "associated data" part of the AEAD encryption of each
+  // |encryped_observation|.
+  ObservationMetadata meta_data = 1;
+
+  // Each EncryptedMessage contains the ciphertext of an Observation that has
+  // been encrypted to the public key of the Analyzer.
+  repeated EncryptedMessage encrypted_observation = 2;
+}
+
+// An envelope contains multiple ObservationBatches. An encrypted Envelope
+// is the unit sent from an Encoder client to a Shuffler.
+message Envelope {
+  repeated ObservationBatch batch = 1;
 }

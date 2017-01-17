@@ -35,15 +35,14 @@
 #include "config/encoding_config.h"
 #include "./observation.pb.h"
 
+using cobalt::Envelope;
+using cobalt::ObservationBatch;
 using cobalt::analyzer::kAnalyzerPort;
 using cobalt::analyzer::Analyzer;
-using cobalt::analyzer::ObservationBatch;
 using cobalt::config::EncodingRegistry;
 using cobalt::encoder::ClientSecret;
 using cobalt::forculus::ForculusEncrypter;
-using cobalt::shuffler::Envelope;
 using cobalt::shuffler::Shuffler;
-using cobalt::shuffler::ShufflerResponse;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -294,16 +293,19 @@ class CGen {
     // Build the messages to send to the shuffler.
     std::vector<EncryptedMessage> messages;
 
-    for (const GenObservation& observation : observations_) {
+    for (GenObservation& observation : observations_) {
+      // TODO(rudominer) Use the fact that an Envelope can hold
+      // multpile ObservationBatches and an ObservationBatch can hold
+      // multiple observations. For now we are using an Envelope per
+      // Observation.
       Envelope envelope;
-
-      envelope.set_allocated_observation_meta_data(
+      auto* observation_batch = envelope.add_batch();
+      observation_batch->set_allocated_meta_data(
           new ObservationMetadata(observation.metadata));
 
-      envelope.set_allocated_encrypted_message(
-          new EncryptedMessage(observation.encrypted));
-
-      envelope.set_recipient_url(dst);
+      auto* encrypted_observation =
+          observation_batch->add_encrypted_observation();
+      encrypted_observation->Swap(&observation.encrypted);
 
       // Encrypt the envelope.
       std::string cleartext, encrypted;
@@ -328,7 +330,7 @@ class CGen {
 
     for (int i = 0; i < FLAGS_num_rpcs; i++) {
       ClientContext context;
-      ShufflerResponse resp;
+      Empty resp;
 
       Status status = shuffler->Process(&context, *msg_iter, &resp);
 

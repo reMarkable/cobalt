@@ -21,45 +21,11 @@ package cobalt.shuffler;
 option go_package = "cobalt";
 
 import "encrypted_message.proto";
+import "google/protobuf/empty.proto";
 
 // Interface exported by the Shuffler service.
 service Shuffler {
   // Processes an incoming Envelope from the encoder.
   // The EncryptedMessage should contain the encryption of an |Envelope|.
-  rpc Process(EncryptedMessage) returns (ShufflerResponse) {}
-}
-
-// Response from Shuffler service
-// TODO(ukode): Replace ShufflerResponse with built-in Empty proto, after
-// figuring out the same import from multiple packages issue.
-message ShufflerResponse {
-  enum Status {
-    OK = 0;
-    ERROR = 1;
-  }
-  Status status = 1;
-}
-
-// Shuffler receives an |encrypted_message| either from another Shuffler or
-// directly as an incoming request from the Encoder. It is then decrypted to an
-// |envelope| that contains the next |encrypted_message| blob, optional
-// |observation_meta_data| and the routing address for the next immediate
-// recipient.
-message Envelope {
-  // Meta-data for the Observation encrypted in |encrypted_message| or unset if
-  // |encrypted_message| does not contain an Observation.
-  ObservationMetadata observation_meta_data = 1;
-
-  // The encryption of either an Observation or another Envelope. Which of
-  // these two cases it is is determined by the value of the |recipient_url|
-  // field. If the recipient is another Shuffler then this is the encryption
-  // of another Envelope and it will be sent to the other Shuffler in the
-  // Process() call. If the recipient is an analyzer then this is the encryption
-  // of an Observation and it will be included in an ObservationBatch and
-  // sent to the Analyzer in the AddObservations() call.
-  EncryptedMessage encrypted_message = 2;
-
-  // The URL of the party to which the contents of this envelope should be
-  // forwarded.
-  string recipient_url = 3;
+  rpc Process(EncryptedMessage) returns (google.protobuf.Empty) {}
 }
