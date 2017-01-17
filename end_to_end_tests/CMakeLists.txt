@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build functional tests
-set(FUNCTIONAL_TESTS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-set(COBALT_TEST_SRC
-    "${FUNCTIONAL_TESTS_SRC}/cobalt_test.go")
-set(COBALT_TEST_BIN ${GO_TESTS}/cobalt_test)
+# Build end-to-end tests
+set(E2E_TESTS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set(COBALT_TEST_SRC "${E2E_TESTS_SRC}/cobalt_test.go")
+set(COBALT_TEST_BIN ${DIR_END_TO_END_TESTS}/cobalt_test)
 
 set(COBALT_SHUFFLER_CONF_SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/config/shuffler_default.conf")
@@ -41,7 +40,7 @@ add_custom_target(test_all ALL
       DEPENDS ${COBALT_TEST_CONF_BIN}
 )
 
-add_executable(bigtable_test ${FUNCTIONAL_TESTS_SRC}/bigtable_test.cc)
+add_executable(bigtable_test ${E2E_TESTS_SRC}/bigtable_test.cc)
 target_link_libraries(bigtable_test gtest gtest_main cobalt_analyzer)
 set_target_properties(bigtable_test PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

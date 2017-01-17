@@ -101,8 +101,8 @@ def _lint(args):
   golint.main()
 
 # Specifiers of subsets of tests to run
-TEST_FILTERS =['all', 'gtests', 'nogtests',
-    'gotests', 'nogotests', 'btemulator', 'nobtemulator']
+TEST_FILTERS =['all', 'gtests', 'nogtests', 'gotests', 'nogotests',
+               'btemulator', 'nobtemulator', 'e2e', 'noe2e']
 
 # Returns 0 if all tests return 0, otherwise returns 1.
 def _test(args):
@@ -113,6 +113,7 @@ def _test(args):
     'gtests': ['gtests'],
     'gotests' : ['go_tests'],
     'btemulator': ['gtests_btemulator'],
+    'e2e': ['e2e_tests']
   }
 
   # Get the list of test directories we should run.
@@ -289,7 +290,7 @@ def main():
     help='Runs Cobalt tests. You must build first.')
   sub_parser.set_defaults(func=_test)
   sub_parser.add_argument('--tests', choices=TEST_FILTERS,
-      help='Specify a subset of tests to run',  default='nobtemulator')
+  help='Specify a subset of tests to run',  default='nobtemulator')
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')

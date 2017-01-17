@@ -31,6 +31,7 @@ enable_language(CXX)
 
 SET (DIR_GTESTS "${CMAKE_BINARY_DIR}/gtests")
 SET (DIR_SYSROOT "${CMAKE_SOURCE_DIR}/sysroot")
+SET (DIR_END_TO_END_TESTS "${CMAKE_BINARY_DIR}/e2e_tests")
 
 # Note - we specify the exact library version because dev environments have
 # protobuf.so.8 (v2) preinstalled in a higher priority search path.  Instead we
@@ -79,7 +80,7 @@ add_subdirectory(algorithms)
 add_subdirectory(analyzer)
 add_subdirectory(config)
 add_subdirectory(encoder)
-add_subdirectory(functional_tests)
+add_subdirectory(end_to_end_tests)
 add_subdirectory(shuffler)
 add_subdirectory(tools)
 add_subdirectory(third_party/boringssl/src)
