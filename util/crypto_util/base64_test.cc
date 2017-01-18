@@ -48,6 +48,16 @@ TEST(Base64Test, RegexEncode) {
   std::string decoded;
   EXPECT_TRUE(RegexDecode(encoded, &decoded));
   EXPECT_EQ(data_str, decoded);
+
+  // Expect the decoding to fail if the input string contain a '+' since we are
+  // using "_" instead of "+" in our regex-friendly version of the encoding.
+  encoded = "AAECAwQFBv/+/fz7_g==";
+  EXPECT_FALSE(RegexDecode(encoded, &decoded));
+
+  // Expect the decoding to fail if the input string contain an '&' since "&"
+  // is not used in Base64 encoding.
+  encoded = "AAECAwQFBv/&/fz7_g==";
+  EXPECT_FALSE(RegexDecode(encoded, &decoded));
 }
 
 }  // namespace crypto

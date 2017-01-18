@@ -98,6 +98,9 @@ bool RegexEncode(const std::string& data, std::string* encoded_out) {
 }
 
 bool RegexDecode(std::string encoded_in, std::string* decoded_out) {
+  if (encoded_in.find('+') != std::string::npos) {
+    return false;
+  }
   std::replace(encoded_in.begin(), encoded_in.end(), '_', '+');
   return Base64Decode(encoded_in, decoded_out);
 }
