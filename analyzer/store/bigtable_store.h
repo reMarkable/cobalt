@@ -48,7 +48,7 @@ class BigtableStore : public DataStore {
 
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
                         std::string limit_row_key,
-                        std::vector<std::string> column_names,
+                        const std::vector<std::string>& column_names,
                         size_t max_rows) override;
 
   Status DeleteRow(Table table, std::string row_key) override;

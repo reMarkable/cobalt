@@ -126,7 +126,7 @@ class DataStore {
   //           Must be positive or kInvalidArguments will be returned.
   virtual ReadResponse ReadRows(Table table, std::string start_row_key,
                                 bool inclusive, std::string limit_row_key,
-                                std::vector<std::string> column_names,
+                                const std::vector<std::string>& column_names,
                                 size_t max_rows) = 0;
 
   // Deletes the given row from the given table, if it exists.

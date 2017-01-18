@@ -142,7 +142,7 @@ Status BigtableStore::WriteRow(DataStore::Table table, DataStore::Row row) {
 
 BigtableStore::ReadResponse BigtableStore::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
-    std::string limit_row_key, std::vector<std::string> column_names,
+    std::string limit_row_key, const std::vector<std::string>& column_names,
     size_t max_rows) {
   ReadResponse read_response;
   read_response.status = kOK;
@@ -159,18 +159,18 @@ BigtableStore::ReadResponse BigtableStore::ReadRows(
   RowRange* row_range = rowset->add_row_ranges();
 
   if (inclusive) {
-    row_range->set_start_key_closed(start_row_key);
+    row_range->mutable_start_key_closed()->swap(start_row_key);
   } else {
-    row_range->set_start_key_open(start_row_key);
+    row_range->mutable_start_key_open()->swap(start_row_key);
   }
   if (!limit_row_key.empty()) {
-    row_range->set_end_key_open(limit_row_key);
+    row_range->mutable_end_key_open()->swap(limit_row_key);
   }
 
   if (!column_names.empty()) {
     std::string column_filter;
     bool first = true;
-    for (auto& column_name : column_names) {
+    for (const auto& column_name : column_names) {
       if (!first) {
         column_filter += "|";
       }

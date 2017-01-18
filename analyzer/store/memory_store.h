@@ -35,7 +35,7 @@ class MemoryStoreSingleton : public DataStore {
 
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
                         std::string limit_row_key,
-                        std::vector<std::string> column_names,
+                        const std::vector<std::string>& column_names,
                         size_t max_rows) override;
 
   Status DeleteRow(Table table, std::string row_key) override;
@@ -62,7 +62,7 @@ class MemoryStore : public DataStore {
 
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
                         std::string limit_row_key,
-                        std::vector<std::string> column_names,
+                        const std::vector<std::string>& column_names,
                         size_t max_rows) override {
     return MemoryStoreSingleton::Instance().ReadRows(
         table, start_row_key, inclusive, limit_row_key, column_names, max_rows);

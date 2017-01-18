@@ -40,7 +40,7 @@ Status MemoryStoreSingleton::WriteRow(Table table, Row row) {
 
 DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
-    std::string limit_row_key, std::vector<std::string> column_names,
+    std::string limit_row_key, const std::vector<std::string>& column_names,
     size_t max_rows) {
   ReadResponse read_response;
   read_response.status = kOK;
