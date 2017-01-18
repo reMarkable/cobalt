@@ -14,6 +14,7 @@
 
 #include "util/crypto_util/cipher.h"
 
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -49,6 +50,11 @@ namespace {
     return EVP_aead_aes_256_gcm();
   }
   static const size_t GROUP_ELEMENT_SIZE  = 256 / 8;  // (g^xy) object length
+
+  // For hybrid mode, we can fix the nonce to all zeroes without losing
+  // security. See: https://goto.google.com/aes-gcm-zero-nonce-security
+  const byte kAllZeroNonce[SymmetricCipher::NONCE_SIZE] = {0x00};
+
 }  //  namespace
 
 class CipherContext {
@@ -193,7 +199,6 @@ bool HybridCipher::set_private_key(const byte private_key[PRIVATE_KEY_SIZE]) {
 bool HybridCipher::Encrypt(const byte *ptext, int ptext_len,
                            byte public_key_part_out[PUBLIC_KEY_SIZE],
                            byte salt_out[SALT_SIZE],
-                           byte nonce_out[NONCE_SIZE],
                            std::vector<byte>* ctext) {
   std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
       EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
@@ -230,25 +235,26 @@ bool HybridCipher::Encrypt(const byte *ptext, int ptext_len,
   Random rand;
   rand.RandomBytes(salt_out, SALT_SIZE);
 
-  // Derive hkdf_derived_key by running HKDF with SHA256 and random salt
+  // Derive hkdf_derived_key by running HKDF with SHA512 and random salt
   byte hkdf_derived_key[SymmetricCipher::KEY_SIZE];
-  if (!HKDF(hkdf_derived_key, SymmetricCipher::KEY_SIZE, EVP_sha256(),
-           shared_key, shared_key_len,
-           salt_out, SALT_SIZE,
-           nullptr, 0)) {
+  std::vector<byte> hkdf_input(PUBLIC_KEY_SIZE + GROUP_ELEMENT_SIZE);
+  std::memcpy(hkdf_input.data(), public_key_part_out, PUBLIC_KEY_SIZE);
+  std::memcpy(hkdf_input.data() + PUBLIC_KEY_SIZE, shared_key,
+              GROUP_ELEMENT_SIZE);
+  if (!HKDF(hkdf_derived_key, SymmetricCipher::KEY_SIZE, EVP_sha512(),
+            hkdf_input.data(), hkdf_input.size(),
+            salt_out, SALT_SIZE,
+            nullptr, 0)) {
     return false;
   }
-
-  // Choose random nonce for symmetric encryption
-  // TODO(pseudorandom): Verify crypto math and then set nonce to all zeroes
-  // whenever using AES-GCM in hybrid mode
-  rand.RandomBytes(nonce_out, NONCE_SIZE);
 
   // Do symmetric encryption with hkdf_derived_key
   if (!symm_cipher_->set_key(hkdf_derived_key)) {
     return false;
   }
-  if (!symm_cipher_->Encrypt(nonce_out, ptext, ptext_len, ctext)) {
+  // For hybrid mode, we can fix the nonce to all zeroes without losing
+  // security. See: https://goto.google.com/aes-gcm-zero-nonce-security
+  if (!symm_cipher_->Encrypt(kAllZeroNonce, ptext, ptext_len, ctext)) {
     return false;
   }
 
@@ -258,7 +264,6 @@ bool HybridCipher::Encrypt(const byte *ptext, int ptext_len,
 
 bool HybridCipher::Decrypt(const byte public_key_part[PUBLIC_KEY_SIZE],
                            const byte salt[SALT_SIZE],
-                           const byte nonce[NONCE_SIZE],
                            const byte *ctext, int ctext_len,
                            std::vector<byte>* ptext) {
   // Read public_key_part into new EVP_PKEY object
@@ -290,13 +295,20 @@ bool HybridCipher::Decrypt(const byte public_key_part[PUBLIC_KEY_SIZE],
                                 ecpoint.get(),
                                 EVP_PKEY_get0_EC_KEY(context_->GetKey()),
                                 nullptr);
+  if (shared_key_len != sizeof(shared_key)) {
+    return false;
+  }
 
-  // Derive hkdf_derived_key by running HKDF with SHA256 and given salt
+  // Derive hkdf_derived_key by running HKDF with SHA512 and given salt
   byte hkdf_derived_key[SymmetricCipher::KEY_SIZE];
-  if (!HKDF(hkdf_derived_key, SymmetricCipher::KEY_SIZE, EVP_sha256(),
-           shared_key, shared_key_len,
-           salt, SALT_SIZE,
-           nullptr, 0)) {
+  std::vector<byte> hkdf_input(PUBLIC_KEY_SIZE + GROUP_ELEMENT_SIZE);
+  std::memcpy(hkdf_input.data(), public_key_part, PUBLIC_KEY_SIZE);
+  std::memcpy(hkdf_input.data() + PUBLIC_KEY_SIZE, shared_key,
+              GROUP_ELEMENT_SIZE);
+  if (!HKDF(hkdf_derived_key, SymmetricCipher::KEY_SIZE, EVP_sha512(),
+            hkdf_input.data(), hkdf_input.size(),
+            salt, SALT_SIZE,
+            nullptr, 0)) {
     return false;
   }
 
@@ -304,7 +316,10 @@ bool HybridCipher::Decrypt(const byte public_key_part[PUBLIC_KEY_SIZE],
   if (!symm_cipher_->set_key(hkdf_derived_key)) {
     return false;
   }
-  if (!symm_cipher_->Decrypt(nonce, ctext, ctext_len, ptext)) {
+
+  // For hybrid mode, we can fix the nonce to all zeroes without losing
+  // security. See: https://goto.google.com/aes-gcm-zero-nonce-security
+  if (!symm_cipher_->Decrypt(kAllZeroNonce, ctext, ctext_len, ptext)) {
     return false;
   }
 

@@ -103,19 +103,18 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher,
   // Encrypt
   byte public_key_part[HybridCipher::PUBLIC_KEY_SIZE];
   byte salt[HybridCipher::SALT_SIZE];
-  byte nonce[HybridCipher::NONCE_SIZE];
   std::vector<byte> cipher_text;
   ASSERT_TRUE(hybrid_cipher->set_public_key(public_key))
       << GetLastErrorMessage();
   EXPECT_TRUE(hybrid_cipher->Encrypt(plain_text, ptext_len, public_key_part,
-                                     salt, nonce, &cipher_text))
+                                     salt, &cipher_text))
       << GetLastErrorMessage();
 
   // Decrypt
   std::vector<byte> recovered_text;
   ASSERT_TRUE(hybrid_cipher->set_private_key(private_key))
       << GetLastErrorMessage();
-  ASSERT_TRUE(hybrid_cipher->Decrypt(public_key_part, salt, nonce,
+  ASSERT_TRUE(hybrid_cipher->Decrypt(public_key_part, salt,
                                      cipher_text.data(), cipher_text.size(),
                                      &recovered_text))
       << GetLastErrorMessage();
@@ -127,7 +126,7 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher,
 
   // Decrypt with flipped salt
   salt[0] ^= 0x1;  // flip a bit in the salt
-  EXPECT_FALSE(hybrid_cipher->Decrypt(public_key_part, salt, nonce,
+  EXPECT_FALSE(hybrid_cipher->Decrypt(public_key_part, salt,
                                       cipher_text.data(), cipher_text.size(),
                                       &recovered_text))
       << GetLastErrorMessage();
@@ -136,7 +135,7 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher,
   salt[0] ^= 0x1;  // flip salt bit back
   public_key_part[2] ^= 0x1;  // flip any bit except in first byte (due to
                               // X9.62 serialization)
-  EXPECT_FALSE(hybrid_cipher->Decrypt(public_key_part, salt, nonce,
+  EXPECT_FALSE(hybrid_cipher->Decrypt(public_key_part, salt,
                                       cipher_text.data(), cipher_text.size(),
                                       &recovered_text))
       << GetLastErrorMessage();
@@ -162,8 +161,8 @@ void doGenerateKeys(byte public_key[HybridCipher::PUBLIC_KEY_SIZE],
   // Set private_key
   std::unique_ptr<BIGNUM, decltype(&::BN_free)> bn_private_key(
       BN_dup(EC_KEY_get0_private_key(eckey.get())), BN_free);
-  const size_t PKEY_SIZE = HybridCipher::PRIVATE_KEY_SIZE;
-  ASSERT_TRUE(BN_bn2bin(bn_private_key.get(), private_key) <= PKEY_SIZE);
+  ASSERT_TRUE(BN_bn2bin_padded(private_key, HybridCipher::PRIVATE_KEY_SIZE,
+                               bn_private_key.get()));
 }
 
 TEST(HybridCipherTest, Test) {
@@ -172,8 +171,6 @@ TEST(HybridCipherTest, Test) {
   byte private_key[HybridCipher::PRIVATE_KEY_SIZE];
 
   // Test with five different key pairs
-  // TODO(pseudorandom): Test is flaky. Succeeds with 500 key pairs, fails
-  // with 5000. Investigate.
   for (int times = 0; times < 5; ++times) {
     doGenerateKeys(public_key, private_key);
 

@@ -101,35 +101,41 @@ class SymmetricCipher {
 //
 //    1. Samples a fresh EC keypair (g^y, y)
 //    2. Samples a salt
-//    3. Computes symmetric key = HKDF(g^xy, salt) with SHA256 compression
-//    function
-//    4. Chooses a fresh nonce of size SymmetricCipher::NONCE_SIZE
-//    5. (Symmetric) encrypts message using SymmetricCipher::encrypt with key
-//    and nonce computed above into ciphertext
-//    6. Publishes (public_key_part, salt, nonce, ciphertext) as the hybrid
+//    3. Computes symmetric key = HKDF(g^y, g^xy, salt) with SHA512
+//    compression function (also, see Note 2)
+//    4. (Symmetric) encrypts message using SymmetricCipher::encrypt with key
+//    and all-zero nonce into ciphertext
+//    5. Publishes (public_key_part, salt, ciphertext) as the hybrid
 //    ciphertext, where public_key_part is the X9.62 serialization of g^y.
 //
-// Dec(private key, hybrid ciphertext = (public_key_part, salt, nonce,
-//        ciphertext)):
+// Dec(private key, hybrid ciphertext = (public_key_part, salt, ciphertext)):
 //
-//    1. Computes symmetric key = HKDF(g^xy, salt) with SHA256 compression
-//    function from private key (x) and public_key_part (g^y)
+//    1. Computes symmetric key = HKDF(g^y, g^xy, salt) with SHA512
+//    compression function from private key (x) and public_key_part (g^y)
 //    2. (Symmetric) decrypts ciphertext using SymmetricCipher::decrypt with
-//    key and nonce
+//    key and all-zero nonce.
 //
 // An instance of HybridCipher may be used repeatedly for multiple
 // encryptions or decryptions. The method set_public_key() must be used before
 // encryptions and set_private_key() must be used before decryptions.
 //
+// Note 1: We choose to fix the nonce (to all-zeroes) to save on overhead. This
+// is particularly useful when we're encrypting small plaintexts. For more
+// information, see https://goto.google.com/aes-gcm-zero-nonce-security
+//
+// Note 2: This implements the ECIES way of deriving a shared key from ECDH as
+// outlined in an ISO standard draft: http://www.shoup.net/iso/std6.pdf. The
+// same construction hashing g^y and key length is given in the HEG
+// construction in Section 10.1 in http://www.shoup.net/papers/cca2.pdf
+//
 // TODO(pseudorandom): Can we eliminate salt and save space without
-// compromising security?
+// compromising security? Probably not.
 class HybridCipher {
  public:
   static const size_t PUBLIC_KEY_SIZE    = 33;  // One byte extra
                                                 // for X9.62 serialization
   static const size_t PRIVATE_KEY_SIZE   = 256 / 8;
-  static const size_t NONCE_SIZE         = 128 / 8;  // Nonce for symm cipher
-  static const size_t SALT_SIZE          = 32 / 8;   // Salt for HKDF
+  static const size_t SALT_SIZE          = 128 / 8;   // Salt for HKDF
 
   HybridCipher();
   ~HybridCipher();
@@ -169,9 +175,6 @@ class HybridCipher {
   // |salt| is a pointer to a vector that will be modified to store a random
   // salt of size |SALT_SIZE|
   //
-  // |nonce_out| must point to a buffer of size  SymmetricCipher::NONCE_SIZE.
-  // The nonce will be written there
-  //
   // |ctext| A pointer to a vector that will be modified to contain
   // the ciphertext under the derived symmetric key
   //
@@ -180,7 +183,6 @@ class HybridCipher {
   bool Encrypt(const byte *ptext, int ptext_len,
                byte public_key_part_out[PUBLIC_KEY_SIZE],
                byte salt_out[SALT_SIZE],
-               byte nonce_out[NONCE_SIZE],
                std::vector<byte>* ctext);
 
   // Performs ECDH-based hybrid decryption.
@@ -193,8 +195,6 @@ class HybridCipher {
   // |salt| The salt to be used in the HKDF step in decryption. Must have size
   // |SALT_SIZE|
   //
-  // |nonce| must be of length SymmetricCipher::NONCE_SIZE
-  //
   // |ctext| The ciphertext to be decrypted.
   //
   // |ctext_len| The number of bytes of ciphertext.
@@ -206,7 +206,6 @@ class HybridCipher {
   // in errors.h to obtain error information upon failure.
   bool Decrypt(const byte public_key_part[PUBLIC_KEY_SIZE],
                const byte salt[SALT_SIZE],
-               const byte nonce[NONCE_SIZE],
                const byte *ctext, int ctext_len,
                std::vector<byte>* ptext);
 
