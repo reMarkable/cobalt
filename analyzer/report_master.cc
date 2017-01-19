@@ -27,8 +27,7 @@
 
 #include "algorithms/forculus/forculus_analyzer.h"
 #include "analyzer/report_generator.h"
-#include "analyzer/schema.pb.h"
-#include "analyzer/store/store.h"
+#include "analyzer/store/data_store.h"
 #include "config/encoding_config.h"
 #include "config/metric_config.h"
 #include "config/report_config.h"
@@ -40,72 +39,64 @@ using cobalt::config::ReportRegistry;
 namespace cobalt {
 namespace analyzer {
 
-DEFINE_string(metrics, "", "Metrics definition file");
-DEFINE_string(reports, "", "Reports definition file");
-DEFINE_string(encodings, "", "Encodings definition file");
+using store::ObservationStore;
+using store::DataStore;
 
-// XXX TODO(bittau):
-//
-// WARNING ======================================================
-//
-// This entire class is simply an experiment and a place holder.  It is merely
-// used to tie up pieces to see how they work.  This is in no way final or
-// representative of what the final outcome will look like.
-//
-// Eventually this class will be implemented for real.  Currently it's a
-// prototype / playground only.
-//
-// WARNING ======================================================
-//
+DEFINE_string(cobalt_config_dir, "",
+              "Path to the Cobalt configuration directory (should not end with "
+              "forward slash)");
+
 class ReportMaster {
  public:
-  explicit ReportMaster(std::shared_ptr<Store> store)
+  explicit ReportMaster(std::shared_ptr<DataStore> store)
       : metrics_(new MetricRegistry),
         reports_(new ReportRegistry),
         encodings_(new EncodingRegistry),
-        store_(store) {}
+        store_(store),
+        observation_store_(new ObservationStore(store)) {}
 
-  void Start() {
+  void Start(std::atomic<bool>* shut_down) {
     load_configuration();
 
-    while (1) {
+    while (!(*shut_down)) {
       run_reports();
       sleep(10);
     }
   }
 
  private:
+  // TODO(rudominer) Don't hard-code the names of the config files.
   void load_configuration() {
-    if (FLAGS_metrics != "") {
-      auto metrics = MetricRegistry::FromFile(FLAGS_metrics, nullptr);
-      if (metrics.second != config::kOK)
-        LOG(FATAL) << "Can't load metrics configuration";
+    CHECK(!FLAGS_cobalt_config_dir.empty())
+        << "Flag --cobalt_config_dir is mandatory";
 
-      metrics_.reset(metrics.first.release());
+    auto encodings = EncodingRegistry::FromFile(
+        FLAGS_cobalt_config_dir + "/registered_encodings.txt", nullptr);
+    if (encodings.second != config::kOK) {
+      LOG(FATAL) << "Can't load encoding configuration";
     }
+    encodings_.reset(encodings.first.release());
 
-    if (FLAGS_reports != "") {
-      auto reports = ReportRegistry::FromFile(FLAGS_reports, nullptr);
-      if (reports.second != config::kOK)
-        LOG(FATAL) << "Can't load reports configuration";
-
-      reports_.reset(reports.first.release());
+    auto metrics = MetricRegistry::FromFile(
+        FLAGS_cobalt_config_dir + "/registered_metrics.txt", nullptr);
+    if (metrics.second != config::kOK) {
+      LOG(FATAL) << "Can't load metrics configuration";
     }
+    metrics_.reset(metrics.first.release());
 
-    if (FLAGS_encodings != "") {
-      auto encodings = EncodingRegistry::FromFile(FLAGS_encodings, nullptr);
-      if (encodings.second != config::kOK)
-        LOG(FATAL) << "Can't load encodings configuration";
-
-      encodings_.reset(encodings.first.release());
+    auto reports = ReportRegistry::FromFile(
+        FLAGS_cobalt_config_dir + "/registered_reports.txt", nullptr);
+    if (reports.second != config::kOK) {
+      LOG(FATAL) << "Can't load reports configuration";
     }
+    reports_.reset(reports.first.release());
   }
 
   void run_reports() {
     LOG(INFO) << "Report cycle";
 
-    std::unique_ptr<ReportGenerator> report_generator(
-        new ReportGenerator(metrics_, reports_, encodings_, store_));
+    std::unique_ptr<ReportGenerator> report_generator(new ReportGenerator(
+        metrics_, reports_, encodings_, observation_store_));
 
     for (const ReportConfig& config : *reports_) {
       report_generator->GenerateReport(config);
@@ -115,14 +106,15 @@ class ReportMaster {
   std::shared_ptr<MetricRegistry> metrics_;
   std::shared_ptr<ReportRegistry> reports_;
   std::shared_ptr<EncodingRegistry> encodings_;
-  std::shared_ptr<Store> store_;
+  std::shared_ptr<DataStore> store_;
+  std::shared_ptr<ObservationStore> observation_store_;
 };
 
-void report_master_main() {
+void ReportMasterMain(std::atomic<bool>* shut_down) {
   LOG(INFO) << "Starting report_master";
 
-  ReportMaster report_master(MakeStore(false));
-  report_master.Start();
+  ReportMaster report_master(store::DataStore::CreateFromFlagsOrDie());
+  report_master.Start(shut_down);
 }
 
 }  // namespace analyzer

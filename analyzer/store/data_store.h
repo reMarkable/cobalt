@@ -52,6 +52,8 @@ enum Status {
 // The rows are ordered lexicographically by row_key.
 class DataStore {
  public:
+  static std::shared_ptr<DataStore> CreateFromFlagsOrDie();
+
   // The different tables that are controlled by this data store.
   enum Table {
     // The Observations table.

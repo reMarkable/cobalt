@@ -15,14 +15,16 @@
 #ifndef COBALT_ANALYZER_REPORT_MASTER_H_
 #define COBALT_ANALYZER_REPORT_MASTER_H_
 
+#include <atomic>
+
 namespace cobalt {
 namespace analyzer {
 
-// This is the main method for the report master.  This call blocks
-// forever.  Currently it is not folded into main() because we run both the
-// analyzer_service and the report master in a single process and each have
-// their own "main()".
-void report_master_main();
+// This function is the main function for the ReportMaster's thread. In the
+// future the ReportMaster will be a separate process and this will be
+// replaced by the process's main. This call blocks until |shut_down| is set
+// to true.
+void ReportMasterMain(std::atomic<bool>* shut_down);
 
 }  // namespace analyzer
 }  // namespace cobalt

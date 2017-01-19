@@ -15,27 +15,31 @@
 #ifndef COBALT_ANALYZER_ANALYZER_SERVICE_H_
 #define COBALT_ANALYZER_ANALYZER_SERVICE_H_
 
-#include <grpc++/grpc++.h>
-
 #include <memory>
 #include <string>
 #include <utility>
 
 #include "analyzer/analyzer.grpc.pb.h"
-#include "analyzer/store/store.h"
+#include "analyzer/store/data_store.h"
+#include "analyzer/store/observation_store.h"
+#include "grpc++/grpc++.h"
 
 namespace cobalt {
 namespace analyzer {
-
-const int kAnalyzerPort = 8080;
 
 // Implements the Analyzer gRPC service.  It will receive observations via gRPC
 // and store them in Bigtable.  No analysis is performed.  Analysis is
 // kicked-off and done by other components (i.e., the reporter)
 class AnalyzerServiceImpl final : public Analyzer::Service {
  public:
-  explicit AnalyzerServiceImpl(std::unique_ptr<Store>&& store)
-      : store_(std::move(store)) {}
+  static std::unique_ptr<AnalyzerServiceImpl> CreateFromFlagsOrDie();
+
+  // Constructs an AnalyzerServiceImpl that accessess the given
+  // |observation_store|, listens on the given tcp |port|, and uses
+  // the given |server_credentials| for authentication and encryption.
+  AnalyzerServiceImpl(
+      std::shared_ptr<store::ObservationStore> observation_store, int port,
+      std::shared_ptr<grpc::ServerCredentials> server_credentials);
 
   // Starts the analyzer service
   void Start();
@@ -53,49 +57,18 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
                                google::protobuf::Empty* response) override;
 
  private:
+  // Decrypts the |ciphertext| in |em| and then parses the resulting bytes
+  // as an Observation and writes the result into |observation|. Returns OK
+  // if this succeeds or an error Status containing an appropriate error
+  // message otherwise.
+  grpc::Status ParseEncryptedObservation(Observation* observation,
+                                 const EncryptedMessage& em);
+
+  std::shared_ptr<store::ObservationStore> observation_store_;
+  int port_;
+  std::shared_ptr<grpc::ServerCredentials> server_credentials_;
   std::unique_ptr<grpc::Server> server_;
-  std::unique_ptr<Store> store_;
 };
-
-// The Observations table row key is currently defined as:
-// customer:project:metric:day:receive_time:random
-// Random is 64bit to try and avoid collisions on observations for the same
-// day received at the same time.
-class ObservationKey {
- public:
-  ObservationKey() : customer_(0), project_(0), metric_(0), day_(0),
-                     rx_time_(0), rnd_(0) {}
-
-  explicit ObservationKey(const ObservationMetadata& metadata);
-
-  // This will initialize the key and all its parts to the maximum value.
-  // Individual parts can subsequently be set using the set_* calls.  This is
-  // useful for calculating the upperbound of a range.
-  void set_max() {
-    customer_ = project_ = metric_ = day_ = UINT32_MAX;
-    rx_time_ = rnd_ = UINT64_MAX;
-  }
-
-  void set_customer(uint32_t id) { customer_ = id; }
-  void set_project(uint32_t id) { project_ = id; }
-  void set_metric(uint32_t id) { metric_ = id; }
-
-  std::string MakeKey();
-
- private:
-  uint32_t customer_;
-  uint32_t project_;
-  uint32_t metric_;
-  uint32_t day_;
-  uint64_t rx_time_;
-  uint64_t rnd_;
-};
-
-// This is the main method for the analyzer service.  This call blocks forever.
-// Currently it is not folded into main() because we run both the
-// analyzer_service and the reporter in a single process and each have their own
-// "main()".
-void analyzer_service_main();
 
 }  // namespace analyzer
 }  // namespace cobalt

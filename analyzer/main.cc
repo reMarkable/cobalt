@@ -15,6 +15,8 @@
 #include <err.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+
+#include <atomic>
 #include <string>
 #include <thread>
 
@@ -25,12 +27,17 @@ int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  // Right now we combine both the analyzer service and the reporter component
-  // into one process, using two threads.  Each component has its own _main
-  // method making it easy to speparate them into multiple programs in the
-  // future.  Their _main methods would be folded into the top-level main().
-  std::thread reporter(cobalt::analyzer::report_master_main);
-  cobalt::analyzer::analyzer_service_main();
+  // In Cobatl V0.1 the ReportMaster is run in another thread of this
+  // process. In the future we expect it will be a seperate process.
+  std::atomic<bool> shut_down_reporter(false);
+  std::thread reporter(cobalt::analyzer::ReportMasterMain,
+                       &shut_down_reporter);
+
+  auto analyzer = cobalt::analyzer::AnalyzerServiceImpl::CreateFromFlagsOrDie();
+  analyzer->Start();
+  analyzer->Wait();
+
+  shut_down_reporter = true;
   reporter.join();
 
   return 0;

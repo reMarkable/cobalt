@@ -21,7 +21,7 @@
 #include "./encrypted_message.pb.h"
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"
-#include "analyzer/store/store.h"
+#include "analyzer/store/observation_store.h"
 #include "config/encoding_config.h"
 #include "config/metric_config.h"
 #include "config/report_config.h"
@@ -31,10 +31,11 @@ namespace analyzer {
 
 class ReportGenerator {
  public:
-  explicit ReportGenerator(std::shared_ptr<config::MetricRegistry> metrics,
-                           std::shared_ptr<config::ReportRegistry> reports,
-                           std::shared_ptr<config::EncodingRegistry> encodings,
-                           std::shared_ptr<Store> store);
+  explicit ReportGenerator(
+      std::shared_ptr<config::MetricRegistry> metrics,
+      std::shared_ptr<config::ReportRegistry> reports,
+      std::shared_ptr<config::EncodingRegistry> encodings,
+      std::shared_ptr<store::ObservationStore> observation_store);
 
   void GenerateReport(const ReportConfig& config);
 
@@ -46,7 +47,7 @@ class ReportGenerator {
   std::shared_ptr<config::MetricRegistry> metrics_;
   std::shared_ptr<config::ReportRegistry> reports_;
   std::shared_ptr<config::EncodingRegistry> encodings_;
-  std::shared_ptr<Store> store_;
+  std::shared_ptr<store::ObservationStore> observation_store_;
 
   // Reports are run serially per (customer, project, metric) triple.  Each
   // observation though can be encoded using different encodings.  We keep track

@@ -17,109 +17,106 @@
 
 #include "analyzer/analyzer_service.h"
 
-#include <sys/time.h>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include <string>
 
-#include "analyzer/schema.pb.h"
-#include "analyzer/store/store.h"
-#include "util/crypto_util/random.h"
-
-using cobalt::analyzer::schema::ObservationValue;
-using google::protobuf::Empty;
-using grpc::Server;
-using grpc::ServerBuilder;
-using grpc::ServerContext;
-using grpc::Status;
+#include "./observation.pb.h"
+#include "analyzer/store/data_store.h"
 
 namespace cobalt {
 namespace analyzer {
 
-Status AnalyzerServiceImpl::AddObservations(ServerContext* context,
-                                            const ObservationBatch* request,
-                                            Empty* response) {
-  // Add a row for every observation
-  for (const EncryptedMessage& em : request->encrypted_observation()) {
-    ObservationKey obs_key(request->meta_data());
-    std::string key = obs_key.MakeKey();
-    std::string val;
+using store::DataStore;
+using store::ObservationStore;
 
-    ObservationValue value;
-    value.set_allocated_metadata(new ObservationMetadata(request->meta_data()));
-    value.set_allocated_observation(new EncryptedMessage(em));
+DEFINE_int32(port, 0, "The port that the Analyzer Service should listen on.");
+DEFINE_string(ssl_cert_info, "", "TBD: Some info about SSL Certificates.");
 
-    value.SerializeToString(&val);
-
-    store_->put(key, val);
+std::unique_ptr<AnalyzerServiceImpl>
+AnalyzerServiceImpl::CreateFromFlagsOrDie() {
+  auto data_store = DataStore::CreateFromFlagsOrDie();
+  std::shared_ptr<ObservationStore> observation_store(
+      new ObservationStore(data_store));
+  CHECK(FLAGS_port) << "--port is a mandatory flag";
+  std::shared_ptr<grpc::ServerCredentials> server_credentials;
+  if (FLAGS_ssl_cert_info.empty()) {
+    LOG(WARNING) << "WARNING: Using insecure server credentials. Pass "
+                    "-ssl_cert_info to enable SSL.";
+    server_credentials = grpc::InsecureServerCredentials();
+  } else {
+    LOG(INFO) << "Reading SSL certificate information from '"
+              << FLAGS_ssl_cert_info << "'.";
+    grpc::SslServerCredentialsOptions options;
+    // TODO(rudominer) Set up options based on FLAGS_ssl_cert_info.
+    server_credentials = grpc::SslServerCredentials(options);
   }
-
-  return Status::OK;
+  return std::unique_ptr<AnalyzerServiceImpl>(new AnalyzerServiceImpl(
+      observation_store, FLAGS_port, server_credentials));
 }
+
+AnalyzerServiceImpl::AnalyzerServiceImpl(
+    std::shared_ptr<store::ObservationStore> observation_store, int port,
+    std::shared_ptr<grpc::ServerCredentials> server_credentials)
+    : observation_store_(observation_store),
+      port_(port),
+      server_credentials_(server_credentials) {}
 
 void AnalyzerServiceImpl::Start() {
-  ServerBuilder builder;
-  char port[1024];
-
-  snprintf(port, sizeof(port), "0.0.0.0:%d", kAnalyzerPort);
-
-  builder.AddListeningPort(port, grpc::InsecureServerCredentials());
+  grpc::ServerBuilder builder;
+  char local_address[1024];
+  // We use 0.0.0.0 to indicate the wildcard interface.
+  snprintf(local_address, sizeof(local_address), "0.0.0.0:%d", port_);
+  builder.AddListeningPort(local_address, server_credentials_);
   builder.RegisterService(this);
-
   server_ = builder.BuildAndStart();
+  LOG(INFO) << "Starting Analyzer service on port " << port_;
 }
 
-void AnalyzerServiceImpl::Shutdown() {
-  server_->Shutdown();
+void AnalyzerServiceImpl::Shutdown() { server_->Shutdown(); }
+
+void AnalyzerServiceImpl::Wait() { server_->Wait(); }
+
+grpc::Status AnalyzerServiceImpl::AddObservations(
+    grpc::ServerContext* context, const ObservationBatch* batch,
+    google::protobuf::Empty* empty) {
+  for (const EncryptedMessage& em : batch->encrypted_observation()) {
+    Observation observation;
+    auto parse_status = ParseEncryptedObservation(&observation, em);
+    if (!parse_status.ok()) {
+      return parse_status;
+    }
+    auto add_status =
+        observation_store_->AddObservation(batch->meta_data(), observation);
+    if (add_status != store::kOK) {
+      LOG(ERROR) << "AddObservations() failed with status code " << add_status;
+      switch (add_status) {
+        case store::kInvalidArguments:
+          return grpc::Status(grpc::INVALID_ARGUMENT, "");
+
+        default:
+          return grpc::Status(grpc::INTERNAL, "");
+      }
+    }
+  }
+
+  return grpc::Status::OK;
 }
 
-void AnalyzerServiceImpl::Wait() {
-  server_->Wait();
-}
-
-//
-// ObservationKey implementation
-//
-ObservationKey::ObservationKey(const ObservationMetadata& meta) {
-  customer_ = meta.customer_id();
-  project_ = meta.project_id();
-  metric_ = meta.metric_id();
-  day_ = meta.day_index();
-
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  rx_time_ = tv.tv_sec * 1000000UL + tv.tv_usec;
-
-  cobalt::crypto::Random random;
-  rnd_ = random.RandomUint64();
-}
-
-std::string ObservationKey::MakeKey() {
-  char out[128];
-
-  // TODO(bittau): the key should be binary (e.g., a big-endian encoding of the
-  // struct representing the key).  Right now it's human readable for easy
-  // debugging.
-  snprintf(out, sizeof(out), "%.10u:%.10u:%.10u:%.10u:%.20lu:%.20lu",
-           customer_,
-           project_,
-           metric_,
-           day_,
-           rx_time_,
-           rnd_);
-
-  return std::string(out);
-}
-
-//
-// Main entry point of the analyzer servie.
-//
-void analyzer_service_main() {
-  LOG(INFO) << "Starting Analyzer service";
-
-  AnalyzerServiceImpl analyzer(MakeStore(true));
-  analyzer.Start();
-  analyzer.Wait();
+grpc::Status AnalyzerServiceImpl::ParseEncryptedObservation(
+    Observation* observation, const EncryptedMessage& em) {
+  // TODO(rudominer) Actually perform a decryption when bytes is encrypted.
+  if (!observation->ParseFromString(em.ciphertext())) {
+    std::string error_message(
+        "An EncryptedMessage was successfully decrypted using "
+        "the public key of the Analyzer, but the contents of "
+        "the decrypted message could not be parsed as an "
+        "Observation.");
+    LOG(ERROR) << error_message;
+    return grpc::Status(grpc::INVALID_ARGUMENT, error_message);
+  }
+  return grpc::Status::OK;
 }
 
 }  // namespace analyzer

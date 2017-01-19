@@ -39,8 +39,3 @@ add_custom_target(test_all ALL
       DEPENDS ${COBALT_TEST_BIN}
       DEPENDS ${COBALT_TEST_CONF_BIN}
 )
-
-add_executable(bigtable_test ${E2E_TESTS_SRC}/bigtable_test.cc)
-target_link_libraries(bigtable_test gtest gtest_main cobalt_analyzer)
-set_target_properties(bigtable_test PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

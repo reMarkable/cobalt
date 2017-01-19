@@ -16,28 +16,27 @@
 //
 // This is a test and debug client to send data to cobalt components
 
+#include <assert.h>
+#include <err.h>
+#include <libgen.h>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <err.h>
-#include <limits.h>
-#include <libgen.h>
-#include <stdlib.h>
-#include <assert.h>
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "./observation.pb.h"
 #include "algorithms/forculus/forculus_encrypter.h"
 #include "analyzer/analyzer_service.h"
-#include "shuffler/shuffler.grpc.pb.h"
-#include "config/encodings.pb.h"
 #include "config/encoding_config.h"
-#include "./observation.pb.h"
+#include "config/encodings.pb.h"
+#include "shuffler/shuffler.grpc.pb.h"
 
 using cobalt::Envelope;
 using cobalt::ObservationBatch;
-using cobalt::analyzer::kAnalyzerPort;
 using cobalt::analyzer::Analyzer;
 using cobalt::config::EncodingRegistry;
 using cobalt::encoder::ClientSecret;
@@ -51,10 +50,8 @@ using google::protobuf::Empty;
 namespace cobalt {
 namespace cgen {
 
-const int kShufflerPort = 50051;
-
-DEFINE_string(analyzer, "", "Analyzer IP");
-DEFINE_string(shuffler, "", "Shuffler IP");
+DEFINE_string(analyzer_uri, "", "The URI of the Analyzer");
+DEFINE_string(shuffler_uri, "", "The URI of the Shuffler");
 DEFINE_int32(num_rpcs, 1, "Number of RPCs to send");
 DEFINE_int32(num_observations, 1, "Number of Observations to generate");
 DEFINE_uint32(customer, 1, "Customer ID");
@@ -62,7 +59,7 @@ DEFINE_uint32(project, 1, "Project ID");
 DEFINE_uint32(metric, 1, "Metric ID");
 DEFINE_uint32(encoding, 1, "Encoding ID");
 DEFINE_string(registry, "", "Registry path for registered_encodings.txt etc.");
-DEFINE_string(part, "", "Observation part name");
+DEFINE_string(part, "city", "Observation part name");
 DEFINE_string(payload, "hello", "Observation payload");
 
 // Measures time between start and stop.  Useful for benchmarking.
@@ -70,13 +67,9 @@ class Timer {
  public:
   Timer() : start_(0), stop_(0) {}
 
-  void start() {
-    start_ = now();
-  }
+  void start() { start_ = now(); }
 
-  void stop() {
-    stop_ = now();
-  }
+  void stop() { stop_ = now(); }
 
   // returns time in microseconds
   uint64_t now() {
@@ -109,7 +102,7 @@ struct GenObservation {
 // Generates observations and RPCs to Cobalt components
 class CGen {
  public:
-  void setup(int argc, char *argv[]) {
+  void setup(int argc, char* argv[]) {
     google::SetUsageMessage("Cobalt gRPC generator");
     google::ParseCommandLineFlags(&argc, &argv, true);
 
@@ -125,8 +118,7 @@ class CGen {
       char path[PATH_MAX], path2[PATH_MAX];
 
       // Get the directory of cgen.
-      if (!realpath(argv[0], path))
-        LOG(FATAL) << "realpath(): " << argv[0];
+      if (!realpath(argv[0], path)) LOG(FATAL) << "realpath(): " << argv[0];
 
       char* dir = dirname(path);
 
@@ -134,8 +126,7 @@ class CGen {
       snprintf(path2, sizeof(path2), "%s/../../config/registered", dir);
 
       // Get the absolute path to the registry.
-      if (!realpath(path2, path))
-        LOG(FATAL) << "realpath(): " << path2;
+      if (!realpath(path2, path)) LOG(FATAL) << "realpath(): " << path2;
 
       registry_path = path;
     }
@@ -158,10 +149,11 @@ class CGen {
   void start() {
     generate_observations();
 
-    if (FLAGS_shuffler != "")
+    if (!FLAGS_shuffler_uri.empty() && !FLAGS_analyzer_uri.empty()) {
       send_shuffler();
-    else if (FLAGS_analyzer != "")
+    } else if (!FLAGS_analyzer_uri.empty()) {
       send_analyzer();
+    }
   }
 
  private:
@@ -177,15 +169,13 @@ class CGen {
     metadata.set_day_index(4);
 
     // encode the observation.
-    const EncodingConfig* const enc = encodings_->Get(
-        customer_id_, project_id_, FLAGS_encoding);
+    const EncodingConfig* const enc =
+        encodings_->Get(customer_id_, project_id_, FLAGS_encoding);
 
-    if (!enc)
-      LOG(FATAL) << "Unkown encoding: " << FLAGS_encoding;
+    if (!enc) LOG(FATAL) << "Unkown encoding: " << FLAGS_encoding;
 
     // TODO(bittau): add support for algorithms other than forculus.
-    if (!enc->has_forculus())
-      LOG(FATAL) << "Unsupported encoding";
+    if (!enc->has_forculus()) LOG(FATAL) << "Unsupported encoding";
 
     ForculusConfig config;
     ClientSecret client_secret = ClientSecret::GenerateNewSecret();
@@ -204,8 +194,8 @@ class CGen {
       ForculusObservation* forc_obs = part.mutable_forculus();
       uint32_t day_index = 0;
 
-      if (forculus.Encrypt(FLAGS_payload, day_index, forc_obs)
-          != forculus::ForculusEncrypter::kOK) {
+      if (forculus.Encrypt(FLAGS_payload, day_index, forc_obs) !=
+          forculus::ForculusEncrypter::kOK) {
         LOG(FATAL) << "Forculus encryption failed";
       }
 
@@ -235,13 +225,9 @@ class CGen {
 
   // Send observations to the analyzer.
   void send_analyzer() {
-    // connect to the analyzer
-    char dst[1024];
-
-    snprintf(dst, sizeof(dst), "%s:%d", FLAGS_analyzer.c_str(), kAnalyzerPort);
-
-    std::shared_ptr<Channel> chan =
-        grpc::CreateChannel(dst, grpc::InsecureChannelCredentials());
+    CHECK(!FLAGS_analyzer_uri.empty());
+    std::shared_ptr<Channel> chan = grpc::CreateChannel(
+        FLAGS_analyzer_uri, grpc::InsecureChannelCredentials());
 
     std::unique_ptr<Analyzer::Stub> analyzer(Analyzer::NewStub(chan));
 
@@ -273,22 +259,17 @@ class CGen {
 
     t.stop();
 
-    printf("Took %lu ms for %d requests\n",
-           t.elapsed() / 1000UL, FLAGS_num_rpcs);
+    printf("Took %lu ms for %d requests\n", t.elapsed() / 1000UL,
+           FLAGS_num_rpcs);
   }
 
   void send_shuffler() {
-    char dst[1024];
+    CHECK(!FLAGS_shuffler_uri.empty());
 
-    snprintf(dst, sizeof(dst), "%s:%d", FLAGS_shuffler.c_str(), kShufflerPort);
-
-    std::shared_ptr<Channel> chan =
-        grpc::CreateChannel(dst, grpc::InsecureChannelCredentials());
+    std::shared_ptr<Channel> chan = grpc::CreateChannel(
+        FLAGS_shuffler_uri, grpc::InsecureChannelCredentials());
 
     std::unique_ptr<Shuffler::Stub> shuffler(Shuffler::NewStub(chan));
-
-    // Build analyzer URL.
-    snprintf(dst, sizeof(dst), "%s:%d", FLAGS_analyzer.c_str(), kAnalyzerPort);
 
     // Build the messages to send to the shuffler.
     std::vector<EncryptedMessage> messages;
@@ -325,8 +306,7 @@ class CGen {
 
     auto msg_iter = messages.begin();
 
-    if (msg_iter == messages.end())
-      LOG(FATAL) << "Need messags";
+    if (msg_iter == messages.end()) LOG(FATAL) << "Need messags";
 
     for (int i = 0; i < FLAGS_num_rpcs; i++) {
       ClientContext context;
@@ -337,14 +317,13 @@ class CGen {
       if (!status.ok())
         errx(1, "error sending RPC: %s", status.error_message().c_str());
 
-      if (++msg_iter == messages.end())
-        msg_iter = messages.begin();
+      if (++msg_iter == messages.end()) msg_iter = messages.begin();
     }
 
     t.stop();
 
-    printf("Took %lu ms for %d requests\n",
-           t.elapsed() / 1000UL, FLAGS_num_rpcs);
+    printf("Took %lu ms for %d requests\n", t.elapsed() / 1000UL,
+           FLAGS_num_rpcs);
   }
 
   void encrypt(const std::string& in, std::string* out) {
@@ -363,7 +342,7 @@ class CGen {
 }  // namespace cgen
 }  // namespace cobalt
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   cobalt::cgen::CGen cgen;
 
   cgen.setup(argc, argv);

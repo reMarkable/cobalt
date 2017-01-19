@@ -19,94 +19,68 @@
 #include <map>
 #include <memory>
 #include <string>
-
-// TODO(rudominer) Eliminate dependency on analyzer_service.h. Currently
-// it is needed for ObservationKey.
-#include "analyzer/analyzer_service.h"
-#include "analyzer/schema.pb.h"
+#include <vector>
 
 using cobalt::config::EncodingRegistry;
 using cobalt::config::MetricRegistry;
 using cobalt::config::ReportRegistry;
 using cobalt::forculus::ForculusAnalyzer;
-using cobalt::analyzer::schema::ObservationValue;
 
 namespace cobalt {
 namespace analyzer {
 
-namespace {
-// TODO(pseudorandom): implement
-bool Decrypt(const std::string ciphertext, std::string* cleartext) {
-  *cleartext = ciphertext;
+using store::ObservationStore;
 
-  return true;
-}
-}  // namespace
-
-ReportGenerator::ReportGenerator(std::shared_ptr<MetricRegistry> metrics,
-                                 std::shared_ptr<ReportRegistry> reports,
-                                 std::shared_ptr<EncodingRegistry> encodings,
-                                 std::shared_ptr<Store> store)
+ReportGenerator::ReportGenerator(
+    std::shared_ptr<MetricRegistry> metrics,
+    std::shared_ptr<ReportRegistry> reports,
+    std::shared_ptr<EncodingRegistry> encodings,
+    std::shared_ptr<ObservationStore> observation_store)
     : metrics_(metrics),
       reports_(reports),
       encodings_(encodings),
-      store_(store) {}
+      observation_store_(observation_store) {}
 
 void ReportGenerator::GenerateReport(const ReportConfig& config) {
   LOG(INFO) << "Running report " << config.name();
 
-  // Read the part of the DB pertinent to this report.
-  ObservationKey keys[2];  // start, end keys.
-
-  keys[1].set_max();
-
-  for (ObservationKey& key : keys) {
-    key.set_customer(config.customer_id());
-    key.set_project(config.project_id());
-    key.set_metric(config.metric_id());
-  }
-
-  std::map<std::string, std::string> db;
-  int rc = store_->get_range(keys[0].MakeKey(), keys[1].MakeKey(), &db);
-
-  if (rc != 0) {
-    LOG(ERROR) << "get_range() error: " << rc;
-    return;
-  }
-
-  LOG(INFO) << "Observations found: " << db.size();
-
   // As we process observations, we store results in analyzers_
   analyzers_.clear();
 
-  // Try to decode all observations.
-  for (const auto& i : db) {
-    // Parse the database entry.
-    ObservationValue entry;
+  // TODO(rudominer) Compute the real start and end day indices based on the
+  // |aggregation_epoch_type|. For now we use [0, infinity)
+  uint32_t start_day_index = 0;
+  uint32_t end_day_index = UINT32_MAX;
+  // TODO(rudominer) Build the parts vector from the |variable| field.
+  // For now we use an empty parts vector indicating we want all parts.
+  std::vector<std::string> parts;
+  size_t max_results = 1000;
+  ObservationMetadata metadata;
+  metadata.set_customer_id(config.customer_id());
+  metadata.set_project_id(config.project_id());
+  metadata.set_metric_id(config.metric_id());
 
-    if (!entry.ParseFromString(i.second)) {
-      LOG(ERROR) << "Can't parse ObservationValue.  Key: " << i.first;
-      continue;
+  store::ObservationStore::QueryResponse query_response;
+  query_response.pagination_token = "";
+  do {
+    query_response = observation_store_->QueryObservations(
+        config.customer_id(), config.project_id(), config.metric_id(),
+        start_day_index, end_day_index, parts, max_results,
+        query_response.pagination_token);
+
+    if (query_response.status != store::kOK) {
+      LOG(ERROR) << "QueryObservations() error: " << query_response.status;
+      return;
     }
 
-    // Decrypt the observation.
-    Observation obs;
+    LOG(INFO) << "Observations found: " << query_response.results.size();
 
-    std::string cleartext;
-
-    if (!Decrypt(entry.observation().ciphertext(), &cleartext)) {
-      LOG(ERROR) << "Can't decrypt";
-      continue;
+    for (const auto& query_result : query_response.results) {
+      metadata.set_day_index(query_result.day_index);
+      // Process the observation.  This will populate analyzers_.
+      ProcessObservation(config, metadata, query_result.observation);
     }
-
-    if (!obs.ParseFromString(cleartext)) {
-      LOG(ERROR) << "Can't parse Observation.  Key: " << i.first;
-      continue;
-    }
-
-    // Process the observation.  This will populate analyzers_.
-    ProcessObservation(config, entry.metadata(), obs);
-  }
+  } while (!query_response.pagination_token.empty());
 
   // See what results are available.
   for (auto& analyzer : analyzers_) {
