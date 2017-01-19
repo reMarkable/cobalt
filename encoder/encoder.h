@@ -20,7 +20,6 @@
 #include <string>
 #include <vector>
 
-#include "./encrypted_message.pb.h"
 #include "./observation.pb.h"
 #include "encoder/client_secret.h"
 #include "encoder/project_context.h"

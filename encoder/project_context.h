@@ -39,7 +39,7 @@ class ProjectContext {
         encoding_registry_(encoding_registry) {}
 
   // Returns the Metric with the given ID in the project, or nullptr if there is
-  // no such MetricConfig. The caller does not take ownership of the returned
+  // no such Metric. The caller does not take ownership of the returned
   // pointer.
   const Metric* Metric(uint32_t id) const {
     return metric_registry_->Get(customer_id_, project_id_, id);
