@@ -29,6 +29,50 @@ An extensible, privacy-preserving, user-data analysis pipeline.
   * If setup.sh or compiling fails, try removing any previously installed
     versions of protobuf, grpc and golang.
 
+### Running the Analyzer Service Locally
+
+You can run the Analyzer Service locally using an in-memory data store as follows:
+
+* Let `<root>` be the root of your Cobalt installation.
+
+* `export LD_LIBRARY_PATH=<root>/sysroot/lib`
+
+* `./out/analyzer/analyzer -for_testing_only_use_memstore -port=8080 -cobalt_config_dir="config/registered" -logtostderr`
+
+### Bigtable emulator
+
+You can run the analyzer locally using the Bigtable emulator as follows.  Start
+the Bigtable emulator:
+
+* `./sysroot/gcloud/google-cloud-sdk/platform/bigtable-emulator/cbtemulator`
+
+In a separate console run:
+
+* `export LD_LIBRARY_PATH=<root>/sysroot/lib`
+
+* `./out/analyzer/analyzer -for_testing_only_use_bigtable_emulator -port=8080 -cobalt_config_dir="config/registered" -logtostderr`
+
+### Shuffler
+
+ You can run the shuffler locally as follows:
+
+* `/out/shuffler/shuffler -logtostderr -config_file out/config/shuffler_default.conf -batch_size 100 -vmodule=receiver=2,dispatcher=1,store=2`
+
+
+## cgen: Cobalt gRPC generator
+
+The following example sends a single RPC containing an ObservationBatch with 200
+Observations to an Analyzer running locally on port 8080:
+
+* `export LD_LIBRARY_PATH=<root>/sysroot/lib`
+
+* `./out/tools/cgen -analyzer_uri="localhost:8080" -num_observations=200`
+
+The following example sends the RPC instead to the shuffler running locally on port 50051:
+
+
+* `./out/tools/cgen -analyzer_uri="localhost:8080" -shuffler_uri="localhost:50051" -num_observations=200`
+
 ## Google Container Engine (GCE)
 
 The cobaltb.py tool is also a helper to interact with GCE.  The following
@@ -64,29 +108,6 @@ the JSON file containing credentials.  Follow the instructions of step "1." of
 "How the Application Default Credentials work" from:
 
 <https://developers.google.com/identity/protocols/application-default-credentials>
-
-### Bigtable emulator
-
-You can run the analyzer locally using the Bigtable emulator as follows.  Start
-the Bigtable emulator:
-
-* gcloud beta emulators bigtable start
-
-Then start the Analyzer with the appropriate environment set:
-
-* $(gcloud beta emulators bigtable env-init)
-
-* analyzer -table projects/google.com:shuffler-test/instances/cobalt-analyzer/tables/observations
-
-Note, you can run the analyzer using the -memstore option to use an internal
-in-memory database that doesn't even require Bigtable or its emulator.
-
-## cgen: Cobalt gRPC generator
-
-The following example sends a single RPC containing an ObservationBatch with two
-Observations to an Analyzer running locally:
-
-* cgen -analyzer 127.0.0.1 -num\_observations 2
 
 ## sysroot (Cobalt's dependencies)
 

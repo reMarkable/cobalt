@@ -109,7 +109,7 @@ def _test(args):
   # A map from positive filter specifiers to the list of test directories
   # it represents.
   FILTER_MAP = {
-    'all': ['gtests', 'go_tests', 'gtests_btemulator'],
+    'all': ['gtests', 'go_tests', 'gtests_btemulator', 'e2e_tests'],
     'gtests': ['gtests'],
     'gotests' : ['go_tests'],
     'btemulator': ['gtests_btemulator'],

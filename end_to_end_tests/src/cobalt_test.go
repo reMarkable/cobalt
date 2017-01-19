@@ -22,7 +22,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -36,6 +35,8 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"golang.org/x/net/context"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 // This fixture stands up the bigtable emulator.
@@ -49,18 +50,22 @@ type BigtableFixture struct {
 
 func NewBigtableFixture() (*BigtableFixture, error) {
 	f := new(BigtableFixture)
-
-	f.project = "google.com:shuffler-test"
-	f.instance = "cobalt-analyzer"
+	// These strings must coincide with the ones in bigtable_emulator_helper.h
+	f.project = "TestProject"
+	f.instance = "TestInstance"
+	// This name must coincide with the one in bigtable_names.h
 	f.table = "observations"
 
-	f.cmd = exec.Command("gcloud", "beta", "emulators", "bigtable", "start")
+	sysRootDir, _ := filepath.Abs(filepath.Join(filepath.Dir(os.Args[0]), "../../sysroot"))
+	bin := filepath.Join(sysRootDir, "gcloud", "google-cloud-sdk", "platform", "bigtable-emulator", "cbtemulator")
+	f.cmd = exec.Command(bin)
 
-	stderr, _ := f.cmd.StderrPipe()
-	reader := bufio.NewReader(stderr)
+	stdout, _ := f.cmd.StdoutPipe()
+	reader := bufio.NewReader(stdout)
 
 	// Create a process group so we can kill children
 	f.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	log.Printf("Starting Bigtable Emulator: %v", bin)
 	f.cmd.Start()
 
 	// Wait for bigtable to start
@@ -76,6 +81,7 @@ func NewBigtableFixture() (*BigtableFixture, error) {
 			break
 		}
 	}
+	log.Printf("Bigtable Emulator started with host: %v", f.host)
 
 	return f, nil
 }
@@ -89,18 +95,29 @@ func (f *BigtableFixture) Close() {
 }
 
 func (f *BigtableFixture) CountRows() int {
+	conn, err := grpc.Dial(f.host, grpc.WithInsecure())
+	if err != nil {
+		log.Printf("Error while attempting to connect to the Bigtable Emulator: %v", err)
+		return -1
+	}
+
 	ctx := context.Background()
-	client, _ := bigtable.NewClient(ctx, f.project, f.instance)
+	client, err := bigtable.NewClient(ctx, f.project, f.instance, option.WithGRPCConn(conn))
+	if err != nil {
+		log.Printf("Error while attempting to create a Bigtable Client: %v", err)
+		return -1
+	}
 	defer client.Close()
 	tbl := client.Open(f.table)
 
 	count := 0
-	err := tbl.ReadRows(ctx, bigtable.InfiniteRange(""),
+	err = tbl.ReadRows(ctx, bigtable.InfiniteRange(""),
 		func(row bigtable.Row) bool {
 			count++
 			return true
 		})
 	if err != nil {
+		log.Printf("Error while attempting to count rows in Bigtable: %v", err)
 		return -1
 	}
 
@@ -139,20 +156,18 @@ func NewAnalyzerFixture() (*AnalyzerFixture, error) {
 	f := new(AnalyzerFixture)
 	f.bigtable = bigtable
 
-	f.outdir = filepath.Join(filepath.Dir(os.Args[0]), "../../out")
-	abin := filepath.Join(f.outdir, "/analyzer/analyzer")
+	f.outdir, _ = filepath.Abs(filepath.Join(filepath.Dir(os.Args[0]), "../../out"))
+	abin := filepath.Join(f.outdir, "analyzer", "analyzer")
 
-	table := fmt.Sprintf("projects/%v/instances/%v/tables/%v",
-		bigtable.project, bigtable.instance, bigtable.table)
-	f.cmd = exec.Command(abin, "-table", table)
+	configDir, _ := filepath.Abs(filepath.Join(f.outdir, "..", "config", "registered"))
+	f.cmd = exec.Command(abin, "--port=8080", "-for_testing_only_use_bigtable_emulator",
+		"--cobalt_config_dir", configDir, "-logtostderr")
 	var out bytes.Buffer
 	f.cmd.Stdout = &out
 	var serr bytes.Buffer
 	f.cmd.Stderr = &serr
 
-	os.Setenv("BIGTABLE_EMULATOR_HOST", bigtable.host)
-
-	log.Printf("Starting Analyzer...")
+	log.Printf("Starting Analyzer: %v", strings.Join(f.cmd.Args, " "))
 	err = f.cmd.Start()
 	if err != nil {
 		log.Printf("Command finished with error:[%v] with stdout:[%s] and stderr:[%s]", err, out.String(), serr.String())
@@ -198,13 +213,12 @@ func NewShufflerFixture() (*ShufflerFixture, error) {
 	f.analyzer = analyzer
 	f.outdir = filepath.Join(filepath.Dir(os.Args[0]), "../../out")
 
-	bin := filepath.Join(f.analyzer.outdir, "shuffler/shuffler")
+	bin, _ := filepath.Abs(filepath.Join(f.analyzer.outdir, "shuffler", "shuffler"))
 
-	shufflerTestConfig := filepath.Join(f.outdir, "config/shuffler_default.conf")
+	shufflerTestConfig, _ := filepath.Abs(filepath.Join(f.outdir, "config", "shuffler_default.conf"))
 	f.cmd = exec.Command(bin,
 		"-config_file", shufflerTestConfig,
 		"-batch_size", strconv.Itoa(100),
-		"-v", strconv.Itoa(2),
 		"-vmodule=receiver=2,dispatcher=2,store=2",
 		"-logtostderr")
 
@@ -213,7 +227,7 @@ func NewShufflerFixture() (*ShufflerFixture, error) {
 	var serr bytes.Buffer
 	f.cmd.Stderr = &serr
 
-	log.Printf("Starting Shuffler...")
+	log.Printf("Starting Shuffler: %v", strings.Join(f.cmd.Args, " "))
 	err = f.cmd.Start()
 	if err != nil {
 		log.Printf("Command finished with error:[%v] with stdout:[%s] and stderr:[%s]", err, out.String(), serr.String())
@@ -250,7 +264,7 @@ func OTestAnalyzerAddObservations(t *testing.T) {
 	// Run cgen on the analyzer to create 2 observations
 	num := 2
 	cmd := exec.Command(f.cgen,
-		"-analyzer", "127.0.0.1",
+		"-analyzer_uri", "localhost:8080",
 		"-num_observations", strconv.Itoa(num))
 	if cmd.Run() != nil {
 		t.Error("cgen failed")
@@ -286,14 +300,17 @@ func TestShufflerProcess(t *testing.T) {
 	// Run cgen on the analyzer to create 2 observations
 	num := 2
 	cmd := exec.Command(f.analyzer.cgen,
-		"-shuffler", "127.0.0.1",
-		"-analyzer", "127.0.0.1",
+		"-shuffler_uri", "localhost:50051",
+		"-analyzer_uri", "localhost:8080",
 		"-num_observations", strconv.Itoa(num),
 		"-num_rpcs", strconv.Itoa(num))
+
+	log.Printf("Running cgen: %v", strings.Join(cmd.Args, " "))
 	if cmd.Run() != nil {
 		t.Error("cgen failed")
 		return
 	}
+	log.Printf("cgen completed")
 
 	var rows int
 
@@ -317,4 +334,5 @@ func TestShufflerProcess(t *testing.T) {
 		t.Errorf("Unexpected number of rows got %v want %v", rows, num)
 		return
 	}
+
 }
