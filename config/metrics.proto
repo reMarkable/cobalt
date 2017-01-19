@@ -13,8 +13,6 @@
 // limitations under the License.
 syntax = "proto3";
 
-import "encodings.proto";
-
 package cobalt;
 
 // A |Metric| is composed of one or more |MetricParts|. A |MetricPart| has a

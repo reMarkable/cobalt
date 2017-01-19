@@ -16,7 +16,7 @@
 #define COBALT_CONFIG_REPORT_CONFIG_H_
 
 #include "config/config.h"
-#include "config/reports.pb.h"
+#include "config/report_configs.pb.h"
 
 namespace cobalt {
 namespace config {
