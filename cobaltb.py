@@ -290,7 +290,8 @@ def main():
     help='Runs Cobalt tests. You must build first.')
   sub_parser.set_defaults(func=_test)
   sub_parser.add_argument('--tests', choices=TEST_FILTERS,
-  help='Specify a subset of tests to run',  default='noe2e')
+      help='Specify a subset of tests to run. Default=noe2e',
+      default='noe2e')
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')
