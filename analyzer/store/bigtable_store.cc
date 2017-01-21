@@ -84,14 +84,14 @@ std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
 }
 
 BigtableStore::BigtableStore(
-    std::string uri, std::shared_ptr<grpc::ChannelCredentials> credentials,
-    std::string project_name, std::string instance_name)
-    : stub_(
-          Bigtable::NewStub(grpc::CreateChannel(std::move(uri), credentials))),
+    const std::string& uri,
+    std::shared_ptr<grpc::ChannelCredentials> credentials,
+    const std::string& project_name, const std::string& instance_name)
+    : stub_(Bigtable::NewStub(grpc::CreateChannel(uri, credentials))),
       observations_table_name_(
           BigtableNames::ObservationsTableName(project_name, instance_name)),
-      reports_table_name_(BigtableNames::ReportsTableName(
-          std::move(project_name), std::move(instance_name))) {}
+      reports_table_name_(
+          BigtableNames::ReportsTableName(project_name, instance_name)) {}
 
 std::string BigtableStore::TableName(DataStore::Table table) {
   switch (table) {

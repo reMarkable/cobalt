@@ -40,9 +40,10 @@ class BigtableStore : public DataStore {
   // names read from flags.
   static std::unique_ptr<BigtableStore> CreateFromFlagsOrDie();
 
-  BigtableStore(std::string uri,
+  BigtableStore(const std::string& uri,
                 std::shared_ptr<grpc::ChannelCredentials> credentials,
-                std::string project_name, std::string instance_name);
+                const std::string& project_name,
+                const std::string& instance_name);
 
   Status WriteRow(Table table, DataStore::Row row) override;
 

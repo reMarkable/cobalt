@@ -30,29 +30,25 @@ const char kCloudBigtableAdminUri[] = "bigtableadmin.googleapis.com";
 
 class BigtableNames {
  public:
-  static std::string TableParentName(std::string project_name,
-                                     std::string instance_name) {
-    return "projects/" + std::move(project_name) + "/instances/" +
-           std::move(instance_name);
+  static std::string TableParentName(const std::string& project_name,
+                                     const std::string& instance_name) {
+    return "projects/" + project_name + "/instances/" + instance_name;
   }
 
-  static std::string ObservationsTableName(std::string project_name,
-                                           std::string instance_name) {
-    return FullTableName(std::move(project_name), std::move(instance_name),
-                         kObservationsTableId);
+  static std::string ObservationsTableName(const std::string& project_name,
+                                           const std::string& instance_name) {
+    return FullTableName(project_name, instance_name, kObservationsTableId);
   }
 
-  static std::string ReportsTableName(std::string project_name,
-                                      std::string instance_name) {
-    return FullTableName(std::move(project_name), std::move(instance_name),
-                         kReportsTableId);
+  static std::string ReportsTableName(const std::string& project_name,
+                                      const std::string& instance_name) {
+    return FullTableName(project_name, instance_name, kReportsTableId);
   }
 
-  static std::string FullTableName(std::string project_name,
-                                   std::string instance_name,
-                                   std::string table_id) {
-    return TableParentName(std::move(project_name), std::move(instance_name)) +
-           "/tables/" + table_id;
+  static std::string FullTableName(const std::string& project_name,
+                                   const std::string& instance_name,
+                                   const std::string& table_id) {
+    return TableParentName(project_name, instance_name) + "/tables/" + table_id;
   }
 };
 
