@@ -38,7 +38,7 @@ class BigtableStore : public DataStore {
   // account read from the file named in the environment variable
   // GOOGLE_APPLICATION_CREDENTIALS, and the project and instance
   // names read from flags.
-  static std::shared_ptr<BigtableStore> CreateFromFlagsOrDie();
+  static std::unique_ptr<BigtableStore> CreateFromFlagsOrDie();
 
   BigtableStore(std::string uri,
                 std::shared_ptr<grpc::ChannelCredentials> credentials,

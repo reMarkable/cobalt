@@ -61,12 +61,12 @@ DEFINE_bool(for_testing_only_use_bigtable_emulator, false,
             "is true then use insecure client credentials to connect to "
             "the Bigtable Emulator running at the default port on localhost.");
 
-std::shared_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
+std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   if (FLAGS_for_testing_only_use_bigtable_emulator) {
     LOG(WARNING) << "*** Using an insecure connection to Bigtable Emulator "
                     "instead of using a secure connection to Cloud Bigtable. "
                     "***";
-    return std::shared_ptr<BigtableStore>(
+    return std::unique_ptr<BigtableStore>(
         BigtableStoreEmulatorFactory::NewStore());
   }
 
@@ -79,7 +79,7 @@ std::shared_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   auto creds = grpc::GoogleDefaultCredentials();
   CHECK(creds);
   LOG(INFO) << "Connecting to CloudBigtable at " << kCloudBigtableUri;
-  return std::shared_ptr<BigtableStore>(new BigtableStore(
+  return std::unique_ptr<BigtableStore>(new BigtableStore(
       kCloudBigtableUri, creds, FLAGS_project_name, FLAGS_instance_name));
 }
 

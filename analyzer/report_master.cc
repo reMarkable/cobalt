@@ -112,8 +112,9 @@ class ReportMaster {
 
 void ReportMasterMain(std::atomic<bool>* shut_down) {
   LOG(INFO) << "Starting report_master";
-
-  ReportMaster report_master(store::DataStore::CreateFromFlagsOrDie());
+  std::shared_ptr<DataStore> store(
+      store::DataStore::CreateFromFlagsOrDie().release());
+  ReportMaster report_master(store);
   report_master.Start(shut_down);
 }
 

@@ -36,7 +36,8 @@ DEFINE_string(ssl_cert_info, "", "TBD: Some info about SSL Certificates.");
 
 std::unique_ptr<AnalyzerServiceImpl>
 AnalyzerServiceImpl::CreateFromFlagsOrDie() {
-  auto data_store = DataStore::CreateFromFlagsOrDie();
+  std::shared_ptr<DataStore> data_store(
+      DataStore::CreateFromFlagsOrDie().release());
   std::shared_ptr<ObservationStore> observation_store(
       new ObservationStore(data_store));
   CHECK(FLAGS_port) << "--port is a mandatory flag";

@@ -29,11 +29,11 @@ DEFINE_bool(for_testing_only_use_memstore, false,
 
 DataStore::~DataStore() {}
 
-std::shared_ptr<DataStore> DataStore::CreateFromFlagsOrDie() {
+std::unique_ptr<DataStore> DataStore::CreateFromFlagsOrDie() {
   if (FLAGS_for_testing_only_use_memstore) {
     LOG(WARNING)
         << "**** Using an in-memory data store instead of BigTable. ****";
-    return std::shared_ptr<DataStore>(new MemoryStore());
+    return std::unique_ptr<DataStore>(new MemoryStore());
   }
 
   return BigtableStore::CreateFromFlagsOrDie();
