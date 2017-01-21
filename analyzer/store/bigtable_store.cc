@@ -14,7 +14,6 @@
 
 #include "analyzer/store/bigtable_store.h"
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <google/bigtable/v2/data.pb.h>
 
@@ -25,6 +24,7 @@
 #include <vector>
 
 #include "analyzer/store/bigtable_emulator_helper.h"
+#include "analyzer/store/bigtable_flags.h"
 #include "analyzer/store/bigtable_names.h"
 #include "util/crypto_util/base64.h"
 
@@ -49,18 +49,6 @@ namespace store {
 using crypto::RegexEncode;
 using crypto::RegexDecode;
 
-// TODO(rudominer) The default values for these flags should eventually be
-// removed. They conveniently point to our Cloud instance for now.
-DEFINE_string(project_name, "google.com:shuffler-test",
-              "The name of Cobalt's Google Cloud project.");
-DEFINE_string(instance_name, "cobalt-analyzer",
-              "The name of Cobalt's Google Cloud Bigtable instance.");
-
-DEFINE_bool(for_testing_only_use_bigtable_emulator, false,
-            "If --for_cobalt_testing_only_use_memstore=false and this flag "
-            "is true then use insecure client credentials to connect to "
-            "the Bigtable Emulator running at the default port on localhost.");
-
 std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   if (FLAGS_for_testing_only_use_bigtable_emulator) {
     LOG(WARNING) << "*** Using an insecure connection to Bigtable Emulator "
@@ -74,13 +62,14 @@ std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   // and loads the private keys for this account from the file named in
   // the environment variable GOOGLE_APPLICATION_CREDENTIALS.
   // See http://www.grpc.io/docs/guides/auth.html.
-  CHECK_NE("", FLAGS_project_name);
-  CHECK_NE("", FLAGS_instance_name);
+  CHECK_NE("", FLAGS_bigtable_project_name);
+  CHECK_NE("", FLAGS_bigtable_instance_name);
   auto creds = grpc::GoogleDefaultCredentials();
   CHECK(creds);
   LOG(INFO) << "Connecting to CloudBigtable at " << kCloudBigtableUri;
-  return std::unique_ptr<BigtableStore>(new BigtableStore(
-      kCloudBigtableUri, creds, FLAGS_project_name, FLAGS_instance_name));
+  return std::unique_ptr<BigtableStore>(
+      new BigtableStore(kCloudBigtableUri, creds, FLAGS_bigtable_project_name,
+                        FLAGS_bigtable_instance_name));
 }
 
 BigtableStore::BigtableStore(

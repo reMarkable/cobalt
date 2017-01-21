@@ -16,8 +16,10 @@ set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 # Build the analyzer store library
+# TODO(rudominer) Production Cobalt shouldn't be linked with memory_store.cc.
 add_library(analyzer_store
             bigtable_admin.cc
+            bigtable_flags.cc
             bigtable_store.cc
             data_store.cc
             memory_store.cc
