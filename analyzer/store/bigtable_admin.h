@@ -28,11 +28,17 @@ namespace analyzer {
 namespace store {
 
 // BigtableAdmin is used to create the Cobalt Bigtable tables. This is not
-// used in the normal operation of Cobalt. It is used when testing with the
-// Bigtable Emulator and it may also be used to build a tool for provisioning a
-// data center.
+// used in the normal operation of Cobalt. It is used for testing and it may
+// also be used to build a tool for provisioning a data center.
 class BigtableAdmin {
  public:
+  // Creates and returns an instance of BigtableAdmin using the well-known
+  // URI of Google Cloud Bigtable, credentials for for the Cobalt service
+  // account read from the file named in the environment variable
+  // GOOGLE_APPLICATION_CREDENTIALS, and the project and instance
+  // names read from flags.
+  static std::shared_ptr<BigtableAdmin> CreateFromFlagsOrDie();
+
   BigtableAdmin(std::string uri,
                 std::shared_ptr<grpc::ChannelCredentials> credentials,
                 std::string project_name, std::string instance_name);
@@ -41,7 +47,7 @@ class BigtableAdmin {
   // Returns whether or not the connection succeeded.
   bool WaitForConnected(std::chrono::system_clock::time_point deadline);
 
-  // Creates the Cobalt tables. Returns true for success.
+  // Creates the Cobalt tables if they don't exist. Returns true for success.
   bool CreateTablesIfNecessary();
 
  private:

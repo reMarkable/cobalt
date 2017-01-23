@@ -26,7 +26,7 @@ import tools.cpplint as cpplint
 import tools.golint as golint
 import tools.test_runner as test_runner
 
-THIS_DIR = os.path.dirname(__file__)
+THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
 
@@ -102,18 +102,20 @@ def _lint(args):
 
 # Specifiers of subsets of tests to run
 TEST_FILTERS =['all', 'gtests', 'nogtests', 'gotests', 'nogotests',
-               'btemulator', 'nobtemulator', 'e2e', 'noe2e']
+               'btemulator', 'nobtemulator', 'e2e', 'noe2e', 'cloud_bt']
 
 # Returns 0 if all tests return 0, otherwise returns 1.
 def _test(args):
   # A map from positive filter specifiers to the list of test directories
-  # it represents.
+  # it represents. Note that 'cloud_bt' tests are special. They are not
+  # included in 'all'. They are only run if asked for explicitly.
   FILTER_MAP = {
     'all': ['gtests', 'go_tests', 'gtests_btemulator', 'e2e_tests'],
     'gtests': ['gtests'],
     'gotests' : ['go_tests'],
     'btemulator': ['gtests_btemulator'],
-    'e2e': ['e2e_tests']
+    'e2e': ['e2e_tests'],
+    'cloud_bt' : ['gtests_cloud_bt']
   }
 
   # Get the list of test directories we should run.
@@ -126,8 +128,16 @@ def _test(args):
   success = True
   for test_dir in test_dirs:
     use_bt_emulator = (test_dir == 'gtests_btemulator')
+    test_args = None
+    if (test_dir == 'gtests_cloud_bt'):
+      if args.bigtable_instance_name == '':
+        print '--bigtable_instance_name must be specified'
+        success = False
+        break
+      test_args = ("--bigtable_project_name=%s --bigtable_instance_name=%s" %
+          (args.bigtable_project_name, args.bigtable_instance_name))
     success = (success and
-        test_runner.run_all_tests(test_dir, use_bt_emulator) == 0)
+        test_runner.run_all_tests(test_dir, use_bt_emulator, test_args) == 0)
 
   print
   if success:
@@ -292,6 +302,14 @@ def main():
   sub_parser.add_argument('--tests', choices=TEST_FILTERS,
       help='Specify a subset of tests to run. Default=noe2e',
       default='noe2e')
+  sub_parser.add_argument('--bigtable_project_name',
+      help='Specify a Cloud project against which to run the cloud_bt tests.'
+      ' Optional. Default=google.com:shuffler-test.'
+      ' Only used when --tests=cloud_bt', default='google.com:shuffler-test'),
+  sub_parser.add_argument('--bigtable_instance_name',
+      help='Specify a Cloud Bigtable instance within the specified Cloud'
+      ' project against which to run the cloud_bt tests.'
+      ' Used and required only when --tests=cloud_bt.', default='')
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')
@@ -350,8 +368,13 @@ def main():
       "%s/bin" % SYSROOT_DIR \
       + os.pathsep + "%s/gcloud/google-cloud-sdk/bin" % SYSROOT_DIR \
       + os.pathsep + os.environ["PATH"]
-
   os.environ["LD_LIBRARY_PATH"] = "%s/lib" % SYSROOT_DIR
+
+  os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(os.path.join(
+      THIS_DIR, 'service_account_credentials.json'))
+
+  os.environ["GRPC_DEFAULT_SSL_ROOTS_FILE_PATH"] = os.path.abspath(
+      os.path.join(SYSROOT_DIR, 'share', 'grpc', 'roots.pem'))
 
   os.environ["GOROOT"] = "%s/golang" % SYSROOT_DIR
 

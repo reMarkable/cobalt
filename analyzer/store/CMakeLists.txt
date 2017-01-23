@@ -48,3 +48,12 @@ add_executable(bigtable_emulator_tests
 target_link_libraries(bigtable_emulator_tests gtest gtest_main cobalt_analyzer)
 set_target_properties(bigtable_emulator_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})
+
+# Versions of our tests that connect to the real Cloud Bigtable. See
+# notes in bigtabe_cloud_helper.h for how this works.
+add_executable(bigtable_cloud_tests
+               bigtable_store_cloud_test.cc observation_store_cloud_test.cc)
+target_link_libraries(bigtable_cloud_tests gtest gtest_main cobalt_analyzer)
+set_target_properties(bigtable_cloud_tests PROPERTIES
+                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})
+

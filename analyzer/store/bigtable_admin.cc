@@ -19,6 +19,7 @@
 
 #include <utility>
 
+#include "analyzer/store/bigtable_flags.h"
 #include "analyzer/store/bigtable_names.h"
 
 namespace cobalt {
@@ -32,6 +33,26 @@ using google::bigtable::admin::v2::GetTableRequest;
 using grpc::ClientContext;
 
 typedef google::bigtable::admin::v2::Table BtTable;
+
+std::shared_ptr<BigtableAdmin> BigtableAdmin::CreateFromFlagsOrDie() {
+  // See https://developers.google.com/identity/protocols/ \
+  //         application-default-credentials
+  // for an explanation of grpc::GoogleDefaultCredentials(). When running
+  // on GKE this should cause the service account to be used. When running
+  // on a developer's machine this might either use the user's oauth credentials
+  // or a service account if the user has installed one. To use a service
+  // account the library looks for a key file located at the path specified in
+  // the environment variable GOOGLE_APPLICATION_CREDENTIALS.
+  CHECK_NE("", FLAGS_bigtable_project_name);
+  CHECK_NE("", FLAGS_bigtable_instance_name);
+  auto creds = grpc::GoogleDefaultCredentials();
+  CHECK(creds);
+  LOG(INFO) << "Connecting to CloudBigtable admin API at "
+            << kCloudBigtableAdminUri;
+  return std::shared_ptr<BigtableAdmin>(new BigtableAdmin(
+      kCloudBigtableAdminUri, creds, FLAGS_bigtable_project_name,
+      FLAGS_bigtable_instance_name));
+}
 
 BigtableAdmin::BigtableAdmin(
     std::string uri, std::shared_ptr<grpc::ChannelCredentials> credentials,
@@ -91,7 +112,7 @@ bool BigtableAdmin::CreateTableIfNecessary(std::string table_id) {
     // by looking for the text 'already exists'.
     if (error_message.find("already exists") == -1) {
       LOG(ERROR) << "Can't create table: " << create_s.error_message()
-                 << ". error code=" << create_s.error_code();
+                 << " error code=" << create_s.error_code();
       return false;
     }
   }

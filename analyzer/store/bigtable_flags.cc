@@ -18,11 +18,9 @@ namespace cobalt {
 namespace analyzer {
 namespace store {
 
-// TODO(rudominer) The default values for these flags should eventually be
-// removed. They conveniently point to our Cloud instance for now.
-DEFINE_string(bigtable_project_name, "google.com:shuffler-test",
+DEFINE_string(bigtable_project_name, "",
               "The name of Cobalt's Google Cloud project.");
-DEFINE_string(bigtable_instance_name, "cobalt-analyzer",
+DEFINE_string(bigtable_instance_name, "",
               "The name of Cobalt's Google Cloud Bigtable instance.");
 
 DEFINE_bool(for_testing_only_use_bigtable_emulator, false,

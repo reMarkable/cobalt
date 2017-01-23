@@ -139,8 +139,8 @@ class DataStore {
   //     restriction.
   //
   // max_rows: At most |max_rows| rows will be returned. The number of
-  //           returned rows may be less than max_rows for several reasons.
-  //           Must be positive or kInvalidArguments will be returned.
+  //    returned rows may be less than max_rows for several reasons. Must be
+  //    positive or kInvalidArguments will be returned.
   virtual ReadResponse ReadRows(Table table, std::string start_row_key,
                                 bool inclusive, std::string limit_row_key,
                                 const std::vector<std::string>& column_names,

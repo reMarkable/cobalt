@@ -56,6 +56,11 @@ using crypto::RegexEncode;
 using crypto::RegexDecode;
 
 namespace {
+// We never request more than this many rows regardless of how many the user
+// asks for. Bigtable fails with "operation aborted", status_code=10 if too
+// many rows are requested.
+size_t kMaxRowsReadLimit = 10000;
+
 // Returns an error message appropriate for LOG(ERROR) based on the given
 // status (which should be an error status) and the name of the method in
 // which the error occured.
@@ -87,15 +92,20 @@ std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
         BigtableStoreEmulatorFactory::NewStore());
   }
 
-  // Note that grpc::GoogleDefaultCredentials() uses a Google service account
-  // and loads the private keys for this account from the file named in
+  // See https://developers.google.com/identity/protocols/ \
+  //         application-default-credentials
+  // for an explanation of grpc::GoogleDefaultCredentials(). When running
+  // on GKE this should cause the service account to be used. When running
+  // on a developer's machine this might either use the user's oauth credentials
+  // or a service account if the user has installed one. To use a service
+  // account the library looks for a key file located at the path specified in
   // the environment variable GOOGLE_APPLICATION_CREDENTIALS.
-  // See http://www.grpc.io/docs/guides/auth.html.
   CHECK_NE("", FLAGS_bigtable_project_name);
   CHECK_NE("", FLAGS_bigtable_instance_name);
   auto creds = grpc::GoogleDefaultCredentials();
   CHECK(creds);
-  LOG(INFO) << "Connecting to CloudBigtable at " << kCloudBigtableUri;
+  LOG(INFO) << "Connecting to CloudBigtable at " << kCloudBigtableUri << ", "
+            << kCloudBigtableAdminUri;
   return std::unique_ptr<BigtableStore>(new BigtableStore(
       kCloudBigtableUri, kCloudBigtableAdminUri, creds,
       FLAGS_bigtable_project_name, FLAGS_bigtable_instance_name));
@@ -193,6 +203,7 @@ BigtableStore::ReadResponse BigtableStore::ReadRows(
     read_response.status = kInvalidArguments;
     return read_response;
   }
+  max_rows = std::min(max_rows, kMaxRowsReadLimit);
 
   ReadRowsRequest req;
   req.set_table_name(TableName(table));
@@ -341,6 +352,8 @@ Status BigtableStore::DeleteRowsWithPrefix(Table table,
   grpc::Status status = admin_stub_->DropRowRange(&context, req, &resp);
 
   if (!status.ok()) {
+    // TODO(rudominer) Consider doing a retry here. Consider if this
+    // method should be asynchronous.
     LOG(ERROR) << ErrorMessage(status, "DeleteRowsWithPrefix");
     return GrpcStatusToStoreStatus(status);
   }
@@ -358,6 +371,8 @@ Status BigtableStore::DeleteAllRows(Table table) {
   grpc::Status status = admin_stub_->DropRowRange(&context, req, &resp);
 
   if (!status.ok()) {
+    // TODO(rudominer) Consider doing a retry here. Consider if this
+    // method should be asynchronous.
     LOG(ERROR) << ErrorMessage(status, "DeleteAllRows");
     return GrpcStatusToStoreStatus(status);
   }

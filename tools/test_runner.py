@@ -36,7 +36,7 @@ def start_bigtable_emulator():
   return subprocess.Popen([path])
 
 # Returns 0 if all tests return 0, otherwise returns 1.
-def run_all_tests(test_dir, bigtable_emulator=False):
+def run_all_tests(test_dir, bigtable_emulator=False, test_args=None):
   tdir = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'out', test_dir))
 
   if not os.path.exists(tdir):
@@ -53,6 +53,9 @@ def run_all_tests(test_dir, bigtable_emulator=False):
         bt_emulator_process = start_bigtable_emulator()
       print "Running %s..." % test_executable
       path = os.path.abspath(os.path.join(tdir, test_executable))
+      if test_args is not None:
+        path = "%s %s" % (path, test_args)
+        print "Test arguments: '%s'" % test_args
       return_code = subprocess.call([path, '--logtostderr=1'], shell=True)
       all_passed = all_passed and return_code == 0
       if return_code < 0:

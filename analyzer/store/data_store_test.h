@@ -22,6 +22,8 @@
 #include <utility>
 #include <vector>
 
+#include "gflags/gflags.h"
+#include "glog/logging.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
 // This file contains type-parameterized tests of the DataStore interface.
@@ -42,40 +44,6 @@ namespace analyzer {
 namespace store {
 
 static const int kNumColumns = 3;
-
-// Generates a row key string based on the given |index| and prefix.
-std::string RowKeyString(const std::string& prefix, uint32_t index) {
-  // We allocate a buffer of size 14 to leave room for the trailing null.
-  std::string out(14, 0);
-  std::snprintf(&out[0], out.size(), "row%.10u", index);
-  // Discard the trailing null.
-  out.resize(13);
-  return prefix + out;
-}
-
-// Generates a column name string based on the given |colum_index|.
-std::string ColumnNameString(uint32_t column_index) {
-  std::string out(17, 0);
-  std::snprintf(&out[0], out.size(), "column%.10u", column_index);
-  return out;
-}
-
-// Generates a value string based on the given |row_index| and |colum_index|.
-std::string ValueString(uint32_t row_index, uint32_t column_index) {
-  std::string out(27, 0);
-  std::snprintf(&out[0], out.size(), "value%.10u:%.10u", row_index,
-                column_index);
-  return out;
-}
-
-// Makes a vector of column name strings for |num_columns| columns.
-std::vector<std::string> MakeColumnNames(size_t num_columns) {
-  std::vector<std::string> column_names;
-  for (int column_index = 0; column_index < num_columns; column_index++) {
-    column_names.push_back(ColumnNameString(column_index));
-  }
-  return column_names;
-}
 
 // DataStoreTest is templatized on the parameter |StoreFactoryClass| which
 // must be the name of a class that contains the following method:
@@ -120,6 +88,40 @@ class DataStoreTest : public ::testing::Test {
   // a test will be prefixed with |test_prefix|.
   void set_test_prefix(std::string test_prefix) {
     test_prefix_ = std::move(test_prefix);
+  }
+
+  // Generates a row key string based on the given |index| and prefix.
+  static std::string RowKeyString(const std::string& prefix, uint32_t index) {
+    // We allocate a buffer of size 14 to leave room for the trailing null.
+    std::string out(14, 0);
+    std::snprintf(&out[0], out.size(), "row%.10u", index);
+    // Discard the trailing null.
+    out.resize(13);
+    return prefix + out;
+  }
+
+  // Generates a column name string based on the given |colum_index|.
+  static std::string ColumnNameString(uint32_t column_index) {
+    std::string out(17, 0);
+    std::snprintf(&out[0], out.size(), "column%.10u", column_index);
+    return out;
+  }
+
+  // Generates a value string based on the given |row_index| and |colum_index|.
+  static std::string ValueString(uint32_t row_index, uint32_t column_index) {
+    std::string out(27, 0);
+    std::snprintf(&out[0], out.size(), "value%.10u:%.10u", row_index,
+                  column_index);
+    return out;
+  }
+
+  // Makes a vector of column name strings for |num_columns| columns.
+  static std::vector<std::string> MakeColumnNames(size_t num_columns) {
+    std::vector<std::string> column_names;
+    for (int column_index = 0; column_index < num_columns; column_index++) {
+      column_names.push_back(ColumnNameString(column_index));
+    }
+    return column_names;
   }
 
   std::unique_ptr<DataStore> data_store_;
