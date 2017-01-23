@@ -78,7 +78,7 @@ store::Status GrpcStatusToStoreStatus(const grpc::Status& status) {
 
 }  // namespace
 
-std::shared_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
+std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   if (FLAGS_for_testing_only_use_bigtable_emulator) {
     LOG(WARNING) << "*** Using an insecure connection to Bigtable Emulator "
                     "instead of using a secure connection to Cloud Bigtable. "
