@@ -38,6 +38,19 @@ Status MemoryStoreSingleton::WriteRow(Table table, Row row) {
   return kOK;
 }
 
+Status MemoryStoreSingleton::WriteRows(Table table, std::vector<Row> rows) {
+  size_t total_num_columns = 0;
+  for (Row& row : rows) {
+    total_num_columns += row.column_values.size();
+    if (total_num_columns > 100000) {
+      LOG(ERROR) << "Too much data. Only 100,000 columns total allowed.";
+      return kInvalidArguments;
+    }
+    WriteRow(table, std::move(row));
+  }
+  return kOK;
+}
+
 DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
     std::string limit_row_key, const std::vector<std::string>& column_names,
@@ -107,27 +120,22 @@ Status MemoryStoreSingleton::DeleteRow(Table table, std::string row_key) {
   return kOK;
 }
 
-Status MemoryStoreSingleton::DeleteRows(Table table, std::string start_row_key,
-                                        bool inclusive,
-                                        std::string limit_row_key) {
+Status MemoryStoreSingleton::DeleteRowsWithPrefix(Table table,
+                                                  std::string row_key_prefix) {
+  if (row_key_prefix.empty()) {
+    return kInvalidArguments;
+  }
+
   ImplMapType& rows =
       (table == kObservations ? observation_rows_ : report_rows_);
 
-  // Find the first row of the range (inclusive or exclusive)
-  ImplMapType::iterator start_iterator;
-  if (inclusive) {
-    start_iterator = rows.lower_bound(start_row_key);
-  } else {
-    start_iterator = rows.upper_bound(start_row_key);
-  }
+  // Find the first row of the range.
+  auto start_iterator = rows.lower_bound(row_key_prefix);
 
-  ImplMapType::iterator limit_iterator;
-  if (limit_row_key.empty()) {
-    limit_iterator = rows.end();
-  } else {
-    // Find the least row greater than or equal to limit_row_key.
-    limit_iterator = rows.lower_bound(limit_row_key);
-  }
+  // Find the first row past the range.
+  size_t last_byte_index = row_key_prefix.size() - 1;
+  row_key_prefix[last_byte_index]++;
+  auto limit_iterator = rows.lower_bound(std::move(row_key_prefix));
 
   rows.erase(start_iterator, limit_iterator);
   return kOK;

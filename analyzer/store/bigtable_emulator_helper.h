@@ -58,8 +58,9 @@ class BigtableStoreEmulatorFactory {
       LOG(FATAL) << "Unable to create the Cobalt BigTables.";
     }
 
-    return new BigtableStore(kDefaultUrl, grpc::InsecureChannelCredentials(),
-                             kTestProject, kTestInstance);
+    return new BigtableStore(kDefaultUrl, kDefaultUrl,
+                             grpc::InsecureChannelCredentials(), kTestProject,
+                             kTestInstance);
   }
 };
 

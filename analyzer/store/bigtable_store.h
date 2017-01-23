@@ -40,12 +40,14 @@ class BigtableStore : public DataStore {
   // names read from flags.
   static std::unique_ptr<BigtableStore> CreateFromFlagsOrDie();
 
-  BigtableStore(const std::string& uri,
+  BigtableStore(const std::string& uri, const std::string& admin_uri,
                 std::shared_ptr<grpc::ChannelCredentials> credentials,
                 const std::string& project_name,
                 const std::string& instance_name);
 
   Status WriteRow(Table table, DataStore::Row row) override;
+
+  Status WriteRows(Table table, std::vector<Row> rows) override;
 
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
                         std::string limit_row_key,
@@ -54,10 +56,16 @@ class BigtableStore : public DataStore {
 
   Status DeleteRow(Table table, std::string row_key) override;
 
+  Status DeleteRowsWithPrefix(Table table, std::string row_key_prefix) override;
+
+  Status DeleteAllRows(Table table) override;
+
  private:
   std::string TableName(DataStore::Table table);
 
   std::unique_ptr<google::bigtable::v2::Bigtable::Stub> stub_;
+  std::unique_ptr<google::bigtable::admin::v2::BigtableTableAdmin::Stub>
+      admin_stub_;
   std::string observations_table_name_, reports_table_name_;
 };
 

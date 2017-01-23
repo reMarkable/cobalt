@@ -89,6 +89,15 @@ class DataStore {
   // Returns kOK on success or an error status on failure.
   virtual Status WriteRow(Table table, Row row) = 0;
 
+  // Writes many rows of |table|. The operation may consists of inserts of
+  // new rows and replacements of existing rows.
+  //
+  // The sum over all of the rows of the number of columns being written
+  // must be less than 100,000.
+  //
+  // Returns kOK on success or an error status on failure.
+  virtual Status WriteRows(Table table, std::vector<Row> rows) = 0;
+
   // A ReadResponse is returned from the ReadRows() method.
   struct ReadResponse {
     // status will be kOK on success or an error status on failure.
@@ -111,18 +120,24 @@ class DataStore {
     bool more_available = false;
   };
 
-  // Read a range of rows from the store.
+  // Reads a lexicographic range of rows from the store.
+  //
   // table: Which table to read from.
-  // start_row_key: The start of the interval to be read.
+  //
+  // start_row_key: The start of the lexicographic interval to be read.
+  //
   // inclusive: Whether or not the interval to be read includes the
-  //            |start_row_key|.
+  //    |start_row_key|.
+  //
   // limit_row_key: The *exclusive* end of the interval to be read. That is,
-  //                interval does not include |limit_row_key|.
-  //                If |limit_row_key| is empty it is interpreted as the
-  //                infinite row key.
+  //     the interval does not include |limit_row_key|. If |limit_row_key| is
+  //     empty it is interpreted as the infinite row key. |start_row_key| must
+  //     be less than |limit_row_key| lexicographically.
+  //
   // column_names: If non-empty then the read will only return data from the
-  //               columns with the specified names. Otherwise there will be no
-  //               restriction.
+  //     columns with the specified names. Otherwise there will be no
+  //     restriction.
+  //
   // max_rows: At most |max_rows| rows will be returned. The number of
   //           returned rows may be less than max_rows for several reasons.
   //           Must be positive or kInvalidArguments will be returned.
@@ -134,22 +149,21 @@ class DataStore {
   // Deletes the given row from the given table, if it exists.
   virtual Status DeleteRow(Table table, std::string row_key) = 0;
 
-  // Deletes a range of rows from the store.
+  // Deletes the rows from the store whose row keys contain the given
+  // |row_key_prefix| as a prefix.
+  //
   // table: Which table to delete from.
-  // start_row_key: The start of the interval to be deleted.
-  // inclusive: Whether or not the interval to be deleted includes the
-  //            |start_row_key|.
-  // limit_row_key: The *exclusive* end of the interval to be deleted. That is,
-  //                interval does not include |limit_row_key|.
-  //                If |limit_row_key| is empty it is interpreted as the
-  //                infinite row key.
-  virtual Status DeleteRows(Table table, std::string start_row_key,
-                            bool inclusive, std::string limit_row_key);
+  //
+  // row_key_prefix: All rows with row keys that extend this prefix will be
+  //     deleted. |row_key_prefix| cannot be empty. To delete all rows use
+  //     DeleteAllRows().
+  virtual Status DeleteRowsWithPrefix(Table table,
+                                      std::string row_key_prefix) = 0;
 
   // Deletes all of the rows of the given table.
-  virtual Status DeleteAllRows(Table table) {
-    return DeleteRows(table, "", true, "");
-  }
+  //
+  // WARNING: This permanently deletes all data from the table.
+  virtual Status DeleteAllRows(Table table) = 0;
 };
 
 }  // namespace store

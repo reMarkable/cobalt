@@ -41,11 +41,16 @@ namespace cobalt {
 namespace analyzer {
 namespace store {
 
-// Generates a row key string based on the given |index|.
-std::string RowKeyString(uint32_t index) {
+static const int kNumColumns = 3;
+
+// Generates a row key string based on the given |index| and prefix.
+std::string RowKeyString(const std::string& prefix, uint32_t index) {
+  // We allocate a buffer of size 14 to leave room for the trailing null.
   std::string out(14, 0);
   std::snprintf(&out[0], out.size(), "row%.10u", index);
-  return out;
+  // Discard the trailing null.
+  out.resize(13);
+  return prefix + out;
 }
 
 // Generates a column name string based on the given |colum_index|.
@@ -64,7 +69,7 @@ std::string ValueString(uint32_t row_index, uint32_t column_index) {
 }
 
 // Makes a vector of column name strings for |num_columns| columns.
-std::vector<std::string> MakeColumnNames(int num_columns) {
+std::vector<std::string> MakeColumnNames(size_t num_columns) {
   std::vector<std::string> column_names;
   for (int column_index = 0; column_index < num_columns; column_index++) {
     column_names.push_back(ColumnNameString(column_index));
@@ -82,54 +87,72 @@ std::vector<std::string> MakeColumnNames(int num_columns) {
 template <class StoreFactoryClass>
 class DataStoreTest : public ::testing::Test {
  protected:
-  DataStoreTest() : data_store_(StoreFactoryClass::NewStore()) {
-    data_store_->DeleteAllRows(DataStore::kObservations);
+  DataStoreTest() : data_store_(StoreFactoryClass::NewStore()) {}
+
+  void SetUp() {
     EXPECT_EQ(kOK, data_store_->DeleteAllRows(DataStore::kObservations));
+    EXPECT_EQ(0, GetNumRows());
   }
 
-  // Adds |num_rows| rows with |num_columns| columns each.
-  void AddRows(int num_columns, int num_rows);
+  // Adds |num_rows| rows with kNumColumns columns each.
+  void AddRows(int num_rows);
 
-  // Counts the total number of rows in the store.
-  void CheckNumRows(int expected_num_rows);
+  // Returns the total number of rows in the store.
+  size_t GetNumRows();
 
   // Reads the specified number of columns from the specified row range
   // and checks that the results are as expected.
+  //
+  // If num_columns = 0 then no columns are specified in the read and therefore
+  // all columns should be returned and so the expected num_columns is
+  // kNumColumns.
   //
   // Set limit_row = -1 to indicate an unbounded range.
   void ReadRowsAndCheck(int num_columns, int start_row, bool inclusive,
                         int limit_row, int max_rows, int expected_num_rows,
                         bool expect_more_available);
 
-  void DeleteRows(int start_row, bool inclusive, int limit_row);
+  void DeleteRowsWithPrefix(int basis, int suffix_length);
+
+  // In order to work around the following bug in the Bigtable Emulator
+  // https://github.com/GoogleCloudPlatform/google-cloud-go/issues/489
+  // we use a different set of row keys for each test. Each row created during
+  // a test will be prefixed with |test_prefix|.
+  void set_test_prefix(std::string test_prefix) {
+    test_prefix_ = std::move(test_prefix);
+  }
 
   std::unique_ptr<DataStore> data_store_;
+  std::string test_prefix_;
 };
 
 template <class StoreFactoryClass>
-void DataStoreTest<StoreFactoryClass>::AddRows(int num_columns, int num_rows) {
-  std::vector<std::string> column_names = MakeColumnNames(num_columns);
+void DataStoreTest<StoreFactoryClass>::AddRows(int num_rows) {
+  std::vector<std::string> column_names = MakeColumnNames(kNumColumns);
+  std::vector<DataStore::Row> rows;
   for (int row_index = 0; row_index < num_rows; row_index++) {
     DataStore::Row row;
-    row.key = RowKeyString(row_index);
-    for (int column_index = 0; column_index < num_columns; column_index++) {
+    row.key = RowKeyString(test_prefix_, row_index);
+    for (int column_index = 0; column_index < kNumColumns; column_index++) {
       row.column_values[column_names[column_index]] =
           ValueString(row_index, column_index);
     }
-    data_store_->WriteRow(DataStore::kObservations, std::move(row));
+    rows.emplace_back(std::move(row));
   }
+  EXPECT_EQ(kOK,
+            data_store_->WriteRows(DataStore::kObservations, std::move(rows)));
 }
 
 template <class StoreFactoryClass>
-void DataStoreTest<StoreFactoryClass>::CheckNumRows(int expected_num_rows) {
+size_t DataStoreTest<StoreFactoryClass>::GetNumRows() {
   std::vector<std::string> column_names;
 
-  DataStore::ReadResponse read_response =
-      data_store_->ReadRows(DataStore::kObservations, RowKeyString(0), true, "",
-                            column_names, UINT32_MAX);
+  DataStore::ReadResponse read_response = data_store_->ReadRows(
+      DataStore::kObservations, RowKeyString(test_prefix_, 0), true, "",
+      column_names, UINT32_MAX);
 
   EXPECT_EQ(kOK, read_response.status);
-  EXPECT_EQ(expected_num_rows, read_response.rows.size());
+  return read_response.rows.size();
 }
 
 template <class StoreFactoryClass>
@@ -142,19 +165,21 @@ void DataStoreTest<StoreFactoryClass>::ReadRowsAndCheck(
   if (limit_row < 0) {
     limit_row_key = "";
   } else {
-    limit_row_key = RowKeyString(limit_row);
+    limit_row_key = RowKeyString(test_prefix_, limit_row);
   }
-  DataStore::ReadResponse read_response =
-      data_store_->ReadRows(DataStore::kObservations, RowKeyString(start_row),
-                            inclusive, limit_row_key, column_names, max_rows);
+  DataStore::ReadResponse read_response = data_store_->ReadRows(
+      DataStore::kObservations, RowKeyString(test_prefix_, start_row),
+      inclusive, limit_row_key, column_names, max_rows);
 
   EXPECT_EQ(kOK, read_response.status);
   EXPECT_EQ(expected_num_rows, read_response.rows.size());
+  int expected_num_columns = (num_columns == 0 ? kNumColumns : num_columns);
   int row_index = (inclusive ? start_row : start_row + 1);
   for (const DataStore::Row& row : read_response.rows) {
-    EXPECT_EQ(RowKeyString(row_index), row.key);
-    EXPECT_EQ(num_columns, row.column_values.size());
-    for (int column_index = 0; column_index < num_columns; column_index++) {
+    EXPECT_EQ(RowKeyString(test_prefix_, row_index), row.key);
+    EXPECT_EQ(expected_num_columns, row.column_values.size());
+    for (int column_index = 0; column_index < expected_num_columns;
+         column_index++) {
       EXPECT_EQ(ValueString(row_index, column_index),
                 row.column_values.at(ColumnNameString(column_index)));
     }
@@ -164,17 +189,12 @@ void DataStoreTest<StoreFactoryClass>::ReadRowsAndCheck(
 }
 
 template <class StoreFactoryClass>
-void DataStoreTest<StoreFactoryClass>::DeleteRows(int start_row, bool inclusive,
-                                                  int limit_row) {
-  std::string limit_row_key;
-  if (limit_row < 0) {
-    limit_row_key = "";
-  } else {
-    limit_row_key = RowKeyString(limit_row);
-  }
+void DataStoreTest<StoreFactoryClass>::DeleteRowsWithPrefix(int basis,
+                                                            int suffix_length) {
+  std::string prefix = RowKeyString(test_prefix_, basis);
+  prefix.resize(prefix.size() - suffix_length);
   Status status =
-      data_store_->DeleteRows(DataStore::kObservations, RowKeyString(start_row),
-                              inclusive, limit_row_key);
+      data_store_->DeleteRowsWithPrefix(DataStore::kObservations, prefix);
 
   EXPECT_EQ(kOK, status);
 }
@@ -182,137 +202,188 @@ void DataStoreTest<StoreFactoryClass>::DeleteRows(int start_row, bool inclusive,
 TYPED_TEST_CASE_P(DataStoreTest);
 
 TYPED_TEST_P(DataStoreTest, WriteAndReadRows) {
-  // Add 1000 rows of 3 columns each.
-  this->AddRows(3, 1000);
+  // Add 3000 rows of 3 columns each.
+  this->AddRows(3000);
 
   // Read rows [100, 175) with max_rows = 50. Expect 50 rows with more
   // available.
   size_t max_rows = 50;
   size_t expected_rows = 50;
-  this->ReadRowsAndCheck(3, 100, true, 175, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 100, true, 175, max_rows, expected_rows,
+                         true);
 
   // Read rows (100, 175) with max_rows = 50. Expect 50 rows with more
   // available.
-  this->ReadRowsAndCheck(3, 100, false, 175, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 100, false, 175, max_rows, expected_rows,
+                         true);
 
   // Read rows [100, 175) with max_rows = 80. Expect 75 rows with no more
   // available.
   max_rows = 80;
   expected_rows = 75;
-  this->ReadRowsAndCheck(3, 100, true, 175, max_rows, expected_rows, false);
+  this->ReadRowsAndCheck(kNumColumns, 100, true, 175, max_rows, expected_rows,
+                         false);
 
   // Read rows (100, 175) with max_rows = 80. Expect 74 rows with no more
   // available.
   max_rows = 80;
   expected_rows = 74;
-  this->ReadRowsAndCheck(3, 100, false, 175, max_rows, expected_rows, false);
+  this->ReadRowsAndCheck(kNumColumns, 100, false, 175, max_rows, expected_rows,
+                         false);
 
-  // Read rows [100, 300) with max_rows = 100. Expect 100 rows with
+  // Read rows [100, 2100) with max_rows = 100. Expect 100 rows with
   // more  available.
   max_rows = 100;
   expected_rows = 100;
-  this->ReadRowsAndCheck(3, 100, true, 300, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 100, true, 2100, max_rows, expected_rows,
+                         true);
 
-  // Read rows (100, 300) with max_rows = 100. Expect 100 rows with
+  // Read rows (100, 2100) with max_rows = 100. Expect 100 rows with
   // more  available.
-  this->ReadRowsAndCheck(3, 100, false, 300, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 100, false, 2100, max_rows, expected_rows,
+                         true);
 
-  // Read rows [0, 0) with max_rows = 100. Expect 0 rows with
-  // more no available.
-  max_rows = 100;
-  expected_rows = 0;
-  this->ReadRowsAndCheck(3, 0, true, 0, max_rows, expected_rows, false);
+  // Read rows (100, 2100) with max_rows = UINT32_MAX. Expect 1999 rows with
+  // no more  available.
+  max_rows = UINT32_MAX;
+  expected_rows = 1999;
+  this->ReadRowsAndCheck(kNumColumns, 100, false, 2100, max_rows, expected_rows,
+                         false);
 
   // Read rows [0, 1) with max_rows = 100. Expect 1 row with
   // more no available.
   max_rows = 100;
   expected_rows = 1;
-  this->ReadRowsAndCheck(3, 0, true, 1, max_rows, expected_rows, false);
+  this->ReadRowsAndCheck(kNumColumns, 0, true, 1, max_rows, expected_rows,
+                         false);
 }
 
 // Tests reading an unbounded range.
 TYPED_TEST_P(DataStoreTest, UnboundedRange) {
+  this->set_test_prefix("UnboundedRange");
   // Add 1000 rows of 3 columns each.
-  this->AddRows(3, 1000);
+  this->AddRows(1000);
+  ASSERT_EQ(1000, this->GetNumRows());
 
   // Read rows [100, infinity) with max_rows = 50. Expect 50 rows with more
   // available.
   size_t max_rows = 50;
   size_t expected_rows = 50;
-  this->ReadRowsAndCheck(3, 100, true, -1, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 100, true, -1, max_rows, expected_rows,
+                         true);
 
   // Read rows (100, infinity) with max_rows = 50. Expect 50 rows with more
   // available.
-  this->ReadRowsAndCheck(3, 100, false, -1, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 100, false, -1, max_rows, expected_rows,
+                         true);
 
   // Read rows [100, infinity) with max_rows = 100. Expect 100 rows with
   // more  available.
   max_rows = 100;
   expected_rows = 100;
-  this->ReadRowsAndCheck(3, 100, true, -1, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 100, true, -1, max_rows, expected_rows,
+                         true);
 
   // Read rows (100, infinity) with max_rows = 100. Expect 100 rows with
   // more  available.
-  this->ReadRowsAndCheck(3, 100, false, -1, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 100, false, -1, max_rows, expected_rows,
+                         true);
 
   // Read rows [950, infinity) with max_rows = 100. Expect 50 rows with
   // no more  available.
   expected_rows = 50;
-  this->ReadRowsAndCheck(3, 950, true, -1, max_rows, expected_rows, false);
+  this->ReadRowsAndCheck(kNumColumns, 950, true, -1, max_rows, expected_rows,
+                         false);
 
   // Read rows (950, infinity) with max_rows = 100 Expect 49 rows with
   // no more  available.
   expected_rows = 49;
-  this->ReadRowsAndCheck(3, 950, false, -1, max_rows, expected_rows, false);
+  this->ReadRowsAndCheck(kNumColumns, 950, false, -1, max_rows, expected_rows,
+                         false);
 
   // Read rows [0, infinity) with max_rows = 10,000. Expect 1,000 rows with
   // no more  available.
   max_rows = 10000;
   expected_rows = 1000;
-  this->ReadRowsAndCheck(3, 0, true, -1, max_rows, expected_rows, false);
+  this->ReadRowsAndCheck(kNumColumns, 0, true, -1, max_rows, expected_rows,
+                         false);
 
   // Read rows [0, infinity) with max_rows = 1,000, Expect 1,000 rows with
   // no more  available.
   max_rows = 1000;
   expected_rows = 1000;
-  this->ReadRowsAndCheck(3, 0, true, -1, max_rows, expected_rows, false);
+  this->ReadRowsAndCheck(kNumColumns, 0, true, -1, max_rows, expected_rows,
+                         false);
 
   // Read rows [0, infinity) with max_rows = 999, Expect 999 rows with
   // more  available.
   max_rows = 999;
   expected_rows = 999;
-  this->ReadRowsAndCheck(3, 0, true, -1, max_rows, expected_rows, true);
+  this->ReadRowsAndCheck(kNumColumns, 0, true, -1, max_rows, expected_rows,
+                         true);
+}
+
+TYPED_TEST_P(DataStoreTest, ReadDifferentNumColumns) {
+  this->set_test_prefix("ReadDifferentNumColumns");
+  // Add 10 rows of 3 columns each.
+  this->AddRows(10);
+  ASSERT_EQ(10, this->GetNumRows());
+
+  // Read rows [3, 6). Expect 3 rows with no more available.
+  size_t max_rows = UINT32_MAX;
+  size_t expected_rows = 3;
+
+  // Try the read with different numbers of columns specified to read.
+  for (size_t num_rows = 0; num_rows <= kNumColumns; num_rows++) {
+    this->ReadRowsAndCheck(num_rows, 3, true, 6, max_rows, expected_rows,
+                           false);
+  }
 }
 
 // Tests deleting ranges of rows.
 TYPED_TEST_P(DataStoreTest, DeleteRanges) {
+  this->set_test_prefix("DeleteRanges");
   // Initially there should be no rows.
-  this->CheckNumRows(0);
+  ASSERT_EQ(0, this->GetNumRows());
 
-  // Add 1000 rows of 1 column each.
-  this->AddRows(1, 1000);
-  // Now there should be 1000 rows.
-  this->CheckNumRows(1000);
+  // Add 3000 rows.
+  this->AddRows(3000);
+  // Now there should be 3000 rows.
+  ASSERT_EQ(3000, this->GetNumRows());
 
-  // Delete rows [100, 200)
-  this->DeleteRows(100, true, 200);
-  this->CheckNumRows(900);
+  // Delete 10^0 rows starting with row 100.
+  // i.e. delete row 100
+  this->DeleteRowsWithPrefix(100, 0);
+  ASSERT_EQ(2999, this->GetNumRows());
 
-  // Delete rows (500, 700)
-  this->DeleteRows(500, false, 700);
-  this->CheckNumRows(701);
+  // Delete 10^1 rows starting with row 200.
+  // i.e. delete rows [200, 209]
+  this->DeleteRowsWithPrefix(200, 1);
+  ASSERT_EQ(2989, this->GetNumRows());
 
-  // Delete rows [0, 1)
-  this->DeleteRows(0, true, 1);
-  this->CheckNumRows(700);
+  // Delete 10^2 rows starting with row 300.
+  // i.e. delete rows [300, 399]
+  this->DeleteRowsWithPrefix(300, 2);
+  ASSERT_EQ(2889, this->GetNumRows());
 
-  // Delete rows [0, 10000)
-  this->DeleteRows(0, true, 10000);
-  this->CheckNumRows(0);
+  // Delete 10^3 rows starting with row 0.
+  // i.e. delete rows [0, 999]
+  this->DeleteRowsWithPrefix(0, 3);
+  ASSERT_EQ(2000, this->GetNumRows());
+
+  // Delete 10^3 rows starting with row 1000.
+  // i.e. delete rows [1000, 1999]
+  this->DeleteRowsWithPrefix(1000, 3);
+  ASSERT_EQ(1000, this->GetNumRows());
+
+  // Delete 10^4 rows starting with row 0.
+  // i.e. delete rows [0, 9999]
+  this->DeleteRowsWithPrefix(0, 4);
+  ASSERT_EQ(0, this->GetNumRows());
 }
 
 REGISTER_TYPED_TEST_CASE_P(DataStoreTest, WriteAndReadRows, UnboundedRange,
-                           DeleteRanges);
+                           ReadDifferentNumColumns, DeleteRanges);
 
 }  // namespace store
 }  // namespace analyzer

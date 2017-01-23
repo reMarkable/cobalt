@@ -39,35 +39,6 @@ std::unique_ptr<DataStore> DataStore::CreateFromFlagsOrDie() {
   return BigtableStore::CreateFromFlagsOrDie();
 }
 
-Status DataStore::DeleteRows(DataStore::Table table, std::string start_row_key,
-                             bool inclusive, std::string limit_row_key) {
-  std::string interval_start_row = std::move(start_row_key);
-  ReadResponse read_response;
-  do {
-    std::vector<std::string> column_names;
-    read_response = ReadRows(table, std::move(interval_start_row), inclusive,
-                             limit_row_key, column_names, 1000);
-    if (read_response.status != kOK) {
-      return read_response.status;
-    }
-    if (read_response.rows.empty()) {
-      DCHECK(!read_response.more_available);
-      return kOK;
-    }
-    // Copy the last row key now to be the interval_start_row for next time
-    // through the loop. Later we will move the string so we need to copy it
-    // now.
-    interval_start_row = read_response.rows.back().key;
-    for (auto& row : read_response.rows) {
-      Status status = DeleteRow(table, std::move(row.key));
-      if (status != kOK) {
-        return status;
-      }
-    }
-  } while (read_response.more_available);
-  return kOK;
-}
-
 }  // namespace store
 }  // namespace analyzer
 }  // namespace cobalt

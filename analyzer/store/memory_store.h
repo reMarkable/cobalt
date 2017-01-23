@@ -33,6 +33,8 @@ class MemoryStoreSingleton : public DataStore {
 
   Status WriteRow(Table table, Row row) override;
 
+  Status WriteRows(Table table, std::vector<Row> rows) override;
+
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
                         std::string limit_row_key,
                         const std::vector<std::string>& column_names,
@@ -40,8 +42,7 @@ class MemoryStoreSingleton : public DataStore {
 
   Status DeleteRow(Table table, std::string row_key) override;
 
-  Status DeleteRows(Table table, std::string start_row_key, bool inclusive,
-                    std::string limit_row_key) override;
+  Status DeleteRowsWithPrefix(Table table, std::string row_key_prefix) override;
 
   Status DeleteAllRows(Table table) override;
 
@@ -60,6 +61,10 @@ class MemoryStore : public DataStore {
     return MemoryStoreSingleton::Instance().WriteRow(table, std::move(row));
   }
 
+  Status WriteRows(Table table, std::vector<Row> rows) override {
+    return MemoryStoreSingleton::Instance().WriteRows(table, std::move(rows));
+  }
+
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
                         std::string limit_row_key,
                         const std::vector<std::string>& column_names,
@@ -72,10 +77,10 @@ class MemoryStore : public DataStore {
     return MemoryStoreSingleton::Instance().DeleteRow(table, row_key);
   }
 
-  Status DeleteRows(Table table, std::string start_row_key, bool inclusive,
-                    std::string limit_row_key) override {
-    return MemoryStoreSingleton::Instance().DeleteRows(
-        table, start_row_key, inclusive, limit_row_key);
+  Status DeleteRowsWithPrefix(Table table,
+                              std::string row_key_prefix) override {
+    return MemoryStoreSingleton::Instance().DeleteRowsWithPrefix(
+        table, row_key_prefix);
   }
 
   Status DeleteAllRows(Table table) override {

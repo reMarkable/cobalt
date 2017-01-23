@@ -16,6 +16,7 @@
 
 #include <glog/logging.h>
 #include <google/bigtable/v2/data.pb.h>
+#include <google/rpc/code.pb.h>
 
 #include <algorithm>
 #include <map>
@@ -28,15 +29,20 @@
 #include "analyzer/store/bigtable_names.h"
 #include "util/crypto_util/base64.h"
 
+using google::bigtable::admin::v2::BigtableTableAdmin;
+using google::bigtable::admin::v2::DropRowRangeRequest;
 using google::bigtable::v2::Bigtable;
 using google::bigtable::v2::MutateRowRequest;
 using google::bigtable::v2::MutateRowResponse;
+using google::bigtable::v2::MutateRowsRequest;
+using google::bigtable::v2::MutateRowsResponse;
 using google::bigtable::v2::Mutation_SetCell;
 using google::bigtable::v2::ReadRowsRequest;
 using google::bigtable::v2::ReadRowsResponse;
 using google::bigtable::v2::ReadRowsResponse_CellChunk;
 using google::bigtable::v2::RowRange;
 using google::bigtable::v2::RowSet;
+using google::protobuf::Empty;
 using grpc::ClientContext;
 using grpc::ClientReader;
 
@@ -49,7 +55,30 @@ namespace store {
 using crypto::RegexEncode;
 using crypto::RegexDecode;
 
-std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
+namespace {
+// Returns an error message appropriate for LOG(ERROR) based on the given
+// status (which should be an error status) and the name of the method in
+// which the error occured.
+std::string ErrorMessage(const grpc::Status& status,
+                         const std::string& method_name) {
+  std::ostringstream stream;
+  stream << "Error during << " << method_name << ": " << status.error_message()
+         << " code=" << status.error_code();
+  return stream.str();
+}
+
+store::Status GrpcStatusToStoreStatus(const grpc::Status& status) {
+  switch (status.error_code()) {
+    case grpc::INVALID_ARGUMENT:
+      return kInvalidArguments;
+    default:
+      return kOperationFailed;
+  }
+}
+
+}  // namespace
+
+std::shared_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   if (FLAGS_for_testing_only_use_bigtable_emulator) {
     LOG(WARNING) << "*** Using an insecure connection to Bigtable Emulator "
                     "instead of using a secure connection to Cloud Bigtable. "
@@ -67,16 +96,18 @@ std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   auto creds = grpc::GoogleDefaultCredentials();
   CHECK(creds);
   LOG(INFO) << "Connecting to CloudBigtable at " << kCloudBigtableUri;
-  return std::unique_ptr<BigtableStore>(
-      new BigtableStore(kCloudBigtableUri, creds, FLAGS_bigtable_project_name,
-                        FLAGS_bigtable_instance_name));
+  return std::unique_ptr<BigtableStore>(new BigtableStore(
+      kCloudBigtableUri, kCloudBigtableAdminUri, creds,
+      FLAGS_bigtable_project_name, FLAGS_bigtable_instance_name));
 }
 
 BigtableStore::BigtableStore(
-    const std::string& uri,
+    const std::string& uri, const std::string& admin_uri,
     std::shared_ptr<grpc::ChannelCredentials> credentials,
     const std::string& project_name, const std::string& instance_name)
     : stub_(Bigtable::NewStub(grpc::CreateChannel(uri, credentials))),
+      admin_stub_(BigtableTableAdmin::NewStub(
+          grpc::CreateChannel(admin_uri, credentials))),
       observations_table_name_(
           BigtableNames::ObservationsTableName(project_name, instance_name)),
       reports_table_name_(
@@ -96,37 +127,59 @@ std::string BigtableStore::TableName(DataStore::Table table) {
 }
 
 Status BigtableStore::WriteRow(DataStore::Table table, DataStore::Row row) {
-  MutateRowRequest req;
+  std::vector<Row> rows;
+  rows.emplace_back(std::move(row));
+  return WriteRows(table, std::move(rows));
+}
+
+Status BigtableStore::WriteRows(DataStore::Table table,
+                                std::vector<DataStore::Row> rows) {
+  MutateRowsRequest req;
   req.set_table_name(TableName(table));
-  req.mutable_row_key()->swap(row.key);
+  for (auto& row : rows) {
+    auto entry = req.add_entries();
+    entry->mutable_row_key()->swap(row.key);
 
-  for (auto& pair : row.column_values) {
-    Mutation_SetCell* cell = req.add_mutations()->mutable_set_cell();
-    cell->set_family_name(kDataColumnFamilyName);
-    // We Regex encode all values before using them as column names so that
-    // we can use a regular expression to search for specific column names
-    // later.
-    std::string encoded_column_name;
-    if (!RegexEncode(pair.first, &encoded_column_name)) {
-      LOG(ERROR) << "RegexEncode failed on '" << pair.first << "'";
-      return kInvalidArguments;
+    for (auto& pair : row.column_values) {
+      Mutation_SetCell* cell = entry->add_mutations()->mutable_set_cell();
+      cell->set_family_name(kDataColumnFamilyName);
+      // We Regex encode all values before using them as column names so that
+      // we can use a regular expression to search for specific column names
+      // later.
+      std::string encoded_column_name;
+      if (!RegexEncode(pair.first, &encoded_column_name)) {
+        LOG(ERROR) << "RegexEncode failed on '" << pair.first << "'";
+        return kInvalidArguments;
+      }
+      cell->mutable_column_qualifier()->swap(encoded_column_name);
+      cell->mutable_value()->swap(pair.second);
     }
-    cell->mutable_column_qualifier()->swap(encoded_column_name);
-    cell->mutable_value()->swap(pair.second);
   }
 
+  Status return_status = kOK;
   ClientContext context;
-  MutateRowResponse resp;
-  grpc::Status status = stub_->MutateRow(&context, req, &resp);
+  std::unique_ptr<ClientReader<MutateRowsResponse>> reader(
+      stub_->MutateRows(&context, req));
 
-  if (!status.ok()) {
-    // TODO(rudominer) Consider doing a retry here. Consider if this
-    // method should be asynchronous.
-    LOG(ERROR) << "Error during WriteRow: " << status.error_message();
-    return kOperationFailed;
+  MutateRowsResponse resp;
+  while (reader->Read(&resp)) {
+    for (const auto& entry : resp.entries()) {
+      if (entry.status().code() != google::rpc::OK) {
+        LOG(ERROR) << "MutateRows failed at entry " << entry.index()
+                   << " with error " << entry.status().message()
+                   << " code=" << entry.status().code();
+        return_status = kOperationFailed;
+      }
+    }
   }
 
-  return kOK;
+  grpc::Status status = reader->Finish();
+  if (!status.ok()) {
+    LOG(ERROR) << ErrorMessage(status, "MutateRows");
+    return_status = GrpcStatusToStoreStatus(status);
+  }
+
+  return return_status;
 }
 
 BigtableStore::ReadResponse BigtableStore::ReadRows(
@@ -212,7 +265,8 @@ BigtableStore::ReadResponse BigtableStore::ReadRows(
 
       // When we get a different row key, start a new row.
       if (read_response.rows.empty() ||
-          read_response.rows.back().key != chunk.row_key()) {
+          (!chunk.row_key().empty() &&
+           read_response.rows.back().key != chunk.row_key())) {
         read_response.rows.emplace_back();
         read_response.rows.back().key = chunk.row_key();
         // We are starting a new row so reset the current column.
@@ -247,8 +301,8 @@ BigtableStore::ReadResponse BigtableStore::ReadRows(
   if (!status.ok()) {
     // TODO(rudominer) Consider doing a retry here. Consider if this
     // method should be asynchronous.
-    LOG(ERROR) << "Error during ReadRows: " << status.error_message();
-    read_response.status = kOperationFailed;
+    LOG(ERROR) << ErrorMessage(status, "ReadRows");
+    read_response.status = GrpcStatusToStoreStatus(status);
     return read_response;
   }
 
@@ -269,8 +323,43 @@ Status BigtableStore::DeleteRow(Table table, std::string row_key) {
   if (!status.ok()) {
     // TODO(rudominer) Consider doing a retry here. Consider if this
     // method should be asynchronous.
-    LOG(ERROR) << "Error during DeleteRow: " << status.error_message();
-    return kOperationFailed;
+    LOG(ERROR) << ErrorMessage(status, "DeleteRow");
+    return GrpcStatusToStoreStatus(status);
+  }
+
+  return kOK;
+}
+
+Status BigtableStore::DeleteRowsWithPrefix(Table table,
+                                           std::string row_key_prefix) {
+  DropRowRangeRequest req;
+  req.set_name(TableName(table));
+  req.mutable_row_key_prefix()->swap(row_key_prefix);
+
+  ClientContext context;
+  Empty resp;
+  grpc::Status status = admin_stub_->DropRowRange(&context, req, &resp);
+
+  if (!status.ok()) {
+    LOG(ERROR) << ErrorMessage(status, "DeleteRowsWithPrefix");
+    return GrpcStatusToStoreStatus(status);
+  }
+
+  return kOK;
+}
+
+Status BigtableStore::DeleteAllRows(Table table) {
+  DropRowRangeRequest req;
+  req.set_name(TableName(table));
+  req.set_delete_all_data_from_table(true);
+
+  ClientContext context;
+  Empty resp;
+  grpc::Status status = admin_stub_->DropRowRange(&context, req, &resp);
+
+  if (!status.ok()) {
+    LOG(ERROR) << ErrorMessage(status, "DeleteAllRows");
+    return GrpcStatusToStoreStatus(status);
   }
 
   return kOK;
