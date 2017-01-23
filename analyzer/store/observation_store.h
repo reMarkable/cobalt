@@ -41,6 +41,10 @@ class ObservationStore {
   Status AddObservation(const ObservationMetadata& metadata,
                         const Observation& observation);
 
+  // Adds a batch of Observations with a common set of metadata to the store.
+  Status AddObservationBatch(const ObservationMetadata& metadata,
+                             const std::vector<Observation>& observations);
+
   // A QueryResult represents one of the results contained in the QueryResponse
   // returned from QueryObservations(). This is a move-only type.
   struct QueryResult {

@@ -55,39 +55,45 @@ class ObservationStoreAbstractTest : public ::testing::Test {
     EXPECT_EQ(kOK, data_store_->DeleteAllRows(DataStore::kObservations));
   }
 
-  void AddObservation(uint32_t metric_id, uint32_t day_index, int num_parts) {
+  void AddObservationBatch(uint32_t metric_id, uint32_t day_index,
+                           int num_parts, size_t num_observations) {
     ObservationMetadata metadata;
     metadata.set_customer_id(kCustomerId);
     metadata.set_project_id(kProjectId);
     metadata.set_metric_id(metric_id);
     metadata.set_day_index(day_index);
-    Observation observation;
-    for (int part_index = 0; part_index < num_parts; part_index++) {
-      std::string part_name = PartName(part_index);
-      ObservationPart observation_part;
-      switch (part_index % 3) {
-        case 0:
-          observation_part.mutable_forculus()->set_ciphertext(part_name);
-          break;
-        case 1:
-          observation_part.mutable_rappor()->set_data(part_name);
-          break;
-        default:
-          observation_part.mutable_basic_rappor()->set_data(part_name);
-          break;
+    std::vector<Observation> observations;
+    for (int i = 0; i < num_observations; i++) {
+      Observation observation;
+      for (int part_index = 0; part_index < num_parts; part_index++) {
+        std::string part_name = PartName(part_index);
+        ObservationPart observation_part;
+        switch (part_index % 3) {
+          case 0:
+            observation_part.mutable_forculus()->set_ciphertext(part_name);
+            break;
+          case 1:
+            observation_part.mutable_rappor()->set_data(part_name);
+            break;
+          default:
+            observation_part.mutable_basic_rappor()->set_data(part_name);
+            break;
+        }
+        (*observation.mutable_parts())[part_name].Swap(&observation_part);
       }
-      (*observation.mutable_parts())[part_name].Swap(&observation_part);
+      observations.emplace_back();
+      observations.back().Swap(&observation);
     }
-    EXPECT_EQ(kOK, observation_store_->AddObservation(metadata, observation));
+
+    EXPECT_EQ(kOK,
+              observation_store_->AddObservationBatch(metadata, observations));
   }
 
   void AddObservations(uint32_t metric_id, uint32_t first_day_index,
                        int32_t last_day_index, int num_per_day, int num_parts) {
     for (uint32_t day_index = first_day_index; day_index <= last_day_index;
          day_index++) {
-      for (int i = 0; i < num_per_day; i++) {
-        AddObservation(metric_id, day_index, num_parts);
-      }
+      AddObservationBatch(metric_id, day_index, num_parts, num_per_day);
     }
   }
 

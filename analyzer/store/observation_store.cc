@@ -132,6 +132,28 @@ Status ObservationStore::AddObservation(const ObservationMetadata& metadata,
   return store_->WriteRow(DataStore::kObservations, std::move(row));
 }
 
+Status ObservationStore::AddObservationBatch(
+    const ObservationMetadata& metadata,
+    const std::vector<Observation>& observations) {
+  std::vector<DataStore::Row> rows;
+  for (const Observation& observation : observations) {
+    DataStore::Row row;
+    row.key = GenerateNewRowKey(metadata.customer_id(), metadata.project_id(),
+                                metadata.metric_id(), metadata.day_index());
+    for (const auto& pair : observation.parts()) {
+      std::string serialized_observation_part;
+      pair.second.SerializeToString(&serialized_observation_part);
+      // TODO(rudominer) Consider ways to avoid having so many copies of the
+      // part names.
+      row.column_values[pair.first] = std::move(serialized_observation_part);
+    }
+
+    rows.emplace_back(std::move(row));
+  }
+
+  return store_->WriteRows(DataStore::kObservations, std::move(rows));
+}
+
 ObservationStore::QueryResponse ObservationStore::QueryObservations(
     uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
     uint32_t start_day_index, uint32_t end_day_index,

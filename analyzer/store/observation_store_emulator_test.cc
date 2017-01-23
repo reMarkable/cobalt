@@ -20,10 +20,10 @@ namespace cobalt {
 namespace analyzer {
 namespace store {
 
-// We instantiate ObservationStoreAbstractTest using an instance of BigtableStore
-// connected to a local Bigtable Emulator as the underlying DataStore.
-// It is assumed that the Bigtable Emulator is running on localhost at
-// the default port (9000).
+// We instantiate ObservationStoreAbstractTest using an instance of
+// BigtableStore connected to a local Bigtable Emulator as the underlying
+// DataStore. It is assumed that the Bigtable Emulator is running on localhost
+// at the default port (9000).
 
 INSTANTIATE_TYPED_TEST_CASE_P(ObservationStoreEmulatorTest,
                               ObservationStoreAbstractTest,
