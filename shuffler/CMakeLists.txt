@@ -116,6 +116,18 @@ add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Build receiver unit tests
+set(RECEIVER_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/receiver/receiver_test.go")
+set(RECEIVER_TEST_BIN ${GO_TESTS}/receiver_test)
+add_custom_command(OUTPUT ${RECEIVER_TEST_BIN}
+    COMMAND ${GO_BIN} test -c -o ${RECEIVER_TEST_BIN} ${RECEIVER_TEST_SRC}
+            ${RECEIVER_SRC}
+    DEPENDS ${RECEIVER_SRC} ${RECEIVER_TEST_SRC}
+    DEPENDS ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
+    DEPENDS ${CONFIG_GEN_PROTO_FILE}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 # Build util unit tests
 set(UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util_test.go")
 set(UTIL_TEST_BIN ${GO_TESTS}/crypto_util_test)
@@ -151,6 +163,7 @@ add_custom_target(shuffler_all ALL
             ${SHUFFLER_CONF}
             ${TEST_CLIENT_BIN}
             ${DISPATCHER_TEST_BIN}
+            ${RECEIVER_TEST_BIN}
             ${UTIL_TEST_BIN}
             ${CONFIG_TEST_BIN}
             ${STORAGE_TEST_BIN}

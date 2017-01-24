@@ -51,7 +51,7 @@ type Store interface {
 	// data store for the given |metadata| key.
 	GetObservations(metadata *shufflerpb.ObservationMetadata) ([]*ObservationInfo, error)
 
-	// GetObservationsSize returns the count of ObservationInfos for a given
+	// GetNumObservations returns the count of ObservationInfos for a given
 	// |metadata| key.
 	GetNumObservations(metadata *shufflerpb.ObservationMetadata) (int, error)
 

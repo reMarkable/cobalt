@@ -60,5 +60,5 @@ func main() {
 	if glog.V(2) {
 		glog.Info("Listening for incoming encoder requests on port [", *port, "]...")
 	}
-	receiver.ReceiveAndStore(*tls, *certFile, *keyFile, *port, config, store)
+	receiver.ReceiveAndStore(*tls, *certFile, *keyFile, *port, store)
 }

@@ -44,13 +44,13 @@ var (
 	store storage.Store
 )
 
-// shufflerServer is used to implement shuffler.ShufflerServer.
-type shufflerServer struct{}
+// ShufflerServer is used to implement shuffler.ShufflerServer.
+type ShufflerServer struct{}
 
 // Process() function processes the incoming encoder requests and stores them
 // locally in a random order. During dispatch event, the records get sent to
 // Analyzer and deleted from Shuffler.
-func (s *shufflerServer) Process(ctx context.Context,
+func (s *ShufflerServer) Process(ctx context.Context,
 	encryptedMessage *shufflerpb.EncryptedMessage) (*empty.Empty, error) {
 	// TODO(ukode): Add impl for decrypting the sealed envelope.
 	glog.V(2).Infoln("Function Process() is invoked.")
@@ -74,8 +74,8 @@ func (s *shufflerServer) Process(ctx context.Context,
 	// Shuffler |envelope.RecipientUrl|.
 
 	for _, batch := range envelope.GetBatch() {
-		for _, encrypted_observation := range batch.GetEncryptedObservation() {
-			if encrypted_observation == nil {
+		for _, encryptedObservation := range batch.GetEncryptedObservation() {
+			if encryptedObservation == nil {
 				return nil, fmt.Errorf("Received empty encrypted message for key [%v]", batch.GetMetaData())
 			}
 
@@ -83,7 +83,7 @@ func (s *shufflerServer) Process(ctx context.Context,
 			// store for dispatcher to consume and forward to Analyzer based on some
 			// dispatch criteria. The data store shuffles the order of the Observation
 			// before persisting.
-			if err := store.AddObservation(batch.GetMetaData(), storage.MakeObservationInfo(encrypted_observation)); err != nil {
+			if err := store.AddObservation(batch.GetMetaData(), storage.MakeObservationInfo(encryptedObservation)); err != nil {
 				return nil, fmt.Errorf("Error in saving observation: %v", batch.GetMetaData())
 			}
 		}
@@ -93,19 +93,23 @@ func (s *shufflerServer) Process(ctx context.Context,
 	return &empty.Empty{}, nil
 }
 
-func newServer() *shufflerServer {
-	server := new(shufflerServer)
+func newServer() *ShufflerServer {
+	server := new(ShufflerServer)
 	return server
 }
 
-// ReceiveAndStore serves incoming requests from encoders.
-func ReceiveAndStore(tls bool, certFile string, keyFile string, port int, config *shufflerpb.ShufflerConfig, dataStore storage.Store) {
-	if config == nil || dataStore == nil {
-		glog.Fatal("Invalid config or data store handles, exiting.")
+func initializeDataStore(dataStore storage.Store) {
+	if dataStore == nil {
+		glog.Fatal("Invalid data store handle, exiting.")
 	}
 
 	// Initialize data store handle
 	store = dataStore
+}
+
+// ReceiveAndStore serves incoming requests from encoders.
+func ReceiveAndStore(tls bool, certFile string, keyFile string, port int, dataStore storage.Store) {
+	initializeDataStore(dataStore)
 
 	// Start the grpc receiver and start listening for requests from Encoders
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))

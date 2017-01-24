@@ -142,7 +142,7 @@ func dispatchInternal(config *shufflerpb.ShufflerConfig, store storage.Store, ba
 		} else {
 			// If threshold policy is not met, loop through the messages and check
 			// if any messages are in the queue for more than the allowed duration
-			// |dispage_age_days|. If found, discard them, otherwise queue it back
+			// |disposal_age_days|. If found, discard them, otherwise queue it back
 			// in the store for the next dispatch event.
 			obInfos, err := store.GetObservations(key)
 			if err != nil {
