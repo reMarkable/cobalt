@@ -33,6 +33,12 @@ enum Status {
   // The operation was not attempted because the arguments are invalid.
   kInvalidArguments,
 
+  // The requested item was not found.
+  kNotFound,
+
+  // The operation requires a pre-condition which is not true.
+  kPreconditionFailed,
+
   // The operation was attempted but failed for an unspecified reason. More
   // information may be found in the log file.
   kOperationFailed
@@ -97,6 +103,25 @@ class DataStore {
   //
   // Returns kOK on success or an error status on failure.
   virtual Status WriteRows(Table table, std::vector<Row> rows) = 0;
+
+  // Reads the row with the given key from the store, if there is one.
+  //
+  // table: Which table to read from.
+  //
+  // column_names: If non-empty then the read will only return data from the
+  //     columns with the specified names. Otherwise there will be no
+  //     restriction.
+  //
+  // row: is both input and output. On input only the |key| field will be
+  //     inspected and the |column_values| will be cleared. The row with the
+  //     given |key| will be fetched from the datastore.
+  //
+  // Returns kOK on success, kNotFound if there is no such row,
+  // kInvalidArgument if |row| is nullptr, and kOperationFailed if there was
+  // any other unexpected problem.
+  virtual Status ReadRow(Table table,
+                         const std::vector<std::string>& column_names,
+                         Row* row) = 0;
 
   // A ReadResponse is returned from the ReadRows() method.
   struct ReadResponse {

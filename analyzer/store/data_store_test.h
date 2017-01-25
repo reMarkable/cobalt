@@ -68,6 +68,15 @@ class DataStoreTest : public ::testing::Test {
   // Returns the total number of rows in the store.
   size_t GetNumRows();
 
+  // Reads the specified number of columns from the specified row and checks
+  // that the result is as expected.
+  //
+  // If num_columns = 0 then no columns are specified in the read and therefore
+  // all columns should be returned and so the expected num_columns is
+  // kNumColumns.
+  void ReadSingleRowAndCheck(int num_columns, int row_idnex,
+                             bool expect_row_found);
+
   // Reads the specified number of columns from the specified row range
   // and checks that the results are as expected.
   //
@@ -158,6 +167,28 @@ size_t DataStoreTest<StoreFactoryClass>::GetNumRows() {
 }
 
 template <class StoreFactoryClass>
+void DataStoreTest<StoreFactoryClass>::ReadSingleRowAndCheck(
+    int num_columns, int row_index, bool expect_row_found) {
+  std::vector<std::string> column_names = MakeColumnNames(num_columns);
+  DataStore::Row row;
+  row.key = RowKeyString(test_prefix_, row_index);
+  auto status =
+      data_store_->ReadRow(DataStore::kObservations, column_names, &row);
+  if (expect_row_found) {
+    ASSERT_EQ(kOK, status);
+  } else {
+    EXPECT_EQ(kNotFound, status);
+    return;
+  }
+  int expected_num_columns = (num_columns == 0 ? kNumColumns : num_columns);
+  for (int column_index = 0; column_index < expected_num_columns;
+       column_index++) {
+    EXPECT_EQ(ValueString(row_index, column_index),
+              row.column_values.at(ColumnNameString(column_index)));
+  }
+}
+
+template <class StoreFactoryClass>
 void DataStoreTest<StoreFactoryClass>::ReadRowsAndCheck(
     int num_columns, int start_row, bool inclusive, int limit_row, int max_rows,
     int expected_num_rows, bool expect_more_available) {
@@ -206,6 +237,18 @@ TYPED_TEST_CASE_P(DataStoreTest);
 TYPED_TEST_P(DataStoreTest, WriteAndReadRows) {
   // Add 3000 rows of 3 columns each.
   this->AddRows(3000);
+
+  // Read row number 0, expect it to exist.
+  this->ReadSingleRowAndCheck(kNumColumns, 0, true);
+
+  // Read row number 1234, expect it to exist.
+  this->ReadSingleRowAndCheck(kNumColumns, 1234, true);
+
+  // Read row number 2999, expect it to exist.
+  this->ReadSingleRowAndCheck(kNumColumns, 2999, true);
+
+  // Read row number 3000, expect it to not exist.
+  this->ReadSingleRowAndCheck(kNumColumns, 3000, false);
 
   // Read rows [100, 175) with max_rows = 50. Expect 50 rows with more
   // available.
@@ -336,9 +379,15 @@ TYPED_TEST_P(DataStoreTest, ReadDifferentNumColumns) {
   size_t expected_rows = 3;
 
   // Try the read with different numbers of columns specified to read.
-  for (size_t num_rows = 0; num_rows <= kNumColumns; num_rows++) {
-    this->ReadRowsAndCheck(num_rows, 3, true, 6, max_rows, expected_rows,
+  for (size_t num_columns = 0; num_columns <= kNumColumns; num_columns++) {
+    this->ReadRowsAndCheck(num_columns, 3, true, 6, max_rows, expected_rows,
                            false);
+  }
+
+  // Read row 8 alone.
+  // Try the read with different numbers of columns specified to read.
+  for (size_t num_columns = 0; num_columns <= kNumColumns; num_columns++) {
+    this->ReadSingleRowAndCheck(num_columns, 8, true);
   }
 }
 

@@ -49,6 +49,9 @@ class BigtableStore : public DataStore {
 
   Status WriteRows(Table table, std::vector<Row> rows) override;
 
+  Status ReadRow(Table table, const std::vector<std::string>& column_names,
+                 Row* row) override;
+
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
                         std::string limit_row_key,
                         const std::vector<std::string>& column_names,
@@ -62,6 +65,16 @@ class BigtableStore : public DataStore {
 
  private:
   std::string TableName(DataStore::Table table);
+
+  // This method is used to implement ReadRow and ReadRows. It is identical to
+  // ReadRows except that instead of limit_row_key it has end_row_key and
+  // inclusive_end. In other words it supports intervals that are closed on
+  // the right.
+  ReadResponse ReadRowsInternal(Table table, std::string start_row_key,
+                                bool inclusive_start, std::string end_row_key,
+                                bool inclusive_end,
+                                const std::vector<std::string>& column_names,
+                                size_t max_rows);
 
   std::unique_ptr<google::bigtable::v2::Bigtable::Stub> stub_;
   std::unique_ptr<google::bigtable::admin::v2::BigtableTableAdmin::Stub>

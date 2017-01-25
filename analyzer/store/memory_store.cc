@@ -51,6 +51,46 @@ Status MemoryStoreSingleton::WriteRows(Table table, std::vector<Row> rows) {
   return kOK;
 }
 
+Status MemoryStoreSingleton::ReadRow(
+    Table table, const std::vector<std::string>& column_names, Row* row) {
+  if (row == nullptr) {
+    return kInvalidArguments;
+  }
+
+  ImplMapType* rows;
+  switch (table) {
+    case kObservations:
+      rows = &observation_rows_;
+      break;
+    case kReports:
+      rows = &report_rows_;
+      break;
+    default:
+      CHECK(false) << "Unrecognized table" << table;
+  }
+  auto iter = rows->find(row->key);
+  if (iter == rows->end()) {
+    return kNotFound;
+  }
+
+  // Make a set of the requested column_names
+  std::set<std::string> requested_column_names(column_names.begin(),
+                                               column_names.end());
+
+  // iter->second is a map of column-name to column-value.
+  // Iterate through this sub-map.
+  for (const auto& pair : iter->second) {
+    // For each element of the sub-map add a ColumnValue to column_values.
+    if (requested_column_names.empty() ||
+        requested_column_names.find(pair.first) !=
+            requested_column_names.end()) {
+      row->column_values[pair.first] = pair.second;
+    }
+  }
+
+  return kOK;
+}
+
 DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
     std::string limit_row_key, const std::vector<std::string>& column_names,
@@ -62,23 +102,32 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     return read_response;
   }
 
-  ImplMapType& rows =
-      (table == kObservations ? observation_rows_ : report_rows_);
+  ImplMapType* rows;
+  switch (table) {
+    case kObservations:
+      rows = &observation_rows_;
+      break;
+    case kReports:
+      rows = &report_rows_;
+      break;
+    default:
+      CHECK(false) << "Unrecognized table" << table;
+  }
 
   // Find the first row of the range (inclusive or exclusive)
   ImplMapType::iterator start_iterator;
   if (inclusive) {
-    start_iterator = rows.lower_bound(start_row_key);
+    start_iterator = rows->lower_bound(start_row_key);
   } else {
-    start_iterator = rows.upper_bound(start_row_key);
+    start_iterator = rows->upper_bound(start_row_key);
   }
 
   ImplMapType::iterator limit_iterator;
   if (limit_row_key.empty()) {
-    limit_iterator = rows.end();
+    limit_iterator = rows->end();
   } else {
     // Find the least row greater than or equal to limit_row_key.
-    limit_iterator = rows.lower_bound(limit_row_key);
+    limit_iterator = rows->lower_bound(limit_row_key);
   }
 
   // Make a set of the requested column_names

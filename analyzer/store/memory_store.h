@@ -35,6 +35,9 @@ class MemoryStoreSingleton : public DataStore {
 
   Status WriteRows(Table table, std::vector<Row> rows) override;
 
+  Status ReadRow(Table table, const std::vector<std::string>& column_names,
+                 Row* row) override;
+
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
                         std::string limit_row_key,
                         const std::vector<std::string>& column_names,
@@ -63,6 +66,11 @@ class MemoryStore : public DataStore {
 
   Status WriteRows(Table table, std::vector<Row> rows) override {
     return MemoryStoreSingleton::Instance().WriteRows(table, std::move(rows));
+  }
+
+  Status ReadRow(Table table, const std::vector<std::string>& column_names,
+                 Row* row) override {
+    return MemoryStoreSingleton::Instance().ReadRow(table, column_names, row);
   }
 
   ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,

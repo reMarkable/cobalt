@@ -192,10 +192,45 @@ Status BigtableStore::WriteRows(DataStore::Table table,
   return return_status;
 }
 
+Status BigtableStore::ReadRow(Table table,
+                              const std::vector<std::string>& column_names,
+                              Row* row) {
+  if (row == nullptr) {
+    return kInvalidArguments;
+  }
+  auto read_response =
+      ReadRowsInternal(table, row->key, true, row->key, true, column_names, 1);
+
+  if (read_response.status != kOK) {
+    return read_response.status;
+  }
+
+  if (read_response.rows.empty()) {
+    return kNotFound;
+  }
+
+  DCHECK(read_response.rows.size() == 1) << read_response.rows.size();
+  DCHECK(read_response.rows[0].key == row->key);
+
+  row->column_values.swap(read_response.rows[0].column_values);
+
+  return kOK;
+}
+
 BigtableStore::ReadResponse BigtableStore::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
     std::string limit_row_key, const std::vector<std::string>& column_names,
     size_t max_rows) {
+  // Invoke ReadRowsInternal passing in false for |inclusive_end| indicating
+  // that our interval is open on the right.
+  return ReadRowsInternal(table, start_row_key, inclusive, limit_row_key, false,
+                          column_names, max_rows);
+}
+
+BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
+    Table table, std::string start_row_key, bool inclusive_start,
+    std::string end_row_key, bool inclusive_end,
+    const std::vector<std::string>& column_names, size_t max_rows) {
   ReadResponse read_response;
   read_response.status = kOK;
   if (max_rows == 0) {
@@ -211,13 +246,17 @@ BigtableStore::ReadResponse BigtableStore::ReadRows(
   RowSet* rowset = req.mutable_rows();
   RowRange* row_range = rowset->add_row_ranges();
 
-  if (inclusive) {
+  if (inclusive_start) {
     row_range->mutable_start_key_closed()->swap(start_row_key);
   } else {
     row_range->mutable_start_key_open()->swap(start_row_key);
   }
-  if (!limit_row_key.empty()) {
-    row_range->mutable_end_key_open()->swap(limit_row_key);
+  if (!end_row_key.empty()) {
+    if (inclusive_end) {
+      row_range->mutable_end_key_closed()->swap(end_row_key);
+    } else {
+      row_range->mutable_end_key_open()->swap(end_row_key);
+    }
   }
 
   if (!column_names.empty()) {
