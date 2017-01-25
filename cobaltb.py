@@ -126,6 +126,8 @@ def _test(args):
     test_dirs = FILTER_MAP[args.tests]
 
   success = True
+  print ("Will run tests in the following directories: %s." %
+      ", ".join(test_dirs))
   for test_dir in test_dirs:
     use_bt_emulator = (test_dir == 'gtests_btemulator')
     test_args = None
@@ -136,8 +138,9 @@ def _test(args):
         break
       test_args = ("--bigtable_project_name=%s --bigtable_instance_name=%s" %
           (args.bigtable_project_name, args.bigtable_instance_name))
-    success = (success and
-        test_runner.run_all_tests(test_dir, use_bt_emulator, test_args) == 0)
+    print '********************************************************'
+    success = (test_runner.run_all_tests(
+        test_dir, use_bt_emulator, test_args) == 0) and success
 
   print
   if success:
