@@ -24,6 +24,7 @@ add_library(analyzer_store
             data_store.cc
             memory_store.cc
             observation_store.cc
+            report_store.cc
             ${COBALT_PROTO_SRCS})
 
 
@@ -36,7 +37,7 @@ target_link_libraries(analyzer_store
 
 # Build the tests
 add_executable(analyzer_store_tests
-               memory_store_test.cc observation_store_test.cc)
+               memory_store_test.cc observation_store_test.cc report_store_test.cc)
 target_link_libraries(analyzer_store_tests gtest gtest_main analyzer_store)
 set_target_properties(analyzer_store_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
@@ -45,7 +46,8 @@ set_target_properties(analyzer_store_tests PROPERTIES
 # the Bigtable Emulator process.
 add_executable(bigtable_emulator_tests
                bigtable_store_emulator_test.cc
-               observation_store_emulator_test.cc)
+               observation_store_emulator_test.cc
+               report_store_emulator_test.cc)
 target_link_libraries(bigtable_emulator_tests gtest gtest_main cobalt_analyzer)
 set_target_properties(bigtable_emulator_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})
@@ -53,7 +55,9 @@ set_target_properties(bigtable_emulator_tests PROPERTIES
 # Versions of our tests that connect to the real Cloud Bigtable. See
 # notes in bigtabe_cloud_helper.h for how this works.
 add_executable(bigtable_cloud_tests
-               bigtable_store_cloud_test.cc observation_store_cloud_test.cc)
+               bigtable_store_cloud_test.cc
+               observation_store_cloud_test.cc
+               report_store_cloud_test.cc)
 target_link_libraries(bigtable_cloud_tests gtest gtest_main cobalt_analyzer)
 set_target_properties(bigtable_cloud_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})

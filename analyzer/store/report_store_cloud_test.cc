@@ -13,19 +13,19 @@
 // limitations under the License.
 
 #include "analyzer/store/bigtable_cloud_helper.h"
-#include "analyzer/store/observation_store_abstract_test.h"
+#include "analyzer/store/report_store_abstract_test.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
 namespace cobalt {
 namespace analyzer {
 namespace store {
 
-// We instantiate ObservationStoreAbstractTest using an instance of
+// We instantiate ReportStoreAbstractTest using an instance of
 // BigtableStore connected to the real Cloud Bigtable as the underlying
 // DataStore. See notes in bigtable_cloud_helper.h
 
-INSTANTIATE_TYPED_TEST_CASE_P(ObservationStoreCloudTest,
-                              ObservationStoreAbstractTest,
+INSTANTIATE_TYPED_TEST_CASE_P(ReportStoreCloudTest,
+                              ReportStoreAbstractTest,
                               BigtableStoreCloudFactory);
 
 }  // namespace store
