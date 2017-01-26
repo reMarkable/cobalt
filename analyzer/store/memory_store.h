@@ -50,10 +50,14 @@ class MemoryStoreSingleton : public DataStore {
   Status DeleteAllRows(Table table) override;
 
  private:
+  typedef std::map<std::string, std::map<std::string, std::string>> ImplMapType;
+
   MemoryStoreSingleton() {}
 
+  ImplMapType& GetRows(Table which_table);
+
   std::map<std::string, std::map<std::string, std::string>> observation_rows_,
-      report_rows_;
+      report_metadata_rows_, report_rows_rows_;
 };
 
 // An in-memory implementation of DataStore. The backing store is a singleton

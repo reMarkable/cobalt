@@ -24,7 +24,8 @@ namespace store {
 
 const char kDataColumnFamilyName[] = "data";
 const char kObservationsTableId[] = "observations";
-const char kReportsTableId[] = "reports";
+const char kReportMetadataTableId[] = "report_metadata";
+const char kReportRowsTableId[] = "report_rows";
 const char kCloudBigtableUri[] = "bigtable.googleapis.com";
 const char kCloudBigtableAdminUri[] = "bigtableadmin.googleapis.com";
 
@@ -40,9 +41,14 @@ class BigtableNames {
     return FullTableName(project_name, instance_name, kObservationsTableId);
   }
 
-  static std::string ReportsTableName(const std::string& project_name,
-                                      const std::string& instance_name) {
-    return FullTableName(project_name, instance_name, kReportsTableId);
+  static std::string ReportMetadataTableName(const std::string& project_name,
+                                             const std::string& instance_name) {
+    return FullTableName(project_name, instance_name, kReportMetadataTableId);
+  }
+
+  static std::string ReportRowsTableName(const std::string& project_name,
+                                         const std::string& instance_name) {
+    return FullTableName(project_name, instance_name, kReportRowsTableId);
   }
 
   static std::string FullTableName(const std::string& project_name,

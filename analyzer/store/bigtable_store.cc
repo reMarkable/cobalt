@@ -120,16 +120,21 @@ BigtableStore::BigtableStore(
           grpc::CreateChannel(admin_uri, credentials))),
       observations_table_name_(
           BigtableNames::ObservationsTableName(project_name, instance_name)),
-      reports_table_name_(
-          BigtableNames::ReportsTableName(project_name, instance_name)) {}
+      report_progress_table_name_(
+          BigtableNames::ReportMetadataTableName(project_name, instance_name)),
+      report_rows_table_name_(
+          BigtableNames::ReportRowsTableName(project_name, instance_name)) {}
 
 std::string BigtableStore::TableName(DataStore::Table table) {
   switch (table) {
     case kObservations:
       return observations_table_name_;
 
-    case kReports:
-      return reports_table_name_;
+    case kReportMetadata:
+      return report_progress_table_name_;
+
+    case kReportRows:
+      return report_rows_table_name_;
 
     default:
       CHECK(false) << "unexpected table: " << table;

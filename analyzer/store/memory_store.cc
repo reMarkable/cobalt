@@ -22,7 +22,19 @@ namespace cobalt {
 namespace analyzer {
 namespace store {
 
-typedef std::map<std::string, std::map<std::string, std::string>> ImplMapType;
+MemoryStoreSingleton::ImplMapType& MemoryStoreSingleton::GetRows(
+    Table which_table) {
+  switch (which_table) {
+    case kObservations:
+      return observation_rows_;
+    case kReportMetadata:
+      return report_metadata_rows_;
+    case kReportRows:
+      return report_rows_rows_;
+    default:
+      CHECK(false) << "Unrecognized table" << which_table;
+  }
+}
 
 MemoryStoreSingleton& MemoryStoreSingleton::Instance() {
   static MemoryStoreSingleton singleton;
@@ -31,8 +43,7 @@ MemoryStoreSingleton& MemoryStoreSingleton::Instance() {
 }
 
 Status MemoryStoreSingleton::WriteRow(Table table, Row row) {
-  ImplMapType& rows =
-      (table == kObservations ? observation_rows_ : report_rows_);
+  auto& rows = GetRows(table);
   rows[row.key].clear();
   rows[row.key] = std::move(row.column_values);
   return kOK;
@@ -57,19 +68,10 @@ Status MemoryStoreSingleton::ReadRow(
     return kInvalidArguments;
   }
 
-  ImplMapType* rows;
-  switch (table) {
-    case kObservations:
-      rows = &observation_rows_;
-      break;
-    case kReports:
-      rows = &report_rows_;
-      break;
-    default:
-      CHECK(false) << "Unrecognized table" << table;
-  }
-  auto iter = rows->find(row->key);
-  if (iter == rows->end()) {
+  auto& rows = GetRows(table);
+  auto iter = rows.find(row->key);
+  if (iter == rows.end()) {
+    LOG(INFO) << row->key << " Not found in table " << table;
     return kNotFound;
   }
 
@@ -102,32 +104,22 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     return read_response;
   }
 
-  ImplMapType* rows;
-  switch (table) {
-    case kObservations:
-      rows = &observation_rows_;
-      break;
-    case kReports:
-      rows = &report_rows_;
-      break;
-    default:
-      CHECK(false) << "Unrecognized table" << table;
-  }
+  auto& rows = GetRows(table);
 
   // Find the first row of the range (inclusive or exclusive)
   ImplMapType::iterator start_iterator;
   if (inclusive) {
-    start_iterator = rows->lower_bound(start_row_key);
+    start_iterator = rows.lower_bound(start_row_key);
   } else {
-    start_iterator = rows->upper_bound(start_row_key);
+    start_iterator = rows.upper_bound(start_row_key);
   }
 
   ImplMapType::iterator limit_iterator;
   if (limit_row_key.empty()) {
-    limit_iterator = rows->end();
+    limit_iterator = rows.end();
   } else {
     // Find the least row greater than or equal to limit_row_key.
-    limit_iterator = rows->lower_bound(limit_row_key);
+    limit_iterator = rows.lower_bound(limit_row_key);
   }
 
   // Make a set of the requested column_names
@@ -163,9 +155,7 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
 }
 
 Status MemoryStoreSingleton::DeleteRow(Table table, std::string row_key) {
-  ImplMapType& rows =
-      (table == kObservations ? observation_rows_ : report_rows_);
-  rows.erase(row_key);
+  GetRows(table).erase(row_key);
   return kOK;
 }
 
@@ -175,8 +165,7 @@ Status MemoryStoreSingleton::DeleteRowsWithPrefix(Table table,
     return kInvalidArguments;
   }
 
-  ImplMapType& rows =
-      (table == kObservations ? observation_rows_ : report_rows_);
+  auto& rows = GetRows(table);
 
   // Find the first row of the range.
   auto start_iterator = rows.lower_bound(row_key_prefix);
@@ -191,9 +180,7 @@ Status MemoryStoreSingleton::DeleteRowsWithPrefix(Table table,
 }
 
 Status MemoryStoreSingleton::DeleteAllRows(Table table) {
-  ImplMapType& rows =
-      (table == kObservations ? observation_rows_ : report_rows_);
-  rows.clear();
+  GetRows(table).clear();
   return kOK;
 }
 

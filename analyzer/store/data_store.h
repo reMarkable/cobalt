@@ -36,6 +36,9 @@ enum Status {
   // The requested item was not found.
   kNotFound,
 
+  // The item being created already exists.
+  kAlreadyExists,
+
   // The operation requires a pre-condition which is not true.
   kPreconditionFailed,
 
@@ -62,11 +65,14 @@ class DataStore {
 
   // The different tables that are controlled by this data store.
   enum Table {
-    // The Observations table.
+    // The Observations table holds the Observations received from the Shuffler.
     kObservations,
 
-    // The Reports table.
-    kReports
+    // The ReportMetadata table holds metadata about reports.
+    kReportMetadata,
+
+    // The ReportRows table holds the actual rows of reports.
+    kReportRows,
   };
 
   virtual ~DataStore() = 0;
@@ -164,8 +170,8 @@ class DataStore {
   //     restriction.
   //
   // max_rows: At most |max_rows| rows will be returned. The number of
-  //    returned rows may be less than max_rows for several reasons. Must be
-  //    positive or kInvalidArguments will be returned.
+  //     returned rows may be less than max_rows for several reasons.
+  //     Must be positive or kInvalidArguments will be returned.
   virtual ReadResponse ReadRows(Table table, std::string start_row_key,
                                 bool inclusive, std::string limit_row_key,
                                 const std::vector<std::string>& column_names,

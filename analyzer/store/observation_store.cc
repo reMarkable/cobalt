@@ -47,7 +47,7 @@ std::string RowKey(uint32_t customer_id, uint32_t project_id,
                    uint32_t metric_id, uint32_t day_index, int64_t time,
                    uint32_t random) {
   // We write five ten-digit numbers, plus one twenty-digit number plus five
-  // columns. The string has size 76 to accommodate a trailing null character.
+  // colons. The string has size 76 to accommodate a trailing null character.
   std::string out(76, 0);
 
   // TODO(bittau, rudominer): the key should be binary (e.g., a big-endian

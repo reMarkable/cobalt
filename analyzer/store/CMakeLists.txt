@@ -24,7 +24,8 @@ add_library(analyzer_store
             data_store.cc
             memory_store.cc
             observation_store.cc
-            ${PROTO_SRCS} ${COBALT_PROTO_SRCS})
+            ${COBALT_PROTO_SRCS})
+
 
 target_link_libraries(analyzer_store
                       cobalt_crypto
@@ -56,4 +57,3 @@ add_executable(bigtable_cloud_tests
 target_link_libraries(bigtable_cloud_tests gtest gtest_main cobalt_analyzer)
 set_target_properties(bigtable_cloud_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})
-

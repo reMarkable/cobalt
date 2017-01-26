@@ -69,7 +69,8 @@ bool BigtableAdmin::WaitForConnected(
 
 bool BigtableAdmin::CreateTablesIfNecessary() {
   return CreateTableIfNecessary(kObservationsTableId) &&
-         CreateTableIfNecessary(kReportsTableId);
+         CreateTableIfNecessary(kReportMetadataTableId) &&
+         CreateTableIfNecessary(kReportRowsTableId);
 }
 
 bool BigtableAdmin::CreateTableIfNecessary(std::string table_id) {

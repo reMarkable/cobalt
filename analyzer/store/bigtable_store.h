@@ -79,7 +79,8 @@ class BigtableStore : public DataStore {
   std::unique_ptr<google::bigtable::v2::Bigtable::Stub> stub_;
   std::unique_ptr<google::bigtable::admin::v2::BigtableTableAdmin::Stub>
       admin_stub_;
-  std::string observations_table_name_, reports_table_name_;
+  std::string observations_table_name_, report_progress_table_name_,
+      report_rows_table_name_;
 };
 
 }  // namespace store
