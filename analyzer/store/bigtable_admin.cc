@@ -55,7 +55,8 @@ std::shared_ptr<BigtableAdmin> BigtableAdmin::CreateFromFlagsOrDie() {
 }
 
 BigtableAdmin::BigtableAdmin(
-    std::string uri, std::shared_ptr<grpc::ChannelCredentials> credentials,
+    const std::string& uri,
+    std::shared_ptr<grpc::ChannelCredentials> credentials,
     std::string project_name, std::string instance_name)
     : channel_(grpc::CreateChannel(uri, credentials)),
       stub_(BigtableTableAdmin::NewStub(channel_)),

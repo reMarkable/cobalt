@@ -39,7 +39,7 @@ class BigtableAdmin {
   // names read from flags.
   static std::shared_ptr<BigtableAdmin> CreateFromFlagsOrDie();
 
-  BigtableAdmin(std::string uri,
+  BigtableAdmin(const std::string& uri,
                 std::shared_ptr<grpc::ChannelCredentials> credentials,
                 std::string project_name, std::string instance_name);
 

@@ -14,9 +14,7 @@
 
 #include "analyzer/store/observation_store.h"
 
-#include <glog/logging.h>
-#include <sys/time.h>
-
+#include <chrono>
 #include <memory>
 #include <string>
 #include <utility>
@@ -25,6 +23,7 @@
 #include "./observation.pb.h"
 #include "analyzer/store/data_store.h"
 #include "analyzer/store/observation_store_internal.h"
+#include "glog/logging.h"
 #include "util/crypto_util/random.h"
 
 namespace cobalt {
@@ -44,8 +43,8 @@ namespace internal {
 
 // Returns the row key that encapsulates the given data.
 std::string RowKey(uint32_t customer_id, uint32_t project_id,
-                   uint32_t metric_id, uint32_t day_index, int64_t time,
-                   uint32_t random) {
+                   uint32_t metric_id, uint32_t day_index,
+                   uint64_t current_time_millis, uint32_t random) {
   // We write five ten-digit numbers, plus one twenty-digit number plus five
   // colons. The string has size 76 to accommodate a trailing null character.
   std::string out(76, 0);
@@ -54,7 +53,8 @@ std::string RowKey(uint32_t customer_id, uint32_t project_id,
   // encoding of the struct representing the key).  Right now it's human
   // readable for easy debugging.
   std::snprintf(&out[0], out.size(), "%.10u:%.10u:%.10u:%.10u:%.20lu:%.10u",
-                customer_id, project_id, metric_id, day_index, time, random);
+                customer_id, project_id, metric_id, day_index,
+                current_time_millis, random);
 
   // Discard the trailing null character.
   out.resize(75);
@@ -94,16 +94,21 @@ std::string RangeLimitKey(uint32_t customer_id, uint32_t project_id,
   }
 }
 
+// Returns the current time expressed as a number of milliseonds since the
+// Unix epoch.
+uint64_t CurrentTimeMillis() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::system_clock::now().time_since_epoch())
+      .count();
+}
+
 // Generates a new row key for a row with the given data.
 std::string GenerateNewRowKey(uint32_t customer_id, uint32_t project_id,
                               uint32_t metric_id, uint32_t day_index) {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  int64_t current_time = tv.tv_sec * 1000000UL + tv.tv_usec;
   cobalt::crypto::Random rand;
-  int32_t random = rand.RandomUint64();
-  return RowKey(customer_id, project_id, metric_id, day_index, current_time,
-                random);
+  int32_t random = rand.RandomUint32();
+  return RowKey(customer_id, project_id, metric_id, day_index,
+                CurrentTimeMillis(), random);
 }
 
 bool ParseEncryptedObservationPart(ObservationPart* observation_part,

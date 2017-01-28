@@ -19,8 +19,6 @@
 #include <string>
 #include <vector>
 
-// TODO(rudominer) Move ObservationMetadata into observation.proto
-#include "./encrypted_message.pb.h"
 #include "./observation.pb.h"
 #include "analyzer/store/data_store.h"
 
