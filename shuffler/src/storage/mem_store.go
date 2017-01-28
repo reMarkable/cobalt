@@ -1,21 +1,40 @@
+// Copyright 2016 The Fuchsia Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
-	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 
 	shufflerpb "cobalt"
 
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+
+	rand_util "util"
 )
+
+var randGen rand_util.Random
 
 // MemStore is an in-memory implementation of the Store interface.
 type MemStore struct {
-	// ObservationsMap is a map indexed by ObersvationMetadata to a list of
-	// ObservationInfo that contains sealed EncryptedMessages along with creation
-	// timestamp.
-	observationsMap map[string][]*ObservationInfo
+	// ObservationsMap is a map for storing observations. Map keys are serialized
+	// |ObservationMetadata| strings that point to a list of |ObservationVal|s.
+	observationsMap map[string][]*shufflerpb.ObservationVal
 
 	// mu is the global mutex that protects all elements of the store
 	mu sync.RWMutex
@@ -23,8 +42,10 @@ type MemStore struct {
 
 // NewMemStore creates an empty MemStore.
 func NewMemStore() *MemStore {
+	randGen = rand_util.NewDeterministicRandom(int64(1))
+
 	return &MemStore{
-		observationsMap: make(map[string][]*ObservationInfo),
+		observationsMap: make(map[string][]*shufflerpb.ObservationVal),
 	}
 }
 
@@ -34,103 +55,149 @@ func key(om *shufflerpb.ObservationMetadata) string {
 		return ""
 	}
 
-	// TODO(ukode) Change to a more efficient implementation that gives
-	// shorter keys.
 	return proto.CompactTextString(om)
 }
 
-// shuffle shuffles the list of ObservationInfos and returns a random ordering
-// of Observations that are sent to the Analyzer.
-func shuffle(obInfos []*ObservationInfo) []*ObservationInfo {
-	numObservations := len(obInfos)
+// shuffle returns a random ordering of input ObservationVals.
+func shuffle(obVals []*shufflerpb.ObservationVal) []*shufflerpb.ObservationVal {
+	numObservations := len(obVals)
 
 	// Get a random ordering for all messages. We assume that the random
 	// number generator is appropriately seeded.
 	perm := rand.Perm(numObservations)
 
-	shuffledObservations := make([]*ObservationInfo, numObservations)
+	shuffledObservations := make([]*shufflerpb.ObservationVal, numObservations)
 	for i, rnd := range perm {
-		shuffledObservations[i] = obInfos[rnd]
+		shuffledObservations[i] = obVals[rnd]
 	}
 
 	return shuffledObservations
 }
 
-// AddObservation inserts |observationInfo| into MemStore under the key
-// |metadata|.
-func (store *MemStore) AddObservation(om *shufflerpb.ObservationMetadata, obInfo *ObservationInfo) error {
+// AddAllObservations adds all of the encrypted observations in all of the
+// ObservationBatches in |envelopeBatch| to the store. New |ObservationVal|s
+// are created to hold the values and the given |arrivalDayIndex|. Returns a
+// non-nil error if the arguments are invalid or the operation fails.
+func (store *MemStore) AddAllObservations(envelopeBatch []*shufflerpb.ObservationBatch, dayIndex uint32) error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if om == nil {
-		return nil
+
+	for _, batch := range envelopeBatch {
+		if batch != nil {
+			om := batch.GetMetaData()
+			if om == nil {
+				return grpc.Errorf(codes.InvalidArgument, "One of the ObservationBatches did not have meta_data set")
+			}
+			for _, encryptedObservation := range batch.GetEncryptedObservation() {
+				if encryptedObservation == nil {
+					return grpc.Errorf(codes.InvalidArgument, "The ObservationBatch with key %v contained a Null encrypted_observation", om)
+				}
+
+				id, err := randGen.RandomUint63(1<<63 - 1)
+				if err != nil {
+					return grpc.Errorf(codes.Internal, "Error in generating unique identifier for key [%v]: %v", om, err)
+				}
+				store.observationsMap[key(om)] = append(store.observationsMap[key(om)], NewObservationVal(encryptedObservation, strconv.Itoa(int(id)), dayIndex))
+			}
+		}
 	}
 
-	store.observationsMap[key(om)] = append(store.observationsMap[key(om)], obInfo)
 	return nil
 }
 
-// GetObservations retrieves the list of ObservationInfos from MemStore
-// for the given |metadata| key.
-func (store *MemStore) GetObservations(om *shufflerpb.ObservationMetadata) ([]*ObservationInfo, error) {
+// GetObservations returns the shuffled list of ObservationVals from the
+// data store for the given |ObservationMetadata| key or returns an error.
+// TODO(ukode): If the returned resultset cannot fit in memory, the api
+// needs to be tweaked to return ObservationVals in batches.
+func (store *MemStore) GetObservations(om *shufflerpb.ObservationMetadata) ([]*shufflerpb.ObservationVal, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
 	if om == nil {
-		return nil, fmt.Errorf("Invalid metric [%v]", *om)
+		panic("om is nil")
 	}
 
-	obInfos, present := store.observationsMap[key(om)]
+	obVals, present := store.observationsMap[key(om)]
 	if !present {
-		return nil, fmt.Errorf("Metric %v doesn't exist in data store.", *om)
+		return nil, grpc.Errorf(codes.InvalidArgument, "Key %v not found", om)
 	}
-	// TODO(ukode) to make this more efficient. There is no reason to shuffle
-	// more than once. We should keep track of whether or not a shuffle is
-	// required.
-	return shuffle(obInfos), nil
+	// Shuffler data store layer guarantees that the list returned on Get() call
+	// is always shuffled. In memstore, this is acheieved by shuffling the
+	// |ObservationVal| result set.
+	return shuffle(obVals), nil
 }
 
-// GetKeys returns the list of unique ObservationMetadata keys stored in
-// MemStore.
-func (store *MemStore) GetKeys() []*shufflerpb.ObservationMetadata {
+// GetKeys returns the list of all |ObservationMetadata| keys stored in the
+// data store or returns an error.
+func (store *MemStore) GetKeys() ([]*shufflerpb.ObservationMetadata, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
 	keys := []*shufflerpb.ObservationMetadata{}
-	om := &shufflerpb.ObservationMetadata{}
 	for k := range store.observationsMap {
+		om := &shufflerpb.ObservationMetadata{}
 		err := proto.UnmarshalText(k, om)
 		if err != nil {
-			break
+			return nil, grpc.Errorf(codes.Internal, "Error in parsing keys: %v", err)
 		}
 		keys = append(keys, om)
 	}
-	return keys
+	return keys, nil
 }
 
-// EraseAll deletes both the |metadata| key and all it's ObservationInfos from
-// MemStore.
-func (store *MemStore) EraseAll(om *shufflerpb.ObservationMetadata) error {
+// DeleteValues deletes the given |ObservationVal|s for |ObservationMetadata|
+// key from the data store or returns an error.
+func (store *MemStore) DeleteValues(om *shufflerpb.ObservationMetadata, deleteObVals []*shufflerpb.ObservationVal) error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	delete(store.observationsMap, key(om))
+	if om == nil {
+		panic("om is nil")
+	}
+
+	obVals, present := store.observationsMap[key(om)]
+	if !present {
+		return grpc.Errorf(codes.InvalidArgument, "Key %v not found", om)
+	}
+
+	for _, deleteObVal := range deleteObVals {
+		for i := 0; i < len(obVals); i++ {
+			if deleteObVal.Id == obVals[i].Id {
+				obVals[i] = obVals[len(obVals)-1]
+				obVals[len(obVals)-1] = nil
+				obVals = obVals[:len(obVals)-1]
+			}
+		}
+	}
+	store.observationsMap[key(om)] = obVals
+	if len(obVals) == 0 {
+		delete(store.observationsMap, key(om))
+	}
 	return nil
 }
 
-// GetNumObservations returns the count of ObservationInfos for a given
-// |metadata| key.
+// GetNumObservations returns the total count of ObservationVals in the data
+// store for the given |ObservationMmetadata| key or returns an error.
 func (store *MemStore) GetNumObservations(om *shufflerpb.ObservationMetadata) (int, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
 	if om == nil {
-		return 0, fmt.Errorf("Invalid metric: [%v]", *om)
+		panic("om is nil")
 	}
 
-	obInfos, present := store.observationsMap[key(om)]
+	obVals, present := store.observationsMap[key(om)]
 	if !present {
-		return 0, fmt.Errorf("Metric %v doesn't exist in data store.", *om)
+		return 0, grpc.Errorf(codes.InvalidArgument, "Key %v not found", om)
 	}
 
-	return len(obInfos), nil
+	return len(obVals), nil
+}
+
+// Reset clears the existing in-memory state for |store|.
+func (store *MemStore) Reset() {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	store.observationsMap = make(map[string][]*shufflerpb.ObservationVal)
 }

@@ -15,11 +15,7 @@
 package dispatcher
 
 import (
-	"crypto/rand"
-	"fmt"
 	"reflect"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -27,217 +23,258 @@ import (
 	"storage"
 )
 
-func TestReadyToDispatch(t *testing.T) {
-	now := time.Now()
-
-	// Dispatch frequency set to 0, always dispatch!
-	if !readyToDispatch(0, &now) {
-		t.Errorf("No interval specified, dispatch should always happen!")
-	}
-
-	// Dispatch frequency set to 1 hour, dispatch attempt should fail and last
-	// timestamp must not be updated.
-	if readyToDispatch(1, &now) {
-		t.Errorf("Dispatch attempt must fail, as there is one dispatch attempt in the last 1 hour.")
-	}
-
-	// Set the dispatch frequency to 1 hour, and validate that readyToDispatch
-	// returns true as the elapsed time is greater than 1 hour.
-	oneDayAgo := time.Unix(now.Unix()-(60*60*24*1), 0)
-	if !readyToDispatch(1, &oneDayAgo) {
-		t.Errorf("Dispatch attempt must succeed, as the last dispatch attempt happened more than an hour ago.")
-	}
-
-	// Assert that last timestamp has been modified to the current time.
-	if uint32(now.Sub(oneDayAgo).Hours()) != 0 {
-		t.Errorf("Last dispatch timestamp must be updated to current time.")
-	}
-
-	// Dispatch frequency set to 0, always dispatch!
-	if !readyToDispatch(0, &now) {
-		t.Errorf("No interval specified, multiple dispatch events can happen within the same hour!")
-	}
-}
-
-// createRandomObservationInfo constructs fake |ObservationInfo| for testing.
-func createRandomObservationInfo(pubKey string, ts time.Time) *storage.ObservationInfo {
-	var bytes = make([]byte, 20)
-	rand.Read(bytes)
-	return &storage.ObservationInfo{
-		CreationTimestamp: ts,
-		EncryptedMessage: &shufflerpb.EncryptedMessage{
-			Scheme:     shufflerpb.EncryptedMessage_NONE,
-			PubKey:     pubKey,
-			Ciphertext: bytes},
-	}
-}
-
-func createTestStore(numObservations int) (storage.Store, *shufflerpb.ObservationMetadata, []*storage.ObservationInfo) {
-	store := storage.NewMemStore()
-
-	// Add same observations
-	key := &shufflerpb.ObservationMetadata{
-		CustomerId: uint32(2),
-		ProjectId:  uint32(22),
-		MetricId:   uint32(222),
-		DayIndex:   uint32(3),
-	}
-
-	now := time.Now()
-
-	var obInfos []*storage.ObservationInfo
-	num := int(numObservations / 3)
-
-	//create 10 with current time
-	for i := 0; i < num; i++ {
-		obInfos = append(obInfos, createRandomObservationInfo(strings.Join([]string{"pubkey", strconv.Itoa(i)}, "_"), now))
-	}
-
-	//create 10 with 3 days ago as the creation timestamp
-	for i := 0; i < num; i++ {
-		obInfos = append(obInfos, createRandomObservationInfo(strings.Join([]string{"pubkey", strconv.Itoa(i)}, "_"), time.Unix(now.Unix()-(60*60*24*3), 0)))
-	}
-
-	//create 10 with 1 day ago as the creation timestamp
-	for i := 0; i < num; i++ {
-		obInfos = append(obInfos, createRandomObservationInfo(strings.Join([]string{"pubkey", strconv.Itoa(i)}, "_"), time.Unix(now.Unix()-(60*60*24*1), 0)))
-	}
-
-	for _, obInfo := range obInfos {
-		if err := store.AddObservation(key, obInfo); err != nil {
-			fmt.Printf("got error %v, expected AddObservation to be a success", err)
-		}
-	}
-
-	return store, key, obInfos
-}
-
-func TestGetObservationBatchChunk(t *testing.T) {
-	key := &shufflerpb.ObservationMetadata{
-		CustomerId: uint32(1),
-		ProjectId:  uint32(11),
-		MetricId:   uint32(111),
-		DayIndex:   uint32(2),
-	}
-
-	var obInfos []*storage.ObservationInfo
-	for i := 0; i < 30; i++ {
-		obInfos = append(obInfos, createRandomObservationInfo(strings.Join([]string{"pubkey", strconv.Itoa(i)}, "_"), time.Now()))
-	}
-
-	// Retrieve a chunk of size 5 and assert the starting msg and the size of the
-	// batch returned.
-	chunkSize := 5
-	obBatch := getObservationBatchChunk(key, obInfos, 5, 10)
-	encMsgList := obBatch.EncryptedObservation
-	if len(encMsgList) != chunkSize {
-		t.Errorf("Got chunk of size [%v], expected [%d]", len(encMsgList), chunkSize)
-	}
-
-	if !reflect.DeepEqual(encMsgList[0], obInfos[5].EncryptedMessage) {
-		t.Errorf("Got [%v], expected [%v]", encMsgList[0], obInfos[5].EncryptedMessage)
-	}
-}
-
-func TestUpdateObservations(t *testing.T) {
-	store, key, obInfos := createTestStore(30)
-
-	var obInfosLen int
-	var err error
-	if obInfosLen, err = store.GetNumObservations(key); err != nil {
-		t.Errorf("got error [%v], expected multiple observations", err)
-	} else {
-		if obInfosLen <= 1 {
-			t.Errorf("got [%d] ObservationInfos, expected more than one ObservationInfo per metric", obInfosLen)
-		}
-	}
-
-	err = updateObservations(store, key, obInfos, uint32(2))
-	if err != nil {
-		t.Errorf("Expected successful update, got error [%v]", err)
-	}
-
-	if obInfosLen, err = store.GetNumObservations(key); err != nil {
-		t.Errorf("got error [%v], expected 20 observations", err)
-	} else {
-		if obInfosLen != 20 {
-			t.Errorf("got [%d] ObservationInfos, expected 20 filtered ObservationInfos after disposing 10 observations", obInfosLen)
-		}
-	}
-}
-
-// This is a fake Analyzer object that just caches the Observations in the order
-// they are received. This lets us verify the output of the dispatcher.
-type MockAnalyzer struct {
+// This is a fake Analyzer transport client that just caches the Observations
+// in the order they are received. This lets us verify the output of the
+// dispatcher.
+type fakeAnalyzerTransport struct {
 	obBatch []*shufflerpb.ObservationBatch
 	numSent int
 }
 
-func (a *MockAnalyzer) send(obBatch *shufflerpb.ObservationBatch) error {
+func (a *fakeAnalyzerTransport) send(obBatch *shufflerpb.ObservationBatch) error {
+	if obBatch == nil {
+		return nil
+	}
+
 	a.numSent++
 	a.obBatch = append(a.obBatch, obBatch)
 	return nil
 }
 
-func TestDispatch(t *testing.T) {
+func (a *fakeAnalyzerTransport) close() {
+	// do nothing
+}
+
+func (a *fakeAnalyzerTransport) reconnect() {
+	// do nothing
+}
+
+// makeTestStore returns a sample test store with |numObservations| for a single
+// ObservationMetadata key and its generated |obVals| or an error.
+//
+// The observations are divided in such a way that first 1/4th of the
+// observations are generated for the |currentDayIndex|, next 1/4th are
+// generated for |currentDayIndex - 1| and so on spanning a range of 4
+// dayIndexes.
+//
+// The test store created is an in-memory store if |useMemStore| is true.
+// Otherwise, a LevelDB persistent store is used.
+func makeTestStore(numObservations int, currentDayIndex uint32, useMemStore bool) (storage.Store, *shufflerpb.ObservationMetadata, []*shufflerpb.ObservationVal, error) {
+	var store storage.Store
+	var err error
+	if useMemStore {
+		store = storage.NewMemStore()
+	} else {
+		if store, err = storage.NewLevelDBStore("/tmp"); err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	om := storage.NewObservationMetaData(22)
+	dayIndexRange := []uint32{
+		currentDayIndex - 1,
+		currentDayIndex - 2,
+		currentDayIndex - 3,
+		currentDayIndex - 4}
+	for _, di := range dayIndexRange {
+		batch := &shufflerpb.ObservationBatch{
+			MetaData:             om,
+			EncryptedObservation: storage.MakeRandomEncryptedMsgs(numObservations / 4),
+		}
+
+		if err = store.AddAllObservations([]*shufflerpb.ObservationBatch{batch}, di); err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	obVals, err := store.GetObservations(om)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return store, om, obVals, nil
+}
+
+// newTestDispatcher generates a new dispatcher using test configuration for
+// the given |batchSize|, |threshold|, |frequencyInHours| and |store| values.
+//
+// Panics if |store| is not set.
+func newTestDispatcher(store storage.Store, batchSize int, threshold int, frequencyInHours int) *Dispatcher {
+	if store == nil {
+		panic("store is nil")
+	}
+
 	// testconfig for immediate dispatch for smaller batches
 	testConfig := &shufflerpb.ShufflerConfig{}
 	testConfig.GlobalConfig = &shufflerpb.Policy{
-		FrequencyInHours: 0,
+		FrequencyInHours: uint32(frequencyInHours),
 		PObservationDrop: 0.0,
-		Threshold:        0,
+		Threshold:        uint32(threshold),
 		AnalyzerUrl:      "localhost",
 		DisposalAgeDays:  100,
 	}
 
-	// Test dispatch for different batch sizes
-	num := 30
-	analyzer := MockAnalyzer{numSent: 0}
+	analyzerTransport := fakeAnalyzerTransport{numSent: 0}
+	return &Dispatcher{
+		store:             store,
+		config:            testConfig,
+		batchSize:         batchSize,
+		analyzerTransport: &analyzerTransport,
+		lastDispatchTime:  time.Now(),
+	}
+}
 
-	for _, batchSize := range []int{1, 15, 30, 100} {
-		// Generate test store with |num| entries
-		store, key, obInfos := createTestStore(num)
-		if len(obInfos) != num {
-			t.Errorf("BatchSize: [%d], got observations [%v], expected [%v]", batchSize, len(obInfos), num)
-		}
-
-		dispatchInternal(testConfig, store, batchSize, &analyzer)
-
-		// check if all msgs are sent
-		if num >= batchSize {
-			if len(analyzer.obBatch) != num/batchSize {
-				t.Errorf("BatchSize: [%d], unexpected number of observations dispatched, got [%v] expected [%v]", batchSize, len(analyzer.obBatch), num)
-			}
-		} else if len(analyzer.obBatch) != 1 {
-			t.Errorf("BatchSize: [%d], expected all observations to be sent at once, got [%v] expected [1]", batchSize, len(analyzer.obBatch))
-		}
-		// check if the data is sent in batches based on batchSize
-		if num >= batchSize {
-			if analyzer.numSent != num/batchSize {
-				t.Errorf("BatchSize: [%d], unexpected number of analyzer send calls, got [%d], want [%d]", batchSize, analyzer.numSent, num/batchSize)
-			}
-		} else if analyzer.numSent != 1 {
-			t.Errorf("BatchSize: [%d], expected all observations to be sent at once, got [%d], want [1]", batchSize, analyzer.numSent)
-		}
-		// make sure that all sent msgs are deleted from the Shuffler datastore
-		if obInfosLen, err := store.GetNumObservations(key); err == nil || obInfosLen > 0 {
-			t.Errorf("BatchSize: [%d], got error [%v] and bucketSize [%d], expected empty observations in the store", batchSize, err, obInfosLen)
-		}
-		analyzer.numSent = 0
-		analyzer.obBatch = nil
+// getAnalyzerTransport returns analyzerTransport handle from the given
+// Dispatcher |d|.
+func getAnalyzerTransport(d *Dispatcher) *fakeAnalyzerTransport {
+	if d == nil {
+		panic("dispatcher is nil")
 	}
 
-	// Test dispatch for different thresholds
-	batchSize := 30
-	for _, threshold := range []int{1, 10, 30, 100} {
-		testConfig.GlobalConfig.Threshold = uint32(threshold)
-		// Generate test store with |num| entries
-		store, key, obInfos := createTestStore(num)
-		if len(obInfos) != num {
-			t.Errorf("Threshold: [%d], got observations [%v], expected [%v]", threshold, len(obInfos), num)
+	switch a := d.analyzerTransport.(type) {
+	case *fakeAnalyzerTransport:
+		return a
+	default:
+		panic("unsupported store type")
+	}
+}
+
+// doTestDeleteOldObservations tests deleteOldObservations() method.
+func doTestDeleteOldObservations(t *testing.T, useMemStore bool) {
+	const num = 4
+	const currentDayIndex = 10
+
+	store, key, obVals, err := makeTestStore(num, currentDayIndex, useMemStore)
+	if err != nil {
+		t.Fatalf("got error [%v] in test store setup", err)
+	}
+
+	var obValsLen int
+	if obValsLen, err = store.GetNumObservations(key); err != nil {
+		t.Errorf("got error [%v], expected multiple observations", err)
+	} else {
+		if obValsLen != len(obVals) {
+			t.Errorf("got [%d] ObservationVals, expected [%d] ObservationVal", obValsLen, len(obVals))
+		}
+	}
+
+	// make test dispatcher by setting threshold and frequency to "0" and
+	// batchsize to max |num| for immediate dispatch.
+	d := newTestDispatcher(store, num, 0, 0)
+
+	// dispose off any older messages that have a dayIndex less than "2". This
+	// list will contain exactly half the observations that are saved in the
+	// store.
+	disposalAgeInDays := uint32(2)
+	err = d.deleteOldObservations(key, currentDayIndex, disposalAgeInDays)
+	if err != nil {
+		t.Errorf("Expected successful update, got error [%v]", err)
+		return
+	}
+
+	if obValsLen, err = d.store.GetNumObservations(key); err != nil {
+		t.Errorf("got error [%v], expected [%d] observations", err, num/2)
+	} else {
+		if obValsLen != num/2 {
+			t.Errorf("got [%d] ObservationVals, expected [%d] filtered ObservationVals after disposing older observations", obValsLen, num/2)
+		}
+	}
+
+	// reset store
+	storage.ResetStoreForTesting(d.store, true)
+}
+
+// doTestDispatchInBatches tests dispatch() method using varying |batchSize|s.
+func doTestDispatchInBatches(t *testing.T, useMemStore bool) {
+	const num = 40
+	const currentDayIndex = 10
+
+	// Test dispatch for different batch sizes
+	for _, batchSize := range []int{1, 10, 20, 40, 100} {
+		// Recreate the test store with |num| entries for every run as they get
+		// deleted after every successful dispatch attempt.
+		store, key, obVals, err := makeTestStore(num, currentDayIndex, useMemStore)
+		if err != nil {
+			t.Fatalf("got error [%v] in test store setup", err)
 		}
 
-		dispatchInternal(testConfig, store, batchSize, &analyzer)
+		if len(obVals) != num {
+			t.Errorf("BatchSize: [%d], got observations [%v], expected [%v]", batchSize, len(obVals), num)
+		}
+
+		// run dispatcher by setting threshold and frequency to "0" and different
+		// batchsizes.
+		d := newTestDispatcher(store, batchSize, 0, 0)
+		analyzer := getAnalyzerTransport(d)
+		d.Dispatch()
+
+		// Assert that last timestamp has been modified to the current time.
+		now := time.Now()
+		if uint32(d.lastDispatchTime.Sub(now).Minutes()) != 0 {
+			t.Errorf("got last dispatch time [%v], expected last dispatch time [%v] to be updated to current", d.lastDispatchTime, now)
+		}
+
+		// check if all msgs are sent
+		if num >= d.batchSize {
+			if len(analyzer.obBatch) != num/d.batchSize {
+				t.Errorf("BatchSize: [%d], unexpected number of observations dispatched, got [%v] expected [%v]", d.batchSize, len(analyzer.obBatch), num)
+			}
+		} else if len(analyzer.obBatch) != 1 {
+			t.Errorf("BatchSize: [%d], expected all observations to be sent at once, got [%v] expected [1]", d.batchSize, len(analyzer.obBatch))
+		}
+
+		// check if the data is sent in batches based on batchSize
+		if num >= d.batchSize {
+			if analyzer.numSent != num/d.batchSize {
+				t.Errorf("BatchSize: [%d], unexpected number of analyzer send calls, got [%d], want [%d]", d.batchSize, analyzer.numSent, num/d.batchSize)
+			}
+		} else if analyzer.numSent != 1 {
+			t.Errorf("BatchSize: [%d], expected all observations to be sent at once, got [%d], want [1]", d.batchSize, analyzer.numSent)
+		}
+
+		// check if all the sent msgs are deleted from the Shuffler datastore
+		if obValsLen, _ := d.store.GetNumObservations(key); obValsLen != 0 {
+			t.Errorf("BatchSize: [%d], got [%d] observations, expected [0] observations in the store for meatdata [%v]", d.batchSize, obValsLen, key)
+		}
+
+		// reset analyzer
+		analyzer.numSent = 0
+		analyzer.obBatch = nil
+
+		// reset store
+		storage.ResetStoreForTesting(d.store, true)
+	}
+}
+
+// doTestDispatchInBatches tests dispatch() method using varying |threshold|
+// limits.
+func doTestDispatchBasedOnThresholds(t *testing.T, useMemStore bool) {
+	const num = 40
+	const currentDayIndex = 10
+
+	// Test dispatch for different thresholds
+	for _, threshold := range []int{1, 10, 20, 40, 80, 100} {
+		// Recreate the test store with |num| entries for every run as they get
+		// deleted after every successful dispatch attempt.
+		store, key, obVals, err := makeTestStore(num, currentDayIndex, useMemStore)
+		if err != nil {
+			t.Fatalf("got error [%v] in test store setup", err)
+		}
+
+		if len(obVals) != num {
+			t.Errorf("Threshold: [%d], got observations [%v], expected [%v]", threshold, len(obVals), num)
+		}
+
+		// run dispatcher with frequency set to "0" and batchsize set to the max
+		// chunk size - "num" for sending all messages at once in one large batch.
+		d := newTestDispatcher(store, num, threshold, 0)
+		analyzer := getAnalyzerTransport(d)
+		d.Dispatch()
+
+		// Assert that last timestamp has been modified to the current time.
+		now := time.Now()
+		if uint32(d.lastDispatchTime.Sub(now).Minutes()) != 0 {
+			t.Errorf("got last dispatch time [%v], expected last dispatch time [%v] to be updated to current", d.lastDispatchTime, now)
+		}
 
 		if num < threshold {
 			if analyzer.numSent != 0 {
@@ -250,11 +287,119 @@ func TestDispatch(t *testing.T) {
 			}
 
 			// make sure that all sent msgs are deleted from the Shuffler datastore
-			if obInfosLen, err := store.GetNumObservations(key); err == nil || obInfosLen > 0 {
-				t.Errorf("Threshold: [%d], got error [%v] and bucketSize [%d], expected empty observations in the store", threshold, err, obInfosLen)
+			if obValsLen, _ := store.GetNumObservations(key); obValsLen != 0 {
+				t.Errorf("Threshold: [%d], got [%d] observations, expected [0] observations in the store for meatdata [%v]", threshold, obValsLen, key)
 			}
 		}
+
+		// reset analyzer
 		analyzer.numSent = 0
 		analyzer.obBatch = nil
+
+		// reset store
+		storage.ResetStoreForTesting(store, true)
+	}
+}
+
+func TestDeleteOldObservationsForMemStore(t *testing.T) {
+	doTestDeleteOldObservations(t, true)
+}
+
+func TestDeleteOldObservationsForLevelDBStore(t *testing.T) {
+	doTestDeleteOldObservations(t, false)
+}
+
+func TestDispatchInBatchesForMemStore(t *testing.T) {
+	doTestDispatchInBatches(t, true)
+}
+
+func TestDispatchInBatchesForLevelDBStore(t *testing.T) {
+	doTestDispatchInBatches(t, false)
+}
+
+func TestThresholdBasedDispatchForMemStore(t *testing.T) {
+	doTestDispatchBasedOnThresholds(t, true)
+}
+
+func TestThresholdBasedDispatchForLevelDBStore(t *testing.T) {
+	doTestDispatchBasedOnThresholds(t, false)
+}
+
+func TestComputeWaitTime(t *testing.T) {
+	// create a test dispatcher with all defaults
+	d := newTestDispatcher(storage.NewMemStore(), 1, 0, 0)
+
+	now := time.Now()
+
+	// Dispatch frequency set to 0, always dispatch!
+	if d.computeWaitTime(now) != 0 {
+		t.Errorf("No interval specified, dispatch should always happen!")
+	}
+
+	// Testcase for wait
+	// Set dispatch frequency to 1 hour, dispatch attempt should fail and last
+	// timestamp should not be updated.
+	lastDispatch := d.lastDispatchTime
+	d.config.GlobalConfig.FrequencyInHours = uint32(1)
+	waitTimeInS := d.computeWaitTime(now)
+	if int(waitTimeInS) > 0 {
+		t.Errorf("got waitTime [%f], expected waitTime [0] as the last dispatch attempt happened in the past 1 hour [%v]", waitTimeInS, d.lastDispatchTime)
+	}
+
+	if !d.lastDispatchTime.Equal(lastDispatch) {
+		t.Errorf("got last dispatch time [%v], expected last dispatch time [%v]", d.lastDispatchTime, lastDispatch)
+	}
+
+	// Testcase for dispatch
+	// Set the dispatch frequency to 1 hour and last dispatch attempt to one day
+	// ago. computeWaitTime should return 0 waitTime and last dispatch time must
+	// be updated.
+	oneDayAgo := time.Unix(now.Unix()-(60*60*24*1), 0) // one day ago
+	d.lastDispatchTime = oneDayAgo
+	d.config.GlobalConfig.FrequencyInHours = uint32(1)
+	if d.computeWaitTime(now) != 0 {
+		t.Errorf("got last dispatch time [%v], expected immediate dispatch for frequency interval [%d]", d.lastDispatchTime, d.config.GlobalConfig.FrequencyInHours)
+	}
+
+	// Reset dispatch frequency to 0, dispatch should succeed.
+	d.config.GlobalConfig.FrequencyInHours = uint32(0)
+	currTime := time.Now()
+	if d.computeWaitTime(currTime) > 0 {
+		t.Errorf("got last dispatch time [%v], expected immediate dispatch for frequency interval [%d]", d.lastDispatchTime, d.config.GlobalConfig.FrequencyInHours)
+	}
+}
+
+func TestMakeBatch(t *testing.T) {
+	dayIndex := storage.GetDayIndexUtc(time.Now())
+	key := &shufflerpb.ObservationMetadata{
+		CustomerId: uint32(1),
+		ProjectId:  uint32(11),
+		MetricId:   uint32(111),
+		DayIndex:   dayIndex,
+	}
+	obVals := storage.MakeRandomObservationVals(30)
+
+	// Retrieve a chunk of size 5 and assert the starting msg and the size of the
+	// batch returned.
+	chunkSize := 5
+	obBatch := makeBatch(key, obVals, 5, 10)
+	encMsgList := obBatch.EncryptedObservation
+	if len(encMsgList) != chunkSize {
+		t.Errorf("Got chunk of size [%v], expected [%d]", len(encMsgList), chunkSize)
+	}
+
+	if !reflect.DeepEqual(encMsgList[0], obVals[5].EncryptedObservation) {
+		t.Errorf("Got [%v], expected [%v]", encMsgList[0], obVals[5].EncryptedObservation)
+	}
+
+	obBatch = makeBatch(key, obVals, 27, 32)
+	encMsgList = obBatch.EncryptedObservation
+	if len(encMsgList) != 3 {
+		t.Errorf("Got chunk size [%v], expected chunk size [3]", len(encMsgList))
+		return
+	}
+
+	if !reflect.DeepEqual(encMsgList[0], obVals[27].EncryptedObservation) {
+		t.Errorf("Got [%v], expected [%v]", encMsgList[0], obVals[27].EncryptedObservation)
 	}
 }

@@ -19,47 +19,55 @@ import (
 	"time"
 )
 
-// ObservationInfo is the value stored in the Shuffler data store. It contains
-// the sealed encrypted message blob and the timestamp when it was added to the
-// store.
-type ObservationInfo struct {
-	CreationTimestamp time.Time
-	EncryptedMessage  *shufflerpb.EncryptedMessage
-}
-
-// MakeObservationInfo constructs ObservationInfo from the |encryptedMessage|.
-func MakeObservationInfo(encryptedMessage *shufflerpb.EncryptedMessage) *ObservationInfo {
-	if encryptedMessage == nil {
-		return nil
-	}
-	return &ObservationInfo{
-		CreationTimestamp: time.Now(),
-		EncryptedMessage:  encryptedMessage,
-	}
-}
-
 // Store is a generic Shuffler data store interface to store and retrieve data
 // from a local in-memory or persistent data store. Data store contains
-// ObservationMetadata as keys and the corresponding list of ObservationInfos
+// |ObservationMetadata| as keys and the corresponding list of |ObservationVal|
 // as values.
 type Store interface {
-	// AddObservation inserts |observationInfo| into the data store under the key
-	// |metadata|.
-	AddObservation(metadata *shufflerpb.ObservationMetadata, observationInfo *ObservationInfo) error
+	// AddAllObservations adds all of the encrypted observations in all of the
+	// ObservationBatches in |envelopeBatch| to the store. New |ObservationVal|s
+	// are created to hold the values and the given |arrivalDayIndex|. Returns a
+	// non-nil error if the arguments are invalid or the operation fails.
+	AddAllObservations(envelopeBatch []*shufflerpb.ObservationBatch, arrivalDayIndex uint32) error
 
-	// GetObservations retrieves the shuffled list of ObservationInfos from the
-	// data store for the given |metadata| key.
-	GetObservations(metadata *shufflerpb.ObservationMetadata) ([]*ObservationInfo, error)
+	// GetObservations returns a *shuffled* list of ObservationVals from the
+	// data store for the given |ObservationMetadata| key or returns an error.
+	// TODO(ukode): If the returned resultset cannot fit in memory, the api
+	// needs to be tweaked to return ObservationVals in batches.
+	GetObservations(metadata *shufflerpb.ObservationMetadata) ([]*shufflerpb.ObservationVal, error)
 
-	// GetNumObservations returns the count of ObservationInfos for a given
-	// |metadata| key.
+	// GetNumObservations returns the total count of ObservationVals in the data
+	// store for the given |ObservationMmetadata| key or returns an error.
 	GetNumObservations(metadata *shufflerpb.ObservationMetadata) (int, error)
 
-	// GetKeys returns the list of unique ObservationMetadata keys stored in the
-	// data store.
-	GetKeys() []*shufflerpb.ObservationMetadata
+	// GetKeys returns the list of all |ObservationMetadata| keys stored in the
+	// data store or returns an error.
+	GetKeys() ([]*shufflerpb.ObservationMetadata, error)
 
-	// EraseAll deletes both the |metadata| key and all it's ObservationInfos
-	// from the data store.
-	EraseAll(metadata *shufflerpb.ObservationMetadata) error
+	// DeleteValues deletes the given |ObservationVal|s for |ObservationMetadata|
+	// key from the data store or returns an error.
+	DeleteValues(metadata *shufflerpb.ObservationMetadata, obVals []*shufflerpb.ObservationVal) error
+}
+
+// GetDayIndexUtc returns the day_index corresponding to the given Time |t|
+// in the UTC time zone.
+func GetDayIndexUtc(t time.Time) uint32 {
+	epochTime := time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)
+	return uint32(t.Sub(epochTime).Hours() / 24)
+}
+
+// NewObservationVal constructs an ObservationVal from the given
+// |encryptedMessage|, |arrivalDayIndex| and |id| which should be a unique
+// identifier for the new |ObservationVal|. Panics if |encryptedMessage|
+// is nil.
+func NewObservationVal(encryptedMessage *shufflerpb.EncryptedMessage, id string, arrivalDayIndex uint32) *shufflerpb.ObservationVal {
+	if encryptedMessage == nil {
+		panic("invalid encrypted message")
+	}
+
+	return &shufflerpb.ObservationVal{
+		Id:                   id,
+		ArrivalDayIndex:      arrivalDayIndex,
+		EncryptedObservation: encryptedMessage,
+	}
 }

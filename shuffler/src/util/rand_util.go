@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/big"
 	mathrand "math/rand"
+	"sync"
 )
 
 // Random is an interface that provides utility functions for generating random
@@ -37,6 +38,7 @@ type Random interface {
 // DeterministicRandom uses a deterministic PRNG to generate random values
 // using the less secure "math/rand" library apis.
 type DeterministicRandom struct {
+	mu   sync.RWMutex
 	rand *mathrand.Rand
 }
 
@@ -51,6 +53,8 @@ func NewDeterministicRandom(seed int64) *DeterministicRandom {
 // distribution or error if the underlying source of entropy fails.
 func (r *DeterministicRandom) RandomBytes(num uint32) ([]byte, error) {
 	var bytes = make([]byte, num)
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	_, err := r.rand.Read(bytes)
 	return bytes, err
 }
@@ -62,6 +66,9 @@ func (r *DeterministicRandom) RandomUint63(max uint64) (uint64, error) {
 	if max <= 0 || max >= 1<<63 {
 		return 0, fmt.Errorf("Invalid |max| value [%v]", max)
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	// Int63n returns a non-negative int64 pseudo-random number in [0,max).
 	return uint64(r.rand.Int63n(int64(max))), nil

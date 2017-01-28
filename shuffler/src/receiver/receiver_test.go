@@ -16,7 +16,6 @@ package receiver
 
 import (
 	"context"
-	"crypto/rand"
 	"reflect"
 	"testing"
 
@@ -27,127 +26,85 @@ import (
 	"util"
 )
 
-func generateEnvelope(pubKey string, numBatches int) *shufflerpb.Envelope {
-	var bytes = make([]byte, 20)
-	// TODO(ukode): Return encrypted envelopes once PKE library is integrated.
-	var eMsgList []*shufflerpb.EncryptedMessage
-	for i := 0; i < numBatches; i++ {
-		rand.Read(bytes)
-		eMsgList = append(eMsgList, &shufflerpb.EncryptedMessage{
-			Scheme:     shufflerpb.EncryptedMessage_NONE,
-			PubKey:     pubKey,
-			Ciphertext: bytes,
-		})
-	}
-	return &shufflerpb.Envelope{
-		Batch: []*shufflerpb.ObservationBatch{
-			&shufflerpb.ObservationBatch{
-				MetaData: &shufflerpb.ObservationMetadata{
-					CustomerId: uint32(2),
-					ProjectId:  uint32(22),
-					MetricId:   uint32(222),
-					DayIndex:   uint32(3),
-				},
-				EncryptedObservation: eMsgList,
-			},
-		},
-	}
-}
-
-func generateEnvelopeForHybridObservations(pubKey string) *shufflerpb.Envelope {
-	var bytes = make([]byte, 20)
+// makeEnvelope creates an Envelope containing |numBatches| ObservationBatches
+// containing |numObservationsPerBatch| EncryptedMessages each containing
+// random ciphertext bytes.
+func makeEnvelope(numBatches int, numObservationsPerBatch int) *shufflerpb.Envelope {
 	var batch []*shufflerpb.ObservationBatch
-	// TODO(ukode): Return encrypted envelopes once PKE library is integrated.
-	for i := 1; i <= 10; i++ {
-		var eMsgList []*shufflerpb.EncryptedMessage
-		for j := 0; j < 5; j++ {
-			rand.Read(bytes)
-			eMsgList = append(eMsgList, &shufflerpb.EncryptedMessage{
-				Scheme:     shufflerpb.EncryptedMessage_NONE,
-				PubKey:     pubKey,
-				Ciphertext: bytes,
-			})
-		}
-
+	for i := 1; i <= numBatches; i++ {
 		batch = append(batch, &shufflerpb.ObservationBatch{
-			MetaData: &shufflerpb.ObservationMetadata{
-				CustomerId: uint32(i + 10),
-				ProjectId:  uint32(i + 100),
-				MetricId:   uint32(i + 1000),
-				DayIndex:   uint32(i % 7),
-			},
-			EncryptedObservation: eMsgList,
+			MetaData:             storage.NewObservationMetaData(i),
+			EncryptedObservation: storage.MakeRandomEncryptedMsgs(numObservationsPerBatch),
 		})
 	}
 
 	return &shufflerpb.Envelope{Batch: batch}
 }
 
-func TestProcess(t *testing.T) {
-	testShuffler := ShufflerServer{}
-	store := storage.NewMemStore()
-	initializeDataStore(store)
-
-	pubKey := "test_pub_key_1"
+// makeTestEnvelopes creates sample envelopes with different configuration for
+// testing.
+func makeTestEnvelopes() []*shufflerpb.Envelope {
 	emptyEnvelope := &shufflerpb.Envelope{}
-	singleEnvelope := generateEnvelope(pubKey, 0)
-	multiEnvelope := generateEnvelope(pubKey, 7)
-	hybridEnvelope := generateEnvelopeForHybridObservations(pubKey)
-	testEnvelopes := []*shufflerpb.Envelope{emptyEnvelope, singleEnvelope, multiEnvelope, hybridEnvelope}
+	envelopeWithOneObservation := makeEnvelope(1, 1)
+	envelopeWithMultipleObservations := makeEnvelope(1, 7)
+	envelopeWithHybridObservations := makeEnvelope(10, 5)
+	return []*shufflerpb.Envelope{emptyEnvelope, envelopeWithOneObservation, envelopeWithMultipleObservations, envelopeWithHybridObservations}
+}
 
-	for _, envelope := range testEnvelopes {
-		data, err := proto.Marshal(envelope)
-		if err != nil {
-			t.Fatalf("Error in marshalling envelope data: %v", err)
-		}
-		c := util.NoOpCrypter{}
-		eMsg := &shufflerpb.EncryptedMessage{
-			Scheme:     shufflerpb.EncryptedMessage_NONE,
-			PubKey:     pubKey,
-			Ciphertext: c.Encrypt(data, pubKey),
-		}
-
-		_, err = testShuffler.Process(context.Background(), eMsg)
-		if err != nil {
-			t.Fatalf("Expected success, got error: %v", err)
-		}
-
-		var om *shufflerpb.ObservationMetadata
-		for _, batch := range envelope.GetBatch() {
-			om = batch.GetMetaData()
-			numObservations := len(batch.GetEncryptedObservation())
-			if obInfoSize, sErr := store.GetNumObservations(om); sErr != nil {
-				if numObservations != 0 {
-					t.Errorf("got error %v, expected some saved observations", sErr)
-				}
-			} else {
-				if obInfoSize != numObservations {
-					t.Errorf("got observation count [%d], expected only one observation", obInfoSize)
-				}
-			}
-
-			var gotObInfos []*storage.ObservationInfo
-			if gotObInfos, err = store.GetObservations(om); err != nil {
-				if numObservations != 0 {
-					t.Errorf("got error %v, expected atleast one observation", err)
-				}
-			}
-
-			// check the store if each observation was successfully saved
-			for _, encryptedObservation := range batch.GetEncryptedObservation() {
-				var found bool
-				found = false
-				for i := 0; i < numObservations; i++ {
-					if reflect.DeepEqual(gotObInfos[i].EncryptedMessage, encryptedObservation) {
-						found = true
-						break
-					}
-				}
-
-				if !found {
-					t.Errorf("Observation not saved by Shuffler [%v]", encryptedObservation)
-				}
-			}
-		}
+func TestMemStoreShuffler(t *testing.T) {
+	for _, envelope := range makeTestEnvelopes() {
+		doTestProcess(t, envelope, storage.NewMemStore())
 	}
+}
+
+func TestLevelDBShuffler(t *testing.T) {
+	for _, envelope := range makeTestEnvelopes() {
+		levelDBStore, err := storage.NewLevelDBStore("/tmp")
+		if err != nil {
+			t.Errorf("Failed to initialize leveldb store")
+			return
+		}
+		doTestProcess(t, envelope, levelDBStore)
+	}
+}
+
+func doTestProcess(t *testing.T, envelope *shufflerpb.Envelope, store storage.Store) {
+	c := util.NoOpCrypter{}
+	data, err := proto.Marshal(envelope)
+	if err != nil {
+		t.Fatalf("Error in marshalling envelope data: %v", err)
+	}
+	eMsg := &shufflerpb.EncryptedMessage{
+		Ciphertext: c.Encrypt(data, "pubKeyHash"),
+	}
+
+	shuffler := &ShufflerServer{
+		store: store,
+		config: ServerConfig{
+			EnableTLS: false,
+			CertFile:  "",
+			KeyFile:   "",
+			Port:      0,
+		},
+	}
+
+	_, err = shuffler.Process(context.Background(), eMsg)
+
+	if err != nil && !reflect.DeepEqual(envelope, &shufflerpb.Envelope{}) {
+		t.Fatalf("Expected success, got error: %v", err)
+	}
+
+	for _, batch := range envelope.GetBatch() {
+		numObservations := len(batch.GetEncryptedObservation())
+		if numObservations == 0 {
+			continue
+		}
+
+		om := batch.GetMetaData()
+		storage.CheckNumObservations(t, shuffler.store, om, numObservations)
+		storage.CheckGetObservations(t, shuffler.store, om, batch.GetEncryptedObservation())
+	}
+
+	// clear store contents before testing a new envelope
+	storage.ResetStoreForTesting(store, true)
 }

@@ -27,12 +27,14 @@ package receiver
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 
 	shufflerpb "cobalt"
@@ -40,29 +42,37 @@ import (
 	util "util"
 )
 
-var (
-	store storage.Store
-)
+var shufflerServer *ShufflerServer
 
-// ShufflerServer is used to implement shuffler.ShufflerServer.
-type ShufflerServer struct{}
+// ShufflerServer implements the Shufffler service.
+type ShufflerServer struct {
+	store  storage.Store
+	config ServerConfig
+}
 
-// Process() function processes the incoming encoder requests and stores them
-// locally in a random order. During dispatch event, the records get sent to
-// Analyzer and deleted from Shuffler.
+// ServerConfig specifies the configuration options for setting up a Grpc
+// server.
+type ServerConfig struct {
+	// Connection uses TLS if true, else plain TCP
+	EnableTLS bool
+	// The TLS cert file
+	CertFile string
+	// The TLS key file
+	KeyFile string
+	// The server port
+	Port int
+}
+
+// Process processes the incoming encoder requests and persists them locally in
+// a random order. During dispatching, the records get sent to Analyzer and
+// deleted from Shuffler.
 func (s *ShufflerServer) Process(ctx context.Context,
 	encryptedMessage *shufflerpb.EncryptedMessage) (*empty.Empty, error) {
-	// TODO(ukode): Add impl for decrypting the sealed envelope.
-	glog.V(2).Infoln("Function Process() is invoked.")
-	pubKey := encryptedMessage.PubKey
-	ciphertext := encryptedMessage.Ciphertext
+	glog.V(3).Infoln("Process() is invoked.")
+	envelope, err := decryptEnvelope(encryptedMessage)
 
-	c := util.NoOpCrypter{}
-
-	envelope := &shufflerpb.Envelope{}
-	err := proto.Unmarshal(c.Decrypt(ciphertext, pubKey), envelope)
 	if err != nil {
-		return nil, fmt.Errorf("Error in unmarshalling ciphertext: %v", err)
+		return nil, grpc.Errorf(codes.InvalidArgument, "Failed to decrypt encrypted message: %v", err)
 	}
 
 	// TODO(ukode): Some notes here for future development:
@@ -73,61 +83,77 @@ func (s *ShufflerServer) Process(ctx context.Context,
 	// a channel that the forwarder can consume and dispatch to the next
 	// Shuffler |envelope.RecipientUrl|.
 
-	for _, batch := range envelope.GetBatch() {
-		for _, encryptedObservation := range batch.GetEncryptedObservation() {
-			if encryptedObservation == nil {
-				return nil, fmt.Errorf("Received empty encrypted message for key [%v]", batch.GetMetaData())
-			}
-
-			// Extract the Observation from the sealed envelope, save it in Shuffler data
-			// store for dispatcher to consume and forward to Analyzer based on some
-			// dispatch criteria. The data store shuffles the order of the Observation
-			// before persisting.
-			if err := store.AddObservation(batch.GetMetaData(), storage.MakeObservationInfo(encryptedObservation)); err != nil {
-				return nil, fmt.Errorf("Error in saving observation: %v", batch.GetMetaData())
-			}
-		}
+	// Extract the Observation from the sealed envelope, save it in Shuffler
+	// data store for dispatcher to consume and forward to Analyzer based on
+	// some dispatch criteria. The data store shuffles the order of the
+	// Observation before persisting.
+	if err := s.store.AddAllObservations(envelope.GetBatch(), storage.GetDayIndexUtc(time.Now())); err != nil {
+		return nil, err
 	}
 
-	glog.V(2).Infoln("Process() done, returning OK.")
+	glog.V(3).Infoln("Process() done, returning OK.")
 	return &empty.Empty{}, nil
 }
 
-func newServer() *ShufflerServer {
-	server := new(ShufflerServer)
-	return server
-}
-
-func initializeDataStore(dataStore storage.Store) {
+// Run serves incoming encoder requests and blocks forever unless a fatal error
+// occurs in the network layer. Run is invoked by the main() function in
+// shuffler_main and will result in a fatal error if invoked twice within the
+// same process.
+func Run(dataStore storage.Store, config *ServerConfig) {
 	if dataStore == nil {
 		glog.Fatal("Invalid data store handle, exiting.")
 	}
 
-	// Initialize data store handle
-	store = dataStore
+	if config == nil {
+		glog.Fatal("Invalid server config, exiting.")
+	}
+
+	if shufflerServer != nil {
+		glog.Fatal("Run() must not be invoked twice, exiting.")
+	}
+
+	// Start shuffler service
+	shufflerServer := &ShufflerServer{
+		store:  dataStore,
+		config: *config,
+	}
+	shufflerServer.startServer()
 }
 
-// ReceiveAndStore serves incoming requests from encoders.
-func ReceiveAndStore(tls bool, certFile string, keyFile string, port int, dataStore storage.Store) {
-	initializeDataStore(dataStore)
-
-	// Start the grpc receiver and start listening for requests from Encoders
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+// startServer sets up and starts the grpc server using configuration from
+// |ShufflerServer.ServerConfig|.
+func (s *ShufflerServer) startServer() {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.Port))
 	if err != nil {
-		glog.V(2).Info("Grpc: Failed to accept connections:", err)
+		glog.Error("Grpc: Error in accepting connections on port [", s.config.Port, "]:", err)
 		return
 	}
 	var opts []grpc.ServerOption
-	if tls {
-		creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
+	if s.config.EnableTLS {
+		creds, err := credentials.NewServerTLSFromFile(s.config.CertFile, s.config.KeyFile)
 		if err != nil {
-			glog.V(2).Info("Grpc: Failed to generate credentials:", err)
+			glog.Error("Grpc: Failed to generate credentials:", err)
 			return
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
-	glog.V(2).Info("Starting Shuffler:", err)
+
+	glog.Info("Starting Shuffler on port [", s.config.Port, "]...")
 	grpcServer := grpc.NewServer(opts...)
-	shufflerpb.RegisterShufflerServer(grpcServer, newServer())
+	shufflerpb.RegisterShufflerServer(grpcServer, s)
 	grpcServer.Serve(lis)
+}
+
+// decryptEnvelope decrypts the incoming encoder message and returns the sealed
+// envelope or an error.
+func decryptEnvelope(encryptedMessage *shufflerpb.EncryptedMessage) (*shufflerpb.Envelope, error) {
+	// TODO(ukode): Add impl for decrypting the sealed envelope.
+	pubKeyHash := encryptedMessage.PubKey
+	ciphertext := encryptedMessage.Ciphertext
+
+	c := util.NoOpCrypter{}
+
+	envelope := &shufflerpb.Envelope{}
+	err := proto.Unmarshal(c.Decrypt(ciphertext, pubKeyHash), envelope)
+	return envelope, err
 }

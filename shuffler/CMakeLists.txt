@@ -22,11 +22,14 @@ set(SHUFFLER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/shuffler.pb.go")
 set(ANALYZER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/analyzer.pb.go")
 set(CONFIG_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/config.pb.go")
 set(OBSERVATION_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/observation.pb.go")
+set(SHUFFLER_DB_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/shuffler_db.pb.go")
 add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
                           ${ANALYZER_GEN_PROTO_FILE}
                           ${CONFIG_GEN_PROTO_FILE}
                           ${OBSERVATION_GEN_PROTO_FILE}
+                          ${SHUFFLER_DB_GEN_PROTO_FILE}
     COMMAND ${PROTOC} ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
+            ${CMAKE_CURRENT_SOURCE_DIR}/shuffler_db.proto
             ${CMAKE_SOURCE_DIR}/encrypted_message.proto
             ${CMAKE_SOURCE_DIR}/observation.proto
             ${CMAKE_SOURCE_DIR}/analyzer/analyzer_service/analyzer.proto
@@ -43,11 +46,13 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
     # errors, so moving all generated files under cobalt package.
     COMMAND mv ${GO_PROTO_GEN}/cobalt/shuffler/shuffler.pb.go ${SHUFFLER_GEN_PROTO_FILE}
     COMMAND mv ${GO_PROTO_GEN}/cobalt/analyzer/analyzer_service/analyzer.pb.go ${ANALYZER_GEN_PROTO_FILE}
+    COMMAND mv ${GO_PROTO_GEN}/cobalt/shuffler/shuffler_db.pb.go ${SHUFFLER_DB_GEN_PROTO_FILE}
     COMMAND mv ${GO_PROTO_GEN}/cobalt/shuffler/config.pb.go ${CONFIG_GEN_PROTO_FILE}
     COMMAND rmdir ${GO_PROTO_GEN}/cobalt/shuffler
     COMMAND rmdir ${GO_PROTO_GEN}/cobalt/analyzer/analyzer_service
     COMMAND rmdir ${GO_PROTO_GEN}/cobalt/analyzer
     DEPENDS shuffler.proto
+    DEPENDS shuffler_db.proto
     DEPENDS config.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/observation.proto
@@ -74,10 +79,13 @@ set(RAND_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/rand_util.go")
 set(CONFIG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_util.go")
 set(STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/store.go")
 set(MEM_STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store.go")
+set(LEVELDB_STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/leveldb_store.go")
+set(KEY_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/key_util.go")
 add_custom_command(OUTPUT ${SHUFFLER_BIN}
     # Compiles shuffler_main and all its dependencies
     COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN} shuffler_main.go
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
+    DEPENDS ${SHUFFLER_DB_GEN_PROTO_FILE}
     DEPENDS ${ANALYZER_GEN_PROTO_FILE}
     DEPENDS ${CONFIG_GEN_PROTO_FILE}
     DEPENDS ${DISPATCHER_SRC}
@@ -117,7 +125,7 @@ add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
             ${DISPATCHER_SRC}
     DEPENDS ${DISPATCHER_SRC} ${DISPATCHER_TEST_SRC}
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
-    DEPENDS ${CONFIG_GEN_PROTO_FILE}
+    DEPENDS ${CONFIG_GEN_PROTO_FILE} ${SHUFFLER_DB_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -129,7 +137,7 @@ add_custom_command(OUTPUT ${RECEIVER_TEST_BIN}
             ${RECEIVER_SRC}
     DEPENDS ${RECEIVER_SRC} ${RECEIVER_TEST_SRC}
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
-    DEPENDS ${CONFIG_GEN_PROTO_FILE}
+    DEPENDS ${CONFIG_GEN_PROTO_FILE} ${SHUFFLER_DB_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -153,13 +161,23 @@ add_custom_command(OUTPUT ${CONFIG_TEST_BIN}
 )
 
 # Build storage unit tests
-set(STORAGE_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store_test.go")
+set(STORE_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/store_test.go")
+set(MEM_STORE_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store_test.go")
+set(LEVELDB_STORE_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/leveldb_store_test.go")
+set(TESTUTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/testutil.go")
+set(KEY_UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/key_util_test.go")
 set(STORAGE_TEST_BIN ${GO_TESTS}/storage_test)
 add_custom_command(OUTPUT ${STORAGE_TEST_BIN}
-    COMMAND ${GO_BIN} test -c -o ${STORAGE_TEST_BIN} ${STORAGE_TEST_SRC} ${STORE_SRC} ${MEM_STORE_SRC}
-    DEPENDS ${STORE_SRC} ${MEM_STORE_SRC} ${STORAGE_TEST_SRC}
+    COMMAND ${GO_BIN} test -c -o ${STORAGE_TEST_BIN}
+        ${STORE_TEST_SRC} ${MEM_STORE_TEST_SRC} ${LEVELDB_STORE_TEST_SRC}
+        ${STORE_SRC} ${MEM_STORE_SRC} ${LEVELDB_STORE_SRC} ${TESTUTIL_SRC}
+        ${KEY_UTIL_TEST_SRC} ${KEY_UTIL_SRC}
+    DEPENDS ${STORE_SRC} ${STORE_TEST_SRC} ${TESTUTIL_SRC}
+    DEPENDS ${MEM_STORE_SRC} ${MEM_STORE_TEST_SRC}
+    DEPENDS ${LEVELDB_STORE_SRC} ${LEVELDB_STORE_TEST_SRC}
+    DEPENDS ${KEY_UTIL_SRC} ${KEY_UTIL_TEST_SRC}
     DEPENDS ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
-    DEPENDS ${CONFIG_GEN_PROTO_FILE}
+    DEPENDS ${CONFIG_GEN_PROTO_FILE} ${SHUFFLER_DB_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -179,7 +197,9 @@ add_custom_target(shuffler_all ALL
 # parallel builds to work.  Almost everything depends on the cobalt package
 # created by the shuffler_gen_pb target so do that first.
 add_custom_target(shuffler_gen_pb
-    DEPENDS ${SHUFFLER_GEN_PROTO_FILE} ${ANALYZER_GEN_PROTO_FILE}
+    DEPENDS ${SHUFFLER_GEN_PROTO_FILE}
+            ${ANALYZER_GEN_PROTO_FILE}
+            ${SHUFFLER_DB_GEN_PROTO_FILE}
 )
 
 add_dependencies(shuffler_all shuffler_gen_pb)

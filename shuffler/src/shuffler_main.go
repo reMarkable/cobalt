@@ -16,9 +16,11 @@ package main
 
 import (
 	"flag"
+	"path/filepath"
 
 	"github.com/golang/glog"
 
+	shufflerpb "cobalt"
 	"config"
 	"dispatcher"
 	"receiver"
@@ -26,37 +28,86 @@ import (
 )
 
 var (
-	tls        = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
-	certFile   = flag.String("cert_file", "", "The TLS cert file")
-	keyFile    = flag.String("key_file", "", "The TLS key file")
-	port       = flag.Int("port", 50051, "The server port")
+	// If true, tls is enabled for both server and client connections
+	tls = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
+
+	// shuffler server configuration flags
+	certFile = flag.String("cert_file", "", "The TLS cert file")
+	keyFile  = flag.String("key_file", "", "The TLS key file")
+	port     = flag.Int("port", 50051, "The server port")
+
+	// shuffler client configuration flags to connect to analyzer
+	caFile               = flag.String("ca_file", "", "The file containing the CA root certificate")
+	timeout              = flag.Int("timeout", 30, "Grpc connection timeout in seconds")
+	analyzerURL          = flag.String("analyzer_url", "", "The URL for analyzer service")
+	analyzerHostOverride = flag.String("analyzer_host", "", "The host name for analyzer service")
+
+	// shuffler dispatch configuration flags
 	configFile = flag.String("config_file", "", "The Shuffler config file")
 	batchSize  = flag.Int("batch_size", 100, "The size of ObservationBatch to be sent to Analyzer")
+
+	// shuffler db configuration flags
+	useMemStore = flag.Bool("use_mem_store", false, "Shuffler uses in memory store if true, else persistent store")
+	//TODO(ukode): Need to change defaults once a permanent location is in place.
+	dbDir = flag.String("db_dir", "/tmp", "Path to the Shuffler local datastore")
 )
 
 func main() {
 	flag.Parse()
 
 	// Initialize Shuffler configuration
+	var sConfig *shufflerpb.ShufflerConfig
+	var err error
 	if *configFile == "" {
-		glog.Warning("Using Shuffler default configuration...")
+		glog.Warning("Using Shuffler default configuration. Pass -config_file to specify custom config options.")
 		// Use the default config
-		*configFile = "./out/shuffler/conf/config_v0.txt"
-	}
-
-	config, err := config.LoadConfig(*configFile)
-	if err != nil {
-		glog.Fatal("Error loading shuffler config file [", *configFile, "]: ", err)
+		sConfig = &shufflerpb.ShufflerConfig{}
+		sConfig.GlobalConfig = &shufflerpb.Policy{
+			FrequencyInHours: 24,
+			PObservationDrop: 0.0,
+			Threshold:        500,
+			AnalyzerUrl:      "localhost:6001",
+			DisposalAgeDays:  4,
+		}
+	} else {
+		if sConfig, err = config.LoadConfig(*configFile); err != nil {
+			glog.Fatal("Error loading shuffler config file: [", *configFile, "]: ", err)
+		}
 	}
 
 	// Initialize Shuffler data store
-	store := storage.NewMemStore()
+	var store storage.Store
+	if *useMemStore {
+		store = storage.NewMemStore()
+	} else {
+		observationsDBpath := filepath.Join(*dbDir, "observations_db")
+		if store, err = storage.NewLevelDBStore(observationsDBpath); err != nil || store == nil {
+			glog.Fatal("Error initializing shuffler datastore: [", *dbDir, "]: ", err)
+		}
+	}
+
+	// Override analyzer client's url if |analyzerURL| flag is set
+	url := sConfig.GetGlobalConfig().AnalyzerUrl
+	if *analyzerURL != "" {
+		url = *analyzerURL
+	}
+
+	grpcAnalyzerClient := dispatcher.NewGrpcAnalyzerTransport(&dispatcher.GrpcClientConfig{
+		EnableTLS: *tls,
+		CAFile:    *caFile,
+		Timeout:   *timeout,
+		URL:       url,
+	})
 
 	// Start dispatcher and keep polling for dispatch events
-	go dispatcher.Dispatch(config, store, *batchSize, &dispatcher.GrpcAnalyzer{
-		URL: config.GetGlobalConfig().AnalyzerUrl})
+	go dispatcher.Start(sConfig, store, *batchSize, grpcAnalyzerClient)
 
 	// Start listening on receiver for incoming requests from Encoder
-	glog.Info("Shuffler starting on port [", *port, "]...")
-	receiver.ReceiveAndStore(*tls, *certFile, *keyFile, *port, store)
+	glog.Info("Shuffler started on port [", *port, "]...")
+	receiver.Run(store, &receiver.ServerConfig{
+		EnableTLS: *tls,
+		CertFile:  *certFile,
+		KeyFile:   *keyFile,
+		Port:      *port,
+	})
 }
