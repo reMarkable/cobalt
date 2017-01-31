@@ -22,3 +22,9 @@
 [submodule "third_party/glog"]
 	path = third_party/glog
 	url = https://fuchsia.googlesource.com/third_party/glog
+[submodule "third_party/go/src/github.com/syndtr/goleveldb"]
+	path = third_party/go/src/github.com/syndtr/goleveldb
+	url = https://github.com/syndtr/goleveldb
+[submodule "third_party/go/src/github.com/golang/snappy"]
+	path = third_party/go/src/github.com/golang/snappy
+	url = https://github.com/golang/snappy
