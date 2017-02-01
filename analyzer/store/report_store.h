@@ -187,10 +187,13 @@ class ReportStore {
                                     size_t max_results,
                                     std::string pagination_token);
 
+  static std::string ToString(const ReportId& report_id);
+
  private:
   friend class ReportStorePrivateTest;
   // Makes all instantiations of ReportStoreAbstractTest friends.
-  template <class X> friend class ReportStoreAbstractTest;
+  template <class X>
+  friend class ReportStoreAbstractTest;
 
   // Makes the row key for the report_metadata table that corresponds to the
   // given |report_id|.

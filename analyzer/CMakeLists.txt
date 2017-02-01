@@ -16,18 +16,9 @@ add_subdirectory(store)
 
 set(ANALYZER_SRCS
     analyzer_service.cc
+    encoding_mixer.cc
     report_generator.cc
     report_master.cc
-    )
-
-set(ANALYZER_LIBS
-    ${PROTOBUF_LIBRARY}
-    analyzer_store
-    googleapis
-    forculus_analyzer
-    cobalt_crypto
-    glog
-    gflags
     )
 
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
@@ -50,14 +41,25 @@ set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
 # Build the analyzer library
 add_library(cobalt_analyzer ${ANALYZER_SRCS} ${PROTO_SRCS} ${COBALT_PROTO_SRCS}
             ${PROTO_SCHEMA_SRCS})
-target_link_libraries(cobalt_analyzer ${ANALYZER_LIBS})
+target_link_libraries(cobalt_analyzer
+                      ${PROTOBUF_LIBRARY}
+                      analyzer_store
+                      cobalt_crypto
+                      glog
+                      gflags
+                      googleapis
+                      forculus_analyzer
+                      rappor_analyzer)
 
 # Build the analyzer executable
 add_executable(analyzer main.cc)
 target_link_libraries(analyzer cobalt_analyzer)
 
-# Build the test
-add_executable(analyzer_tests analyzer_service_test.cc)
-target_link_libraries(analyzer_tests gtest gtest_main cobalt_analyzer)
+# Build the tests
+add_executable(analyzer_tests
+               analyzer_service_test.cc encoding_mixer_test.cc)
+target_link_libraries(analyzer_tests
+                      encoder cobalt_analyzer
+                      gtest gtest_main)
 set_target_properties(analyzer_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

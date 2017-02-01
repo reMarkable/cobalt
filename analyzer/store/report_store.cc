@@ -54,23 +54,6 @@ uint32_t RandomUint32() {
   return rand.RandomUint32();
 }
 
-std::string ToString(const ReportId& report_id) {
-  // We write four ten-digit numbers, plus one twenty-digit number plus one
-  // one digit number plus five coluns. That is 66 characters. The string has
-  // size 67 to accommodate a trailing null character.
-  std::string out(67, 0);
-
-  std::snprintf(&out[0], out.size(), "%.10u:%.10u:%.10u:%.20lu:%.10u:%.1u",
-                report_id.customer_id(), report_id.project_id(),
-                report_id.report_config_id(), report_id.start_timestamp_ms(),
-                report_id.instance_id(), report_id.variable_slice());
-
-  // Discard the trailing null character.
-  out.resize(66);
-
-  return out;
-}
-
 void ParseReportIdFromMetadataRowKey(const std::string row_key,
                                      ReportId* report_id) {
   int32_t customer_id, project_id, report_config_id, instance_id;
@@ -110,7 +93,7 @@ Status ParseSingleColumn(const ReportId& report_id, const DataStore::Row& row,
                          MessageLite* proto_message) {
   if (row.column_values.size() != 1) {
     LOG(ERROR) << error_message_prefix << " for report_id "
-               << ToString(report_id)
+               << ReportStore::ToString(report_id)
                << ": expected to receive one column but recieved "
                << row.column_values.size() << " columns.";
     return kOperationFailed;
@@ -120,13 +103,15 @@ Status ParseSingleColumn(const ReportId& report_id, const DataStore::Row& row,
 
   if (iter == row.column_values.end()) {
     LOG(ERROR) << error_message_prefix << " for report_id "
-               << ToString(report_id) << ": Column not found: " << column_name;
+               << ReportStore::ToString(report_id)
+               << ": Column not found: " << column_name;
     return kOperationFailed;
   }
 
   if (!proto_message->ParseFromString(iter->second)) {
     LOG(ERROR) << error_message_prefix << " for report_id "
-               << ToString(report_id) << ": Unable to parse ReportRow";
+               << ReportStore::ToString(report_id)
+               << ": Unable to parse ReportRow";
     return kOperationFailed;
   }
   return kOK;
@@ -136,7 +121,7 @@ std::string MakeReportRowKey(const ReportId& report_id, uint32_t suffix) {
   // TODO(rudominer): Replace human-readable row key with smaller more efficient
   // representation.
   std::ostringstream stream;
-  stream << ToString(report_id) << ":" << suffix;
+  stream << ReportStore::ToString(report_id) << ":" << suffix;
   return stream.str();
 }
 
@@ -151,7 +136,7 @@ bool ValidateVariableSlice(const ReportId& report_id,
         LOG(ERROR) << "Attempt to AddReportRow for VARIABLE_1 ReportID but "
                       "report_row does not contain a value for |value| and "
                       "no value for |value2|: "
-                   << ToString(report_id);
+                   << ReportStore::ToString(report_id);
         return false;
       }
       break;
@@ -160,7 +145,7 @@ bool ValidateVariableSlice(const ReportId& report_id,
         LOG(ERROR) << "Attempt to AddReportRow for VARIABLE_2 ReportID but "
                       "report_row does not contain a value for |value2| and "
                       "no value for |value|: "
-                   << ToString(report_id);
+                   << ReportStore::ToString(report_id);
         return false;
       }
       break;
@@ -168,7 +153,7 @@ bool ValidateVariableSlice(const ReportId& report_id,
       if (!report_row.has_value() || !report_row.has_value2()) {
         LOG(ERROR) << "Attempt to AddReportRow for JOINT ReportID but "
                       "report_row does not contain two values: "
-                   << ToString(report_id);
+                   << ReportStore::ToString(report_id);
         return false;
       }
       break;
@@ -496,6 +481,23 @@ std::string ReportStore::ReportEndRowKey(const ReportId& report_id) {
   std::ostringstream stream;
   stream << ToString(report_id) << ":9999999999";
   return stream.str();
+}
+
+std::string ReportStore::ToString(const ReportId& report_id) {
+  // We write four ten-digit numbers, plus one twenty-digit number plus one
+  // one digit number plus five coluns. That is 66 characters. The string has
+  // size 67 to accommodate a trailing null character.
+  std::string out(67, 0);
+
+  std::snprintf(&out[0], out.size(), "%.10u:%.10u:%.10u:%.20lu:%.10u:%.1u",
+                report_id.customer_id(), report_id.project_id(),
+                report_id.report_config_id(), report_id.start_timestamp_ms(),
+                report_id.instance_id(), report_id.variable_slice());
+
+  // Discard the trailing null character.
+  out.resize(66);
+
+  return out;
 }
 
 }  // namespace store

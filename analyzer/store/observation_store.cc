@@ -49,9 +49,10 @@ std::string RowKey(uint32_t customer_id, uint32_t project_id,
   // colons. The string has size 76 to accommodate a trailing null character.
   std::string out(76, 0);
 
-  // TODO(bittau, rudominer): the key should be binary (e.g., a big-endian
-  // encoding of the struct representing the key).  Right now it's human
-  // readable for easy debugging.
+  // TODO(rudominer): Replace human-readable row key with smaller more efficient
+  // representation.
+  // TODO(rudominer): Use (random, time) instead of (time, random) because this
+  // allows the ReportGenerator to be sharded based on random.
   std::snprintf(&out[0], out.size(), "%.10u:%.10u:%.10u:%.10u:%.20lu:%.10u",
                 customer_id, project_id, metric_id, day_index,
                 current_time_millis, random);
