@@ -66,7 +66,8 @@ add_custom_command(OUTPUT ${SHUFFLER_CONF}
 set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
 set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
 set(RECEIVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/receiver/receiver.go")
-set(UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util.go")
+set(CRYPTO_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util.go")
+set(RAND_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/rand_util.go")
 set(CONFIG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_util.go")
 set(STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/store.go")
 set(MEM_STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store.go")
@@ -78,7 +79,8 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     DEPENDS ${CONFIG_GEN_PROTO_FILE}
     DEPENDS ${DISPATCHER_SRC}
     DEPENDS ${RECEIVER_SRC}
-    DEPENDS ${UTIL_SRC}
+    DEPENDS ${CRYPTO_UTIL_SRC}
+    DEPENDS ${RAND_UTIL_SRC}
     DEPENDS ${STORE_SRC}
     DEPENDS ${CONFIG_SRC}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shuffler_main.go
@@ -128,12 +130,13 @@ add_custom_command(OUTPUT ${RECEIVER_TEST_BIN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Build util unit tests
-set(UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util_test.go")
-set(UTIL_TEST_BIN ${GO_TESTS}/crypto_util_test)
+# Build crypto util unit tests
+set(CRYPTO_UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util_test.go")
+set(RAND_UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/rand_util_test.go")
+set(UTIL_TEST_BIN ${GO_TESTS}/util_test)
 add_custom_command(OUTPUT ${UTIL_TEST_BIN}
-    COMMAND ${GO_BIN} test -c -o ${UTIL_TEST_BIN} ${UTIL_TEST_SRC} ${UTIL_SRC}
-    DEPENDS ${UTIL_SRC} ${UTIL_TEST_SRC}
+    COMMAND ${GO_BIN} test -c -o ${UTIL_TEST_BIN} ${CRYPTO_UTIL_TEST_SRC} ${RAND_UTIL_TEST_SRC} ${CRYPTO_UTIL_SRC} ${RAND_UTIL_SRC}
+    DEPENDS ${CRYPTO_UTIL_SRC} ${CRYPTO_UTIL_TEST_SRC} ${RAND_UTIL_SRC} ${RAND_UTIL_TEST_SRC}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
