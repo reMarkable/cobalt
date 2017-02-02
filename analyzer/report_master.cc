@@ -40,6 +40,7 @@ namespace cobalt {
 namespace analyzer {
 
 using store::ObservationStore;
+using store::ReportStore;
 using store::DataStore;
 
 DEFINE_string(cobalt_config_dir, "",
@@ -53,7 +54,8 @@ class ReportMaster {
         reports_(new ReportRegistry),
         encodings_(new EncodingRegistry),
         store_(store),
-        observation_store_(new ObservationStore(store)) {}
+        observation_store_(new ObservationStore(store)),
+        report_store_(new ReportStore(store)) {}
 
   void Start(std::atomic<bool>* shut_down) {
     load_configuration();
@@ -96,11 +98,12 @@ class ReportMaster {
     LOG(INFO) << "Report cycle";
 
     std::unique_ptr<ReportGenerator> report_generator(new ReportGenerator(
-        metrics_, reports_, encodings_, observation_store_));
+        metrics_, reports_, encodings_, observation_store_, report_store_));
 
-    for (const ReportConfig& config : *reports_) {
-      report_generator->GenerateReport(config);
-    }
+    // TODO(rudominer) Disabled for now as ReportMaster is being refactored.
+    // for (const ReportConfig& config : *reports_) {
+    //   report_generator->GenerateReport(config);
+    // }
   }
 
   std::shared_ptr<MetricRegistry> metrics_;
@@ -108,6 +111,7 @@ class ReportMaster {
   std::shared_ptr<EncodingRegistry> encodings_;
   std::shared_ptr<DataStore> store_;
   std::shared_ptr<ObservationStore> observation_store_;
+  std::shared_ptr<ReportStore> report_store_;
 };
 
 void ReportMasterMain(std::atomic<bool>* shut_down) {
