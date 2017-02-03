@@ -1,0 +1,224 @@
+// Copyright 2017 The Fuchsia Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package cobalt.analyzer;
+
+import "observation.proto";
+import "google/protobuf/timestamp.proto";
+
+// A Report is the final output of the Cobalt pipeline. The ReportMaster
+// is the component of Cobalt that orchestrates and schedules the generation
+// of reports.
+//
+// ReportMaster service is used by Cobalt customers to generate one-off
+// reports, to query the set of reports that exist, and to fetch individual
+// reports. Note that in the primary use of Cobalt report generation occurs
+// automatically on a regular schedule and there is no reason to request the
+// generation of a one-off report. This interface may be used to query and
+// fetch both one-off, manually-requested reports and regularly scheduled
+// reports.
+service ReportMaster {
+
+  // Requests that the ReportMaster start to generate a new one-off report. The
+  // |report_id| returned in the response may be used to query the progress
+  // and results.
+  rpc StartReport (StartReportRequest) returns
+      (StartReportResponse) {}
+
+  // Fetches a report and its metadata by ID. If the report generation is not
+  // yet complete then only the metadata is returned.
+  rpc GetReport(GetReportRequest) returns (Report) {}
+
+  // Queries for the list of all reports that exist in the system for the
+  // specified ReportConfig that were created over the specified time span.
+  // Uses server streaming to return the results. The results are returned in
+  // chronological order of report creation time.
+  rpc QueryReports(QueryReportsRequest)
+      returns (stream QueryReportsResponse) {}
+}
+
+// The request message for StartReport.
+message StartReportRequest {
+  // The (customer_id, project_id, report_config_id) triple specifies the
+  // ID of the ReportConfig that the generated report will be based on.
+  // ReportConfigs are registered in the Cobalt config system.
+  uint32 customer_id = 1;
+  uint32 project_id = 2;
+  uint32 report_config_id = 3;
+
+  // The report will analyze the set of Observations that have been tagged with
+  // a day index that falls within the interval
+  // [first_day_index, last_day_index]. Day indices in Cobalt are zero-based
+  // with day zero being January 1, 1970.
+  uint32 first_day_index = 4;
+  uint32 last_day_index = 5;
+}
+
+// The response message for StartReport.
+message StartReportResponse {
+  // The unique identifier for the new report whose generation has begun. Use
+  // this to query the state of the report generation, to fetch metadata about
+  // the report being generated and to fetch the results when the generation is
+  // complete.
+  string report_id = 1;
+}
+
+// The request message for GetReport.
+message GetReportRequest {
+  // The ID of the report to get.
+  string report_id = 1;
+}
+
+// The response message for GetReport.
+message Report {
+  // The metadata for the report.
+  ReportMetadata metadata = 1;
+
+  // The rows of the report. This will only be populated if the |state|
+  // of the report in the ReportMetadata is |COMPLETED_SUCCESSFULLY|.
+  repeated ReportRow rows = 2;
+}
+
+// Metadata about an instance of a report.
+message ReportMetadata {
+  // The unique ID of this report.
+  string report_id = 1;
+
+  // (customer_id, project_id, report_config_id) together specify which
+  // ReportConfig this is a report for.
+  uint32 customer_id = 2;
+  uint32 project_id = 3;
+  uint32 report_config_id= 4;
+
+  // The current state of the report generation.
+  ReportState state = 5;
+
+  // The time that the generation of this report was first initialized,
+  // as recorded by the server. This may be different than |start_time| if
+  // the report was initially in the WAITING_TO_START state.
+  google.protobuf.Timestamp creation_time = 6;
+
+  // The time that the generation of this report began, as recorded by the
+  // server.
+  google.protobuf.Timestamp start_time = 7;
+
+  // The time that the generation of this report completed, as recorded by the
+  // server. This is unset if the state is IN_PROGRESS.
+  google.protobuf.Timestamp finish_time = 8;
+
+  // This report analyzes Observations with a day_index in the range
+  // [first_day_index, last_day_index]
+  uint32 first_day_index = 9;
+  uint32 last_day_index = 10;
+
+  // The names of the metric parts analyzed in this report. This will contain
+  // one name for a single-variable report or a one-way marginal of a
+  // two-variable report. This will contain two names for a two-variable report.
+  repeated string metric_parts = 11;
+
+  // The IDs of associated reports, if any. For example if this is a joint
+  // two-variable report this field will contain the IDs of the two one-way
+  // marginal reports.
+  repeated string associated_report_ids = 12;
+
+  // Is this a one-off report that was explicitly requested via the
+  // StartReport method as opposed to being generated by regular periodic
+  // report scheduling? This is purely for informational purposes and has no
+  // other bearing on the report.
+  bool one_off = 13;
+
+  // Any human-readable messages directed toward the report consumer that
+  // were produced by the server during the generation of the report.
+  repeated InfoMessage info_messages = 14;
+}
+
+// The request message for QueryReports.
+message QueryReportsRequest {
+  // The (customer_id, project_id, report_config_id) triple specify the
+  // ID of the ReportConfig whose reports are being queried. ReportConfigs
+  // are registered in the Cobalt config system.
+  uint32 customer_id = 1;
+  uint32 project_id = 2;
+  uint32 report_config_id = 3;
+
+  // The query is restricted to reports whose |creation_time| falls in the
+  // interval of time [first_timestamp, limit_timestamp). Note that this is
+  // unrelated to the day_indices of the Observations that the reports analyze.
+  google.protobuf.Timestamp first_timestamp = 4;
+  google.protobuf.Timestamp limit_timestamp = 5;
+}
+
+// The response message for QueryReports. These will be streamed back by the
+// server in chronological order of |creation_time|.
+message QueryReportsResponse {
+  // The ReportMetadata are sorted by |creation_time|.
+  repeated ReportMetadata reports = 1;
+}
+
+// A single row of a report.
+message ReportRow {
+  // The values for this row. A report analyzes either 1 or two variables.
+  // If this is a row of a univariate report then only |value| will be set. If
+  // this is a row of a one-way marginal of a two-variable report then
+  // either |value| or |value2| may be set depending on which marginal this is.
+  // If this is a row of a joint report of two variables then both |value| and
+  // |value2| will be set.
+  ValuePart value = 1;
+  ValuePart value2 = 2;
+
+  // This field is the primary output of Cobalt Analysis. It is an estimate
+  // of the true count of the value or values in the user population.
+  float count_estimate = 3;
+
+  // Multiply this value by z_{alpha/2} to obtain the radius of an approximate
+  // 100(1 - alpha)% confidence interval. For example an approximate 95%
+  // confidence interval for the count is given by
+  // (count_estimate - 1.96*std_error, count_estimate + 1.96 * std_error)
+  // because 1.96 ~= z_{.025} meaning that P(Z > 1.96) ~= 0.025 where
+  // Z ~ Normal(0, 1).
+  float std_error = 4;
+}
+
+
+// What state is the report generation in?
+enum ReportState {
+  // The report generation is waiting for some condition before it can start.
+  // One example is that a joint two-variable report needs to wait for the
+  // one-way marginal reports to complete before it can start. The
+  // |info_messages| field of ReprtMetadata may have more information.
+  WAITING_TO_START = 0;
+
+  // The report generation is in progress.
+  IN_PROGRESS = 1;
+
+  // The report generation has completed successfully.
+  COMPLETED_SUCCESSFULLY = 2;
+
+  // The report generation terminated without completing successfully.
+  // More information may be found in the |info_message|.
+  TERMINATED = 3;
+}
+
+// A human-readable message generated by the server during the generation
+// of the report.
+message InfoMessage {
+  google.protobuf.Timestamp timestamp = 1;
+  string messge = 2;
+}
+
+
+
+
