@@ -69,13 +69,13 @@ class ReportStoreAbstractTest : public ::testing::Test {
   static const uint32_t kFirstDayIndex = 12345;
   static const uint32_t kLastDayIndex = 12347;
 
-  static ReportId MakeReportId(uint64_t start_timestamp_ms,
+  static ReportId MakeReportId(int64_t creation_time_seconds,
                                uint32_t instance_id) {
     ReportId report_id;
     report_id.set_customer_id(kCustomerId);
     report_id.set_project_id(kProjectId);
     report_id.set_report_config_id(kReportConfigId);
-    report_id.set_start_timestamp_ms(start_timestamp_ms);
+    report_id.set_creation_time_seconds(creation_time_seconds);
     report_id.set_instance_id(instance_id);
     return report_id;
   }
@@ -83,9 +83,9 @@ class ReportStoreAbstractTest : public ::testing::Test {
   static std::string MakeStringValue(const ReportId& report_id,
                                      size_t row_index, uint8_t variable_index) {
     std::ostringstream stream;
-    stream << report_id.start_timestamp_ms() << ":" << report_id.instance_id()
-           << ":" << report_id.variable_slice() << ":" << row_index << ":"
-           << variable_index;
+    stream << report_id.creation_time_seconds() << ":"
+           << report_id.instance_id() << ":" << report_id.variable_slice()
+           << ":" << row_index << ":" << variable_index;
     return stream.str();
   }
 
@@ -152,28 +152,28 @@ class ReportStoreAbstractTest : public ::testing::Test {
     return report_store_->MakeMetadataRowKey(report_id);
   }
 
-  Status StartNewReport(bool requested, ReportId* report_id) {
+  Status StartNewReport(bool one_off, ReportId* report_id) {
     return this->report_store_->StartNewReport(kFirstDayIndex, kLastDayIndex,
-                                               requested, report_id);
+                                               one_off, report_id);
   }
 
-  // Starts a new report with requested=true and our global contstant values
+  // Starts a new report with one_off=true and our global contstant values
   // for all of the parameters.
   ReportId StartNewReport() {
-    bool requested = true;
+    bool one_off = true;
 
     // Make a new ReportID without specifying timestamp or instance_id.
     ReportId report_id = MakeReportId(0, 0);
-    EXPECT_EQ(0, report_id.start_timestamp_ms());
+    EXPECT_EQ(0, report_id.creation_time_seconds());
     EXPECT_EQ(0, report_id.instance_id());
 
     // Invoke StartNewReport().
-    EXPECT_EQ(kOK, StartNewReport(requested, &report_id));
+    EXPECT_EQ(kOK, StartNewReport(one_off, &report_id));
     return report_id;
   }
 
   void BulkWriteMetadata(const std::vector<ReportId>& report_ids,
-                         const std::vector<ReportMetadata>& metadata) {
+                         const std::vector<ReportMetadataLite>& metadata) {
     EXPECT_EQ(report_ids.size(), metadata.size());
     std::vector<DataStore::Row> rows;
     for (int i = 0; i < report_ids.size(); i++) {
@@ -191,19 +191,19 @@ class ReportStoreAbstractTest : public ::testing::Test {
   // the 3 variable slices we insert two rows with two different values of
   // instance_id. For each insert we store timestamp + instance_id + slice_index
   // into the ReportMetadata's start_timestamp_ms field for later verifaction.
-  void WriteManyNewReports(uint64_t start_timestamp, uint64_t timestamp_delta,
+  void WriteManyNewReports(int64_t start_timestamp, uint64_t timestamp_delta,
                            size_t num_timestamps) {
     std::vector<ReportId> report_ids;
-    std::vector<ReportMetadata> metadata_vector;
-    uint64_t timestamp = start_timestamp;
+    std::vector<ReportMetadataLite> metadata_vector;
+    int64_t timestamp = start_timestamp;
     for (int ts_index = 0; ts_index < num_timestamps; ts_index++) {
       for (int instance_id = 0; instance_id <= 1; instance_id++) {
         for (int slice_index = 0; slice_index < 3; slice_index++) {
           report_ids.emplace_back(MakeReportId(timestamp, instance_id));
           EXPECT_EQ(report_ids.back().instance_id(), instance_id);
           report_ids.back().set_variable_slice((VariableSlice)slice_index);
-          ReportMetadata metadata;
-          metadata.set_start_timestamp_ms(timestamp + instance_id +
+          ReportMetadataLite metadata;
+          metadata.set_start_time_seconds(timestamp + instance_id +
                                           slice_index);
           metadata_vector.emplace_back(metadata);
         }
@@ -222,12 +222,12 @@ class ReportStoreAbstractTest : public ::testing::Test {
   }
 
   void GetReportAndCheck(const ReportId& report_id, size_t expected_num_rows) {
-    Report report;
-    EXPECT_EQ(kOK, report_store_->GetReport(report_id, &report));
-    const ReportMetadata& read_metadata = report.metadata();
-    EXPECT_EQ(ReportMetadata::COMPLETED_SUCCESSFULLY, read_metadata.status());
-    EXPECT_EQ(expected_num_rows, report.rows_size());
-    for (const auto& row : report.rows()) {
+    ReportMetadataLite read_metadata;
+    ReportRows rows;
+    EXPECT_EQ(kOK, report_store_->GetReport(report_id, &read_metadata, &rows));
+    EXPECT_EQ(COMPLETED_SUCCESSFULLY, read_metadata.state());
+    EXPECT_EQ(expected_num_rows, rows.rows_size());
+    for (const auto& row : rows.rows()) {
       this->CheckReportRow(row, report_id);
     }
   }
@@ -250,33 +250,33 @@ TYPED_TEST_CASE_P(ReportStoreAbstractTest);
 
 // Tests the methods StartNewReport(), EndReport() and GetMetadata().
 TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
-  bool requested = true;
+  bool one_off = true;
 
   // Make a new ReportID without specifying timestamp or instance_id.
   ReportId report_id = this->MakeReportId(0, 0);
-  EXPECT_EQ(0, report_id.start_timestamp_ms());
+  EXPECT_EQ(0, report_id.creation_time_seconds());
   EXPECT_EQ(0, report_id.instance_id());
 
   // Invoke StartNewReport().
-  EXPECT_EQ(kOK, this->StartNewReport(requested, &report_id));
+  EXPECT_EQ(kOK, this->StartNewReport(one_off, &report_id));
 
   // Check that the report_id was completed.
-  EXPECT_NE(0, report_id.start_timestamp_ms());
+  EXPECT_NE(0, report_id.creation_time_seconds());
   EXPECT_NE(0, report_id.instance_id());
 
   // Get the ReportMetatdata for this new ID.
-  ReportMetadata report_metadata;
+  ReportMetadataLite report_metadata;
   EXPECT_EQ(kOK, this->report_store_->GetMetadata(report_id, &report_metadata));
 
   // Check its state.
-  EXPECT_EQ(ReportMetadata::IN_PROGRESS, report_metadata.status());
+  EXPECT_EQ(IN_PROGRESS, report_metadata.state());
   EXPECT_EQ(this->first_day_index(), report_metadata.first_day_index());
   EXPECT_EQ(this->last_day_index(), report_metadata.last_day_index());
-  EXPECT_EQ(requested, report_metadata.requested());
-  EXPECT_EQ(report_id.start_timestamp_ms(),
-            report_metadata.start_timestamp_ms());
-  EXPECT_EQ(0, report_metadata.finish_timestamp_ms());
-  EXPECT_EQ("", report_metadata.info_message());
+  EXPECT_EQ(one_off, report_metadata.one_off());
+  EXPECT_EQ(report_id.creation_time_seconds(),
+            report_metadata.start_time_seconds());
+  EXPECT_EQ(0, report_metadata.finish_time_seconds());
+  EXPECT_EQ(0, report_metadata.info_messages_size());
 
   // Invoke EndReport() with success=true.
   bool success = true;
@@ -287,14 +287,15 @@ TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
   EXPECT_EQ(kOK, this->report_store_->GetMetadata(report_id, &report_metadata));
 
   // Check its state. It should now be completed and have a finish_timestamp.
-  EXPECT_EQ(ReportMetadata::COMPLETED_SUCCESSFULLY, report_metadata.status());
+  EXPECT_EQ(COMPLETED_SUCCESSFULLY, report_metadata.state());
   EXPECT_EQ(this->first_day_index(), report_metadata.first_day_index());
   EXPECT_EQ(this->last_day_index(), report_metadata.last_day_index());
-  EXPECT_EQ(requested, report_metadata.requested());
-  EXPECT_EQ(report_id.start_timestamp_ms(),
-            report_metadata.start_timestamp_ms());
-  EXPECT_NE(0, report_metadata.finish_timestamp_ms());
-  EXPECT_EQ("hello", report_metadata.info_message());
+  EXPECT_EQ(one_off, report_metadata.one_off());
+  EXPECT_EQ(report_id.creation_time_seconds(),
+            report_metadata.start_time_seconds());
+  EXPECT_NE(0, report_metadata.finish_time_seconds());
+  EXPECT_EQ(1, report_metadata.info_messages_size());
+  EXPECT_EQ("hello", report_metadata.info_messages(0).message());
 
   // Invoke EndReport() with success=false. Note that we never do this in
   // the real product (i.e. convert from COMPLETED_SUCCESSFULLY to
@@ -307,20 +308,21 @@ TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
   EXPECT_EQ(kOK, this->report_store_->GetMetadata(report_id, &report_metadata));
 
   // Check its state. It should now be terminated.
-  EXPECT_EQ(ReportMetadata::TERMINATED, report_metadata.status());
-  EXPECT_EQ("hello : goodbye", report_metadata.info_message());
+  EXPECT_EQ(TERMINATED, report_metadata.state());
+  EXPECT_EQ(2, report_metadata.info_messages_size());
+  EXPECT_EQ("goodbye", report_metadata.info_messages(1).message());
 }
 
-// Tests the function StartAssociatedSlice().
-TYPED_TEST_P(ReportStoreAbstractTest, StartAssociatedSlice) {
-  bool requested = false;
+// Tests the functions CreateSecondarySlice() and StartSecondarySlice.
+TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartSecondarySlice) {
+  bool one_off = false;
 
   // Make a new ReportID without specifying timestamp or instance_id.
   ReportId report_id1 = this->MakeReportId(0, 0);
   EXPECT_EQ(VARIABLE_1, report_id1.variable_slice());
 
   // Invoke StartNewReport().
-  EXPECT_EQ(kOK, this->StartNewReport(requested, &report_id1));
+  EXPECT_EQ(kOK, this->StartNewReport(one_off, &report_id1));
 
   // Invoke EndReport()
   EXPECT_EQ(kOK, this->report_store_->EndReport(report_id1, true, "hello"));
@@ -328,29 +330,47 @@ TYPED_TEST_P(ReportStoreAbstractTest, StartAssociatedSlice) {
   // Copy the new report_id
   ReportId report_id2(report_id1);
 
-  // Invoke StartAssociatedSlice().
+  // Invoke CreateSecondarySlice().
   EXPECT_EQ(kOK,
-            this->report_store_->StartAssociatedSlice(VARIABLE_2, &report_id2));
+            this->report_store_->CreateSecondarySlice(VARIABLE_2, &report_id2));
 
   // Check that report_id2 had its variable_slice set correctly.
   EXPECT_EQ(VARIABLE_2, report_id2.variable_slice());
+  // Creation time should be the same as for the initial report.
+  EXPECT_EQ(report_id1.creation_time_seconds(),
+            report_id2.creation_time_seconds());
 
   // Get the ReportMetatdata for report_id2.
-  ReportMetadata report_metadata;
+  ReportMetadataLite report_metadata;
   EXPECT_EQ(kOK,
             this->report_store_->GetMetadata(report_id2, &report_metadata));
 
   // Check its state.
-  EXPECT_EQ(ReportMetadata::IN_PROGRESS, report_metadata.status());
+  EXPECT_EQ(WAITING_TO_START, report_metadata.state());
   EXPECT_EQ(this->first_day_index(), report_metadata.first_day_index());
   EXPECT_EQ(this->last_day_index(), report_metadata.last_day_index());
-  EXPECT_EQ(requested, report_metadata.requested());
-  EXPECT_NE(0, report_metadata.start_timestamp_ms());
+  EXPECT_EQ(one_off, report_metadata.one_off());
 
-  // finish_timestamp and info_message should not have been copied to this
-  // ReportMetadata.
-  EXPECT_EQ(0, report_metadata.finish_timestamp_ms());
-  EXPECT_EQ("", report_metadata.info_message());
+  // start_time_seconds, finish_time_seconds and info_message should not have
+  // been copied to this ReportMetadataLite.
+  EXPECT_EQ(0, report_metadata.start_time_seconds());
+  EXPECT_EQ(0, report_metadata.finish_time_seconds());
+  EXPECT_EQ(0, report_metadata.info_messages_size());
+
+  // Now start the secondary slice.
+  EXPECT_EQ(kOK, this->report_store_->StartSecondarySlice(report_id2));
+
+  // Get the ReportMetatdata for report_id2.
+  report_metadata.Clear();
+  EXPECT_EQ(kOK,
+            this->report_store_->GetMetadata(report_id2, &report_metadata));
+
+  // Check the state state.
+  EXPECT_EQ(IN_PROGRESS, report_metadata.state());
+
+  // The report should now be started, but not finished.
+  EXPECT_NE(0, report_metadata.start_time_seconds());
+  EXPECT_EQ(0, report_metadata.finish_time_seconds());
 }
 
 // Tests the functions AddReportRow and GetReport
@@ -361,7 +381,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, ReportRows) {
   // And report 2a which is an associated sub-reprot with report 2.
   ReportId report_id2a(report_id2);
   EXPECT_EQ(
-      kOK, this->report_store_->StartAssociatedSlice(VARIABLE_2, &report_id2a));
+      kOK, this->report_store_->CreateSecondarySlice(VARIABLE_2, &report_id2a));
 
   // Add rows to all three reports.
   this->AddReportRows(report_id1, 100);
@@ -385,7 +405,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, ReportRows) {
 
 // Tests the function QueryReports
 TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
-  static const uint64_t kStartTimestamp = 123456789;
+  static const int64_t kStartTimestamp = 123456789;
   static const uint64_t kTimestampDelta = 10;
   size_t num_timestamps = 50;
 
@@ -410,13 +430,13 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
     EXPECT_EQ(this->customer_id(), report_id.customer_id());
     EXPECT_EQ(this->project_id(), report_id.project_id());
     EXPECT_EQ(this->report_config_id(), report_id.report_config_id());
-    uint64_t timestamp = report_id.start_timestamp_ms();
+    uint64_t timestamp = report_id.creation_time_seconds();
     EXPECT_TRUE(first_start_timestamp_ms <= timestamp);
     EXPECT_TRUE(timestamp < limit_start_timestamp_ms);
     // See WriteManyNewReports for how we set
-    // report_metadata.start_timestamp_ms()
+    // report_metadata.start_time_seconds()
     EXPECT_EQ(timestamp + report_id.instance_id() + report_id.variable_slice(),
-              report_record.report_metadata.start_timestamp_ms());
+              report_record.report_metadata.start_time_seconds());
   }
 
   // Query again. This time we set limit_start_timestamp = infinity and
@@ -444,18 +464,19 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
     EXPECT_EQ(this->customer_id(), report_id.customer_id());
     EXPECT_EQ(this->project_id(), report_id.project_id());
     EXPECT_EQ(this->report_config_id(), report_id.report_config_id());
-    uint64_t timestamp = report_id.start_timestamp_ms();
+    uint64_t timestamp = report_id.creation_time_seconds();
     EXPECT_TRUE(first_start_timestamp_ms <= timestamp);
     EXPECT_TRUE(timestamp < limit_start_timestamp_ms);
     // See WriteManyNewReports for how we set
-    // report_metadata.start_timestamp_ms()
+    // report_metadata.start_time_seconds()
     EXPECT_EQ(timestamp + report_id.instance_id() + report_id.variable_slice(),
-              report_record.report_metadata.start_timestamp_ms());
+              report_record.report_metadata.start_time_seconds());
   }
 }
 
 REGISTER_TYPED_TEST_CASE_P(ReportStoreAbstractTest, SetAndGetMetadata,
-                           StartAssociatedSlice, ReportRows, QueryReports);
+                           CreateAndStartSecondarySlice, ReportRows,
+                           QueryReports);
 
 }  // namespace store
 }  // namespace analyzer

@@ -226,9 +226,14 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
               observation_store_->AddObservationBatch(metadata, observations));
   }
 
+  struct GeneratedReport {
+    ReportMetadataLite metadata;
+    ReportRows rows;
+  };
+
   // Uses the ReportGenerator to generate a report that analyzes the specified
   // variable of our two-variable test metric.
-  Report GenerateReport(int variable_index) {
+  GeneratedReport GenerateReport(int variable_index) {
     // Complete the report_id by specifying the variable slice.
     report_id_.set_variable_slice((VariableSlice)variable_index);
 
@@ -242,8 +247,9 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     EXPECT_TRUE(report_generator_->GenerateReport(report_id_).ok());
 
     // Fetch the report from the ReportStore.
-    Report report;
-    EXPECT_EQ(store::kOK, report_store_->GetReport(report_id_, &report));
+    GeneratedReport report;
+    EXPECT_EQ(store::kOK, report_store_->GetReport(report_id_, &report.metadata,
+                                                   &report.rows));
 
     return report;
   }
@@ -272,7 +278,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // and then GenerateReport. It checks the generated Report to make sure
   // it is correct given the Observations that were added and the Forculus
   // config.
-  void CheckForculusReport(const Report& report, int variable_index) {
+  void CheckForculusReport(const ReportRows& report, int variable_index) {
     EXPECT_EQ(2, report.rows_size());
     for (const auto& report_row : report.rows()) {
       EXPECT_EQ(0, report_row.std_error());
@@ -324,7 +330,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // to validate the Basic RAPPOR algorithm here so we simply test that the
   // all three strings appear with a non-zero count and under the correct
   // variable index.
-  void CheckBasicRapporReport(const Report& report, int slice_index) {
+  void CheckBasicRapporReport(const ReportRows& report, int slice_index) {
     EXPECT_EQ(3, report.rows_size());
     for (const auto& report_row : report.rows()) {
       EXPECT_NE(0, report_row.std_error());
@@ -376,13 +382,13 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, Forculus) {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
     auto report = this->GenerateReport(variable_index);
-    this->CheckForculusReport(report, variable_index);
+    this->CheckForculusReport(report.rows, variable_index);
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
     auto report = this->GenerateReport(variable_index);
-    this->CheckForculusReport(report, variable_index);
+    this->CheckForculusReport(report.rows, variable_index);
   }
 }
 
@@ -396,13 +402,13 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, BasicRappor) {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
     auto report = this->GenerateReport(variable_index);
-    this->CheckBasicRapporReport(report, variable_index);
+    this->CheckBasicRapporReport(report.rows, variable_index);
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
     auto report = this->GenerateReport(variable_index);
-    this->CheckBasicRapporReport(report, variable_index);
+    this->CheckBasicRapporReport(report.rows, variable_index);
   }
 }
 

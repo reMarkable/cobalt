@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Defines the output of the command that runs protoc on the .proto files located
+# in the report_master directory.
+set(REPORT_PROTO_SRCS
+    "${CMAKE_BINARY_DIR}/analyzer/report_master/report_master.pb.cc"
+    "${CMAKE_BINARY_DIR}/analyzer/report_master/report_internal.pb.cc")
+
+add_subdirectory(report_master)
 add_subdirectory(store)
 
 set(ANALYZER_SRCS

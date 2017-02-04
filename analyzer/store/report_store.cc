@@ -20,7 +20,8 @@
 #include <utility>
 #include <vector>
 
-#include "./report.pb.h"
+#include "analyzer/report_master/report_internal.pb.h"
+#include "analyzer/report_master/report_master.pb.h"
 #include "analyzer/store/data_store.h"
 #include "glog/logging.h"
 #include "util/crypto_util/random.h"
@@ -43,8 +44,8 @@ const char kMetadataColumnName[] = "metadata";
 // The name of the data column in the report_rows table
 const char kReportRowColumnName[] = "report_row";
 
-uint64_t CurrentTimeMillis() {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(
+int64_t CurrentTimeSeconds() {
+  return std::chrono::duration_cast<std::chrono::seconds>(
              std::chrono::system_clock::now().time_since_epoch())
       .count();
 }
@@ -57,19 +58,19 @@ uint32_t RandomUint32() {
 void ParseReportIdFromMetadataRowKey(const std::string row_key,
                                      ReportId* report_id) {
   int32_t customer_id, project_id, report_config_id, instance_id;
-  uint64_t start_timestamp_ms;
+  int64_t creation_time_seconds;
   int slice_index;
   CHECK_GT(row_key.size(), 65);
   std::sscanf(&row_key[0], "%10u", &customer_id);
   std::sscanf(&row_key[11], "%10u", &project_id);
   std::sscanf(&row_key[22], "%10u", &report_config_id);
-  std::sscanf(&row_key[33], "%20lu", &start_timestamp_ms);
+  std::sscanf(&row_key[33], "%20lu", &creation_time_seconds);
   std::sscanf(&row_key[54], "%10u", &instance_id);
   std::sscanf(&row_key[65], "%1u", &slice_index);
   report_id->set_customer_id(customer_id);
   report_id->set_project_id(project_id);
   report_id->set_report_config_id(report_config_id);
-  report_id->set_start_timestamp_ms(start_timestamp_ms);
+  report_id->set_creation_time_seconds(creation_time_seconds);
   report_id->set_variable_slice((VariableSlice)slice_index);
   report_id->set_instance_id(instance_id);
 }
@@ -167,8 +168,8 @@ bool ValidateVariableSlice(const ReportId& report_id,
 
 ReportStore::ReportStore(std::shared_ptr<DataStore> store) : store_(store) {}
 
-DataStore::Row ReportStore::MakeDataStoreRow(const ReportId& report_id,
-                                             const ReportMetadata& metadata) {
+DataStore::Row ReportStore::MakeDataStoreRow(
+    const ReportId& report_id, const ReportMetadataLite& metadata) {
   std::string serialized_metadata;
   metadata.SerializeToString(&serialized_metadata);
 
@@ -181,7 +182,7 @@ DataStore::Row ReportStore::MakeDataStoreRow(const ReportId& report_id,
 }
 
 Status ReportStore::WriteMetadata(const ReportId& report_id,
-                                  const ReportMetadata& metadata) {
+                                  const ReportMetadataLite& metadata) {
   auto row = MakeDataStoreRow(report_id, metadata);
 
   // Write the Row to the report_metadata table.
@@ -201,26 +202,24 @@ Status ReportStore::StartNewReport(uint32_t first_day_index,
                                    ReportId* report_id) {
   CHECK(report_id);
   // Complete the report_id.
-  report_id->set_start_timestamp_ms(CurrentTimeMillis());
+  report_id->set_creation_time_seconds(CurrentTimeSeconds());
   report_id->set_instance_id(RandomUint32());
 
-  // Build a serialized ReportMetadata.
-  ReportMetadata metadata;
-  metadata.set_status(ReportMetadata::IN_PROGRESS);
+  // Build a serialized ReportMetadataLite.
+  ReportMetadataLite metadata;
+  metadata.set_state(IN_PROGRESS);
   metadata.set_first_day_index(first_day_index);
   metadata.set_last_day_index(last_day_index);
-  metadata.set_requested(requested);
-  // This is the first (and possibly the only) of a set of associated
-  // reports that share the same ReportId except for the variable_slice.
-  // Thus it's start_timestamp should be the same as the one from the ID.
-  metadata.set_start_timestamp_ms(report_id->start_timestamp_ms());
+  metadata.set_one_off(requested);
+  // We are not just creating but also starting this report now.
+  metadata.set_start_time_seconds(report_id->creation_time_seconds());
 
   return WriteMetadata(*report_id, metadata);
 }
 
-Status ReportStore::StartAssociatedSlice(VariableSlice slice,
+Status ReportStore::CreateSecondarySlice(VariableSlice slice,
                                          ReportId* report_id) {
-  ReportMetadata metadata;
+  ReportMetadataLite metadata;
   Status status = GetMetadata(*report_id, &metadata);
   if (status != kOK) {
     return status;
@@ -232,38 +231,51 @@ Status ReportStore::StartAssociatedSlice(VariableSlice slice,
     return kAlreadyExists;
   }
 
-  // Reset the fields we don't want to copy from the fetched ReportMetadata.
-  metadata.set_status(ReportMetadata::IN_PROGRESS);
-  metadata.mutable_info_message()->clear();
-  metadata.set_finish_timestamp_ms(0);
+  // Set the state to WAITING_TO_START
+  metadata.set_state(WAITING_TO_START);
 
-  // This is a subsequent associated reports and so it should get a fresh
-  // value for start_timestamp--not the one from the ReportID which corresponds
-  // to when the first associated sub-report was started.
-  metadata.set_start_timestamp_ms(CurrentTimeMillis());
+  // Reset the fields we don't want to copy from the fetched ReportMetadataLite.
+  metadata.mutable_info_messages()->Clear();
+  // This is a secondary slice report and it has not started yet.
+  metadata.set_start_time_seconds(0);
+  metadata.set_finish_time_seconds(0);
 
   return WriteMetadata(*report_id, metadata);
 }
 
+Status ReportStore::StartSecondarySlice(const ReportId& report_id) {
+  ReportMetadataLite metadata;
+  Status status = GetMetadata(report_id, &metadata);
+  if (status != kOK) {
+    return status;
+  }
+  if (metadata.state() != WAITING_TO_START) {
+    return kPreconditionFailed;
+  }
+  metadata.set_state(IN_PROGRESS);
+
+  // We are starting a secondary slice report so set the start time to the
+  // current time.
+  metadata.set_start_time_seconds(CurrentTimeSeconds());
+
+  return WriteMetadata(report_id, metadata);
+}
+
 Status ReportStore::EndReport(const ReportId& report_id, bool success,
                               std::string message) {
-  ReportMetadata metadata;
+  ReportMetadataLite metadata;
   Status status = GetMetadata(report_id, &metadata);
   if (status != kOK) {
     return status;
   }
 
-  metadata.set_finish_timestamp_ms(CurrentTimeMillis());
-  metadata.set_status(success ? ReportMetadata::COMPLETED_SUCCESSFULLY
-                              : ReportMetadata::TERMINATED);
+  metadata.set_finish_time_seconds(CurrentTimeSeconds());
+  metadata.set_state(success ? COMPLETED_SUCCESSFULLY : TERMINATED);
 
   if (!message.empty()) {
-    std::string messages = metadata.info_message();
-    if (!messages.empty()) {
-      messages += " : ";
-    }
-    messages += message;
-    metadata.set_info_message(messages);
+    auto* info_message = metadata.add_info_messages();
+    info_message->mutable_timestamp()->set_seconds(CurrentTimeSeconds());
+    info_message->set_message(message);
   }
 
   return WriteMetadata(report_id, metadata);
@@ -271,7 +283,7 @@ Status ReportStore::EndReport(const ReportId& report_id, bool success,
 
 Status ReportStore::AddReportRows(const ReportId& report_id,
                                   const std::vector<ReportRow>& report_rows) {
-  if (report_id.start_timestamp_ms() == 0 || report_id.instance_id() == 0) {
+  if (report_id.creation_time_seconds() == 0 || report_id.instance_id() == 0) {
     LOG(ERROR) << "Attempt to AddReportRow for incomplete report_id: "
                << ToString(report_id);
     return kInvalidArguments;
@@ -311,7 +323,7 @@ Status ReportStore::AddReportRows(const ReportId& report_id,
 }
 
 Status ReportStore::GetMetadata(const ReportId& report_id,
-                                ReportMetadata* metadata_out) {
+                                ReportMetadataLite* metadata_out) {
   DataStore::Row row;
   row.key = MakeMetadataRowKey(report_id);
   std::vector<std::string> column_names;
@@ -331,10 +343,13 @@ Status ReportStore::GetMetadata(const ReportId& report_id,
 }
 
 // Note(rudominer) For now we assume a report always fits in memory.
-Status ReportStore::GetReport(const ReportId& report_id, Report* report_out) {
+Status ReportStore::GetReport(const ReportId& report_id,
+                              ReportMetadataLite* metadata_out,
+                              ReportRows* report_out) {
+  CHECK(metadata_out);
   CHECK(report_out);
   // Read the ReportMetaData.
-  Status status = GetMetadata(report_id, report_out->mutable_metadata());
+  Status status = GetMetadata(report_id, metadata_out);
   if (status != kOK) {
     return status;
   }
@@ -372,15 +387,14 @@ Status ReportStore::GetReport(const ReportId& report_id, Report* report_out) {
 
 ReportStore::QueryReportsResponse ReportStore::QueryReports(
     uint32_t customer_id, uint32_t project_id, uint32_t report_config_id,
-    uint64_t first_start_timestamp_millis,
-    uint64_t limit_start_timestamp_millis, size_t max_results,
-    std::string pagination_token) {
+    int64_t interval_start_time_seconds, int64_t interval_end_time_seconds,
+    size_t max_results, std::string pagination_token) {
   QueryReportsResponse query_response;
 
   std::string start_row;
   bool inclusive = true;
   std::string range_start_key = MetadataRangeStartKey(
-      customer_id, project_id, report_config_id, first_start_timestamp_millis);
+      customer_id, project_id, report_config_id, interval_start_time_seconds);
   if (!pagination_token.empty()) {
     // The pagination token should be the row key of the last row returned the
     // previous time this method was invoked.
@@ -395,7 +409,7 @@ ReportStore::QueryReportsResponse ReportStore::QueryReports(
   }
 
   std::string limit_row = MetadataRangeStartKey(
-      customer_id, project_id, report_config_id, limit_start_timestamp_millis);
+      customer_id, project_id, report_config_id, interval_end_time_seconds);
 
   if (limit_row <= start_row) {
     query_response.status = kInvalidArguments;
@@ -450,14 +464,15 @@ std::string ReportStore::MakeMetadataRowKey(const ReportId& report_id) {
   return ToString(report_id);
 }
 
-std::string ReportStore::MetadataRangeStartKey(
-    uint32_t customer_id, uint32_t project_id, uint32_t report_config_id,
-    uint64_t start_timestamp_millis) {
+std::string ReportStore::MetadataRangeStartKey(uint32_t customer_id,
+                                               uint32_t project_id,
+                                               uint32_t report_config_id,
+                                               int64_t creation_time_seconds) {
   ReportId report_id;
   report_id.set_customer_id(customer_id);
   report_id.set_project_id(project_id);
   report_id.set_report_config_id(report_config_id);
-  report_id.set_start_timestamp_ms(start_timestamp_millis);
+  report_id.set_creation_time_seconds(creation_time_seconds);
   report_id.set_instance_id(0);
   // Leave variable_slice unset because the default value is zero.
   return MakeMetadataRowKey(report_id);
@@ -491,7 +506,7 @@ std::string ReportStore::ToString(const ReportId& report_id) {
 
   std::snprintf(&out[0], out.size(), "%.10u:%.10u:%.10u:%.20lu:%.10u:%.1u",
                 report_id.customer_id(), report_id.project_id(),
-                report_id.report_config_id(), report_id.start_timestamp_ms(),
+                report_id.report_config_id(), report_id.creation_time_seconds(),
                 report_id.instance_id(), report_id.variable_slice());
 
   // Discard the trailing null character.

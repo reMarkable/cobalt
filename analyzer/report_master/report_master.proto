@@ -89,7 +89,12 @@ message Report {
 
   // The rows of the report. This will only be populated if the |state|
   // of the report in the ReportMetadata is |COMPLETED_SUCCESSFULLY|.
-  repeated ReportRow rows = 2;
+  ReportRows rows = 2;
+}
+
+// The rows of a report.
+message ReportRows {
+  repeated ReportRow rows = 1;
 }
 
 // Metadata about an instance of a report.
@@ -216,7 +221,7 @@ enum ReportState {
 // of the report.
 message InfoMessage {
   google.protobuf.Timestamp timestamp = 1;
-  string messge = 2;
+  string message = 2;
 }
 
 

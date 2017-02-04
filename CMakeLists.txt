@@ -57,7 +57,7 @@ include_directories(${DIR_SYSROOT}/include)
 # Defines a command to run protoc on the top-level .proto files.
 find_package(Protobuf REQUIRED QUIET)
 protobuf_generate_cpp(COBALT_PROTO_SRCS COBALT_PROTO_HDRS
-                      encrypted_message.proto observation.proto report.proto)
+                      encrypted_message.proto observation.proto)
 
 # Defines the output of the command that runs protoc on the .proto files located
 # in the config directory.

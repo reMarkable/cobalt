@@ -14,6 +14,7 @@
 
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${REPORT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 # Build the analyzer store library
 # TODO(rudominer) Production Cobalt shouldn't be linked with memory_store.cc.
@@ -25,7 +26,8 @@ add_library(analyzer_store
             memory_store.cc
             observation_store.cc
             report_store.cc
-            ${COBALT_PROTO_SRCS})
+            ${COBALT_PROTO_SRCS}
+            ${REPORT_PROTO_SRCS})
 
 
 target_link_libraries(analyzer_store

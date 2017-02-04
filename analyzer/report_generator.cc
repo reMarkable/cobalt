@@ -150,7 +150,7 @@ ReportGenerator::ReportGenerator(
 
 grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   // Fetch ReportMetadata
-  ReportMetadata metadata;
+  ReportMetadataLite metadata;
   auto status = CheckStatusFromGet(
       report_store_->GetMetadata(report_id, &metadata), report_id);
   if (!status.ok()) {
@@ -158,7 +158,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   }
 
   // Report must be IN_PROGRESS
-  if (metadata.status() != ReportMetadata::IN_PROGRESS) {
+  if (metadata.state() != IN_PROGRESS) {
     std::ostringstream stream;
     stream << "Report is not IN_PROGRESS" << ReportStore::ToString(report_id);
     std::string message = stream.str();

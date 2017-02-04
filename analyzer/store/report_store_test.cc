@@ -31,12 +31,12 @@ const uint32_t kCustomerId = 11;
 const uint32_t kProjectId = 222;
 const uint32_t kReportConfigId = 3333;
 
-ReportId MakeReportId(uint64_t start_timestamp_ms, uint32_t instance_id) {
+ReportId MakeReportId(int64_t creation_time_seconds, uint32_t instance_id) {
   ReportId report_id;
   report_id.set_customer_id(kCustomerId);
   report_id.set_project_id(kProjectId);
   report_id.set_report_config_id(kReportConfigId);
-  report_id.set_start_timestamp_ms(start_timestamp_ms);
+  report_id.set_creation_time_seconds(creation_time_seconds);
   report_id.set_instance_id(instance_id);
   return report_id;
 }
@@ -52,9 +52,9 @@ class ReportStorePrivateTest : public ::testing::Test {
     return ReportStore::MakeMetadataRowKey(report_id);
   }
 
-  static std::string MetadataRangeStartKey(uint64_t start_timestamp_millis) {
+  static std::string MetadataRangeStartKey(int64_t creation_time_seconds) {
     return ReportStore::MetadataRangeStartKey(
-        kCustomerId, kProjectId, kReportConfigId, start_timestamp_millis);
+        kCustomerId, kProjectId, kReportConfigId, creation_time_seconds);
   }
 
   static std::string ReportStartRowKey(const ReportId& report_id) {
