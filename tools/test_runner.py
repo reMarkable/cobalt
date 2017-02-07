@@ -63,9 +63,10 @@ def run_all_tests(test_dir, bigtable_emulator=False, test_args=None):
         print "****** WARNING Process terminated by signal %d" % (- return_code)
     finally:
       if bt_emulator_process is not None and bt_emulator_process.poll() is None:
-        print "Killing Cloud Bigtable Emulator"
+        print "Killing Cloud Bigtable Emulator..."
         bt_emulator_process.terminate()
         bt_emulator_process.kill()
+        bt_emulator_process.wait()
   if all_passed:
     return 0
   else:

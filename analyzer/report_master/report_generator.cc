@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "analyzer/report_generator.h"
+#include "analyzer/report_master/report_generator.h"
 
 #include <map>
 #include <memory>
@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-#include "analyzer/encoding_mixer.h"
+#include "analyzer/report_master/encoding_mixer.h"
 #include "glog/logging.h"
 
 namespace cobalt {

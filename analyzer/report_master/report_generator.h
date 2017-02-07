@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef COBALT_ANALYZER_REPORT_GENERATOR_H_
-#define COBALT_ANALYZER_REPORT_GENERATOR_H_
+#ifndef COBALT_ANALYZER_REPORT_MASTER_REPORT_GENERATOR_H_
+#define COBALT_ANALYZER_REPORT_MASTER_REPORT_GENERATOR_H_
 
 #include <map>
 #include <memory>
@@ -126,4 +126,4 @@ class ReportGenerator {
 }  // namespace analyzer
 }  // namespace cobalt
 
-#endif  // COBALT_ANALYZER_REPORT_GENERATOR_H_
+#endif  // COBALT_ANALYZER_REPORT_MASTER_REPORT_GENERATOR_H_

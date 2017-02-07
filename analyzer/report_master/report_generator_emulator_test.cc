@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "analyzer/store/bigtable_cloud_helper.h"
-#include "analyzer/report_generator_abstract_test.h"
+#include "analyzer/report_master/report_generator_abstract_test.h"
+#include "analyzer/store/bigtable_emulator_helper.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
 namespace cobalt {
@@ -21,20 +21,14 @@ namespace analyzer {
 namespace store {
 
 // We instantiate ReportGeneratorAbstractTest using an instance of
-// BigtableStore connected to the real Cloud Bigtable as the underlying
-// DataStore. See notes in bigtable_cloud_helper.h
+// BigtableStore connected to a local Bigtable Emulator as the underlying
+// DataStore. It is assumed that the Bigtable Emulator is running on localhost
+// at the default port (9000).
 
-INSTANTIATE_TYPED_TEST_CASE_P(ReportGeneratorCloudTest,
+INSTANTIATE_TYPED_TEST_CASE_P(ReportGeneratorEmulatorTest,
                               ReportGeneratorAbstractTest,
-                              BigtableStoreCloudFactory);
+                              BigtableStoreEmulatorFactory);
 
 }  // namespace store
 }  // namespace analyzer
 }  // namespace cobalt
-
-int main(int argc, char** argv) {
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

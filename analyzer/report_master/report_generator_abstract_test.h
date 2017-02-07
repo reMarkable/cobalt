@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef COBALT_ANALYZER_REPORT_GENERATOR_ABSTRACT_TEST_H_
-#define COBALT_ANALYZER_REPORT_GENERATOR_ABSTRACT_TEST_H_
+#ifndef COBALT_ANALYZER_REPORT_MASTER_REPORT_GENERATOR_ABSTRACT_TEST_H_
+#define COBALT_ANALYZER_REPORT_MASTER_REPORT_GENERATOR_ABSTRACT_TEST_H_
 
-#include "analyzer/report_generator.h"
+#include "analyzer/report_master/report_generator.h"
 
 #include <memory>
 #include <string>
@@ -417,4 +417,4 @@ REGISTER_TYPED_TEST_CASE_P(ReportGeneratorAbstractTest, Forculus, BasicRappor);
 }  // namespace analyzer
 }  // namespace cobalt
 
-#endif  // COBALT_ANALYZER_REPORT_GENERATOR_ABSTRACT_TEST_H_
+#endif  // COBALT_ANALYZER_REPORT_MASTER_REPORT_GENERATOR_ABSTRACT_TEST_H_

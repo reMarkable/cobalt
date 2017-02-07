@@ -21,12 +21,7 @@ set(REPORT_PROTO_SRCS
 add_subdirectory(report_master)
 add_subdirectory(store)
 
-set(ANALYZER_SRCS
-    analyzer_service.cc
-    encoding_mixer.cc
-    report_generator.cc
-    report_master.cc
-    )
+set(ANALYZER_SRCS analyzer_service.cc)
 
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
@@ -54,9 +49,7 @@ target_link_libraries(cobalt_analyzer
                       cobalt_crypto
                       glog
                       gflags
-                      googleapis
-                      forculus_analyzer
-                      rappor_analyzer)
+                      googleapis)
 
 # Build the analyzer executable
 add_executable(analyzer main.cc)
@@ -64,32 +57,9 @@ target_link_libraries(analyzer cobalt_analyzer)
 
 # Build the tests
 add_executable(analyzer_tests
-              analyzer_service_test.cc
-              encoding_mixer_test.cc
-              report_generator_test.cc)
+              analyzer_service_test.cc)
 target_link_libraries(analyzer_tests
-                      encoder cobalt_analyzer
+                      cobalt_analyzer
                       gtest gtest_main)
 set_target_properties(analyzer_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
-
-# Versions of our tests that expect the existence of a running local instance of
-# the Bigtable Emulator process.
-add_executable(analyzer_emulator_tests
-               report_generator_emulator_test.cc)
-target_link_libraries(analyzer_emulator_tests
-                      encoder cobalt_analyzer
-                      gtest gtest_main)
-set_target_properties(analyzer_emulator_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})
-
-# Versions of our tests that connect to the real Cloud Bigtable. See
-# notes in bigtabe_cloud_helper.h for how this works.
-add_executable(analyzer_cloud_tests
-               report_generator_cloud_test.cc)
-target_link_libraries(analyzer_cloud_tests
-                      encoder  cobalt_analyzer
-                      gtest gtest_main)
-set_target_properties(analyzer_cloud_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})
-
