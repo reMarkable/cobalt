@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"
 #include "algorithms/rappor/basic_rappor_analyzer.h"
 #include "glog/logging.h"
@@ -50,6 +51,10 @@ bool CheckConsistentEncoding(const EncodingConfig& encoding_config,
     case ObservationPart::kRappor:
       consistent = encoding_config.has_rappor();
       break;
+    case ObservationPart::VALUE_NOT_SET:
+      consistent = false;
+      break;
+
     default:
       LOG(FATAL) << "Unexpected case " << observation_part.value_case();
   }
