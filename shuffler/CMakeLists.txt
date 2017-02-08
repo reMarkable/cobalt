@@ -27,7 +27,7 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
     COMMAND ${PROTOC} ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
             ${CMAKE_SOURCE_DIR}/encrypted_message.proto
             ${CMAKE_SOURCE_DIR}/observation.proto
-            ${CMAKE_SOURCE_DIR}/analyzer/analyzer.proto
+            ${CMAKE_SOURCE_DIR}/analyzer/analyzer_service/analyzer.proto
             ${CMAKE_CURRENT_SOURCE_DIR}/config.proto
             -I ${CMAKE_SOURCE_DIR}
             -I ${CMAKE_CURRENT_SOURCE_DIR}
@@ -40,15 +40,16 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
     # directory structure intact in the final output. But this causes runtime
     # errors, so moving all generated files under cobalt package.
     COMMAND mv ${GO_PROTO_GEN}/cobalt/shuffler/shuffler.pb.go ${SHUFFLER_GEN_PROTO_FILE}
-    COMMAND mv ${GO_PROTO_GEN}/cobalt/analyzer/analyzer.pb.go ${ANALYZER_GEN_PROTO_FILE}
+    COMMAND mv ${GO_PROTO_GEN}/cobalt/analyzer/analyzer_service/analyzer.pb.go ${ANALYZER_GEN_PROTO_FILE}
     COMMAND mv ${GO_PROTO_GEN}/cobalt/shuffler/config.pb.go ${CONFIG_GEN_PROTO_FILE}
     COMMAND rmdir ${GO_PROTO_GEN}/cobalt/shuffler
+    COMMAND rmdir ${GO_PROTO_GEN}/cobalt/analyzer/analyzer_service
     COMMAND rmdir ${GO_PROTO_GEN}/cobalt/analyzer
     DEPENDS shuffler.proto
     DEPENDS config.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/observation.proto
-    DEPENDS ${CMAKE_SOURCE_DIR}/analyzer/analyzer.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/analyzer/analyzer_service/analyzer.proto
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

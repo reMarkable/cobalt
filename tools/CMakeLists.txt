@@ -14,5 +14,8 @@
 
 add_executable(cgen cgen.cc)
 
-target_link_libraries(cgen cobalt_analyzer cobalt_shuffler forculus_encrypter
+target_link_libraries(cgen
+                      analyzer_service_lib
+                      cobalt_shuffler
+                      forculus_encrypter
                       gflags)

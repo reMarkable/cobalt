@@ -41,14 +41,13 @@ add_library(analyzer_report_master_lib
             report_generator.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS} ${REPORT_PROTO_SRCS} )
 target_link_libraries(analyzer_report_master_lib
-                      ${PROTOBUF_LIBRARY}
                       analyzer_store
                       cobalt_crypto
                       forculus_analyzer
                       glog
                       gflags
-                      googleapis
-                      rappor_analyzer)
+                      rappor_analyzer
+                      ${PROTOBUF_LIBRARY})
 
 # Build the tests
 add_executable(analyzer_report_master_tests

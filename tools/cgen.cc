@@ -30,7 +30,7 @@
 
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_encrypter.h"
-#include "analyzer/analyzer_service.h"
+#include "analyzer/analyzer_service/analyzer_service.h"
 #include "config/encoding_config.h"
 #include "config/encodings.pb.h"
 #include "shuffler/shuffler.grpc.pb.h"

@@ -29,7 +29,6 @@ add_library(analyzer_store
             ${COBALT_PROTO_SRCS}
             ${REPORT_PROTO_SRCS})
 
-
 target_link_libraries(analyzer_store
                       cobalt_crypto
                       glog
@@ -50,7 +49,12 @@ add_executable(bigtable_emulator_tests
                bigtable_store_emulator_test.cc
                observation_store_emulator_test.cc
                report_store_emulator_test.cc)
-target_link_libraries(bigtable_emulator_tests gtest gtest_main cobalt_analyzer)
+target_link_libraries(bigtable_emulator_tests
+                      analyzer_store
+                      glog
+                      gflags
+                      gtest gtest_main
+                      ${PROTOBUF_LIBRARY})
 set_target_properties(bigtable_emulator_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})
 
@@ -60,6 +64,11 @@ add_executable(bigtable_cloud_tests
                bigtable_store_cloud_test.cc
                observation_store_cloud_test.cc
                report_store_cloud_test.cc)
-target_link_libraries(bigtable_cloud_tests gtest gtest_main cobalt_analyzer)
+target_link_libraries(bigtable_cloud_tests
+                      analyzer_store
+                      glog
+                      gflags
+                      gtest gtest_main
+                      ${PROTOBUF_LIBRARY})
 set_target_properties(bigtable_cloud_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})

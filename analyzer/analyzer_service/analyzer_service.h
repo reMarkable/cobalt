@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef COBALT_ANALYZER_ANALYZER_SERVICE_H_
-#define COBALT_ANALYZER_ANALYZER_SERVICE_H_
+#ifndef COBALT_ANALYZER_ANALYZER_SERVICE_ANALYZER_SERVICE_H_
+#define COBALT_ANALYZER_ANALYZER_SERVICE_ANALYZER_SERVICE_H_
 
 #include <memory>
 #include <string>
 #include <utility>
 
-#include "analyzer/analyzer.grpc.pb.h"
+#include "analyzer/analyzer_service/analyzer.grpc.pb.h"
 #include "analyzer/store/data_store.h"
 #include "analyzer/store/observation_store.h"
 #include "grpc++/grpc++.h"
@@ -73,4 +73,4 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
 }  // namespace analyzer
 }  // namespace cobalt
 
-#endif  // COBALT_ANALYZER_ANALYZER_SERVICE_H_
+#endif  // COBALT_ANALYZER_ANALYZER_SERVICE_ANALYZER_SERVICE_H_

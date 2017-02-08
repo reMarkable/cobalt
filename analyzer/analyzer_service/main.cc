@@ -14,7 +14,7 @@
 
 #include <string>
 
-#include "analyzer/analyzer_service.h"
+#include "analyzer/analyzer_service/analyzer_service.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 
