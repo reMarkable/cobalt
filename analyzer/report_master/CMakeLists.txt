@@ -39,8 +39,10 @@ set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 add_library(analyzer_report_master_lib
             encoding_mixer.cc
             report_generator.cc
+            report_master_service.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS} ${REPORT_PROTO_SRCS} )
 target_link_libraries(analyzer_report_master_lib
+                      analyzer_config
                       analyzer_store
                       cobalt_crypto
                       forculus_analyzer
@@ -48,6 +50,11 @@ target_link_libraries(analyzer_report_master_lib
                       gflags
                       rappor_analyzer
                       ${PROTOBUF_LIBRARY})
+
+# Build the Report Master executable
+add_executable(analyzer_report_master main.cc)
+target_link_libraries(analyzer_report_master
+                      analyzer_report_master_lib)
 
 # Build the tests
 add_executable(analyzer_report_master_tests
