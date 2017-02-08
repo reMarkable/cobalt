@@ -6,5 +6,7 @@ An extensible, privacy-preserving, user-data analysis pipeline.
 * Local Modifications
   * Require "COBALT_" as a prefix in the header guard
 
+  * Allow `#include <condition_variable>`
+  * Allow `#include <mutex>`
   * Allow `#include <thread>`
   * Allow `#include <chrono>`

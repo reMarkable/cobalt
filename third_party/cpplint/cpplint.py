@@ -5529,10 +5529,10 @@ def FlagCxx11Features(filename, clean_lines, linenum, error):
 
   # Flag unapproved C++11 headers.
   if include and include.group(1) in ('cfenv',
-                                      'condition_variable',
+#                                     'condition_variable', # Allow in cobalt
                                       'fenv.h',
                                       'future',
-                                      'mutex',
+#                                     'mutex',  # Allow mutex in cobalt
 #                                     'thread', # Allow threads in cobalt
 #                                     'chrono', # Allow chrono in cobalt
                                       'ratio',
