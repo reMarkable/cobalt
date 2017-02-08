@@ -16,12 +16,28 @@ set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
 protobuf_generate_cpp(CONFIG_PROTO_SRCS CONFIG_PROTO_HDRS
                       encodings.proto metrics.proto report_configs.proto)
 
+# Build the analyzer_config library
+add_library(analyzer_config
+            analyzer_config.cc
+            ${CONFIG_PROTO_SRCS})
+
+target_link_libraries(analyzer_config
+                      glog
+                      gflags
+                      ${PROTOBUF_LIBRARY})
+
 # Build the config_gen tool
 add_executable(config_gen config_gen.cc ${CONFIG_PROTO_SRCS})
 target_link_libraries(config_gen ${PROTOBUF_LIBRARY})
 
-# Build the test
-add_executable(config_test config_test.cc ${CONFIG_PROTO_SRCS})
-target_link_libraries(config_test gtest gtest_main ${PROTOBUF_LIBRARY})
-set_target_properties(config_test PROPERTIES
+# Build the tests
+add_executable(config_tests
+               analyzer_config_test.cc
+               config_test.cc
+               ${CONFIG_PROTO_SRCS})
+target_link_libraries(config_tests
+                      analyzer_config
+                      gtest gtest_main
+                      ${PROTOBUF_LIBRARY})
+set_target_properties(config_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
