@@ -159,29 +159,35 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     auto metric_parse_result =
         config::MetricRegistry::FromString(testing::kMetricConfigText, nullptr);
     EXPECT_EQ(config::kOK, metric_parse_result.second);
-    metric_registry_.reset(metric_parse_result.first.release());
+    std::shared_ptr<config::MetricRegistry> metric_registry(
+        metric_parse_result.first.release());
 
     // Parse the encoding config string
     auto encoding_parse_result = config::EncodingRegistry::FromString(
         testing::kEncodingConfigText, nullptr);
     EXPECT_EQ(config::kOK, encoding_parse_result.second);
-    encoding_configs_.reset(encoding_parse_result.first.release());
+    std::shared_ptr<config::EncodingRegistry> encoding_config_registry(
+        encoding_parse_result.first.release());
 
     // Parse the report config string
     auto report_parse_result =
         config::ReportRegistry::FromString(testing::kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
-    report_configs_.reset(report_parse_result.first.release());
+    std::shared_ptr<config::ReportRegistry> report_config_registry(
+        report_parse_result.first.release());
 
     // Make a ProjectContext
     project_.reset(
         new encoder::ProjectContext(testing::kCustomerId, testing::kProjectId,
-                                    metric_registry_, encoding_configs_));
+                                    metric_registry, encoding_config_registry));
+
+    std::shared_ptr<config::AnalyzerConfig> analyzer_config(
+        new config::AnalyzerConfig(encoding_config_registry, metric_registry,
+                                   report_config_registry));
 
     // Make the ReportGenerator
     report_generator_.reset(new ReportGenerator(
-        metric_registry_, report_configs_, encoding_configs_,
-        observation_store_, report_store_));
+        analyzer_config, observation_store_, report_store_));
   }
 
   // Makes an Observation with two string parts, both of which have the
@@ -364,9 +370,6 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   std::shared_ptr<store::DataStore> data_store_;
   std::shared_ptr<store::ObservationStore> observation_store_;
   std::shared_ptr<store::ReportStore> report_store_;
-  std::shared_ptr<config::MetricRegistry> metric_registry_;
-  std::shared_ptr<config::EncodingRegistry> encoding_configs_;
-  std::shared_ptr<config::ReportRegistry> report_configs_;
   std::unique_ptr<ReportGenerator> report_generator_;
 };
 

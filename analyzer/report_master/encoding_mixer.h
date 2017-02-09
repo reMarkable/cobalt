@@ -24,9 +24,7 @@
 #include "algorithms/forculus/forculus_analyzer.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
-#include "config/encoding_config.h"
-#include "config/metric_config.h"
-#include "config/report_config.h"
+#include "config/analyzer_config.h"
 #include "grpc++/grpc++.h"
 
 namespace cobalt {
@@ -59,15 +57,15 @@ class DecoderAdapter;
 class EncodingMixer {
  public:
   // Constructs an EncodingMixer for the single-variable report with the
-  // given |report_id|. The |encoding_configs| parameter is used to look up
+  // given |report_id|. The |analyzer_config| parameter is used to look up
   // EncodingConfigs by their ID.
   EncodingMixer(const ReportId& report_id,
-                std::shared_ptr<config::EncodingRegistry> encoding_configs);
+                std::shared_ptr<config::AnalyzerConfig> analyzer_config);
 
   // Process the given (day_index, ObservationPart) pair. The |day_index|
   // indicates the day on which the ObservationPart was observed, as specified
   // by the Encoder client. The |encoding_config_id| from the ObservationPart
-  // will be looked up in the EncodingRegistry passed to the constructor and
+  // will be looked up in the AnalyzerConfig passed to the constructor and
   // this will determine which decooder/analyzer is used to process the
   // ObservationPart.
   //
@@ -101,8 +99,8 @@ class EncodingMixer {
   // decode the correspodning encoding.
   std::map<uint32_t, std::unique_ptr<DecoderAdapter>> decoders_;
 
-  // The registry of EncodingConfigs.
-  std::shared_ptr<config::EncodingRegistry> encoding_configs_;
+  // Contains the registry of EncodingConfigs.
+  std::shared_ptr<config::AnalyzerConfig> analyzer_config_;
 };
 
 // A DecoderAdapter offers a common interface for the EncodingMixer to use

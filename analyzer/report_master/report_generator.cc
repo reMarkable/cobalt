@@ -137,14 +137,10 @@ grpc::Status BuildParts(const ReportConfig& report_config,
 }  // namespace
 
 ReportGenerator::ReportGenerator(
-    std::shared_ptr<MetricRegistry> metrics,
-    std::shared_ptr<ReportRegistry> report_configs,
-    std::shared_ptr<config::EncodingRegistry> encoding_configs,
+    std::shared_ptr<config::AnalyzerConfig> analyzer_config,
     std::shared_ptr<ObservationStore> observation_store,
     std::shared_ptr<ReportStore> report_store)
-    : metrics_(metrics),
-      report_configs_(report_configs),
-      encoding_configs_(encoding_configs),
+    : analyzer_config_(analyzer_config),
       observation_store_(observation_store),
       report_store_(report_store) {}
 
@@ -167,9 +163,9 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   }
 
   // Fetch ReportConfig
-  const ReportConfig* report_config =
-      report_configs_->Get(report_id.customer_id(), report_id.project_id(),
-                           report_id.report_config_id());
+  const ReportConfig* report_config = analyzer_config_->ReportConfig(
+      report_id.customer_id(), report_id.project_id(),
+      report_id.report_config_id());
   if (!report_config) {
     std::ostringstream stream;
     stream << "Not found: " << ReportConfigIdString(report_id);
@@ -189,9 +185,9 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   }
 
   // Fetch the Metric.
-  const Metric* metric =
-      metrics_->Get(report_config->customer_id(), report_config->project_id(),
-                    report_config->metric_id());
+  const Metric* metric = analyzer_config_->Metric(report_config->customer_id(),
+                                                  report_config->project_id(),
+                                                  report_config->metric_id());
   if (!metric) {
     std::ostringstream stream;
     stream << "Not found: " << MetricIdString(*report_config);
@@ -237,7 +233,7 @@ grpc::Status ReportGenerator::GenerateSingleVariableReport(
   const std::string& part_name = single_part[0];
 
   // Construct the EncodingMixer.
-  EncodingMixer encoding_mixer(report_id, encoding_configs_);
+  EncodingMixer encoding_mixer(report_id, analyzer_config_);
 
   // We query the ObservationStore for the relevant ObservationParts.
   store::ObservationStore::QueryResponse query_response;

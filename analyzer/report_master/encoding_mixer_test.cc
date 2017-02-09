@@ -28,6 +28,7 @@
 namespace cobalt {
 namespace analyzer {
 
+using config::AnalyzerConfig;
 using config::EncodingRegistry;
 using config::MetricRegistry;
 using encoder::ClientSecret;
@@ -124,12 +125,16 @@ class EncodingMixerTest : public ::testing::Test {
     auto encoding_parse_result =
         EncodingRegistry::FromString(kEncodingConfigText, nullptr);
     EXPECT_EQ(config::kOK, encoding_parse_result.second);
-    encoding_configs_.reset(encoding_parse_result.first.release());
+    std::shared_ptr<EncodingRegistry> encoding_registry(
+        (encoding_parse_result.first.release()));
 
     project_.reset(new ProjectContext(kCustomerId, kProjectId, metric_registry,
-                                      encoding_configs_));
+                                      encoding_registry));
 
-    encoding_mixer_.reset(new EncodingMixer(report_id_, encoding_configs_));
+    std::shared_ptr<AnalyzerConfig> analyzer_config(
+        new AnalyzerConfig(encoding_registry, metric_registry, nullptr));
+
+    encoding_mixer_.reset(new EncodingMixer(report_id_, analyzer_config));
   }
 
   // Makes an Observation with two string parts, both of which have the
@@ -302,7 +307,6 @@ class EncodingMixerTest : public ::testing::Test {
   }
 
   ReportId report_id_;
-  std::shared_ptr<config::EncodingRegistry> encoding_configs_;
   std::shared_ptr<ProjectContext> project_;
   std::unique_ptr<EncodingMixer> encoding_mixer_;
 };

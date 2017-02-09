@@ -25,9 +25,7 @@
 #include "algorithms/forculus/forculus_analyzer.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
-#include "config/encoding_config.h"
-#include "config/metric_config.h"
-#include "config/report_config.h"
+#include "config/analyzer_config.h"
 #include "grpc++/grpc++.h"
 
 namespace cobalt {
@@ -53,9 +51,7 @@ namespace analyzer {
 // to the ReportStore.
 class ReportGenerator {
  public:
-  ReportGenerator(std::shared_ptr<config::MetricRegistry> metrics,
-                  std::shared_ptr<config::ReportRegistry> report_configs,
-                  std::shared_ptr<config::EncodingRegistry> encoding_configs,
+  ReportGenerator(std::shared_ptr<config::AnalyzerConfig> analyzer_config,
                   std::shared_ptr<store::ObservationStore> observation_store,
                   std::shared_ptr<store::ReportStore> report_store);
 
@@ -116,9 +112,7 @@ class ReportGenerator {
                                    uint32_t start_day_index,
                                    uint32_t end_day_index);
 
-  std::shared_ptr<config::MetricRegistry> metrics_;
-  std::shared_ptr<config::ReportRegistry> report_configs_;
-  std::shared_ptr<config::EncodingRegistry> encoding_configs_;
+  std::shared_ptr<config::AnalyzerConfig> analyzer_config_;
   std::shared_ptr<store::ObservationStore> observation_store_;
   std::shared_ptr<store::ReportStore> report_store_;
 };

@@ -26,9 +26,7 @@
 namespace cobalt {
 namespace analyzer {
 
-using config::EncodingRegistry;
-using config::MetricRegistry;
-using config::ReportRegistry;
+using config::AnalyzerConfig;
 using forculus::ForculusAnalyzer;
 using rappor::BasicRapporAnalyzer;
 using store::ObservationStore;
@@ -195,8 +193,8 @@ class BasicRapporAdapter : public DecoderAdapter {
 /// EncodingMixer methods.
 ///////////////////////////////////////////////////////////////////////////
 EncodingMixer::EncodingMixer(const ReportId& report_id,
-                             std::shared_ptr<EncodingRegistry> encoding_configs)
-    : report_id_(report_id), encoding_configs_(encoding_configs) {}
+                             std::shared_ptr<AnalyzerConfig> analyzer_config)
+    : report_id_(report_id), analyzer_config_(analyzer_config) {}
 
 bool EncodingMixer::ProcessObservationPart(uint32_t day_index,
                                            const ObservationPart& obs) {
@@ -249,7 +247,7 @@ grpc::Status EncodingMixer::PerformAnalysis(std::vector<ReportRow>* results) {
 DecoderAdapter* EncodingMixer::GetDecoder(
     const ObservationPart& observation_part) {
   uint32_t encoding_config_id = observation_part.encoding_config_id();
-  const EncodingConfig* encoding_config = encoding_configs_->Get(
+  const EncodingConfig* encoding_config = analyzer_config_->EncodingConfig(
       report_id_.customer_id(), report_id_.project_id(), encoding_config_id);
   if (!encoding_config) {
     LOG(ERROR) << "Bad ObservationPart! Contains invalid encoding_config_id "
