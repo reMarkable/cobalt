@@ -43,6 +43,7 @@ MemoryStoreSingleton& MemoryStoreSingleton::Instance() {
 }
 
 Status MemoryStoreSingleton::WriteRow(Table table, Row row) {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   auto& rows = GetRows(table);
   rows[row.key].clear();
   rows[row.key] = std::move(row.column_values);
@@ -50,6 +51,7 @@ Status MemoryStoreSingleton::WriteRow(Table table, Row row) {
 }
 
 Status MemoryStoreSingleton::WriteRows(Table table, std::vector<Row> rows) {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   size_t total_num_columns = 0;
   for (Row& row : rows) {
     total_num_columns += row.column_values.size();
@@ -64,6 +66,7 @@ Status MemoryStoreSingleton::WriteRows(Table table, std::vector<Row> rows) {
 
 Status MemoryStoreSingleton::ReadRow(
     Table table, const std::vector<std::string>& column_names, Row* row) {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   if (row == nullptr) {
     return kInvalidArguments;
   }
@@ -97,6 +100,7 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
     std::string limit_row_key, const std::vector<std::string>& column_names,
     size_t max_rows) {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   ReadResponse read_response;
   read_response.status = kOK;
   if (max_rows == 0) {
@@ -155,12 +159,14 @@ DataStore::ReadResponse MemoryStoreSingleton::ReadRows(
 }
 
 Status MemoryStoreSingleton::DeleteRow(Table table, std::string row_key) {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   GetRows(table).erase(row_key);
   return kOK;
 }
 
 Status MemoryStoreSingleton::DeleteRowsWithPrefix(Table table,
                                                   std::string row_key_prefix) {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   if (row_key_prefix.empty()) {
     return kInvalidArguments;
   }
@@ -180,6 +186,7 @@ Status MemoryStoreSingleton::DeleteRowsWithPrefix(Table table,
 }
 
 Status MemoryStoreSingleton::DeleteAllRows(Table table) {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
   GetRows(table).clear();
   return kOK;
 }

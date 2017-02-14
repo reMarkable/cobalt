@@ -16,6 +16,7 @@
 #define COBALT_ANALYZER_STORE_MEMORY_STORE_H_
 
 #include <map>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -58,6 +59,9 @@ class MemoryStoreSingleton : public DataStore {
 
   std::map<std::string, std::map<std::string, std::string>> observation_rows_,
       report_metadata_rows_, report_rows_rows_;
+
+  // protects observation_rows_, report_metadata_rows_, report_rows_rows_.
+  std::recursive_mutex mutex_;
 };
 
 // An in-memory implementation of DataStore. The backing store is a singleton

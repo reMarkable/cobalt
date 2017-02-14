@@ -122,7 +122,7 @@ class ObservationStore {
 
  private:
   // The underlying data store.
-  std::shared_ptr<DataStore> store_;
+  const std::shared_ptr<DataStore> store_;
 };
 
 }  // namespace store
