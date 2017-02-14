@@ -415,11 +415,11 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
   this->WriteManyNewReports(kStartTimestamp, kTimestampDelta, num_timestamps);
 
   // Query for 120 of the  300 rows.
-  uint64_t first_start_timestamp_ms = kStartTimestamp + 5 * kTimestampDelta;
-  uint64_t limit_start_timestamp_ms = kStartTimestamp + 25 * kTimestampDelta;
+  uint64_t interval_start_time_seconds = kStartTimestamp + 5 * kTimestampDelta;
+  uint64_t interval_end_time_seconds = kStartTimestamp + 25 * kTimestampDelta;
   auto query_reports_response = this->report_store_->QueryReports(
       this->customer_id(), this->project_id(), this->report_config_id(),
-      first_start_timestamp_ms, limit_start_timestamp_ms, INT_MAX, "");
+      interval_start_time_seconds, interval_end_time_seconds, INT_MAX, "");
 
   // Check the results.
   ASSERT_EQ(kOK, query_reports_response.status);
@@ -431,8 +431,8 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
     EXPECT_EQ(this->project_id(), report_id.project_id());
     EXPECT_EQ(this->report_config_id(), report_id.report_config_id());
     uint64_t timestamp = report_id.creation_time_seconds();
-    EXPECT_TRUE(first_start_timestamp_ms <= timestamp);
-    EXPECT_TRUE(timestamp < limit_start_timestamp_ms);
+    EXPECT_TRUE(interval_start_time_seconds <= timestamp);
+    EXPECT_TRUE(timestamp < interval_end_time_seconds);
     // See WriteManyNewReports for how we set
     // report_metadata.start_time_seconds()
     EXPECT_EQ(timestamp + report_id.instance_id() + report_id.variable_slice(),
@@ -442,13 +442,13 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
   // Query again. This time we set limit_start_timestamp = infinity and
   // we query the results in batches of 100.
   std::vector<ReportStore::ReportRecord> full_results;
-  first_start_timestamp_ms = kStartTimestamp + 5 * kTimestampDelta;
-  limit_start_timestamp_ms = UINT64_MAX;
+  interval_start_time_seconds = kStartTimestamp + 5 * kTimestampDelta;
+  interval_end_time_seconds = UINT64_MAX;
   std::string pagination_token = "";
   do {
     query_reports_response = this->report_store_->QueryReports(
         this->customer_id(), this->project_id(), this->report_config_id(),
-        first_start_timestamp_ms, limit_start_timestamp_ms, 100,
+        interval_start_time_seconds, interval_end_time_seconds, 100,
         pagination_token);
     EXPECT_EQ(kOK, query_reports_response.status);
     for (auto& result : query_reports_response.results) {
@@ -465,8 +465,8 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
     EXPECT_EQ(this->project_id(), report_id.project_id());
     EXPECT_EQ(this->report_config_id(), report_id.report_config_id());
     uint64_t timestamp = report_id.creation_time_seconds();
-    EXPECT_TRUE(first_start_timestamp_ms <= timestamp);
-    EXPECT_TRUE(timestamp < limit_start_timestamp_ms);
+    EXPECT_TRUE(interval_start_time_seconds <= timestamp);
+    EXPECT_TRUE(timestamp < interval_end_time_seconds);
     // See WriteManyNewReports for how we set
     // report_metadata.start_time_seconds()
     EXPECT_EQ(timestamp + report_id.instance_id() + report_id.variable_slice(),

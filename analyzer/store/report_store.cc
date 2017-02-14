@@ -44,12 +44,6 @@ const char kMetadataColumnName[] = "metadata";
 // The name of the data column in the report_rows table
 const char kReportRowColumnName[] = "report_row";
 
-int64_t CurrentTimeSeconds() {
-  return std::chrono::duration_cast<std::chrono::seconds>(
-             std::chrono::system_clock::now().time_since_epoch())
-      .count();
-}
-
 uint32_t RandomUint32() {
   cobalt::crypto::Random rand;
   return rand.RandomUint32();
@@ -166,7 +160,8 @@ bool ValidateVariableSlice(const ReportId& report_id,
 
 }  // namespace
 
-ReportStore::ReportStore(std::shared_ptr<DataStore> store) : store_(store) {}
+ReportStore::ReportStore(std::shared_ptr<DataStore> store)
+    : store_(store), clock_(new util::SystemClock()) {}
 
 DataStore::Row ReportStore::MakeDataStoreRow(
     const ReportId& report_id, const ReportMetadataLite& metadata) {
@@ -202,7 +197,7 @@ Status ReportStore::StartNewReport(uint32_t first_day_index,
                                    ReportId* report_id) {
   CHECK(report_id);
   // Complete the report_id.
-  report_id->set_creation_time_seconds(CurrentTimeSeconds());
+  report_id->set_creation_time_seconds(clock_->CurrentTimeSeconds());
   report_id->set_instance_id(RandomUint32());
 
   // Build a serialized ReportMetadataLite.
@@ -256,7 +251,7 @@ Status ReportStore::StartSecondarySlice(const ReportId& report_id) {
 
   // We are starting a secondary slice report so set the start time to the
   // current time.
-  metadata.set_start_time_seconds(CurrentTimeSeconds());
+  metadata.set_start_time_seconds(clock_->CurrentTimeSeconds());
 
   return WriteMetadata(report_id, metadata);
 }
@@ -269,12 +264,13 @@ Status ReportStore::EndReport(const ReportId& report_id, bool success,
     return status;
   }
 
-  metadata.set_finish_time_seconds(CurrentTimeSeconds());
+  metadata.set_finish_time_seconds(clock_->CurrentTimeSeconds());
   metadata.set_state(success ? COMPLETED_SUCCESSFULLY : TERMINATED);
 
   if (!message.empty()) {
     auto* info_message = metadata.add_info_messages();
-    info_message->mutable_timestamp()->set_seconds(CurrentTimeSeconds());
+    info_message->mutable_timestamp()->set_seconds(
+        clock_->CurrentTimeSeconds());
     info_message->set_message(message);
   }
 

@@ -22,6 +22,7 @@
 #include "analyzer/report_master/report_internal.pb.h"
 #include "analyzer/report_master/report_master.pb.h"
 #include "analyzer/store/data_store.h"
+#include "util/datetime_util.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -218,8 +219,15 @@ class ReportStore {
 
   static std::string ToString(const ReportId& report_id);
 
+  // Sets the clock used by the ReportStore for obtaining the current time.
+  // Mostly useful for tests.
+  void set_clock(std::shared_ptr<util::ClockInterface> clock) {
+    clock_ = clock;
+  }
+
  private:
   friend class ReportStorePrivateTest;
+
   // Makes all instantiations of ReportStoreAbstractTest friends.
   template <class X>
   friend class ReportStoreAbstractTest;
@@ -257,7 +265,9 @@ class ReportStore {
                        const ReportMetadataLite& metadata);
 
   // The underlying data store.
-  std::shared_ptr<DataStore> store_;
+  const std::shared_ptr<DataStore> store_;
+
+  std::shared_ptr<util::ClockInterface> clock_;
 };
 
 }  // namespace store

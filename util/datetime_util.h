@@ -55,6 +55,8 @@
 #ifndef COBALT_UTIL_DATETIME_UTIL_H_
 #define COBALT_UTIL_DATETIME_UTIL_H_
 
+#include <atomic>
+#include <chrono>
 #include <cstdint>
 
 #include "config/metrics.pb.h"
@@ -82,8 +84,8 @@ struct CalendarDate {
   uint32_t year = 1970;
 
   bool operator==(const CalendarDate& other) const {
-    return (other.day_of_month == day_of_month
-        && other.month == month && other.year == year);
+    return (other.day_of_month == day_of_month && other.month == month &&
+            other.year == year);
   }
 };
 
@@ -135,6 +137,36 @@ uint32_t CalendarDateToMonthIndex(const CalendarDate& calendar_date);
 // first day of that month epoch.
 CalendarDate MonthIndexToCalendarDate(uint32_t month_index);
 
+// An abstract clock interface.
+class ClockInterface {
+ public:
+  virtual int64_t CurrentTimeSeconds() = 0;
+};
+
+// An implementation of ClockInterface that uses the system clock.
+class SystemClock : public ClockInterface {
+ public:
+  int64_t CurrentTimeSeconds() override {
+    return std::chrono::duration_cast<std::chrono::seconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+  }
+};
+
+// An implementation of ClockInterface that returns a fixed, settable value.
+class StationaryClock : public ClockInterface {
+ public:
+  StationaryClock() { current_time_seconds_ = 0; }
+
+  int64_t CurrentTimeSeconds() override { return current_time_seconds_; }
+
+  void set_current_time_seconds(int64_t current_time_seconds) {
+    current_time_seconds_ = current_time_seconds;
+  }
+
+ private:
+  std::atomic<int64_t> current_time_seconds_;
+};
 
 }  // namespace util
 }  // namespace cobalt
