@@ -132,6 +132,10 @@ grpc::Status ReportExecutor::Enqueue(std::vector<ReportId> report_id_chain) {
       return grpc::Status(grpc::ABORTED, message);
     }
     work_queue_.emplace_back(std::move(report_id_chain));
+    // Set idle_ false because any thread that invokes WaitUntilIdle() after
+    // this should wait until the |report_id_chain| just enqueued is
+    // processed.
+    idle_ = false;
   }
   worker_notifier_.notify_all();
   return grpc::Status::OK;

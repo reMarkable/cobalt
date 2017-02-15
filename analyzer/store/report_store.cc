@@ -183,7 +183,7 @@ Status ReportStore::WriteMetadata(const ReportId& report_id,
   // Write the Row to the report_metadata table.
   Status status = store_->WriteRow(DataStore::kReportMetadata, std::move(row));
   if (status != kOK) {
-    LOG(ERROR) << "Error while attempting to start a new report for report_id "
+    LOG(ERROR) << "Error while writing metadata for report_id "
                << ToString(report_id) << ": WriteRow() "
                << "failed with status=" << status;
     return status;
