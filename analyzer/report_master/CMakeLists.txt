@@ -61,7 +61,8 @@ target_link_libraries(analyzer_report_master
 add_executable(analyzer_report_master_tests
                encoding_mixer_test.cc
                report_executor_test.cc
-               report_generator_test.cc)
+               report_generator_test.cc
+               report_master_service_test.cc)
 target_link_libraries(analyzer_report_master_tests
                       analyzer_report_master_lib encoder
                       gtest gtest_main)
@@ -72,7 +73,8 @@ set_target_properties(analyzer_report_master_tests PROPERTIES
 # the Bigtable Emulator process.
 add_executable(analyzer_report_master_emulator_tests
                report_executor_emulator_test.cc
-               report_generator_emulator_test.cc)
+               report_generator_emulator_test.cc
+               report_master_service_emulator_test.cc)
 target_link_libraries(analyzer_report_master_emulator_tests
                       encoder analyzer_report_master_lib
                       gtest gtest_main)
@@ -83,7 +85,8 @@ set_target_properties(analyzer_report_master_emulator_tests PROPERTIES
 # notes in bigtabe_cloud_helper.h for how this works.
 add_executable(analyzer_report_master_cloud_tests
                report_executor_cloud_test.cc
-               report_generator_cloud_test.cc)
+               report_generator_cloud_test.cc
+               report_master_service_cloud_test.cc)
 target_link_libraries(analyzer_report_master_cloud_tests
                       encoder  analyzer_report_master_lib
                       gtest gtest_main)

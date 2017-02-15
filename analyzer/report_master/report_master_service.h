@@ -17,6 +17,7 @@
 
 #include <memory>
 
+#include "analyzer/report_master/report_executor.h"
 #include "analyzer/report_master/report_master.grpc.pb.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
@@ -31,7 +32,8 @@ class ReportMasterService final : public ReportMaster::Service {
   static std::unique_ptr<ReportMasterService> CreateFromFlagsOrDie();
 
   ReportMasterService(
-      int port, std::shared_ptr<store::DataStore> store,
+      int port, std::shared_ptr<store::ObservationStore> observation_store,
+      std::shared_ptr<store::ReportStore> report_store,
       std::shared_ptr<config::AnalyzerConfig> analyzer_config,
       std::shared_ptr<grpc::ServerCredentials> server_credentials);
 
@@ -58,10 +60,51 @@ class ReportMasterService final : public ReportMaster::Service {
       grpc::ServerWriter<QueryReportsResponse>* writer) override;
 
  private:
+  // Makes all instantiations of ReportMasterServiceAbstractTest friends.
+  template <class X>
+  friend class ReportMasterServiceAbstractTest;
+
+  // Gets amd validates a ReportConfig. Returns OK or
+  // does Log(ERROR) and returns an error status on error.
+  grpc::Status GetAndValidateReportConfig(
+      uint32_t customer_id, uint32_t project_id, uint32_t report_config_id,
+      const ReportConfig** report_config_out);
+
+  // Invokes ReportStore::StartNewReport().
+  // Does Log(ERROR) and returns an error status on error.
+  grpc::Status StartNewReport(const StartReportRequest& request,
+                              ReportId* report_id);
+
+  // Invokes ReportStore::CreateSecondarySlice().
+  // Does Log(ERROR) and returns an error status on error.
+  grpc::Status CreateSecondarySlice(VariableSlice variable_slice,
+                                    ReportId* report_id);
+
+  // Invokes ReportStore::GetReport().
+  // Does Log(ERROR) and returns an error status on error.
+  grpc::Status GetReport(const ReportId& report_id,
+                         ReportMetadataLite* metadata_out,
+                         ReportRows* report_out);
+
+  // Starts the worker thread in the ReportExecutor.
+  void StartWorkerThread();
+
+  // Blocks until the ReportExecutor is idle. See comments for
+  // ReportExecutor::WaitUntilIdle.
+  void WaitUntilIdle();
+
+  // gRPC server-side streaming is unmocakble as written so we add a thin
+  // mockable wrapper around it so that we can test QueryReports without
+  // using the network stack.
+  grpc::Status QueryReportsInternal(
+      grpc::ServerContext* context, const QueryReportsRequest* request,
+      grpc::WriterInterface<QueryReportsResponse>* writer);
+
   int port_;
   std::shared_ptr<store::ObservationStore> observation_store_;
   std::shared_ptr<store::ReportStore> report_store_;
   std::shared_ptr<config::AnalyzerConfig> analyzer_config_;
+  std::unique_ptr<ReportExecutor> report_executor_;
   std::shared_ptr<grpc::ServerCredentials> server_credentials_;
   std::unique_ptr<grpc::Server> server_;
 };
