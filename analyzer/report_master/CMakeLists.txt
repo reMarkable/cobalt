@@ -64,8 +64,10 @@ add_executable(analyzer_report_master_tests
                report_generator_test.cc
                report_master_service_test.cc)
 target_link_libraries(analyzer_report_master_tests
-                      analyzer_report_master_lib encoder
-                      gtest gtest_main)
+                      analyzer_report_master_lib
+                      encoder
+                      gtest gtest_main
+                      report_store_testutils)
 set_target_properties(analyzer_report_master_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
 
@@ -76,8 +78,10 @@ add_executable(analyzer_report_master_emulator_tests
                report_generator_emulator_test.cc
                report_master_service_emulator_test.cc)
 target_link_libraries(analyzer_report_master_emulator_tests
-                      encoder analyzer_report_master_lib
-                      gtest gtest_main)
+                      analyzer_report_master_lib
+                      encoder
+                      gtest gtest_main
+                      report_store_testutils)
 set_target_properties(analyzer_report_master_emulator_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})
 
@@ -88,7 +92,9 @@ add_executable(analyzer_report_master_cloud_tests
                report_generator_cloud_test.cc
                report_master_service_cloud_test.cc)
 target_link_libraries(analyzer_report_master_cloud_tests
-                      encoder  analyzer_report_master_lib
-                      gtest gtest_main)
+                      analyzer_report_master_lib
+                      encoder
+                      gtest gtest_main
+                      report_store_testutils)
 set_target_properties(analyzer_report_master_cloud_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})

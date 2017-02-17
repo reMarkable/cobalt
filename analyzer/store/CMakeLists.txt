@@ -36,10 +36,16 @@ target_link_libraries(analyzer_store
                       googleapis
                       ${PROTOBUF_LIBRARY})
 
+add_library(report_store_testutils report_store_test_utils.cc)
+target_link_libraries(report_store_testutils analyzer_store)
+
 # Build the tests
 add_executable(analyzer_store_tests
                memory_store_test.cc observation_store_test.cc report_store_test.cc)
-target_link_libraries(analyzer_store_tests gtest gtest_main analyzer_store)
+target_link_libraries(analyzer_store_tests
+                      analyzer_store
+                      gtest gtest_main
+                      report_store_testutils)
 set_target_properties(analyzer_store_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
 
@@ -51,10 +57,8 @@ add_executable(bigtable_emulator_tests
                report_store_emulator_test.cc)
 target_link_libraries(bigtable_emulator_tests
                       analyzer_store
-                      glog
-                      gflags
                       gtest gtest_main
-                      ${PROTOBUF_LIBRARY})
+                      report_store_testutils)
 set_target_properties(bigtable_emulator_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})
 
@@ -66,9 +70,7 @@ add_executable(bigtable_cloud_tests
                report_store_cloud_test.cc)
 target_link_libraries(bigtable_cloud_tests
                       analyzer_store
-                      glog
-                      gflags
                       gtest gtest_main
-                      ${PROTOBUF_LIBRARY})
+                      report_store_testutils)
 set_target_properties(bigtable_cloud_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})

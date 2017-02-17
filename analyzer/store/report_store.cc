@@ -192,6 +192,28 @@ Status ReportStore::WriteMetadata(const ReportId& report_id,
   return kOK;
 }
 
+Status ReportStore::WriteBulkMetadata(
+    const std::vector<ReportId>& report_ids,
+    const std::vector<ReportMetadataLite>& metadata) {
+  size_t num_reports = report_ids.size();
+  CHECK_EQ(num_reports, metadata.size());
+  std::vector<DataStore::Row> rows;
+  for (int i = 0; i < num_reports; i++) {
+    rows.emplace_back(MakeDataStoreRow(report_ids[i], metadata[i]));
+  }
+
+  Status status =
+      store_->WriteRows(DataStore::kReportMetadata, std::move(rows));
+  if (status != kOK) {
+    LOG(ERROR) << "Error while writing metadata for " << num_reports
+               << "reports: WriteRows() "
+               << "failed with status=" << status;
+    return status;
+  }
+
+  return kOK;
+}
+
 Status ReportStore::StartNewReport(uint32_t first_day_index,
                                    uint32_t last_day_index, bool requested,
                                    ReportId* report_id) {

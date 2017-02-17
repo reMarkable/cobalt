@@ -227,6 +227,7 @@ class ReportStore {
 
  private:
   friend class ReportStorePrivateTest;
+  friend class ReportStoreTestUtils;
 
   // Makes all instantiations of ReportStoreAbstractTest friends.
   template <class X>
@@ -263,6 +264,11 @@ class ReportStore {
   // Write a row into the report_metadata table to represent the arguemnts.
   Status WriteMetadata(const ReportId& report_id,
                        const ReportMetadataLite& metadata);
+
+  // Write many rows into the report_metadata table to represent the arguments.
+  // CHECK fails if |report_ids| and |metadata| do not have the same length.
+  Status WriteBulkMetadata(const std::vector<ReportId>& report_ids,
+    const std::vector<ReportMetadataLite>& metadata);
 
   // The underlying data store.
   const std::shared_ptr<DataStore> store_;

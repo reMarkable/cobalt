@@ -16,6 +16,7 @@
 #define COBALT_ANALYZER_REPORT_MASTER_REPORT_MASTER_SERVICE_H_
 
 #include <memory>
+#include <string>
 
 #include "analyzer/report_master/report_executor.h"
 #include "analyzer/report_master/report_master.grpc.pb.h"
@@ -99,6 +100,10 @@ class ReportMasterService final : public ReportMaster::Service {
   grpc::Status QueryReportsInternal(
       grpc::ServerContext* context, const QueryReportsRequest* request,
       grpc::WriterInterface<QueryReportsResponse>* writer);
+
+  // Returns the string version of a ReportId as used in the gRPC API. This
+  // is exposed for use by tests.
+  std::string static MakeStringReportId(const ReportId& report_id);
 
   int port_;
   std::shared_ptr<store::ObservationStore> observation_store_;

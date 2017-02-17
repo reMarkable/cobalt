@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "./observation.pb.h"
+#include "analyzer/store/report_store_test_utils.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
@@ -452,6 +453,53 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     clock_->set_current_time_seconds(current_time_seconds);
   }
 
+  // Writes Metadata directly into the ReportStore simulating the case that
+  // StarReport() was invoked many times to form |num_reports| different
+  // instances of the report with the given |report_config_id|.
+  //
+  // The creation time and start time for report i will be
+  // kFixedTimeSeconds + i.
+  //
+  // The implementation of this function breaks several layers of abstraction
+  // and writes directly into the  underlying ReporStore. This is a convenient
+  // way to efficiently set up the  ReportMetadata table in order test the
+  // QueryReports function. If we were  to use the gRPC API to accomplish this
+  // it would require many RPC roundtrips which would take a long time.
+  // There is no reason for the gRPC API to support an efficient implementation
+  // of this function as it is not useful outside of a test.
+  //
+  // The vector of string report IDs from the gRPC API are returned so that
+  // they may be used to query in the gRPC API.
+  std::vector<std::string> WriteManyNewReports(uint64_t report_config_id,
+                                               size_t num_reports) {
+    ReportId report_id;
+    report_id.set_customer_id(kCustomerId);
+    report_id.set_project_id(kProjectId);
+    report_id.set_report_config_id(report_config_id);
+    std::vector<ReportId> report_ids(num_reports, report_id);
+
+    ReportMetadataLite metadata;
+    metadata.set_state(IN_PROGRESS);
+    metadata.set_first_day_index(kDayIndex);
+    metadata.set_last_day_index(kDayIndex);
+    metadata.set_one_off(true);
+    std::vector<ReportMetadataLite> report_metadata(num_reports, metadata);
+
+    std::vector<std::string> string_report_ids(num_reports);
+    for (int i = 0; i < num_reports; i++) {
+      report_ids[i].set_creation_time_seconds(kFixedTimeSeconds + i);
+      report_ids[i].set_instance_id(i);
+      report_metadata[i].set_start_time_seconds(kFixedTimeSeconds + i);
+      string_report_ids[i] =
+          report_master_service_->MakeStringReportId(report_ids[i]);
+    }
+    // We write all the reports with a single RPC.
+    store::ReportStoreTestUtils test_utils(report_store_);
+    EXPECT_EQ(store::kOK,
+              test_utils.WriteBulkMetadata(report_ids, report_metadata));
+    return string_report_ids;
+  }
+
   std::shared_ptr<encoder::ProjectContext> project_;
   std::shared_ptr<store::DataStore> data_store_;
   std::shared_ptr<store::ObservationStore> observation_store_;
@@ -627,38 +675,15 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
   EXPECT_EQ(20, second_marginal_results[10]);
 }
 
-// Tests the method ReportMaster::QueryReports. We add observations to the
-// ObservationStore. Then we start many instances of ReportConfig1 and
-// invoke QueryReports() and check the results.
+// Tests the method ReportMaster::QueryReports. We write into the ReportStore
+// many instance of ReportConfig 1 and then invoke QueryReports() and check the
+// results.
 TYPED_TEST_P(ReportMasterServiceAbstractTest, QueryReportsTest) {
-  // Add some observations for metric 1.
-  this->AddObservations("Apple", 10, kMetricId1,
-                        kBasicRapporStringEncodingConfigId,
-                        kBasicRapporIntEncodingConfigId, 20);
-
-  // Start 210 copies of ReporcConfig 1.
-  StartReportRequest start_request;
-  start_request.set_customer_id(kCustomerId);
-  start_request.set_project_id(kProjectId);
-  start_request.set_report_config_id(kReportConfigId1);
-  start_request.set_first_day_index(kDayIndex);
-  start_request.set_last_day_index(kDayIndex);
-  StartReportResponse start_response;
-  std::vector<std::string> report_ids;
-  for (int i = 0; i < 210; i++) {
-    // Advance time by one second before starting each report. This ensures
-    // that the query will return the reports in the same order we are
-    // adding them.
-    this->set_current_time_seconds(kFixedTimeSeconds + i);
-    auto status = this->report_master_service_->StartReport(
-        nullptr, &start_request, &start_response);
-    EXPECT_TRUE(status.ok()) << "error_code=" << status.error_code()
-                             << " error_message=" << status.error_message();
-    // Capture each report_id
-    std::string report_id = start_response.report_id();
-    EXPECT_FALSE(report_id.empty());
-    report_ids.emplace_back(std::move(report_id));
-  }
+  // Write Metadata into the ReportStore for 210 reports associated with
+  // ReporcConfig 1  with creation_times that start at kFixedTimeSeconds and
+  // increment by 1 second for each report.
+  std::vector<std::string> report_ids =
+      this->WriteManyNewReports(kReportConfigId1, 210);
 
   // Now invoke QueryReports. We specify a time window that will omit the
   // first three and the last 3 reports. So there should be 204 reports
@@ -696,49 +721,6 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, QueryReportsTest) {
   // Check the third batch.
   EXPECT_EQ(4, response_writer.responses[2].reports_size());
   for (int i = 0; i < 4; i++) {
-    this->CheckMetadata(report_ids[i + 203], kReportConfigId1, expect_part1,
-                        expect_part2, check_completed,
-                        kFixedTimeSeconds + 203 + i,
-                        response_writer.responses[2].reports(i));
-  }
-
-  // Wait until the report generation for all reports completes.
-  this->WaitUntilIdle();
-
-  // Invoke QueryReports again with the same parameters as before.
-  response_writer.responses.clear();
-  this->QueryReports(kReportConfigId1, kFixedTimeSeconds + 3,
-                     kFixedTimeSeconds + 207, &response_writer);
-
-  // Again expect 3 batches.
-  EXPECT_EQ(3, response_writer.responses.size());
-
-  // Check batches as before but this time expect the reports to be
-  // completed.
-  check_completed = true;
-  EXPECT_EQ(100, response_writer.responses[0].reports_size());
-  for (int i = 0; i < 100; i++) {
-    SCOPED_TRACE("");
-    this->CheckMetadata(report_ids[i + 3], kReportConfigId1, expect_part1,
-                        expect_part2, check_completed,
-                        kFixedTimeSeconds + 3 + i,
-                        response_writer.responses[0].reports(i));
-  }
-
-  // Check the second batch.
-  EXPECT_EQ(100, response_writer.responses[1].reports_size());
-  for (int i = 0; i < 100; i++) {
-    SCOPED_TRACE("");
-    this->CheckMetadata(report_ids[i + 103], kReportConfigId1, expect_part1,
-                        expect_part2, check_completed,
-                        kFixedTimeSeconds + 103 + i,
-                        response_writer.responses[1].reports(i));
-  }
-
-  // Check the third batch.
-  EXPECT_EQ(4, response_writer.responses[2].reports_size());
-  for (int i = 0; i < 4; i++) {
-    SCOPED_TRACE("");
     this->CheckMetadata(report_ids[i + 203], kReportConfigId1, expect_part1,
                         expect_part2, check_completed,
                         kFixedTimeSeconds + 203 + i,

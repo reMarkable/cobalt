@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "analyzer/store/observation_store_internal.h"
+#include "analyzer/store/report_store_test_utils.h"
 #include "glog/logging.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
@@ -172,19 +173,6 @@ class ReportStoreAbstractTest : public ::testing::Test {
     return report_id;
   }
 
-  void BulkWriteMetadata(const std::vector<ReportId>& report_ids,
-                         const std::vector<ReportMetadataLite>& metadata) {
-    EXPECT_EQ(report_ids.size(), metadata.size());
-    std::vector<DataStore::Row> rows;
-    for (int i = 0; i < report_ids.size(); i++) {
-      rows.emplace_back(
-          report_store_->MakeDataStoreRow(report_ids[i], metadata[i]));
-    }
-
-    EXPECT_EQ(kOK, data_store_->WriteRows(DataStore::kReportMetadata,
-                                          std::move(rows)));
-  }
-
   // Inserts |num_timestamps| * 6 rows into the report_metadata table.
   // Starting with timestamp=start_timestamp, for |num_timestamps| increments of
   // |timestamp_delta|, 6 rows are inserted with that timestamp: For each of
@@ -210,7 +198,8 @@ class ReportStoreAbstractTest : public ::testing::Test {
       }
       timestamp += timestamp_delta;
     }
-    BulkWriteMetadata(report_ids, metadata_vector);
+    ReportStoreTestUtils test_utils(report_store_);
+    test_utils.WriteBulkMetadata(report_ids, metadata_vector);
   }
 
   void AddReportRows(const ReportId& report_id, size_t num_rows) {
@@ -243,7 +232,7 @@ class ReportStoreAbstractTest : public ::testing::Test {
   uint32_t report_config_id() const { return kReportConfigId; }
 
   std::shared_ptr<DataStore> data_store_;
-  std::unique_ptr<ReportStore> report_store_;
+  std::shared_ptr<ReportStore> report_store_;
 };
 
 TYPED_TEST_CASE_P(ReportStoreAbstractTest);

@@ -557,6 +557,12 @@ grpc::Status ReportMasterService::GetReport(const ReportId& report_id,
   return grpc::Status::OK;
 }
 
+std::string ReportMasterService::MakeStringReportId(const ReportId& report_id) {
+  std::string string_id_out;
+  ReportIdToString(report_id, &string_id_out);
+  return string_id_out;
+}
+
 void ReportMasterService::StartWorkerThread() { report_executor_->Start(); }
 
 void ReportMasterService::WaitUntilIdle() { report_executor_->WaitUntilIdle(); }
