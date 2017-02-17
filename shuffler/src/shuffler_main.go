@@ -57,8 +57,6 @@ func main() {
 		URL: config.GetGlobalConfig().AnalyzerUrl})
 
 	// Start listening on receiver for incoming requests from Encoder
-	if glog.V(2) {
-		glog.Info("Listening for incoming encoder requests on port [", *port, "]...")
-	}
+	glog.Info("Shuffler starting on port [", *port, "]...")
 	receiver.ReceiveAndStore(*tls, *certFile, *keyFile, *port, store)
 }

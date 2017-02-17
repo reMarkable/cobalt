@@ -29,6 +29,10 @@ import tools.test_runner as test_runner
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
+REGISTERED_CONFIG_DIR = os.path.abspath(os.path.join(THIS_DIR, 'config',
+    'registered'))
+SHUFFLER_CONFIG_DIR = os.path.abspath(os.path.join(THIS_DIR, 'shuffler',
+    'src', 'config', 'config_v0.txt'))
 
 IMAGES = ["analyzer", "shuffler"]
 
@@ -173,6 +177,48 @@ def _clean(args):
         else:
            shutil.rmtree(full_path, ignore_errors=True)
 
+def _start_bigtable_emulator(args):
+  print "Starting the Cloud Bigtable Emulator on port 9000..."
+  print
+  path = os.path.abspath(os.path.join(SYSROOT_DIR, 'gcloud',
+      'google-cloud-sdk', 'platform', 'bigtable-emulator', 'cbtemulator'))
+  subprocess.call([path])
+
+def _start_shuffler(args):
+  print "Starting the shuffler..."
+  print
+  path = os.path.abspath(os.path.join(OUT_DIR, 'shuffler', 'shuffler'))
+  subprocess.call([path,
+  "-port", str(args.port),
+  "-config_file", args.config_file,
+  "-logtostderr"])
+
+def _start_analyzer_service(args):
+  print "Will connect to a local Bigtable Emulator instance."
+  print "Have you already started the Bigtable Emulator?"
+  print
+  print "Starting the analyzer service..."
+  print
+  path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'analyzer_service',
+      'analyzer_service'))
+  subprocess.call([path,
+  "-for_testing_only_use_bigtable_emulator",
+  "-port", str(args.port),
+  "-logtostderr"])
+
+def _start_report_master(args):
+  print "Will connect to a local Bigtable Emulator instance."
+  print "Have you already started the Bigtable Emulator?"
+  print
+  print "Starting the analyzer ReportMaster service..."
+  print
+  path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'report_master',
+      'analyzer_report_master'))
+  subprocess.call([path,
+  "-for_testing_only_use_bigtable_emulator",
+  "-port", str(args.port),
+  "-cobalt_config_dir", args.cobalt_config_dir,
+  "-logtostderr"])
 
 def _gce_build(args):
   setGCEImages(args)
@@ -320,6 +366,47 @@ def main():
   sub_parser.add_argument('--full',
       help='Delete the entire "out" directory.',
       action='store_true')
+
+  start_parser = subparsers.add_parser('start',
+    help='Start one of the Cobalt processes running locally.')
+  start_subparsers = start_parser.add_subparsers()
+
+  sub_parser = start_subparsers.add_parser('shuffler',
+      parents=[parent_parser], help='Start the Shuffler running locally.')
+  sub_parser.set_defaults(func=_start_shuffler)
+  sub_parser.add_argument('--port',
+      help='The port on which the Shuffler should listen. Default=5001.',
+      default=5001)
+  sub_parser.add_argument('--config_file',
+      help='Path to the Shuffler configuration file. '
+           'Default=%s' % SHUFFLER_CONFIG_DIR,
+      default=SHUFFLER_CONFIG_DIR)
+
+  sub_parser = start_subparsers.add_parser('analyzer_service',
+      parents=[parent_parser], help='Start the Analyzer Service running locally'
+          ' and connected to a local instance of the Bigtable Emulator.')
+  sub_parser.set_defaults(func=_start_analyzer_service)
+  sub_parser.add_argument('--port',
+      help='The port on which the Analyzer service should listen. Default=6001.',
+      default=6001)
+
+  sub_parser = start_subparsers.add_parser('report_master',
+      parents=[parent_parser], help='Start the Analyzer ReportMaster Service '
+          'running locally and connected to a local instance of the Bigtable'
+          'Emulator.')
+  sub_parser.set_defaults(func=_start_report_master)
+  sub_parser.add_argument('--port',
+      help='The port on which the ReportMaster should listen. Default=7001.',
+      default=7001)
+  sub_parser.add_argument('--cobalt_config_dir',
+      help='Path of directory containing Cobalt configuration files. '
+           'Default=%s' % REGISTERED_CONFIG_DIR,
+      default=REGISTERED_CONFIG_DIR)
+
+  sub_parser = start_subparsers.add_parser('bigtable_emulator',
+    parents=[parent_parser],
+    help='Start the Bigtable Emulator running locally.')
+  sub_parser.set_defaults(func=_start_bigtable_emulator)
 
   sub_parser = subparsers.add_parser('gce_build', parents=[parent_parser],
     help='Builds Docker images for GCE.')

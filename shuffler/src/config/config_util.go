@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 
 	shufflerpb "cobalt"
@@ -37,6 +38,8 @@ func LoadConfig(configFileName string) (*shufflerpb.ShufflerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	glog.Info("Read Shuffler configuration from ", configFileName, ".")
 
 	config := &shufflerpb.ShufflerConfig{}
 	serializedBytes, err := ioutil.ReadFile(configFileName)

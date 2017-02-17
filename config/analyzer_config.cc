@@ -126,6 +126,9 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromFlagsOrDie() {
                << ErrorMessage(report_configs.second) << file_path;
   }
 
+  LOG(INFO) << "Read Cobalt configuration from " << FLAGS_cobalt_config_dir
+            << ".";
+
   return std::unique_ptr<AnalyzerConfig>(new AnalyzerConfig(
       std::shared_ptr<config::EncodingRegistry>(encodings.first.release()),
       std::shared_ptr<config::MetricRegistry>(metrics.first.release()),

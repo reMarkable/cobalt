@@ -45,7 +45,7 @@ using store::ReportStore;
 
 DEFINE_int32(port, 0,
              "The port that the ReportMaster Service should listen on.");
-DEFINE_string(ssl_cert_info, "", "TBD: Some info about SSL Certificates.");
+DEFINE_string(tls_info, "", "TBD: Some info about TLS.");
 
 namespace {
 // Builds the string form of a report_id used in the public ReportMasterService
@@ -215,15 +215,13 @@ ReportMasterService::CreateFromFlagsOrDie() {
   CHECK(FLAGS_port) << "--port is a mandatory flag";
 
   std::shared_ptr<grpc::ServerCredentials> server_credentials;
-  if (FLAGS_ssl_cert_info.empty()) {
+  if (FLAGS_tls_info.empty()) {
     LOG(WARNING) << "WARNING: Using insecure server credentials. Pass "
-                    "-ssl_cert_info to enable SSL.";
+                    "-tls_info to enable TLS.";
     server_credentials = grpc::InsecureServerCredentials();
   } else {
-    LOG(INFO) << "Reading SSL certificate information from '"
-              << FLAGS_ssl_cert_info << "'.";
     grpc::SslServerCredentialsOptions options;
-    // TODO(rudominer) Set up options based on FLAGS_ssl_cert_info.
+    // TODO(rudominer) Set up options based on FLAGS_tls_info.
     server_credentials = grpc::SslServerCredentials(options);
   }
 

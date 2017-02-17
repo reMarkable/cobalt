@@ -17,6 +17,6 @@
 global_config: {
   frequency_in_hours:24
   threshold:10
-  analyzer_url:"localhost:8080"
+  analyzer_url:"localhost:6001"
   disposal_age_days:4
 }
