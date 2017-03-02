@@ -27,16 +27,18 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
     DEPENDS analyzer.proto
 )
 
-set(PROTO_SRCS ${PROTO_SRCS} ${PROTO_GRPC})
-
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+
+add_library(analyzer_grpc_client
+            ${PROTO_GRPC} ${PROTO_SRCS})
 
 # Build the analyzer-service library
 add_library(analyzer_service_lib
             analyzer_service.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS} ${PROTO_SRCS})
 target_link_libraries(analyzer_service_lib
+                      analyzer_grpc_client
                       analyzer_store
                       cobalt_crypto
                       glog

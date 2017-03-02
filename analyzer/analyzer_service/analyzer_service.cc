@@ -80,6 +80,8 @@ void AnalyzerServiceImpl::Wait() { server_->Wait(); }
 grpc::Status AnalyzerServiceImpl::AddObservations(
     grpc::ServerContext* context, const ObservationBatch* batch,
     google::protobuf::Empty* empty) {
+  VLOG(3) << "Received batch of " << batch->encrypted_observation_size()
+          << " observations.";
   for (const EncryptedMessage& em : batch->encrypted_observation()) {
     Observation observation;
     auto parse_status = ParseEncryptedObservation(&observation, em);

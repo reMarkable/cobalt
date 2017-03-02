@@ -16,6 +16,8 @@ syntax = "proto3";
 
 package cobalt.analyzer;
 
+option go_package = "report_master";
+
 import "observation.proto";
 import "google/protobuf/timestamp.proto";
 

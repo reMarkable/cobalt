@@ -208,9 +208,10 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   for (auto& part : parts) {
     if (metric->parts().find(part) == metric->parts().end()) {
       std::ostringstream stream;
-      stream << "Invalid ReportConfig: variable part name " << part
-             << " is not the name of a part of the metric "
-             << MetricIdString(*report_config);
+      stream << "Invalid ReportConfig: variable part name '" << part
+             << "' is not the name of a part of the metric with "
+             << MetricIdString(*report_config) << ". "
+             << ReportConfigIdString(report_id);
       std::string message = stream.str();
       LOG(ERROR) << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);

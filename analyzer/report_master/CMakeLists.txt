@@ -23,14 +23,34 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
                 -I ${CMAKE_CURRENT_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
                 --grpc_out=.
                 --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
-    DEPENDS report_master.proto
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
 )
 
 set(REPORT_PROTO_SRCS ${REPORT_PROTO_SRCS} ${PROTO_GRPC})
 
-# Runs protoc proactively on the proto files.
 add_custom_target(build_report_protos
                   DEPENDS ${REPORT_PROTO_SRCS})
+
+
+# Generate the Go bindings for ReportMaster gRPC service.
+set(GO_PROTO_GEN_DIR "${CMAKE_BINARY_DIR}/go-proto-gen/src")
+file(MAKE_DIRECTORY ${GO_PROTO_GEN_DIR})
+set(REPORT_MASTER_PB_GO "${GO_PROTO_GEN_DIR}/analyzer/report_master/report_master.pb.go")
+
+set(PROTOC ${GO_PATH} protoc)
+add_custom_command(OUTPUT "${REPORT_MASTER_PB_GO}"
+    COMMAND ${PROTOC}
+            ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
+            -I ${CMAKE_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
+            --go_out=plugins=grpc,Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_DIR}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/observation.proto
+)
+
+add_custom_target(build_report_master_pb_go
+                  DEPENDS ${REPORT_MASTER_PB_GO})
+# end: Generate the Go bindings for the ReportMaster gRPC service.
 
 set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)

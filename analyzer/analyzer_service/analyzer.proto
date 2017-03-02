@@ -14,12 +14,12 @@
 
 syntax = "proto3";
 
-import "observation.proto";
-import "google/protobuf/empty.proto";
-
 package cobalt.analyzer;
 
 option go_package = "cobalt";
+
+import "observation.proto";
+import "google/protobuf/empty.proto";
 
 // The Analyzer receives observations from the shufflers.  Reports based on
 // these observations are periodically generated and published.

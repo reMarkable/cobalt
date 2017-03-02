@@ -67,7 +67,7 @@ size_t kMaxRowsReadLimit = 10000;
 std::string ErrorMessage(const grpc::Status& status,
                          const std::string& method_name) {
   std::ostringstream stream;
-  stream << "Error during << " << method_name << ": " << status.error_message()
+  stream << "Error during " << method_name << ": " << status.error_message()
          << " code=" << status.error_code();
   return stream.str();
 }
