@@ -26,7 +26,7 @@ element {
   id: 1
   forculus {
     threshold: 20
-    epoch_type: WEEK
+    epoch_type: DAY
   }
 }
 
@@ -35,12 +35,13 @@ element {
   customer_id: 1
   project_id: 1
   id: 2
-  rappor {
-    num_bloom_bits: 64
-    num_hashes: 2
-    num_cohorts: 100
-    prob_0_becomes_1: 0.2
-    prob_1_stays_1: 0.8
+  basic_rappor {
+    prob_0_becomes_1: 0.1
+    prob_1_stays_1: 0.9
+    int_range_categories: {
+      first: 0
+      last:  23
+    }
   }
 }
 
@@ -50,14 +51,31 @@ element {
   project_id: 1
   id: 3
   basic_rappor {
-    prob_0_becomes_1: 0.1
-    prob_1_stays_1: 0.9
-    int_range_categories: {
-      first: -1
-      last:  1
+    prob_0_becomes_1: 0.01
+    prob_1_stays_1: 0.99
+    string_categories: {
+      category: "apple"
+      category: "banana"
+      category: "cantaloupe"
     }
   }
 }
+
+#### Encoding (1, 1, 4)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  basic_rappor {
+    prob_0_becomes_1: 0.2
+    prob_1_stays_1: 0.8
+    int_range_categories: {
+      first: 0
+      last:  10
+    }
+  }
+}
+
 
 #########################
 # Customer 2 (Acme)
@@ -70,14 +88,12 @@ element {
   customer_id: 2
   project_id: 1
   id: 1
-  basic_rappor {
-    prob_0_becomes_1: 0.1
-    prob_1_stays_1: 0.9
-    string_categories: {
-      category: "dog"
-      category: "cat"
-      category: "fish"
-    }
+  rappor {
+    num_bloom_bits: 64
+    num_hashes: 2
+    num_cohorts: 100
+    prob_0_becomes_1: 0.2
+    prob_1_stays_1: 0.8
   }
 }
 
