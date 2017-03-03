@@ -23,12 +23,18 @@ target_link_libraries(client_secret cobalt_crypto)
 add_library(encoder
             encoder.cc
             envelope_maker.cc
+            shuffler_client.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 target_link_libraries(encoder
-                      client_secret forculus_encrypter glog rappor_encoder)
+                      client_secret
+                      forculus_encrypter
+                      glog
+                      rappor_encoder
+                      shuffler_grpc_client)
 
 add_executable(encoder_tests
-               client_secret_test.cc encoder_test.cc envelope_maker_test.cc)
+               client_secret_test.cc
+               encoder_test.cc envelope_maker_test.cc shuffler_client_test)
 target_link_libraries(encoder_tests
                       gflags gtest gtest_main client_secret encoder
                       ${PROTOBUF_LIBRARY})

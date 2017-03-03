@@ -16,6 +16,6 @@ add_executable(cgen cgen.cc)
 
 target_link_libraries(cgen
                       analyzer_service_lib
-                      cobalt_shuffler
+                      shuffler_grpc_client
                       forculus_encrypter
                       gflags)

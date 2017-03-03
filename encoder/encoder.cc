@@ -252,8 +252,8 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
     // MetricPart.
     if (metric_part.data_type() != value_part_data.data_type) {
       VLOG(3) << "Metric part (" << customer_id_ << ", " << project_id_ << ", "
-              << metric_id << ") is not of type " << value_part_data.data_type
-              << ".";
+              << metric_id << ")-" << part_name << " is not of type "
+              << value_part_data.data_type << ".";
       result.status = kInvalidArguments;
       return result;
     }

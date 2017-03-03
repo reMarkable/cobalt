@@ -93,7 +93,7 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
 set_source_files_properties(shuffler.grpc.pb.cc shuffler.pb.cc
                             PROPERTIES GENERATED TRUE)
 
-add_library(cobalt_shuffler shuffler.grpc.pb.cc shuffler.pb.cc)
+add_library(shuffler_grpc_client shuffler.grpc.pb.cc shuffler.pb.cc)
 
 # Build shuffler test tools
 set(TEST_CLIENT_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler_test_client")

@@ -55,6 +55,9 @@ class EnvelopeMaker {
 
   EncryptedMessage MakeEncryptedEnvelope();
 
+  // Gives direct read-only access to the internal instance of Envelope.
+  const Envelope& envelope() const { return envelope_; }
+
   void Clear() {
     envelope_ = Envelope();
     batch_map_.clear();
@@ -62,8 +65,6 @@ class EnvelopeMaker {
 
  private:
   friend class EnvelopeMakerTest;
-
-  const Envelope& envelope() const { return envelope_; }
 
   // Returns the ObservationBatch containing the given |metadata|. If
   // this is the first time we have seen the given |metadata| then a
