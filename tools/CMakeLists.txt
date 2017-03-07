@@ -19,3 +19,5 @@ target_link_libraries(cgen
                       shuffler_grpc_client
                       forculus_encrypter
                       gflags)
+
+add_subdirectory(test_app)
