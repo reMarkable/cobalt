@@ -27,11 +27,11 @@ using shuffler::Shuffler;
 namespace {
 
 std::shared_ptr<grpc::ChannelCredentials> CreateChannelCredentials(
-    bool use_tls, std::string pem_root_certs) {
+    bool use_tls, const char* pem_root_certs) {
   if (use_tls) {
     auto opts = grpc::SslCredentialsOptions();
-    if (!pem_root_certs.empty()) {
-      opts.pem_root_certs = std::move(pem_root_certs);
+    if (pem_root_certs) {
+      opts.pem_root_certs = pem_root_certs;
     }
     return grpc::SslCredentials(opts);
   } else {
@@ -42,13 +42,12 @@ std::shared_ptr<grpc::ChannelCredentials> CreateChannelCredentials(
 }  // namespace
 
 ShufflerClient::ShufflerClient(const std::string& uri, bool use_tls,
-                               std::string pem_root_certs)
+                               const char* pem_root_certs)
     : shuffler_stub_(Shuffler::NewStub(grpc::CreateChannel(
           uri, CreateChannelCredentials(use_tls, pem_root_certs)))) {}
 
 grpc::Status ShufflerClient::SendToShuffler(
-    const EncryptedMessage& encrypted_message,
-    grpc::ClientContext* context) {
+    const EncryptedMessage& encrypted_message, grpc::ClientContext* context) {
   std::unique_ptr<grpc::ClientContext> temp_context;
   if (context == nullptr) {
     temp_context.reset(new grpc::ClientContext());

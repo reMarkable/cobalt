@@ -44,9 +44,8 @@ TEST_F(ShufflerClientTest, SmokeTest) {
   static const EncryptedMessage encrypted_message;
 
   bool use_tls = false;
-  std::string pem_root_cert = "This is not reall a PEM";
   std::unique_ptr<ShufflerClient> shuffler_client(
-      new ShufflerClient(kUri, use_tls, std::move(pem_root_cert)));
+      new ShufflerClient(kUri, use_tls));
 
   // Since this is a unit test and we are not mocking the gRPC connection
   // and there is no actual Shuffler service to connect to we expect

@@ -35,13 +35,14 @@ class ShufflerClient {
   // use_tls. Should TLS be used to connect to the Shuffler?
   //
   // pem_root_certs. This value is ignored unless |use_tls| is true.
-  // An optional override for the root certificates. If non-empty
-  // this must be the PEM encoding of the root CA certificates to use in TLS.
-  // If empty then a default will be used. The default roots can also be
-  // overridden using the GRPC_DEFAULT_SSL_ROOTS_FILE_PATH environment variable
+  // An optional override for the root certificates. If non NULL
+  // this must point to a buffer containing a null-terminated PEM encoding of
+  // the root CA certificates to use in TLS. If empty then a default will be
+  // used. The default roots can also be erridden using the
+  // GRPC_DEFAULT_SSL_ROOTS_FILE_PATH environment variable
   // pointing to a file on the file system containing the roots.
   ShufflerClient(const std::string& uri, bool use_tls,
-                 std::string pem_root_certs);
+                 const char* pem_root_certs = nullptr);
 
   // Send the given |encrypted_message| to the Shuffler. It should be an
   // encryped Envelope as given by the output of
