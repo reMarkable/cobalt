@@ -34,7 +34,7 @@ namespace encoder {
 // Usage:
 //
 // - Construct a new EnvelopeMaker passing in the public keys of the analyzer
-// and shuffler.
+// and shuffler as well as an encryption scheme.
 //
 // - Invoke AddObservation() multiple times passing in Observations and their
 // corresponding ObservationMetadata. These are obtained from an Encoder.
@@ -48,12 +48,13 @@ namespace encoder {
 class EnvelopeMaker {
  public:
   EnvelopeMaker(std::string analyzer_public_key,
-                std::string shuffler_public_key);
+                std::string shuffler_public_key,
+                EncryptedMessage::EncryptionScheme scheme);
 
   void AddObservation(const Observation& observation,
                       std::unique_ptr<ObservationMetadata> metadata);
 
-  EncryptedMessage MakeEncryptedEnvelope();
+  EncryptedMessage MakeEncryptedEnvelope() const;
 
   // Gives direct read-only access to the internal instance of Envelope.
   const Envelope& envelope() const { return envelope_; }
@@ -74,6 +75,7 @@ class EnvelopeMaker {
   Envelope envelope_;
   std::string analyzer_public_key_;
   std::string shuffler_public_key_;
+  EncryptedMessage::EncryptionScheme encryption_scheme_;
 
   // The keys of the map are serialized ObservationMetadata. The values
   // are the ObservationBatch containing that Metadata

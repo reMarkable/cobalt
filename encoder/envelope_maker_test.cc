@@ -125,7 +125,8 @@ std::shared_ptr<ProjectContext> GetTestProject() {
 class EnvelopeMakerTest : public ::testing::Test {
  public:
   EnvelopeMakerTest()
-      : envelope_maker_(kAnalyzerPublicKey, kShufflerPublicKey),
+      : envelope_maker_(kAnalyzerPublicKey, kShufflerPublicKey,
+                        EncryptedMessage::NONE),
         project_(GetTestProject()),
         encoder_(project_, ClientSecret::GenerateNewSecret()) {
     // Set a static current time so we can test the day_index computation.

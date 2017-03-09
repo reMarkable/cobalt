@@ -22,9 +22,11 @@ namespace cobalt {
 namespace encoder {
 
 EnvelopeMaker::EnvelopeMaker(std::string analyzer_public_key,
-                             std::string shuffler_public_key)
+                             std::string shuffler_public_key,
+                             EncryptedMessage::EncryptionScheme scheme)
     : analyzer_public_key_(std::move(analyzer_public_key)),
-      shuffler_public_key_(std::move(shuffler_public_key)) {}
+      shuffler_public_key_(std::move(shuffler_public_key)),
+      encryption_scheme_(scheme) {}
 
 void EnvelopeMaker::AddObservation(
     const Observation& observation,
@@ -63,7 +65,7 @@ ObservationBatch* EnvelopeMaker::GetBatch(
   return observation_batch;
 }
 
-EncryptedMessage EnvelopeMaker::MakeEncryptedEnvelope() {
+EncryptedMessage EnvelopeMaker::MakeEncryptedEnvelope() const {
   std::string serialized_envelope;
   envelope_.SerializeToString(&serialized_envelope);
 
