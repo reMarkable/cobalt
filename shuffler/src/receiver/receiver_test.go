@@ -34,7 +34,7 @@ func generateEnvelope(pubKey string, numBatches int) *shufflerpb.Envelope {
 	for i := 0; i < numBatches; i++ {
 		rand.Read(bytes)
 		eMsgList = append(eMsgList, &shufflerpb.EncryptedMessage{
-			Scheme:     shufflerpb.EncryptedMessage_PK_SCHEME_1,
+			Scheme:     shufflerpb.EncryptedMessage_NONE,
 			PubKey:     pubKey,
 			Ciphertext: bytes,
 		})
@@ -63,7 +63,7 @@ func generateEnvelopeForHybridObservations(pubKey string) *shufflerpb.Envelope {
 		for j := 0; j < 5; j++ {
 			rand.Read(bytes)
 			eMsgList = append(eMsgList, &shufflerpb.EncryptedMessage{
-				Scheme:     shufflerpb.EncryptedMessage_PK_SCHEME_1,
+				Scheme:     shufflerpb.EncryptedMessage_NONE,
 				PubKey:     pubKey,
 				Ciphertext: bytes,
 			})
@@ -102,7 +102,7 @@ func TestProcess(t *testing.T) {
 		}
 		c := util.NoOpCrypter{}
 		eMsg := &shufflerpb.EncryptedMessage{
-			Scheme:     shufflerpb.EncryptedMessage_PK_SCHEME_1,
+			Scheme:     shufflerpb.EncryptedMessage_NONE,
 			PubKey:     pubKey,
 			Ciphertext: c.Encrypt(data, pubKey),
 		}

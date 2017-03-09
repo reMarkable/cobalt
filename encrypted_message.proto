@@ -21,13 +21,20 @@ option go_package = "cobalt";
 // the bytes of the ciphertext of the standard serialization of various
 // types of proto messages.
 message EncryptedMessage {
+  // The different schemes used to encrypt a message.
   enum EncryptionScheme {
-    UNKNOWN_SCHEME = 0;
-    // TODO(pseudorandom) Change this to the name of an actual scheme
-    // we will use such as PKCSV_1_5 or something.
-    PK_SCHEME_1 = 1;
+    // The message is not encrypted. |ciphertext| contains plaintext bytes
+    // of a serialized protocol buffer message.
+    // This scheme must only be used in tests.
+    NONE = 0;
+
+    // Hybrid Cipher using elliptic curve Diffie-Hellman, version 1.
+    HYBRID_ECDH_V1 = 1;
   }
+
+  // Which scheme was used to encrypt this message?
   EncryptionScheme scheme = 1;
+
   string pub_key = 2;   // Fingerprint (SHA256) of the recipient’s key. This is
                         // used for key rotation.
 

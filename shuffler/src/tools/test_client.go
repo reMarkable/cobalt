@@ -80,7 +80,7 @@ func grpcToShuffler() {
 				},
 				EncryptedObservation: []*cobaltpb.EncryptedMessage{
 					&cobaltpb.EncryptedMessage{
-						Scheme:     cobaltpb.EncryptedMessage_PK_SCHEME_1,
+						Scheme:     cobaltpb.EncryptedMessage_NONE,
 						PubKey:     "pub_key",
 						Ciphertext: ciphertext}}}},
 	}
@@ -124,7 +124,7 @@ func grpcToAnalyzer() {
 	_, err = c.AddObservations(context.Background(), &cobaltpb.ObservationBatch{
 		EncryptedObservation: []*cobaltpb.EncryptedMessage{
 			&cobaltpb.EncryptedMessage{
-				Scheme:     cobaltpb.EncryptedMessage_PK_SCHEME_1,
+				Scheme:     cobaltpb.EncryptedMessage_NONE,
 				PubKey:     "pub_key",
 				Ciphertext: ciphertext}}})
 

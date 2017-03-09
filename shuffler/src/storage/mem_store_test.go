@@ -29,7 +29,7 @@ func createRandomObservationInfo(pubKey string) *ObservationInfo {
 	return &ObservationInfo{
 		CreationTimestamp: time.Now(),
 		EncryptedMessage: &shufflerpb.EncryptedMessage{
-			Scheme:     shufflerpb.EncryptedMessage_PK_SCHEME_1,
+			Scheme:     shufflerpb.EncryptedMessage_NONE,
 			PubKey:     pubKey,
 			Ciphertext: bytes},
 	}

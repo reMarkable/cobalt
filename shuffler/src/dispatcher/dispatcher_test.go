@@ -66,7 +66,7 @@ func createRandomObservationInfo(pubKey string, ts time.Time) *storage.Observati
 	return &storage.ObservationInfo{
 		CreationTimestamp: ts,
 		EncryptedMessage: &shufflerpb.EncryptedMessage{
-			Scheme:     shufflerpb.EncryptedMessage_PK_SCHEME_1,
+			Scheme:     shufflerpb.EncryptedMessage_NONE,
 			PubKey:     pubKey,
 			Ciphertext: bytes},
 	}
