@@ -20,4 +20,5 @@ target_link_libraries(cgen
                       forculus_encrypter
                       gflags)
 
+add_subdirectory(go/src)
 add_subdirectory(test_app)

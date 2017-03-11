@@ -71,7 +71,9 @@ add_custom_target(build_protos
                   DEPENDS ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 
 # Go related defines
-set(GO_PATH env GOPATH="${DIR_SYSROOT}/go:${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen:${CMAKE_SOURCE_DIR}/shuffler")
+set(GO_PATH env GOPATH="${DIR_SYSROOT}/go:${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen")
+set(GO_PATH env "${GO_PATH}:${CMAKE_SOURCE_DIR}/shuffler")
+set(GO_PATH env "${GO_PATH}:${CMAKE_SOURCE_DIR}/tools/go")
 set(GO_BIN ${GO_PATH} go)
 set(GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
 
