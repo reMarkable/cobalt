@@ -21,4 +21,5 @@ target_link_libraries(cgen
                       gflags)
 
 add_subdirectory(go/src)
+add_subdirectory(observation_querier)
 add_subdirectory(test_app)
