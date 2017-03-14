@@ -182,16 +182,22 @@ def _start_bigtable_emulator(args):
   print
   path = os.path.abspath(os.path.join(SYSROOT_DIR, 'gcloud',
       'google-cloud-sdk', 'platform', 'bigtable-emulator', 'cbtemulator'))
-  subprocess.call([path])
+  return_code = subprocess.call([path])
+  if return_code < 0:
+    print
+    print "****** WARNING Process terminated by signal %d" % (- return_code)
 
 def _start_shuffler(args):
   print "Starting the shuffler..."
   print
   path = os.path.abspath(os.path.join(OUT_DIR, 'shuffler', 'shuffler'))
-  subprocess.call([path,
-  "-port", str(args.port),
-  "-config_file", args.config_file,
-  "-logtostderr"])
+  return_code = subprocess.call([path,
+      "-port", str(args.port),
+      "-config_file", args.config_file,
+      "-logtostderr"])
+  if return_code < 0:
+    print
+    print "****** WARNING Process terminated by signal %d" % (- return_code)
 
 def _start_analyzer_service(args):
   print "Will connect to a local Bigtable Emulator instance."
@@ -201,10 +207,13 @@ def _start_analyzer_service(args):
   print
   path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'analyzer_service',
       'analyzer_service'))
-  subprocess.call([path,
-  "-for_testing_only_use_bigtable_emulator",
-  "-port", str(args.port),
-  "-logtostderr"])
+  return_code = subprocess.call([path,
+      "-for_testing_only_use_bigtable_emulator",
+      "-port", str(args.port),
+      "-logtostderr", "-v=3"])
+  if return_code < 0:
+    print
+    print "****** WARNING Process terminated by signal %d" % (- return_code)
 
 def _start_report_master(args):
   print "Will connect to a local Bigtable Emulator instance."
@@ -214,11 +223,25 @@ def _start_report_master(args):
   print
   path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'report_master',
       'analyzer_report_master'))
-  subprocess.call([path,
-  "-for_testing_only_use_bigtable_emulator",
-  "-port", str(args.port),
-  "-cobalt_config_dir", args.cobalt_config_dir,
-  "-logtostderr"])
+  return_code = subprocess.call([path,
+      "-for_testing_only_use_bigtable_emulator",
+      "-port", str(args.port),
+      "-cobalt_config_dir", args.cobalt_config_dir,
+      "-logtostderr"])
+  if return_code < 0:
+    print
+    print "****** WARNING Process terminated by signal %d" % (- return_code)
+
+def _start_test_app(args):
+  path = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'test_app',
+                                      'cobalt_test_app'))
+  return_code =subprocess.call([path,
+      "-shuffler_uri", args.shuffler_uri,
+      "-analyzer_uri", args.analyzer_uri,
+      "-logtostderr", "-v=3"])
+  if return_code < 0:
+    print
+    print "****** WARNING Process terminated by signal %d" % (- return_code)
 
 def _gce_build(args):
   setGCEImages(args)
@@ -402,6 +425,16 @@ def main():
       help='Path of directory containing Cobalt configuration files. '
            'Default=%s' % REGISTERED_CONFIG_DIR,
       default=REGISTERED_CONFIG_DIR)
+
+  sub_parser = start_subparsers.add_parser('test_app',
+      parents=[parent_parser], help='Start the Cobalt test client app.')
+  sub_parser.set_defaults(func=_start_test_app)
+  sub_parser.add_argument('--shuffler_uri',
+      help='Default=localhost:5001',
+      default='localhost:5001')
+  sub_parser.add_argument('--analyzer_uri',
+      help='Default=localhost:6001',
+      default='localhost:6001')
 
   sub_parser = start_subparsers.add_parser('bigtable_emulator',
     parents=[parent_parser],
