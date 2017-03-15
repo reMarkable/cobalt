@@ -24,15 +24,12 @@ import sys
 
 import tools.cpplint as cpplint
 import tools.golint as golint
+import tools.process_starter as process_starter
 import tools.test_runner as test_runner
 
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
-REGISTERED_CONFIG_DIR = os.path.abspath(os.path.join(THIS_DIR, 'config',
-    'registered'))
-SHUFFLER_CONFIG_DIR = os.path.abspath(os.path.join(THIS_DIR, 'shuffler',
-    'src', 'config', 'config_v0.txt'))
 
 IMAGES = ["analyzer", "shuffler"]
 
@@ -122,6 +119,15 @@ def _test(args):
     'cloud_bt' : ['gtests_cloud_bt']
   }
 
+  # A list of test directories for which the contained tests assume the
+  # existence of a running instance of the Bigtable Emulator.
+  NEEDS_BT_EMULATOR=['gtests_btemulator', 'e2e_tests']
+
+  # A list of test directories for which the contained tests assume the
+  # existence of a running instance of the Cobalt processes (Shuffler,
+  # Analyzer Service, Report Master.)
+  NEEDS_COBALT_PROCESSES=['e2e_tests']
+
   # Get the list of test directories we should run.
   if args.tests.startswith('no'):
     test_dirs = [test_dir for test_dir in FILTER_MAP['all']
@@ -133,7 +139,8 @@ def _test(args):
   print ("Will run tests in the following directories: %s." %
       ", ".join(test_dirs))
   for test_dir in test_dirs:
-    use_bt_emulator = (test_dir == 'gtests_btemulator')
+    start_bt_emulator = (test_dir in NEEDS_BT_EMULATOR)
+    start_cobalt_processes = (test_dir in NEEDS_COBALT_PROCESSES)
     test_args = None
     if (test_dir == 'gtests_cloud_bt'):
       if args.bigtable_instance_name == '':
@@ -144,7 +151,9 @@ def _test(args):
           (args.bigtable_project_name, args.bigtable_instance_name))
     print '********************************************************'
     success = (test_runner.run_all_tests(
-        test_dir, use_bt_emulator, test_args) == 0) and success
+        test_dir, start_bt_emulator=start_bt_emulator,
+        start_cobalt_processes=start_cobalt_processes,
+        test_args=test_args) == 0) and success
 
   print
   if success:
@@ -178,70 +187,24 @@ def _clean(args):
            shutil.rmtree(full_path, ignore_errors=True)
 
 def _start_bigtable_emulator(args):
-  print "Starting the Cloud Bigtable Emulator on port 9000..."
-  print
-  path = os.path.abspath(os.path.join(SYSROOT_DIR, 'gcloud',
-      'google-cloud-sdk', 'platform', 'bigtable-emulator', 'cbtemulator'))
-  return_code = subprocess.call([path])
-  if return_code < 0:
-    print
-    print "****** WARNING Process terminated by signal %d" % (- return_code)
+  process_starter.start_bigtable_emulator()
 
 def _start_shuffler(args):
-  print "Starting the shuffler..."
-  print
-  path = os.path.abspath(os.path.join(OUT_DIR, 'shuffler', 'shuffler'))
-  return_code = subprocess.call([path,
-      "-port", str(args.port),
-      "-config_file", args.config_file,
-      "-logtostderr"])
-  if return_code < 0:
-    print
-    print "****** WARNING Process terminated by signal %d" % (- return_code)
+  process_starter.start_shuffler(port=args.port, config_file=args.config_file)
 
 def _start_analyzer_service(args):
-  print "Will connect to a local Bigtable Emulator instance."
-  print "Have you already started the Bigtable Emulator?"
-  print
-  print "Starting the analyzer service..."
-  print
-  path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'analyzer_service',
-      'analyzer_service'))
-  return_code = subprocess.call([path,
-      "-for_testing_only_use_bigtable_emulator",
-      "-port", str(args.port),
-      "-logtostderr", "-v=3"])
-  if return_code < 0:
-    print
-    print "****** WARNING Process terminated by signal %d" % (- return_code)
+  process_starter.start_analyzer_service(port=args.port)
 
 def _start_report_master(args):
-  print "Will connect to a local Bigtable Emulator instance."
-  print "Have you already started the Bigtable Emulator?"
-  print
-  print "Starting the analyzer ReportMaster service..."
-  print
-  path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'report_master',
-      'analyzer_report_master'))
-  return_code = subprocess.call([path,
-      "-for_testing_only_use_bigtable_emulator",
-      "-port", str(args.port),
-      "-cobalt_config_dir", args.cobalt_config_dir,
-      "-logtostderr"])
-  if return_code < 0:
-    print
-    print "****** WARNING Process terminated by signal %d" % (- return_code)
+  process_starter.start_report_master(port=args.port,
+                                      cobalt_config_dir=args.cobalt_config_dir)
 
 def _start_test_app(args):
-  path = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'test_app',
-                                      'cobalt_test_app'))
-  return_code =subprocess.call([path,
-      "-shuffler_uri", args.shuffler_uri,
-      "-analyzer_uri", args.analyzer_uri,
-      "-logtostderr", "-v=3"])
-  if return_code < 0:
-    print
-    print "****** WARNING Process terminated by signal %d" % (- return_code)
+  process_starter.start_test_app(shuffler_uri=args.shuffler_uri,
+                                  analyzer_uri=args.analyzer_uri)
+def _start_report_client(args):
+  process_starter.start_report_client(
+      report_master_uri=args.report_master_uri)
 
 def _gce_build(args):
   setGCEImages(args)
@@ -377,7 +340,7 @@ def main():
   sub_parser.add_argument('--bigtable_project_name',
       help='Specify a Cloud project against which to run the cloud_bt tests.'
       ' Optional. Default=google.com:shuffler-test.'
-      ' Only used when --tests=cloud_bt', default='google.com:shuffler-test'),
+      ' Only used when --tests=cloud_bt', default='google.com:shuffler-test')
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud'
       ' project against which to run the cloud_bt tests.'
@@ -398,20 +361,22 @@ def main():
       parents=[parent_parser], help='Start the Shuffler running locally.')
   sub_parser.set_defaults(func=_start_shuffler)
   sub_parser.add_argument('--port',
-      help='The port on which the Shuffler should listen. Default=5001.',
-      default=5001)
+      help='The port on which the Shuffler should listen. '
+           'Default=%s.' % process_starter.DEFAULT_SHUFFLER_PORT,
+      default=process_starter.DEFAULT_SHUFFLER_PORT)
   sub_parser.add_argument('--config_file',
       help='Path to the Shuffler configuration file. '
-           'Default=%s' % SHUFFLER_CONFIG_DIR,
-      default=SHUFFLER_CONFIG_DIR)
+           'Default=%s' % process_starter.SHUFFLER_CONFIG_DIR,
+      default=process_starter.SHUFFLER_CONFIG_DIR)
 
   sub_parser = start_subparsers.add_parser('analyzer_service',
       parents=[parent_parser], help='Start the Analyzer Service running locally'
           ' and connected to a local instance of the Bigtable Emulator.')
   sub_parser.set_defaults(func=_start_analyzer_service)
   sub_parser.add_argument('--port',
-      help='The port on which the Analyzer service should listen. Default=6001.',
-      default=6001)
+      help='The port on which the Analyzer service should listen. '
+           'Default=%s.' % process_starter.DEFAULT_ANALYZER_SERVICE_PORT,
+      default=process_starter.DEFAULT_ANALYZER_SERVICE_PORT)
 
   sub_parser = start_subparsers.add_parser('report_master',
       parents=[parent_parser], help='Start the Analyzer ReportMaster Service '
@@ -419,22 +384,30 @@ def main():
           'Emulator.')
   sub_parser.set_defaults(func=_start_report_master)
   sub_parser.add_argument('--port',
-      help='The port on which the ReportMaster should listen. Default=7001.',
-      default=7001)
+      help='The port on which the ReportMaster should listen. '
+           'Default=%s.' % process_starter.DEFAULT_REPORT_MASTER_PORT,
+      default=process_starter.DEFAULT_REPORT_MASTER_PORT)
   sub_parser.add_argument('--cobalt_config_dir',
       help='Path of directory containing Cobalt configuration files. '
-           'Default=%s' % REGISTERED_CONFIG_DIR,
-      default=REGISTERED_CONFIG_DIR)
+           'Default=%s' % process_starter.REGISTERED_CONFIG_DIR,
+      default=process_starter.REGISTERED_CONFIG_DIR)
 
   sub_parser = start_subparsers.add_parser('test_app',
       parents=[parent_parser], help='Start the Cobalt test client app.')
   sub_parser.set_defaults(func=_start_test_app)
   sub_parser.add_argument('--shuffler_uri',
-      help='Default=localhost:5001',
-      default='localhost:5001')
+      help='Default=localhost:%s' % process_starter.DEFAULT_SHUFFLER_PORT,
+      default='localhost:%s' % process_starter.DEFAULT_SHUFFLER_PORT)
   sub_parser.add_argument('--analyzer_uri',
-      help='Default=localhost:6001',
-      default='localhost:6001')
+      help='Default=localhost:%s'%process_starter.DEFAULT_ANALYZER_SERVICE_PORT,
+      default='localhost:%s'%process_starter.DEFAULT_ANALYZER_SERVICE_PORT)
+
+  sub_parser = start_subparsers.add_parser('report_client',
+      parents=[parent_parser], help='Start the Cobalt report client.')
+  sub_parser.set_defaults(func=_start_report_client)
+  sub_parser.add_argument('--report_master_uri',
+      help='Default=localhost:%s' % process_starter.DEFAULT_REPORT_MASTER_PORT,
+      default='localhost:%s' % process_starter.DEFAULT_REPORT_MASTER_PORT)
 
   sub_parser = start_subparsers.add_parser('bigtable_emulator',
     parents=[parent_parser],

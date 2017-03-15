@@ -21,9 +21,11 @@ file(MAKE_DIRECTORY ${GO_PROTO_GEN})
 set(SHUFFLER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/shuffler.pb.go")
 set(ANALYZER_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/analyzer.pb.go")
 set(CONFIG_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/config.pb.go")
+set(OBSERVATION_GEN_PROTO_FILE "${GO_PROTO_GEN}/cobalt/observation.pb.go")
 add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
                           ${ANALYZER_GEN_PROTO_FILE}
                           ${CONFIG_GEN_PROTO_FILE}
+                          ${OBSERVATION_GEN_PROTO_FILE}
     COMMAND ${PROTOC} ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
             ${CMAKE_SOURCE_DIR}/encrypted_message.proto
             ${CMAKE_SOURCE_DIR}/observation.proto

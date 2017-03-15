@@ -37,6 +37,10 @@ set(GO_PROTO_GEN_DIR "${CMAKE_BINARY_DIR}/go-proto-gen/src")
 file(MAKE_DIRECTORY ${GO_PROTO_GEN_DIR})
 set(REPORT_MASTER_PB_GO "${GO_PROTO_GEN_DIR}/analyzer/report_master/report_master.pb.go")
 
+# This allows us to indicate below that report_master.pb.go depends on observation.pb.go
+set(OBSERVATION_PB_GO "${GO_PROTO_GEN_DIR}/cobalt/observation.pb.go")
+set_source_files_properties(${OBSERVATION_PB_GO} PROPERTIES GENERATED TRUE)
+
 set(PROTOC ${GO_PATH} protoc)
 add_custom_command(OUTPUT "${REPORT_MASTER_PB_GO}"
     COMMAND ${PROTOC}
@@ -46,6 +50,7 @@ add_custom_command(OUTPUT "${REPORT_MASTER_PB_GO}"
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/observation.proto
+    DEPENDS ${OBSERVATION_PB_GO}
 )
 
 add_custom_target(build_report_master_pb_go
