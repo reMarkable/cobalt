@@ -12,30 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set(REPORT_MASTER_PB_GO "${CMAKE_BINARY_DIR}/go-proto-gen/src/analyzer/report_master/report_master.pb.go")
+set_source_files_properties(${REPORT_MASTER_PB_GO} PROPERTIES GENERATED TRUE)
+
 # Build end-to-end tests
-set(E2E_TESTS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-set(COBALT_TEST_SRC "${E2E_TESTS_SRC}/cobalt_test.go")
-set(COBALT_TEST_BIN ${DIR_END_TO_END_TESTS}/cobalt_test)
+set(REPORT_CLIENT_SRC "${CMAKE_SOURCE_DIR}/tools/go/src/report_client/report_client.go")
+set(COBALT_E2E_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/cobalt_e2e_test.go")
+set(COBALT_E2E_TEST_BINARY ${DIR_END_TO_END_TESTS}/cobalt_e2e_test)
 
-set(COBALT_SHUFFLER_CONF_SRC
-    "${CMAKE_CURRENT_SOURCE_DIR}/config/shuffler_default.conf")
-set(COBALT_TEST_CONF_BIN ${CMAKE_BINARY_DIR}/config/shuffler_default.conf)
-
-add_custom_command(OUTPUT ${COBALT_TEST_CONF_BIN}
-    COMMAND cp ${COBALT_SHUFFLER_CONF_SRC} ${CMAKE_BINARY_DIR}/config
-    DEPENDS ${COBALT_SHUFFLER_CONF_SRC}
+add_custom_command(OUTPUT ${COBALT_E2E_TEST_BINARY}
+    COMMAND ${GO_BIN} test -c -o ${COBALT_E2E_TEST_BINARY}
+            ${COBALT_E2E_TEST_SRC}
+    DEPENDS ${COBALT_E2E_TEST_SRC}
+    DEPENDS ${REPORT_CLIENT_SRC}
+    DEPENDS ${REPORT_MASTER_PB_GO}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_custom_command(OUTPUT ${COBALT_TEST_BIN}
-    COMMAND ${GO_BIN} test -c -o ${COBALT_TEST_BIN}
-            ${COBALT_TEST_SRC}
-    DEPENDS ${COBALT_TEST_SRC}
-    DEPENDS ${COBALT_SHUFFLER_CONF_SRC}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-add_custom_target(test_all ALL
-      DEPENDS ${COBALT_TEST_BIN}
-      DEPENDS ${COBALT_TEST_CONF_BIN}
+add_custom_target(build_e2e_tests ALL
+      DEPENDS ${COBALT_E2E_TEST_BINARY}
 )

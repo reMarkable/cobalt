@@ -19,6 +19,7 @@ auto-generated gRPC client for the ReportMaster API.
 package report_client
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -322,15 +323,25 @@ func (v ByValues) Less(i, j int) bool {
 	}
 }
 
+// ReportRowsSortedByValues returns a sorted slice of ReportRows.
+// The rows of are sorted in increasing order of their values.
+// It is possible for nil to be returned if there are not ReportRows.
+func ReportRowsSortedByValues(report *report_master.Report, includeStdErr bool) []*report_master.ReportRow {
+	rows := report.GetRows().GetRows()
+	if rows != nil {
+		sort.Sort(ByValues(rows))
+	}
+	return rows
+}
+
 // ReportToStrings returns a sorted list of human-readable report rows.
 // Each element of the returned list represents  a row of the report.
 // The rows of are sorted in increasing order of their values.
 // Each row is itself a list of strings as specified by ReportRowToStrings.
 func ReportToStrings(report *report_master.Report, includeStdErr bool) [][]string {
 	result := [][]string{}
-	rows := report.GetRows().GetRows()
+	rows := ReportRowsSortedByValues(report, includeStdErr)
 	if rows != nil {
-		sort.Sort(ByValues(rows))
 		for _, row := range rows {
 			result = append(result, ReportRowToStrings(row, includeStdErr))
 		}
@@ -353,4 +364,16 @@ func WriteCSVReport(w io.Writer, report *report_master.Report, includeStdErr boo
 	}
 	csvWriter.Flush()
 	return nil
+}
+
+// WriteCSVReportToString writes a comma-separated values representation of the
+// given |report| and returns it as a string. See comments at WriteCSVReport
+// for more details.
+func WriteCSVReportToString(report *report_master.Report, includeStdErr bool) (csv string, err error) {
+	var buffer bytes.Buffer
+	if err = WriteCSVReport(&buffer, report, includeStdErr); err != nil {
+		return
+	}
+	csv = buffer.String()
+	return
 }

@@ -157,6 +157,16 @@ def _test(args):
           "--bigtable_project_name=%s" % args.bigtable_project_name,
           "--bigtable_instance_name=%s" % args.bigtable_instance_name
       ]
+    if (test_dir == 'e2e_tests'):
+      test_args = [
+          "-analyzer_uri=localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT,
+          "-shuffler_uri=localhost:%d" % DEFAULT_SHUFFLER_PORT,
+          "-report_master_uri=localhost:%d" % DEFAULT_REPORT_MASTER_PORT,
+          ("-observation_querier_path=%s" %
+              process_starter.OBSERVATION_QUERIER_PATH),
+          "-test_app_path=%s" % process_starter.TEST_APP_PATH,
+          "-sub_process_v=%d"%_verbose_count
+      ]
     print '********************************************************'
     success = (test_runner.run_all_tests(
         test_dir, start_bt_emulator=start_bt_emulator,
@@ -361,8 +371,8 @@ def main():
     help='Runs Cobalt tests. You must build first.')
   sub_parser.set_defaults(func=_test)
   sub_parser.add_argument('--tests', choices=TEST_FILTERS,
-      help='Specify a subset of tests to run. Default=noe2e',
-      default='noe2e')
+      help='Specify a subset of tests to run. Default=all',
+      default='all')
   sub_parser.add_argument('--bigtable_project_name',
       help='Specify a Cloud project against which to run the cloud_bt tests.'
       ' Optional. Default=google.com:shuffler-test.'

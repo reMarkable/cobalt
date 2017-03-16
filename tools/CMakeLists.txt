@@ -12,14 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_executable(cgen cgen.cc)
-
-target_link_libraries(cgen
-                      analyzer_service_lib
-                      shuffler_grpc_client
-                      forculus_encrypter
-                      gflags)
-
 add_subdirectory(go/src)
 add_subdirectory(observation_querier)
 add_subdirectory(test_app)
