@@ -166,3 +166,11 @@ def start_report_client(report_master_uri='', wait=True):
       "-logtostderr", "-v=3"]
   return execute_command(cmd, wait)
 
+def start_observation_querier():
+  path = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'observation_querier',
+                                     'query_observations'))
+  cmd = [path,
+      "-for_testing_only_use_bigtable_emulator",
+      "-logtostderr", "-v=3"]
+  return execute_command(cmd, wait=True)
+

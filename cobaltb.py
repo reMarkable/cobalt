@@ -210,6 +210,9 @@ def _start_report_client(args):
   process_starter.start_report_client(
       report_master_uri=args.report_master_uri)
 
+def _start_observation_querier(args):
+  process_starter.start_observation_querier()
+
 def _gce_build(args):
   setGCEImages(args)
 
@@ -422,6 +425,11 @@ def main():
   sub_parser.add_argument('--report_master_uri',
       help='Default=localhost:%s' % process_starter.DEFAULT_REPORT_MASTER_PORT,
       default='localhost:%s' % process_starter.DEFAULT_REPORT_MASTER_PORT)
+
+  sub_parser = start_subparsers.add_parser('observation_querier',
+      parents=[parent_parser], help='Start the Cobalt ObservationStore '
+                                    'querying tool.')
+  sub_parser.set_defaults(func=_start_observation_querier)
 
   sub_parser = start_subparsers.add_parser('bigtable_emulator',
     parents=[parent_parser],
