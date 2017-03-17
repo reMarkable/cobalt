@@ -37,8 +37,8 @@ import (
 // dispatchDelayInS adds a tiny delay between grpc calls to Analyzer.
 const dispatchDelayInS = 2
 
-// minWaitTimeInS adds a small delay to throttle dispatch attempt checks that
-// happen very frequenctly.
+// In the case that FrequencyInHours has been set to zero we pause for this
+// many seconds between each invocation of Dispatch().
 const minWaitTimeInS = 3
 
 // AnalyzerTransport is an interface for Analyzer where the observations get
@@ -110,7 +110,7 @@ func connect(cc *GrpcClientConfig) *grpc.ClientConn {
 		panic("Grpc client configuration is not set.")
 	}
 
-	glog.V(3).Infoln("Connecting to analyzer: %s", cc.URL)
+	glog.V(3).Infoln("Connecting to analyzer at:", cc.URL)
 	var opts []grpc.DialOption
 	if cc.EnableTLS {
 		var creds credentials.TransportCredentials
@@ -130,7 +130,7 @@ func connect(cc *GrpcClientConfig) *grpc.ClientConn {
 	opts = append(opts, grpc.WithBlock())
 	opts = append(opts, grpc.WithTimeout(time.Second*time.Duration(cc.Timeout)))
 
-	glog.V(3).Infoln("Dialing ", cc.URL, "...")
+	glog.V(4).Infoln("Dialing", cc.URL, "...")
 	conn, err := grpc.Dial(cc.URL, opts...)
 	if err != nil {
 		glog.Fatalf("Error in establishing connection to Analyzer [%v]: %v", cc.URL, err)
@@ -178,13 +178,13 @@ func (g *GrpcAnalyzerTransport) send(obBatch *shufflerpb.ObservationBatch) error
 	// Analyzer forwards a new context, so as to break the context correlation
 	// between originating request and the shuffled request that is being
 	// forwarded.
-	glog.V(3).Infoln("Sending ObservationBatch ...")
+	glog.V(3).Infof("Sending batch of %d observations to the analyzer.", len(obBatch.GetEncryptedObservation()))
 	_, err := g.client.AddObservations(context.Background(), obBatch)
 	if err != nil {
 		return grpc.Errorf(codes.Internal, "AddObservations call failed with error: %v", err)
 	}
 
-	glog.V(3).Infoln("ObservationBatch dispatched successfully.")
+	glog.V(4).Infoln("ObservationBatch dispatched successfully.")
 	return nil
 }
 
@@ -246,22 +246,25 @@ func Start(config *shufflerpb.ShufflerConfig, store storage.Store, batchSize int
 func (d *Dispatcher) Run() {
 	for {
 		waitTime := d.computeWaitTime(time.Now())
-		if waitTime == 0 {
-			waitTime = minWaitTimeInS
+		shouldDisconnectWhileSleeping := true
+		if waitTime <= time.Duration(minWaitTimeInS)*time.Second {
+			waitTime = time.Duration(minWaitTimeInS) * time.Second
+			// Don't bother disconnecting and reconnecting for a 3 second sleep.
+			shouldDisconnectWhileSleeping = false
 		}
-		if waitTime > 0 {
+		if shouldDisconnectWhileSleeping {
 			glog.V(3).Infoln("Close existing connection to Analyzer...")
 			d.analyzerTransport.close()
+		}
 
-			glog.V(3).Infof("Dispatcher going into sleep mode for [%ds]...", waitTime)
-			time.Sleep(time.Duration(waitTime))
+		glog.V(4).Infof("Dispatcher sleeping for [%v]...", waitTime)
+		time.Sleep(waitTime)
 
+		if shouldDisconnectWhileSleeping {
 			glog.V(3).Infoln("Re-establish grpc connection to Analyzer before the next dispatch...")
 			d.analyzerTransport.reconnect()
 		}
 
-		// lastDispatchTime is updated both at system startup and the elapsed time
-		// between the dispatch attempts is greater than |frequencyInHours|.
 		d.lastDispatchTime = time.Now()
 		d.Dispatch()
 	}
@@ -289,7 +292,7 @@ func (d *Dispatcher) Dispatch() {
 		panic("Shuffler config is nil.")
 	}
 
-	glog.V(3).Infoln("Start dispatching ...")
+	glog.V(4).Infoln("Start dispatching ...")
 	keys, err := d.store.GetKeys()
 	if err != nil {
 		glog.Errorf("GetKeys() failed with error: %v", err)
@@ -298,7 +301,7 @@ func (d *Dispatcher) Dispatch() {
 	for _, key := range keys {
 		// Fetch bucket size for each key
 		bucketSize, err := d.store.GetNumObservations(key)
-		glog.V(3).Infoln("Bucket size from store: [%d]", bucketSize)
+		glog.V(4).Infoln("Bucket size from store: [%d]", bucketSize)
 		if err != nil {
 			glog.Errorf("GetNumObservations() failed for key: %v with error: %v", key, err)
 			continue
@@ -348,7 +351,7 @@ func (d *Dispatcher) dispatchBucket(key *shufflerpb.ObservationMetadata) error {
 	batchID := 0
 	for i := 0; i < len(obVals); i += d.batchSize {
 		batchID++
-		glog.V(3).Infoln("Sending observations to Analyzer in chunks, batch [%d] in progress...", batchID)
+		glog.V(4).Infof("Sending observations to Analyzer in chunks, batch [%d] in progress...", batchID)
 		batchToSend := makeBatch(key, obVals, i, i+d.batchSize)
 		sendErr := d.analyzerTransport.send(batchToSend)
 		if sendErr != nil {
@@ -401,25 +404,16 @@ func (d *Dispatcher) deleteOldObservations(key *shufflerpb.ObservationMetadata, 
 	return nil
 }
 
-// computeWaitTime returns |waitTimeInSecs| from the |currentTime| for the next
-// dispatch event. If the Shuffler's dispatch interval is greater than the
-// configured |frequency_in_hours| value, "0" is returned so dispatch happens
-// immediately. Panics if dispatcher |d| is not set.
-func (d *Dispatcher) computeWaitTime(currentTime time.Time) (waitTimeInSecs float64) {
+// computeWaitTime returns the Duration until the next dispatch should occur.
+// Note that this may be negative.
+func (d *Dispatcher) computeWaitTime(currentTime time.Time) (waitTime time.Duration) {
 	if d == nil {
 		panic("Dispatcher is not set")
 	}
 
-	if d.config == nil {
-		panic("Dispatcher's config is nil")
-	}
-
-	frequencyInHours := d.config.GetGlobalConfig().FrequencyInHours
-	diff := currentTime.Sub(d.lastDispatchTime)
-	if uint32(diff.Hours()) < frequencyInHours {
-		waitTimeInSecs = diff.Seconds()
-	}
-	return
+	dispatchInterval := time.Duration(d.config.GetGlobalConfig().FrequencyInHours) * time.Hour
+	nextDispatchTime := d.lastDispatchTime.Add(dispatchInterval)
+	return nextDispatchTime.Sub(currentTime)
 }
 
 // makeBatch returns a new ObservationBatch for |key| consisting of a chunk

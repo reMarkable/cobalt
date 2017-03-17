@@ -190,7 +190,11 @@ def _start_bigtable_emulator(args):
   process_starter.start_bigtable_emulator()
 
 def _start_shuffler(args):
-  process_starter.start_shuffler(port=args.port, config_file=args.config_file)
+  process_starter.start_shuffler(port=args.port,
+                                 analyzer_uri=args.analyzer_uri,
+                                 use_memstore=args.use_memstore,
+                                 erase_db=(not args.keep_existing_db),
+                                 config_file=args.config_file)
 
 def _start_analyzer_service(args):
   process_starter.start_analyzer_service(port=args.port)
@@ -364,6 +368,16 @@ def main():
       help='The port on which the Shuffler should listen. '
            'Default=%s.' % process_starter.DEFAULT_SHUFFLER_PORT,
       default=process_starter.DEFAULT_SHUFFLER_PORT)
+  sub_parser.add_argument('--analyzer_uri',
+      help='Default=localhost:%s'%process_starter.DEFAULT_ANALYZER_SERVICE_PORT,
+      default='localhost:%s'%process_starter.DEFAULT_ANALYZER_SERVICE_PORT)
+  sub_parser.add_argument('-use_memstore',
+      help='Default: False, use persistent LevelDB Store.',
+      action='store_true')
+  sub_parser.add_argument('-keep_existing_db',
+      help='When using LevelDB should any previously persisted data be kept? '
+      'Default=False, erase the DB before starting the Shuffler.',
+      action='store_true')
   sub_parser.add_argument('--config_file',
       help='Path to the Shuffler configuration file. '
            'Default=%s' % process_starter.SHUFFLER_CONFIG_DIR,

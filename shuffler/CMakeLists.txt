@@ -28,6 +28,8 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
                           ${CONFIG_GEN_PROTO_FILE}
                           ${OBSERVATION_GEN_PROTO_FILE}
                           ${SHUFFLER_DB_GEN_PROTO_FILE}
+                          ${CMAKE_CURRENT_BINARY_DIR}/shuffler.grpc.pb.cc
+                          ${CMAKE_CURRENT_BINARY_DIR}/shuffler.pb.cc
     COMMAND ${PROTOC} ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
             ${CMAKE_CURRENT_SOURCE_DIR}/shuffler_db.proto
             ${CMAKE_SOURCE_DIR}/encrypted_message.proto
@@ -60,16 +62,6 @@ add_custom_command(OUTPUT ${SHUFFLER_GEN_PROTO_FILE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# Deploy shuffler config
-set(SHUFFLER_CONF "${CMAKE_BINARY_DIR}/shuffler/conf/config_v0.txt")
-set(SHUFFLER_CONF_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_v0.txt")
-
-add_custom_command(OUTPUT ${SHUFFLER_CONF}
-    COMMAND cp ${SHUFFLER_CONF_SRC} ${SHUFFLER_CONF}
-    DEPENDS ${SHUFFLER_CONF_SRC}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
 # Build shuffler executables
 set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
 set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
@@ -95,14 +87,10 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     DEPENDS ${STORE_SRC}
     DEPENDS ${CONFIG_SRC}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/shuffler_main.go
-    DEPENDS ${SHUFFLER_CONF}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 # Build the protobuf/gRPC c++ library for accessing the shuffler
-set_source_files_properties(shuffler.grpc.pb.cc shuffler.pb.cc
-                            PROPERTIES GENERATED TRUE)
-
 add_library(shuffler_grpc_client shuffler.grpc.pb.cc shuffler.pb.cc)
 
 # Build shuffler test tools
@@ -184,7 +172,6 @@ add_custom_command(OUTPUT ${STORAGE_TEST_BIN}
 # Build shuffler target
 add_custom_target(shuffler_all ALL
     DEPENDS ${SHUFFLER_BIN}
-            ${SHUFFLER_CONF}
             ${TEST_CLIENT_BIN}
             ${DISPATCHER_TEST_BIN}
             ${RECEIVER_TEST_BIN}

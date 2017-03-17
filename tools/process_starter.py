@@ -16,6 +16,7 @@
 """A library with functions to start each of the Cobalt processes locally."""
 
 import os
+import shutil
 import subprocess
 
 THIS_DIR = os.path.dirname(__file__)
@@ -26,7 +27,8 @@ SYS_ROOT_DIR = os.path.join(SRC_ROOT_DIR, 'sysroot')
 REGISTERED_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
     'registered'))
 SHUFFLER_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'shuffler',
-    'src', 'config', 'config_v0.txt'))
+    'src', 'config', 'config_demo.txt'))
+SHUFFLER_DB_DIR = os.path.join("/tmp/cobalt_shuffler")
 
 DEFAULT_SHUFFLER_PORT=5001
 DEFAULT_ANALYZER_SERVICE_PORT=6001
@@ -82,16 +84,38 @@ def start_bigtable_emulator(wait=True):
   cmd = [path]
   return execute_command(cmd, wait)
 
-def start_shuffler(port=DEFAULT_SHUFFLER_PORT, config_file=SHUFFLER_CONFIG_DIR,
-                   wait=True):
-  print
-  print "Starting the shuffler..."
+# If db_dir is not set then the shuffler will use the MemStore.
+def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
+    analyzer_uri='localhost:%d' % DEFAULT_ANALYZER_SERVICE_PORT,
+    use_memstore=False, erase_db=True, config_file=SHUFFLER_CONFIG_DIR,
+    wait=True):
+  """Starts the Shuffler.
+
+  Args:
+    port {int} The port on which the Shuffler should listen.
+    analyzer_uri {string} The URI of the Analyzer Service
+    use_memstore {bool} If false the Shuffler will use the LevelDB store
+    emtpy_db {bool} When using the LevelDB store, should the store be
+        erased before the shuffler starts?
+    config_file {string} The path to the Shuffler's config file.
+  """
   print
   path = os.path.abspath(os.path.join(OUT_DIR, 'shuffler', 'shuffler'))
   cmd = [path,
         "-port", str(port),
+        "-analyzer_uri", analyzer_uri,
         "-config_file", config_file,
         "-logtostderr", "-v=3"]
+  if use_memstore:
+    cmd.append("-use_memstore")
+  else:
+    cmd = cmd + ["-db_dir", SHUFFLER_DB_DIR]
+    if erase_db:
+      print "Erasing Shuffler's LevelDB store at %s." % SHUFFLER_DB_DIR
+      shutil.rmtree(SHUFFLER_DB_DIR, ignore_errors=True)
+
+  print "Starting the shuffler..."
+  print
   return execute_command(cmd, wait)
 
 def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT, wait=True):

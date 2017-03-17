@@ -16,6 +16,7 @@ package storage
 
 import (
 	shufflerpb "cobalt"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -166,6 +167,7 @@ func (store *LevelDBStore) AddAllObservations(envelopeBatch []*shufflerpb.Observ
 			return grpc.Errorf(codes.Internal, "Error in making bucket key for metadata [%v]: [%v]", om, err)
 		}
 
+		glog.V(3).Infoln(fmt.Sprintf("Received a batch of %d encrypted Observations.", len(batch.GetEncryptedObservation())))
 		for _, encryptedObservation := range batch.GetEncryptedObservation() {
 			if encryptedObservation == nil {
 				return grpc.Errorf(codes.InvalidArgument, "One of the encrypted_observations in one of the ObservationBatches with metadata [%v] was null", om)

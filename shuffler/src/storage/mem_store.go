@@ -15,12 +15,14 @@
 package storage
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"sync"
 
 	shufflerpb "cobalt"
 
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -88,6 +90,7 @@ func (store *MemStore) AddAllObservations(envelopeBatch []*shufflerpb.Observatio
 			if om == nil {
 				return grpc.Errorf(codes.InvalidArgument, "One of the ObservationBatches did not have meta_data set")
 			}
+			glog.V(3).Infoln(fmt.Sprintf("Received a batch of %d encrypted Observations.", len(batch.GetEncryptedObservation())))
 			for _, encryptedObservation := range batch.GetEncryptedObservation() {
 				if encryptedObservation == nil {
 					return grpc.Errorf(codes.InvalidArgument, "The ObservationBatch with key %v contained a Null encrypted_observation", om)

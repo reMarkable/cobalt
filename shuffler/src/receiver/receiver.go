@@ -68,7 +68,7 @@ type ServerConfig struct {
 // deleted from Shuffler.
 func (s *ShufflerServer) Process(ctx context.Context,
 	encryptedMessage *shufflerpb.EncryptedMessage) (*empty.Empty, error) {
-	glog.V(3).Infoln("Process() is invoked.")
+	glog.V(4).Infoln("Process() is invoked.")
 	envelope, err := decryptEnvelope(encryptedMessage)
 
 	if err != nil {
@@ -91,7 +91,7 @@ func (s *ShufflerServer) Process(ctx context.Context,
 		return nil, err
 	}
 
-	glog.V(3).Infoln("Process() done, returning OK.")
+	glog.V(4).Infoln("Process() done, returning OK.")
 	return &empty.Empty{}, nil
 }
 
@@ -138,9 +138,9 @@ func (s *ShufflerServer) startServer() {
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
 	}
 
-	glog.Info("Starting Shuffler on port [", s.config.Port, "]...")
 	grpcServer := grpc.NewServer(opts...)
 	shufflerpb.RegisterShufflerServer(grpcServer, s)
+	glog.Info("Shuffler is listening on port ", s.config.Port, "...")
 	grpcServer.Serve(lis)
 }
 

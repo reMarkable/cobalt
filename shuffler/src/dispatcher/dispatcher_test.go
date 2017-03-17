@@ -329,43 +329,57 @@ func TestComputeWaitTime(t *testing.T) {
 	// create a test dispatcher with all defaults
 	d := newTestDispatcher(storage.NewMemStore(), 1, 0, 0)
 
-	now := time.Now()
-
+	// Case 1
+	// lastDispatchTime = 0
+	// FrequencyInHours = 0
+	// expected result: wait <=0
 	// Dispatch frequency set to 0, always dispatch!
-	if d.computeWaitTime(now) != 0 {
-		t.Errorf("No interval specified, dispatch should always happen!")
+	d.lastDispatchTime = time.Time{}
+	if waitTime := d.computeWaitTime(time.Now()); waitTime > 0 {
+		t.Errorf("waitTime=%v", waitTime)
 	}
 
-	// Testcase for wait
-	// Set dispatch frequency to 1 hour, dispatch attempt should fail and last
-	// timestamp should not be updated.
-	lastDispatch := d.lastDispatchTime
-	d.config.GlobalConfig.FrequencyInHours = uint32(1)
-	waitTimeInS := d.computeWaitTime(now)
-	if int(waitTimeInS) > 0 {
-		t.Errorf("got waitTime [%f], expected waitTime [0] as the last dispatch attempt happened in the past 1 hour [%v]", waitTimeInS, d.lastDispatchTime)
+	// Case 2
+	// lastDispatchTime = Now
+	// FrequencyInHours = 0
+	// expected result: wait <=0
+	// Dispatch frequency set to 0, always dispatch!
+	d.lastDispatchTime = time.Now()
+	if waitTime := d.computeWaitTime(time.Now()); waitTime > 0 {
+		t.Errorf("waitTime=%v", waitTime)
 	}
 
-	if !d.lastDispatchTime.Equal(lastDispatch) {
-		t.Errorf("got last dispatch time [%v], expected last dispatch time [%v]", d.lastDispatchTime, lastDispatch)
+	// Case 3
+	// lastDispatchTime = 0
+	// FrequencyInHours = 24
+	// expected result: wait <=0
+	d.lastDispatchTime = time.Time{}
+	d.config.GlobalConfig.FrequencyInHours = uint32(24)
+	if waitTime := d.computeWaitTime(time.Now()); waitTime > 0 {
+		t.Errorf("d.lastDispatchTime=%v, waitTime=%v", d.lastDispatchTime, waitTime)
 	}
 
-	// Testcase for dispatch
-	// Set the dispatch frequency to 1 hour and last dispatch attempt to one day
-	// ago. computeWaitTime should return 0 waitTime and last dispatch time must
-	// be updated.
-	oneDayAgo := time.Unix(now.Unix()-(60*60*24*1), 0) // one day ago
-	d.lastDispatchTime = oneDayAgo
-	d.config.GlobalConfig.FrequencyInHours = uint32(1)
-	if d.computeWaitTime(now) != 0 {
-		t.Errorf("got last dispatch time [%v], expected immediate dispatch for frequency interval [%d]", d.lastDispatchTime, d.config.GlobalConfig.FrequencyInHours)
+	// Case 4
+	// lastDispatchTime = 20 hours ago
+	// FrequencyInHours = 24
+	// expected result: wait ~ 4 hours
+	d.lastDispatchTime = time.Now().Add(time.Duration(-20) * time.Hour)
+	waitTime := d.computeWaitTime(time.Now())
+	if waitTime < time.Duration(4)*time.Hour-time.Duration(1)*time.Minute {
+		t.Errorf("waitTime=%v", waitTime)
+	}
+	if waitTime > time.Duration(4)*time.Hour+time.Duration(1)*time.Minute {
+		t.Errorf("waitTime=%v", waitTime)
 	}
 
-	// Reset dispatch frequency to 0, dispatch should succeed.
-	d.config.GlobalConfig.FrequencyInHours = uint32(0)
-	currTime := time.Now()
-	if d.computeWaitTime(currTime) > 0 {
-		t.Errorf("got last dispatch time [%v], expected immediate dispatch for frequency interval [%d]", d.lastDispatchTime, d.config.GlobalConfig.FrequencyInHours)
+	// Case 5
+	// lastDispatchTime = 30 hours ago
+	// FrequencyInHours = 24
+	// expected result: wait <=0
+	d.lastDispatchTime = time.Now().Add(time.Duration(-30) * time.Hour)
+	waitTime = d.computeWaitTime(time.Now())
+	if waitTime > 0 {
+		t.Errorf("waitTime=%v", waitTime)
 	}
 }
 

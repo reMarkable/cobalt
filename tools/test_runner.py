@@ -72,12 +72,12 @@ def run_all_tests(test_dir,
         bt_emulator_process=process_starter.start_bigtable_emulator(wait=False)
       if start_cobalt_processes:
         time.sleep(1)
-        shuffler_process=process_starter.start_shuffler(wait=False)
-        time.sleep(1)
         analyzer_service_process=process_starter.start_analyzer_service(
             wait=False)
         time.sleep(1)
         report_master_process=process_starter.start_report_master(wait=False)
+        time.sleep(1)
+        shuffler_process=process_starter.start_shuffler(wait=False)
       print "Running %s..." % test_executable
       path = os.path.abspath(os.path.join(tdir, test_executable))
       if test_args is not None:
@@ -89,14 +89,14 @@ def run_all_tests(test_dir,
         print
         print "****** WARNING Process terminated by signal %d" % (- return_code)
     finally:
-      process_starter.kill_process(bt_emulator_process,
-                                   "Cloud Bigtable Emulator")
       process_starter.kill_process(shuffler_process,
                                    "Shuffler")
       process_starter.kill_process(analyzer_service_process,
                                    "Analyzer Service")
       process_starter.kill_process(report_master_process,
                                    "Report Master")
+      process_starter.kill_process(bt_emulator_process,
+                                   "Cloud Bigtable Emulator")
   if all_passed:
     return 0
   else:

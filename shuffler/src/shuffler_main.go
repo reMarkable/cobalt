@@ -37,19 +37,17 @@ var (
 	port     = flag.Int("port", 50051, "The server port")
 
 	// shuffler client configuration flags to connect to analyzer
-	caFile               = flag.String("ca_file", "", "The file containing the CA root certificate")
-	timeout              = flag.Int("timeout", 30, "Grpc connection timeout in seconds")
-	analyzerURL          = flag.String("analyzer_url", "", "The URL for analyzer service")
-	analyzerHostOverride = flag.String("analyzer_host", "", "The host name for analyzer service")
+	caFile      = flag.String("ca_file", "", "The file containing the CA root certificate")
+	timeout     = flag.Int("timeout", 30, "Grpc connection timeout in seconds")
+	analyzerURL = flag.String("analyzer_uri", "", "The URL for analyzer service")
 
 	// shuffler dispatch configuration flags
 	configFile = flag.String("config_file", "", "The Shuffler config file")
 	batchSize  = flag.Int("batch_size", 100, "The size of ObservationBatch to be sent to Analyzer")
 
 	// shuffler db configuration flags
-	useMemStore = flag.Bool("use_mem_store", false, "Shuffler uses in memory store if true, else persistent store")
-	//TODO(ukode): Need to change defaults once a permanent location is in place.
-	dbDir = flag.String("db_dir", "/tmp", "Path to the Shuffler local datastore")
+	useMemStore = flag.Bool("use_memstore", false, "Shuffler uses in memory store if true, else persistent store")
+	dbDir       = flag.String("db_dir", "", "Path to the Shuffler local datastore")
 )
 
 func main() {
@@ -78,9 +76,17 @@ func main() {
 	// Initialize Shuffler data store
 	var store storage.Store
 	if *useMemStore {
+		glog.Warning("Using MemStore--data will not be persistent. All data will be lost when the Shufler restarts!")
 		store = storage.NewMemStore()
 	} else {
-		observationsDBpath := filepath.Join(*dbDir, "observations_db")
+		if *dbDir == "" {
+			glog.Fatal("Either -use_memstore or -db_dir are required.")
+		}
+		observationsDBpath, err := filepath.Abs(filepath.Join(*dbDir, "observations_db"))
+		if err != nil {
+			glog.Fatal("%v", err)
+		}
+		glog.Infof("Using LevelDB store located at %s.", observationsDBpath)
 		if store, err = storage.NewLevelDBStore(observationsDBpath); err != nil || store == nil {
 			glog.Fatal("Error initializing shuffler datastore: [", *dbDir, "]: ", err)
 		}
@@ -103,7 +109,6 @@ func main() {
 	go dispatcher.Start(sConfig, store, *batchSize, grpcAnalyzerClient)
 
 	// Start listening on receiver for incoming requests from Encoder
-	glog.Info("Shuffler started on port [", *port, "]...")
 	receiver.Run(store, &receiver.ServerConfig{
 		EnableTLS: *tls,
 		CertFile:  *certFile,
