@@ -20,7 +20,11 @@
 int main(int argc, char* argv[]) {
   google::SetUsageMessage(
       "Cobalt ObservationStore query tool.\n"
-      "Runs an interactive command-loop used to query the ObservationStore.");
+      "There are two modes of operation controlled by the -interactive flag:\n"
+      "interactive: The program runs an interactive command-loop that "
+      "may be used to query the ObservationStore.\n"
+      "non-interactive: The program performs a single query and \n"
+      "writes the results to std out.");
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 

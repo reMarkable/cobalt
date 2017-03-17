@@ -40,9 +40,8 @@ class ObservationQuerier {
       std::shared_ptr<analyzer::store::ObservationStore> observation_store,
       std::ostream* ostream);
 
-  // Run() is invoked by main(). It executes a command loop that reads a command
-  // from standard input and invokes ProcessCommandLine() until a 'quit'
-  // command is seen.
+  // Run() is invoked by main(). It invokes either CommandLoop()
+  // or QueryOnce() depending on the value of the -interactive flag.
   void Run();
 
   // Processes a single command. The method is public so an instance of
@@ -52,6 +51,15 @@ class ObservationQuerier {
   bool ProcessCommandLine(const std::string command_line);
 
  private:
+  // Implements interactive mode. Reads a command
+  // from standard input and invokes ProcessCommandLine() until a 'quit'
+  // command is seen.
+  void CommandLoop();
+
+  // Implements non-interactive mode. Performs a query based on the flags
+  // and writes the results to std out.
+  void QueryOnce();
+
   bool ProcessCommand(const std::vector<std::string>& command);
   void Query(const std::vector<std::string>& command);
   void ListParameters();

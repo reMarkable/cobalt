@@ -36,6 +36,15 @@ using crypto::Base64Encode;
 
 DEFINE_uint32(customer, 1, "Customer ID");
 DEFINE_uint32(project, 1, "Project ID");
+DEFINE_bool(interactive, true,
+            "If true the program runs an interactive command-loop. Otherwise a "
+            "single query is performed and the count of observations returned "
+            "is written to std out.");
+DEFINE_uint32(metric, 1,
+              "Which metric to query. Used in non-interactive mode only.");
+DEFINE_uint32(max_num, 100,
+              "Maximum number of results to query for. Used in non-interactive "
+              "mode only.");
 
 namespace {
 // Given a |line| of text, breaks it into tokens separated by white space.
@@ -160,6 +169,14 @@ ObservationQuerier::ObservationQuerier(
       ostream_(ostream) {}
 
 void ObservationQuerier::Run() {
+  if (FLAGS_interactive) {
+    CommandLoop();
+    return;
+  }
+  QueryOnce();
+}
+
+void ObservationQuerier::CommandLoop() {
   std::string command_line;
   while (true) {
     *ostream_ << "Command or 'help': ";
@@ -168,6 +185,19 @@ void ObservationQuerier::Run() {
       break;
     }
   }
+}
+
+void ObservationQuerier::QueryOnce() {
+  auto query_response = observation_store_->QueryObservations(
+      customer_, project_, FLAGS_metric, 0, INT32_MAX,
+      std::vector<std::string>(), FLAGS_max_num, "");
+
+  if (query_response.status != analyzer::store::kOK) {
+    LOG(FATAL) << "Query failed with code: " << query_response.status;
+    return;
+  }
+
+  std::cout << query_response.results.size();
 }
 
 bool ObservationQuerier::ProcessCommandLine(const std::string command_line) {
