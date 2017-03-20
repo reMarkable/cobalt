@@ -74,7 +74,7 @@ Status MemoryStoreSingleton::ReadRow(
   auto& rows = GetRows(table);
   auto iter = rows.find(row->key);
   if (iter == rows.end()) {
-    LOG(INFO) << row->key << " Not found in table " << table;
+    VLOG(4) << row->key << " Not found in table " << table;
     return kNotFound;
   }
 

@@ -88,7 +88,7 @@ def start_bigtable_emulator(wait=True):
 def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
     analyzer_uri='localhost:%d' % DEFAULT_ANALYZER_SERVICE_PORT,
     use_memstore=False, erase_db=True, config_file=SHUFFLER_CONFIG_DIR,
-    wait=True):
+    verbose_count=0, wait=True):
   """Starts the Shuffler.
 
   Args:
@@ -105,7 +105,9 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
         "-port", str(port),
         "-analyzer_uri", analyzer_uri,
         "-config_file", config_file,
-        "-logtostderr", "-v=3"]
+        "-logtostderr"]
+  if verbose_count > 0:
+    cmd.append("-v=%d"%verbose_count)
   if use_memstore:
     cmd.append("-use_memstore")
   else:
@@ -118,7 +120,8 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
   print
   return execute_command(cmd, wait)
 
-def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT, wait=True):
+def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
+                           verbose_count=0, wait=True):
   print
   print "Starting the analyzer service..."
   print
@@ -130,11 +133,14 @@ def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT, wait=True):
   cmd = [path,
       "-for_testing_only_use_bigtable_emulator",
       "-port", str(port),
-      "-logtostderr", "-v=3"]
+      "-logtostderr"]
+  if verbose_count > 0:
+    cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
 
 def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
-                        cobalt_config_dir=REGISTERED_CONFIG_DIR, wait=True):
+                        cobalt_config_dir=REGISTERED_CONFIG_DIR,
+                        verbose_count=0, wait=True):
   print
   print "Starting the analyzer ReportMaster service..."
   print
@@ -147,30 +153,40 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
       "-for_testing_only_use_bigtable_emulator",
       "-port", str(port),
       "-cobalt_config_dir", cobalt_config_dir,
-      "-logtostderr", "-v=3"]
+      "-logtostderr"]
+  if verbose_count > 0:
+    cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
 
-def start_test_app(shuffler_uri='', analyzer_uri='', wait=True):
-  path = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'test_app',
-                                      'cobalt_test_app'))
-  cmd = [path,
+TEST_APP_PATH = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'test_app',
+                                'cobalt_test_app'))
+def start_test_app(shuffler_uri='', analyzer_uri='',
+                   verbose_count=0, wait=True):
+  cmd = [TEST_APP_PATH,
       "-shuffler_uri", shuffler_uri,
       "-analyzer_uri", analyzer_uri,
-      "-logtostderr", "-v=3"]
+      "-logtostderr"]
+  if verbose_count > 0:
+    cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
 
-def start_report_client(report_master_uri='', wait=True):
+def start_report_client(report_master_uri='', verbose_count=0, wait=True):
   path = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'report_client'))
   cmd = [path,
       "-report_master_uri", report_master_uri,
-      "-logtostderr", "-v=3"]
+      "-logtostderr"]
+  if verbose_count > 0:
+    cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
 
-def start_observation_querier():
-  path = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'observation_querier',
-                                     'query_observations'))
-  cmd = [path,
+OBSERVATION_QUERIER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'tools',
+                                           'observation_querier',
+                                           'query_observations'))
+def start_observation_querier(verbose_count=0):
+  cmd = [OBSERVATION_QUERIER_PATH,
       "-for_testing_only_use_bigtable_emulator",
-      "-logtostderr", "-v=3"]
+      "-logtostderr"]
+  if verbose_count > 0:
+    cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait=True)
 

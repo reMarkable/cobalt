@@ -33,6 +33,7 @@ _logger = logging.getLogger()
 def run_all_tests(test_dir,
                   start_bt_emulator=False,
                   start_cobalt_processes=False,
+                  verbose_count=0,
                   test_args=None):
   """ Runs the tests in the given directory.
 
@@ -60,7 +61,15 @@ def run_all_tests(test_dir,
     print "Directory %s does not exist." % tdir
     print "Run 'cobaltb.py build' first."
     return 1
+
+  if test_args is None:
+    test_args = []
+  test_args.append('-logtostderr')
+  if verbose_count > 0:
+    test_args.append('-v=%d'%verbose_count)
+
   print "Running all tests in %s " % tdir
+  print "Test arguments: '%s'" % test_args
   all_passed = True
   for test_executable in os.listdir(tdir):
     bt_emulator_process = None
@@ -73,17 +82,16 @@ def run_all_tests(test_dir,
       if start_cobalt_processes:
         time.sleep(1)
         analyzer_service_process=process_starter.start_analyzer_service(
-            wait=False)
+            verbose_count=verbose_count, wait=False)
         time.sleep(1)
-        report_master_process=process_starter.start_report_master(wait=False)
+        report_master_process=process_starter.start_report_master(
+            verbose_count=verbose_count, wait=False)
         time.sleep(1)
         shuffler_process=process_starter.start_shuffler(wait=False)
       print "Running %s..." % test_executable
       path = os.path.abspath(os.path.join(tdir, test_executable))
-      if test_args is not None:
-        path = "%s %s" % (path, test_args)
-        print "Test arguments: '%s'" % test_args
-      return_code = subprocess.call([path, '--logtostderr=1'], shell=True)
+      command = [path] + test_args
+      return_code = subprocess.call(command)
       all_passed = all_passed and return_code == 0
       if return_code < 0:
         print

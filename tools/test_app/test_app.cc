@@ -16,8 +16,10 @@
 
 #include <libgen.h>
 
+#include <chrono>
 #include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -177,7 +179,7 @@ TestApp::Mode ParseMode() {
 // -project flags.
 std::shared_ptr<ProjectContext> LoadProjectContext(
     const std::string& registration_dir_path) {
-  LOG(INFO) << "Loading Cobalt configuration from " << registration_dir_path;
+  VLOG(1) << "Loading Cobalt configuration from " << registration_dir_path;
 
   // Load the encoding registry.
   char fname[PATH_MAX];
@@ -301,8 +303,8 @@ class EnvelopeSender : public EnvelopeSenderInterface {
     for (const ObservationBatch& batch : envelope_maker.envelope().batch()) {
       if (mode_ == TestApp::kInteractive) {
       } else {
-        LOG(INFO) << "Sending to analyzer with deadline = "
-                  << FLAGS_deadline_seconds << " seconds...";
+        VLOG(1) << "Sending to analyzer with deadline = "
+                << FLAGS_deadline_seconds << " seconds...";
       }
       std::unique_ptr<grpc::ClientContext> context(new grpc::ClientContext());
       context->set_deadline(std::chrono::system_clock::now() +
@@ -314,7 +316,7 @@ class EnvelopeSender : public EnvelopeSenderInterface {
         if (mode_ == TestApp::kInteractive) {
           std::cout << "Sent to Analyzer" << std::endl;
         } else {
-          LOG(INFO) << "Sent to Analyzer";
+          VLOG(1) << "Sent to Analyzer";
         }
       } else {
         if (mode_ == TestApp::kInteractive) {
@@ -354,32 +356,37 @@ class EnvelopeSender : public EnvelopeSenderInterface {
 
     if (mode_ == TestApp::kInteractive) {
     } else {
-      LOG(INFO) << "Sending to shuffler with deadline = "
-                << FLAGS_deadline_seconds << " seconds...";
+      VLOG(1) << "Sending to shuffler with deadline = "
+              << FLAGS_deadline_seconds << " seconds...";
     }
 
-    std::unique_ptr<grpc::ClientContext> context(new grpc::ClientContext());
-    context->set_deadline(std::chrono::system_clock::now() +
-                          std::chrono::seconds(FLAGS_deadline_seconds));
+    for (int attempt = 0; attempt < 3; attempt++) {
+      std::unique_ptr<grpc::ClientContext> context(new grpc::ClientContext());
+      context->set_deadline(std::chrono::system_clock::now() +
+                            std::chrono::seconds(FLAGS_deadline_seconds));
 
-    auto status = shuffler_client_->SendToShuffler(
-        envelope_maker.MakeEncryptedEnvelope(), context.get());
-    if (status.ok()) {
-      if (mode_ == TestApp::kInteractive) {
-        std::cout << "Sent to Shuffler." << std::endl;
+      auto status = shuffler_client_->SendToShuffler(
+          envelope_maker.MakeEncryptedEnvelope(), context.get());
+      if (status.ok()) {
+        if (mode_ == TestApp::kInteractive) {
+          std::cout << "Sent to Shuffler." << std::endl;
+        } else {
+          VLOG(1) << "Sent to Shuffler";
+        }
+        return;
       } else {
-        LOG(INFO) << "Sent to Shuffler";
+        if (mode_ == TestApp::kInteractive) {
+          std::cout << "Send to shuffler failed with status="
+                    << status.error_code() << " " << status.error_message()
+                    << std::endl;
+          return;
+        } else {
+          LOG(ERROR) << "Send to shuffler failed with status="
+                     << status.error_code() << " " << status.error_message()
+                     << ". Will try three times.";
+          std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
       }
-    } else {
-      if (mode_ == TestApp::kInteractive) {
-        std::cout << "Send to shuffler failed with status="
-                  << status.error_code() << " " << status.error_message()
-                  << std::endl;
-      } else {
-        LOG(ERROR) << "Send to shuffler failed with status="
-                   << status.error_code() << " " << status.error_message();
-      }
-      return;
     }
   }
 

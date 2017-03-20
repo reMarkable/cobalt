@@ -27,6 +27,12 @@ import tools.golint as golint
 import tools.process_starter as process_starter
 import tools.test_runner as test_runner
 
+from tools.process_starter import DEFAULT_SHUFFLER_PORT
+from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
+from tools.process_starter import DEFAULT_REPORT_MASTER_PORT
+from tools.process_starter import REGISTERED_CONFIG_DIR
+from tools.process_starter import SHUFFLER_CONFIG_DIR
+
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
@@ -147,12 +153,15 @@ def _test(args):
         print '--bigtable_instance_name must be specified'
         success = False
         break
-      test_args = ("--bigtable_project_name=%s --bigtable_instance_name=%s" %
-          (args.bigtable_project_name, args.bigtable_instance_name))
+      test_args = [
+          "--bigtable_project_name=%s" % args.bigtable_project_name,
+          "--bigtable_instance_name=%s" % args.bigtable_instance_name
+      ]
     print '********************************************************'
     success = (test_runner.run_all_tests(
         test_dir, start_bt_emulator=start_bt_emulator,
         start_cobalt_processes=start_cobalt_processes,
+        verbose_count=_verbose_count,
         test_args=test_args) == 0) and success
 
   print
@@ -194,24 +203,34 @@ def _start_shuffler(args):
                                  analyzer_uri=args.analyzer_uri,
                                  use_memstore=args.use_memstore,
                                  erase_db=(not args.keep_existing_db),
-                                 config_file=args.config_file)
+                                 config_file=args.config_file,
+                                 # Because it makes the demo more interesting
+                                 # we use verbose_count at least 3.
+                                 verbose_count=max(3, _verbose_count))
 
 def _start_analyzer_service(args):
-  process_starter.start_analyzer_service(port=args.port)
+  process_starter.start_analyzer_service(port=args.port,
+      # Because it makes the demo more interesting
+      # we use verbose_count at least 3.
+      verbose_count=max(3, _verbose_count))
 
 def _start_report_master(args):
   process_starter.start_report_master(port=args.port,
-                                      cobalt_config_dir=args.cobalt_config_dir)
+                                      cobalt_config_dir=args.cobalt_config_dir,
+                                      verbose_count=_verbose_count)
 
 def _start_test_app(args):
   process_starter.start_test_app(shuffler_uri=args.shuffler_uri,
-                                  analyzer_uri=args.analyzer_uri)
+                                 analyzer_uri=args.analyzer_uri,
+                                 verbose_count=_verbose_count)
+
 def _start_report_client(args):
   process_starter.start_report_client(
-      report_master_uri=args.report_master_uri)
+      report_master_uri=args.report_master_uri,
+      verbose_count=_verbose_count)
 
 def _start_observation_querier(args):
-  process_starter.start_observation_querier()
+  process_starter.start_observation_querier(verbose_count=_verbose_count)
 
 def _gce_build(args):
   setGCEImages(args)
@@ -369,11 +388,11 @@ def main():
   sub_parser.set_defaults(func=_start_shuffler)
   sub_parser.add_argument('--port',
       help='The port on which the Shuffler should listen. '
-           'Default=%s.' % process_starter.DEFAULT_SHUFFLER_PORT,
-      default=process_starter.DEFAULT_SHUFFLER_PORT)
+           'Default=%s.' % DEFAULT_SHUFFLER_PORT,
+      default=DEFAULT_SHUFFLER_PORT)
   sub_parser.add_argument('--analyzer_uri',
-      help='Default=localhost:%s'%process_starter.DEFAULT_ANALYZER_SERVICE_PORT,
-      default='localhost:%s'%process_starter.DEFAULT_ANALYZER_SERVICE_PORT)
+      help='Default=localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT,
+      default='localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT)
   sub_parser.add_argument('-use_memstore',
       help='Default: False, use persistent LevelDB Store.',
       action='store_true')
@@ -383,8 +402,8 @@ def main():
       action='store_true')
   sub_parser.add_argument('--config_file',
       help='Path to the Shuffler configuration file. '
-           'Default=%s' % process_starter.SHUFFLER_CONFIG_DIR,
-      default=process_starter.SHUFFLER_CONFIG_DIR)
+           'Default=%s' % SHUFFLER_CONFIG_DIR,
+      default=SHUFFLER_CONFIG_DIR)
 
   sub_parser = start_subparsers.add_parser('analyzer_service',
       parents=[parent_parser], help='Start the Analyzer Service running locally'
@@ -392,8 +411,8 @@ def main():
   sub_parser.set_defaults(func=_start_analyzer_service)
   sub_parser.add_argument('--port',
       help='The port on which the Analyzer service should listen. '
-           'Default=%s.' % process_starter.DEFAULT_ANALYZER_SERVICE_PORT,
-      default=process_starter.DEFAULT_ANALYZER_SERVICE_PORT)
+           'Default=%s.' % DEFAULT_ANALYZER_SERVICE_PORT,
+      default=DEFAULT_ANALYZER_SERVICE_PORT)
 
   sub_parser = start_subparsers.add_parser('report_master',
       parents=[parent_parser], help='Start the Analyzer ReportMaster Service '
@@ -402,29 +421,29 @@ def main():
   sub_parser.set_defaults(func=_start_report_master)
   sub_parser.add_argument('--port',
       help='The port on which the ReportMaster should listen. '
-           'Default=%s.' % process_starter.DEFAULT_REPORT_MASTER_PORT,
-      default=process_starter.DEFAULT_REPORT_MASTER_PORT)
+           'Default=%s.' % DEFAULT_REPORT_MASTER_PORT,
+      default=DEFAULT_REPORT_MASTER_PORT)
   sub_parser.add_argument('--cobalt_config_dir',
       help='Path of directory containing Cobalt configuration files. '
-           'Default=%s' % process_starter.REGISTERED_CONFIG_DIR,
-      default=process_starter.REGISTERED_CONFIG_DIR)
+           'Default=%s' % REGISTERED_CONFIG_DIR,
+      default=REGISTERED_CONFIG_DIR)
 
   sub_parser = start_subparsers.add_parser('test_app',
       parents=[parent_parser], help='Start the Cobalt test client app.')
   sub_parser.set_defaults(func=_start_test_app)
   sub_parser.add_argument('--shuffler_uri',
-      help='Default=localhost:%s' % process_starter.DEFAULT_SHUFFLER_PORT,
-      default='localhost:%s' % process_starter.DEFAULT_SHUFFLER_PORT)
+      help='Default=localhost:%s' % DEFAULT_SHUFFLER_PORT,
+      default='localhost:%s' % DEFAULT_SHUFFLER_PORT)
   sub_parser.add_argument('--analyzer_uri',
-      help='Default=localhost:%s'%process_starter.DEFAULT_ANALYZER_SERVICE_PORT,
-      default='localhost:%s'%process_starter.DEFAULT_ANALYZER_SERVICE_PORT)
+      help='Default=localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT,
+      default='localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT)
 
   sub_parser = start_subparsers.add_parser('report_client',
       parents=[parent_parser], help='Start the Cobalt report client.')
   sub_parser.set_defaults(func=_start_report_client)
   sub_parser.add_argument('--report_master_uri',
-      help='Default=localhost:%s' % process_starter.DEFAULT_REPORT_MASTER_PORT,
-      default='localhost:%s' % process_starter.DEFAULT_REPORT_MASTER_PORT)
+      help='Default=localhost:%s' % DEFAULT_REPORT_MASTER_PORT,
+      default='localhost:%s' % DEFAULT_REPORT_MASTER_PORT)
 
   sub_parser = start_subparsers.add_parser('observation_querier',
       parents=[parent_parser], help='Start the Cobalt ObservationStore '

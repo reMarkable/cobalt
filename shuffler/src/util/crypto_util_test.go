@@ -15,6 +15,9 @@
 package util
 
 import (
+	// We need to import glog so that the flag --logtostderr is recognized since
+	// our test infrastructre passes this flag to all tests.
+	_ "github.com/golang/glog"
 	"testing"
 )
 
