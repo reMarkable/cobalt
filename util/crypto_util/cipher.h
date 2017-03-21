@@ -105,15 +105,16 @@ class SymmetricCipher {
 //    compression function (also, see Note 2)
 //    4. (Symmetric) encrypts message using SymmetricCipher::encrypt with key
 //    and all-zero nonce into ciphertext
-//    5. Publishes (public_key_part, salt, ciphertext) as the hybrid
+//    5. Publishes (public_key_part, salt, symmetric_ciphertext) as the hybrid
 //    ciphertext, where public_key_part is the X9.62 serialization of g^y.
 //
-// Dec(private key, hybrid ciphertext = (public_key_part, salt, ciphertext)):
+// Dec(private key, hybrid_ciphertext)
+//    where hybrid_ciphertext = (public_key_part, salt, symmetric_ciphertext)):
 //
 //    1. Computes symmetric key = HKDF(g^y, g^xy, salt) with SHA512
 //    compression function from private key (x) and public_key_part (g^y)
-//    2. (Symmetric) decrypts ciphertext using SymmetricCipher::decrypt with
-//    key and all-zero nonce.
+//    2. (Symmetric) decrypts symmetric_ciphertext using
+//    SymmetricCipher::decrypt with key and all-zero nonce.
 //
 // An instance of HybridCipher may be used repeatedly for multiple
 // encryptions or decryptions. The method set_public_key() must be used before
@@ -132,6 +133,7 @@ class SymmetricCipher {
 // compromising security? Probably not.
 class HybridCipher {
  public:
+  // NOTE: All thre sizes below specify a number of bytes (not bits.)
   static const size_t PUBLIC_KEY_SIZE    = 33;  // One byte extra
                                                 // for X9.62 serialization
   static const size_t PRIVATE_KEY_SIZE   = 256 / 8;
@@ -141,7 +143,7 @@ class HybridCipher {
   ~HybridCipher();
 
   // Sets the public key for encryption. This must be invoked
-  // at least once before encrypt is called. Using decryption after
+  // at least once before Encrypt is called. Using decryption after
   // set_public_key is undefined behavior.
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
@@ -151,7 +153,7 @@ class HybridCipher {
   bool set_public_key(const byte key[PUBLIC_KEY_SIZE]);
 
   // Sets the private key for decryption. This must be invoked
-  // at least once before decrypt is called. Using encryption after
+  // at least once before Decrypt is called. Using encryption after
   // set_private_key is undefined behavior.
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
@@ -166,8 +168,37 @@ class HybridCipher {
   //
   // |ptext_len| The number of bytes of plain text
   //
-  // The output is represented in four parts which will be written to
-  // |public_key_part_out|, |salt_out|, |nonce_out| and |ctext| respectively
+  // |hybrid_ctext| A pointer to a vector that will be modified to
+  // contain the hybrid ciphertext.
+  //
+  // Returns true for success or false for failure. Use the functions
+  // in errors.h to obtain error information upon failure.
+  bool Encrypt(const byte *ptext, int ptext_len,
+               std::vector<byte>* hybrid_ctext);
+
+  // Performs ECDH-based hybrid decryption.
+  //
+  // |hybrid_ctext| The hybrid ciphertext to be decrypted.
+  //
+  // |hybrid_ctext_len| The number of bytes of hybrid ciphertext.
+  //
+  // |ptext| A pointer to a vector that will be modified to contain the
+  // recovered plaintext.
+  //
+  // Returns true for success or false for failure. Use the functions
+  // in errors.h to obtain error information upon failure.
+  bool Decrypt(const byte *hybrid_ctext, int hybrid_ctext_len,
+               std::vector<byte>* ptext);
+
+ private:
+  // Performs ECDH-based hybrid encryption
+  //
+  // |ptext| The plain text to be encrypted
+  //
+  // |ptext_len| The number of bytes of plain text
+  //
+  // The output is represented in three parts which will be written to
+  // |public_key_part_out|, |salt_out| and |symmetric_ctext_out| respectively
   //
   // |public_key_part_out| must point to a buffer of size |PUBLIC_KEY_SIZE|.
   // The X9.62 serialization of g^y will be written there
@@ -175,15 +206,15 @@ class HybridCipher {
   // |salt| is a pointer to a vector that will be modified to store a random
   // salt of size |SALT_SIZE|
   //
-  // |ctext| A pointer to a vector that will be modified to contain
-  // the ciphertext under the derived symmetric key
+  // |symmetric_ctext_out| A pointer to a vector that will be modified to
+  // contain the ciphertext under the derived symmetric key
   //
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  bool Encrypt(const byte *ptext, int ptext_len,
-               byte public_key_part_out[PUBLIC_KEY_SIZE],
-               byte salt_out[SALT_SIZE],
-               std::vector<byte>* ctext);
+  bool EncryptInternal(const byte* ptext, int ptext_len,
+                       byte public_key_part_out[PUBLIC_KEY_SIZE],
+                       byte salt_out[SALT_SIZE],
+                       std::vector<byte>* symmetric_ctext_out);
 
   // Performs ECDH-based hybrid decryption.
   //
@@ -195,21 +226,19 @@ class HybridCipher {
   // |salt| The salt to be used in the HKDF step in decryption. Must have size
   // |SALT_SIZE|
   //
-  // |ctext| The ciphertext to be decrypted.
+  // |symmetric_ctext| The ciphertext to be decrypted.
   //
-  // |ctext_len| The number of bytes of ciphertext.
+  // |symmetric_ctext_len| The number of bytes of symmetric ciphertext.
   //
   // |ptext| A pointer to a vector that will be modified to contain the
   // recovered plaintext.
   //
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  bool Decrypt(const byte public_key_part[PUBLIC_KEY_SIZE],
-               const byte salt[SALT_SIZE],
-               const byte *ctext, int ctext_len,
-               std::vector<byte>* ptext);
+  bool DecryptInternal(const byte public_key_part[PUBLIC_KEY_SIZE],
+                       const byte salt[SALT_SIZE], const byte* symmetric_ctext,
+                       int symmetric_ctext_len, std::vector<byte>* ptext);
 
- private:
   std::unique_ptr<HybridCipherContext> context_;
   std::unique_ptr<SymmetricCipher> symm_cipher_;
 };

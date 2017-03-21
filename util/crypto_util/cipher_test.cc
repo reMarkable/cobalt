@@ -101,21 +101,17 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher,
     const byte private_key[HybridCipher::PRIVATE_KEY_SIZE]) {
 
   // Encrypt
-  byte public_key_part[HybridCipher::PUBLIC_KEY_SIZE];
-  byte salt[HybridCipher::SALT_SIZE];
   std::vector<byte> cipher_text;
   ASSERT_TRUE(hybrid_cipher->set_public_key(public_key))
       << GetLastErrorMessage();
-  EXPECT_TRUE(hybrid_cipher->Encrypt(plain_text, ptext_len, public_key_part,
-                                     salt, &cipher_text))
+  EXPECT_TRUE(hybrid_cipher->Encrypt(plain_text, ptext_len, &cipher_text))
       << GetLastErrorMessage();
 
   // Decrypt
   std::vector<byte> recovered_text;
   ASSERT_TRUE(hybrid_cipher->set_private_key(private_key))
       << GetLastErrorMessage();
-  ASSERT_TRUE(hybrid_cipher->Decrypt(public_key_part, salt,
-                                     cipher_text.data(), cipher_text.size(),
+  ASSERT_TRUE(hybrid_cipher->Decrypt(cipher_text.data(), cipher_text.size(),
                                      &recovered_text))
       << GetLastErrorMessage();
 
@@ -125,18 +121,18 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher,
             std::string((const char*)plain_text));
 
   // Decrypt with flipped salt
-  salt[0] ^= 0x1;  // flip a bit in the salt
-  EXPECT_FALSE(hybrid_cipher->Decrypt(public_key_part, salt,
-                                      cipher_text.data(), cipher_text.size(),
+  cipher_text.data()[HybridCipher::PUBLIC_KEY_SIZE] ^=
+      0x1;  // flip a bit in the first byte of the salt
+  EXPECT_FALSE(hybrid_cipher->Decrypt(cipher_text.data(), cipher_text.size(),
                                       &recovered_text))
       << GetLastErrorMessage();
 
   // Decrypt with modified public_key_part
-  salt[0] ^= 0x1;  // flip salt bit back
-  public_key_part[2] ^= 0x1;  // flip any bit except in first byte (due to
-                              // X9.62 serialization)
-  EXPECT_FALSE(hybrid_cipher->Decrypt(public_key_part, salt,
-                                      cipher_text.data(), cipher_text.size(),
+  cipher_text.data()[HybridCipher::PUBLIC_KEY_SIZE] ^=
+      0x1;                       // flip salt bit back
+  cipher_text.data()[2] ^= 0x1;  // flip any bit except in first byte (due to
+                                 // X9.62 serialization)
+  EXPECT_FALSE(hybrid_cipher->Decrypt(cipher_text.data(), cipher_text.size(),
                                       &recovered_text))
       << GetLastErrorMessage();
 }
