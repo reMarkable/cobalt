@@ -73,18 +73,6 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
 # Build the protobuf/gRPC c++ library for accessing the shuffler
 add_library(shuffler_grpc_client shuffler.grpc.pb.cc shuffler.pb.cc)
 
-# Build shuffler test tools
-set(TEST_CLIENT_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler_test_client")
-add_custom_command(OUTPUT ${TEST_CLIENT_BIN}
-    COMMAND ${GO_BIN} build -o ${TEST_CLIENT_BIN} tools/test_client.go
-    DEPENDS src/tools/test_client.go
-    DEPENDS ${SHUFFLER_BIN}
-    DEPENDS ${SHUFFLER_PB_GO}
-    DEPENDS ${ANALYZER_PB_GO}
-    DEPENDS ${CONFIG_PB_GO}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
 # Build dispatcher unit tests
 set(DISPATCHER_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher_test.go")
 set(DISPATCHER_TEST_BIN ${GO_TESTS}/dispatcher_test)
