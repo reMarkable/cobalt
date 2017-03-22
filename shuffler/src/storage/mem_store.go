@@ -20,13 +20,13 @@ import (
 	"strconv"
 	"sync"
 
-	shufflerpb "cobalt"
-
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
+	"cobalt"
+	"shuffler"
 	rand_util "util"
 )
 
@@ -36,7 +36,7 @@ var randGen rand_util.Random
 type MemStore struct {
 	// ObservationsMap is a map for storing observations. Map keys are serialized
 	// |ObservationMetadata| strings that point to a list of |ObservationVal|s.
-	observationsMap map[string][]*shufflerpb.ObservationVal
+	observationsMap map[string][]*shuffler.ObservationVal
 
 	// mu is the global mutex that protects all elements of the store
 	mu sync.RWMutex
@@ -47,12 +47,12 @@ func NewMemStore() *MemStore {
 	randGen = rand_util.NewDeterministicRandom(int64(1))
 
 	return &MemStore{
-		observationsMap: make(map[string][]*shufflerpb.ObservationVal),
+		observationsMap: make(map[string][]*shuffler.ObservationVal),
 	}
 }
 
 // Key returns the text representation of the given |ObservationMetadata|.
-func key(om *shufflerpb.ObservationMetadata) string {
+func key(om *cobalt.ObservationMetadata) string {
 	if om == nil {
 		return ""
 	}
@@ -61,14 +61,14 @@ func key(om *shufflerpb.ObservationMetadata) string {
 }
 
 // shuffle returns a random ordering of input ObservationVals.
-func shuffle(obVals []*shufflerpb.ObservationVal) []*shufflerpb.ObservationVal {
+func shuffle(obVals []*shuffler.ObservationVal) []*shuffler.ObservationVal {
 	numObservations := len(obVals)
 
 	// Get a random ordering for all messages. We assume that the random
 	// number generator is appropriately seeded.
 	perm := rand.Perm(numObservations)
 
-	shuffledObservations := make([]*shufflerpb.ObservationVal, numObservations)
+	shuffledObservations := make([]*shuffler.ObservationVal, numObservations)
 	for i, rnd := range perm {
 		shuffledObservations[i] = obVals[rnd]
 	}
@@ -80,7 +80,7 @@ func shuffle(obVals []*shufflerpb.ObservationVal) []*shufflerpb.ObservationVal {
 // ObservationBatches in |envelopeBatch| to the store. New |ObservationVal|s
 // are created to hold the values and the given |arrivalDayIndex|. Returns a
 // non-nil error if the arguments are invalid or the operation fails.
-func (store *MemStore) AddAllObservations(envelopeBatch []*shufflerpb.ObservationBatch, dayIndex uint32) error {
+func (store *MemStore) AddAllObservations(envelopeBatch []*cobalt.ObservationBatch, dayIndex uint32) error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
@@ -112,7 +112,7 @@ func (store *MemStore) AddAllObservations(envelopeBatch []*shufflerpb.Observatio
 // data store for the given |ObservationMetadata| key or returns an error.
 // TODO(ukode): If the returned resultset cannot fit in memory, the api
 // needs to be tweaked to return ObservationVals in batches.
-func (store *MemStore) GetObservations(om *shufflerpb.ObservationMetadata) ([]*shufflerpb.ObservationVal, error) {
+func (store *MemStore) GetObservations(om *cobalt.ObservationMetadata) ([]*shuffler.ObservationVal, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
@@ -132,13 +132,13 @@ func (store *MemStore) GetObservations(om *shufflerpb.ObservationMetadata) ([]*s
 
 // GetKeys returns the list of all |ObservationMetadata| keys stored in the
 // data store or returns an error.
-func (store *MemStore) GetKeys() ([]*shufflerpb.ObservationMetadata, error) {
+func (store *MemStore) GetKeys() ([]*cobalt.ObservationMetadata, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	keys := []*shufflerpb.ObservationMetadata{}
+	keys := []*cobalt.ObservationMetadata{}
 	for k := range store.observationsMap {
-		om := &shufflerpb.ObservationMetadata{}
+		om := &cobalt.ObservationMetadata{}
 		err := proto.UnmarshalText(k, om)
 		if err != nil {
 			return nil, grpc.Errorf(codes.Internal, "Error in parsing keys: %v", err)
@@ -150,7 +150,7 @@ func (store *MemStore) GetKeys() ([]*shufflerpb.ObservationMetadata, error) {
 
 // DeleteValues deletes the given |ObservationVal|s for |ObservationMetadata|
 // key from the data store or returns an error.
-func (store *MemStore) DeleteValues(om *shufflerpb.ObservationMetadata, deleteObVals []*shufflerpb.ObservationVal) error {
+func (store *MemStore) DeleteValues(om *cobalt.ObservationMetadata, deleteObVals []*shuffler.ObservationVal) error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
@@ -181,7 +181,7 @@ func (store *MemStore) DeleteValues(om *shufflerpb.ObservationMetadata, deleteOb
 
 // GetNumObservations returns the total count of ObservationVals in the data
 // store for the given |ObservationMmetadata| key or returns an error.
-func (store *MemStore) GetNumObservations(om *shufflerpb.ObservationMetadata) (int, error) {
+func (store *MemStore) GetNumObservations(om *cobalt.ObservationMetadata) (int, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
@@ -202,5 +202,5 @@ func (store *MemStore) Reset() {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	store.observationsMap = make(map[string][]*shufflerpb.ObservationVal)
+	store.observationsMap = make(map[string][]*shuffler.ObservationVal)
 }

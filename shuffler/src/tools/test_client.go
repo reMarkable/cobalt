@@ -33,8 +33,10 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	cobaltpb "cobalt"
-	util "util"
+	"analyzer/analyzer_service"
+	"cobalt"
+	"shuffler"
+	"util"
 )
 
 var (
@@ -65,22 +67,22 @@ func grpcToShuffler() {
 	}
 
 	defer conn.Close()
-	sc := cobaltpb.NewShufflerClient(conn)
+	sc := shuffler.NewShufflerClient(conn)
 
 	glog.V(2).Info("Processing a sample envelope...")
 	ciphertext := []byte("test cipher text")
-	env := &cobaltpb.Envelope{
-		Batch: []*cobaltpb.ObservationBatch{
-			&cobaltpb.ObservationBatch{
-				MetaData: &cobaltpb.ObservationMetadata{
+	env := &cobalt.Envelope{
+		Batch: []*cobalt.ObservationBatch{
+			&cobalt.ObservationBatch{
+				MetaData: &cobalt.ObservationMetadata{
 					CustomerId: uint32(123),
 					ProjectId:  uint32(456),
 					MetricId:   uint32(678),
 					DayIndex:   uint32(7),
 				},
-				EncryptedObservation: []*cobaltpb.EncryptedMessage{
-					&cobaltpb.EncryptedMessage{
-						Scheme:     cobaltpb.EncryptedMessage_NONE,
+				EncryptedObservation: []*cobalt.EncryptedMessage{
+					&cobalt.EncryptedMessage{
+						Scheme:     cobalt.EncryptedMessage_NONE,
 						PubKey:     "pub_key",
 						Ciphertext: ciphertext}}}},
 	}
@@ -91,7 +93,7 @@ func grpcToShuffler() {
 	}
 	testPubKey := "pub_key"
 	c := util.NoOpCrypter{}
-	sendMsg := &cobaltpb.EncryptedMessage{
+	sendMsg := &cobalt.EncryptedMessage{
 		PubKey:     testPubKey,
 		Ciphertext: c.Encrypt(data, testPubKey)}
 
@@ -118,13 +120,13 @@ func grpcToAnalyzer() {
 	}
 
 	defer conn.Close()
-	c := cobaltpb.NewAnalyzerClient(conn)
+	c := analyzer_service.NewAnalyzerClient(conn)
 
 	ciphertext := []byte("test cipher text")
-	_, err = c.AddObservations(context.Background(), &cobaltpb.ObservationBatch{
-		EncryptedObservation: []*cobaltpb.EncryptedMessage{
-			&cobaltpb.EncryptedMessage{
-				Scheme:     cobaltpb.EncryptedMessage_NONE,
+	_, err = c.AddObservations(context.Background(), &cobalt.ObservationBatch{
+		EncryptedObservation: []*cobalt.EncryptedMessage{
+			&cobalt.EncryptedMessage{
+				Scheme:     cobalt.EncryptedMessage_NONE,
 				PubKey:     "pub_key",
 				Ciphertext: ciphertext}}})
 

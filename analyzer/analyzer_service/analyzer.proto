@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package cobalt.analyzer;
 
-option go_package = "cobalt";
+option go_package = "analyzer_service";
 
 import "observation.proto";
 import "google/protobuf/empty.proto";

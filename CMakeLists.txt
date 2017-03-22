@@ -79,6 +79,26 @@ set(GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
 
 file(MAKE_DIRECTORY ${GO_TESTS})
 
+# Generate Go bindings for some of the top-level .proto files.
+set(GO_PROTOC ${GO_PATH} protoc)
+set(GO_PROTO_GEN_SRC_DIR "${CMAKE_BINARY_DIR}/go-proto-gen/src")
+file(MAKE_DIRECTORY ${GO_PROTO_GEN_SRC_DIR})
+set(ENCRYPTED_MESSAGE_PB_GO "${GO_PROTO_GEN_SRC_DIR}/cobalt/encrypted_message.pb.go")
+set(OBSERVATION_PB_GO "${GO_PROTO_GEN_SRC_DIR}/cobalt/observation.pb.go")
+
+add_custom_command(OUTPUT ${ENCRYPTED_MESSAGE_PB_GO} ${OBSERVATION_PB_GO}
+    COMMAND ${GO_PROTOC}
+        ${CMAKE_CURRENT_SOURCE_DIR}/encrypted_message.proto
+        ${CMAKE_CURRENT_SOURCE_DIR}/observation.proto
+        -I ${CMAKE_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
+        --go_out=plugins=Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_SRC_DIR}/cobalt
+    DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
+    DEPENDS ${CMAKE_SOURCE_DIR}/observation.proto
+)
+
+add_custom_target(build_go_protos
+                  DEPENDS  ${ENCRYPTED_MESSAGE_PB_GO} ${OBSERVATION_PB_GO})
+
 # Project directories
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)

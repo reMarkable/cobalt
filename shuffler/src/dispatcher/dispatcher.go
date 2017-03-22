@@ -30,7 +30,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 
-	shufflerpb "cobalt"
+	"analyzer/analyzer_service"
+	"cobalt"
+	"shuffler"
 	"storage"
 )
 
@@ -44,7 +46,7 @@ const minWaitTimeInS = 3
 // AnalyzerTransport is an interface for Analyzer where the observations get
 // collected, analyzed and reported.
 type AnalyzerTransport interface {
-	send(obBatch *shufflerpb.ObservationBatch) error
+	send(obBatch *cobalt.ObservationBatch) error
 	close()
 	reconnect()
 }
@@ -77,7 +79,7 @@ type GrpcClientConfig struct {
 type GrpcAnalyzerTransport struct {
 	clientConfig *GrpcClientConfig
 	conn         *grpc.ClientConn
-	client       shufflerpb.AnalyzerClient
+	client       analyzer_service.AnalyzerClient
 }
 
 // NewGrpcAnalyzerTransport establishes a Grpc connection to the Analyzer
@@ -91,7 +93,7 @@ func NewGrpcAnalyzerTransport(clientConfig *GrpcClientConfig) *GrpcAnalyzerTrans
 	return &GrpcAnalyzerTransport{
 		clientConfig: clientConfig,
 		conn:         conn,
-		client:       shufflerpb.NewAnalyzerClient(conn),
+		client:       analyzer_service.NewAnalyzerClient(conn),
 	}
 }
 
@@ -160,13 +162,13 @@ func (g *GrpcAnalyzerTransport) reconnect() {
 
 	if g.conn == nil {
 		g.conn = connect(g.clientConfig)
-		g.client = shufflerpb.NewAnalyzerClient(g.conn)
+		g.client = analyzer_service.NewAnalyzerClient(g.conn)
 	}
 }
 
 // send forwards a given ObservationBatch to Analyzer using the AddObservations
 // interface.
-func (g *GrpcAnalyzerTransport) send(obBatch *shufflerpb.ObservationBatch) error {
+func (g *GrpcAnalyzerTransport) send(obBatch *cobalt.ObservationBatch) error {
 	if g == nil {
 		panic("GrpcAnalyzerTransport is not set.")
 	}
@@ -192,7 +194,7 @@ func (g *GrpcAnalyzerTransport) send(obBatch *shufflerpb.ObservationBatch) error
 // type of |store|, |config|, |batchSize| and the |lastDispatchTime|.
 type Dispatcher struct {
 	store             storage.Store
-	config            *shufflerpb.ShufflerConfig
+	config            *shuffler.ShufflerConfig
 	batchSize         int
 	analyzerTransport AnalyzerTransport
 	lastDispatchTime  time.Time
@@ -204,7 +206,7 @@ var dispatcherSingleton *Dispatcher
 // Shuffler or to the Analyzer, if the dispatch criteria is met. If the
 // dispatch criteria is not met, the incoming Observation is buffered locally
 // for the next dispatch attempt.
-func Start(config *shufflerpb.ShufflerConfig, store storage.Store, batchSize int, analyzerTransport AnalyzerTransport) {
+func Start(config *shuffler.ShufflerConfig, store storage.Store, batchSize int, analyzerTransport AnalyzerTransport) {
 	if store == nil {
 		glog.Fatal("Invalid data store handle, exiting.")
 	}
@@ -330,7 +332,7 @@ func (d *Dispatcher) Dispatch() {
 
 // dispatchBucket dispatches the ObservationBatch associated with |key| in
 // chunks of size |batchSize| to Analyzer using grpc transport.
-func (d *Dispatcher) dispatchBucket(key *shufflerpb.ObservationMetadata) error {
+func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata) error {
 	if key == nil {
 		panic("key is nil")
 	}
@@ -374,7 +376,7 @@ func (d *Dispatcher) dispatchBucket(key *shufflerpb.ObservationMetadata) error {
 // deleteOldObservations deletes the observations for a given |key| from the
 // store if the age of the observation is greater than the configured value
 // |disposalAgeInDays|.
-func (d *Dispatcher) deleteOldObservations(key *shufflerpb.ObservationMetadata, currentDayIndex uint32, disposalAgeInDays uint32) error {
+func (d *Dispatcher) deleteOldObservations(key *cobalt.ObservationMetadata, currentDayIndex uint32, disposalAgeInDays uint32) error {
 	if key == nil {
 		panic("key is nil")
 	}
@@ -391,7 +393,7 @@ func (d *Dispatcher) deleteOldObservations(key *shufflerpb.ObservationMetadata, 
 		return nil // nothing to be updated
 	}
 
-	var staleObVals []*shufflerpb.ObservationVal
+	var staleObVals []*shuffler.ObservationVal
 	for _, obVal := range obVals {
 		if currentDayIndex-obVal.ArrivalDayIndex > disposalAgeInDays {
 			staleObVals = append(staleObVals, obVal)
@@ -418,13 +420,13 @@ func (d *Dispatcher) computeWaitTime(currentTime time.Time) (waitTime time.Durat
 
 // makeBatch returns a new ObservationBatch for |key| consisting of a chunk
 // of observations from |start| to |end| from the given |obVals| list.
-func makeBatch(key *shufflerpb.ObservationMetadata, obVals []*shufflerpb.ObservationVal, start int, end int) *shufflerpb.ObservationBatch {
-	var encryptedMessages []*shufflerpb.EncryptedMessage
+func makeBatch(key *cobalt.ObservationMetadata, obVals []*shuffler.ObservationVal, start int, end int) *cobalt.ObservationBatch {
+	var encryptedMessages []*cobalt.EncryptedMessage
 	for i := start; i < end && i < len(obVals); i++ {
 		encryptedMessages = append(encryptedMessages, obVals[i].EncryptedObservation)
 	}
 
-	return &shufflerpb.ObservationBatch{
+	return &cobalt.ObservationBatch{
 		MetaData:             key,
 		EncryptedObservation: encryptedMessages,
 	}

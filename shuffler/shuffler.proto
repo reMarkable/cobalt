@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package cobalt.shuffler;
 
-option go_package = "cobalt";
+option go_package = "shuffler";
 
 import "encrypted_message.proto";
 import "google/protobuf/empty.proto";

@@ -15,8 +15,10 @@
 package storage
 
 import (
-	shufflerpb "cobalt"
 	"time"
+
+	"cobalt"
+	"shuffler"
 )
 
 // Store is a generic Shuffler data store interface to store and retrieve data
@@ -28,25 +30,25 @@ type Store interface {
 	// ObservationBatches in |envelopeBatch| to the store. New |ObservationVal|s
 	// are created to hold the values and the given |arrivalDayIndex|. Returns a
 	// non-nil error if the arguments are invalid or the operation fails.
-	AddAllObservations(envelopeBatch []*shufflerpb.ObservationBatch, arrivalDayIndex uint32) error
+	AddAllObservations(envelopeBatch []*cobalt.ObservationBatch, arrivalDayIndex uint32) error
 
 	// GetObservations returns a *shuffled* list of ObservationVals from the
 	// data store for the given |ObservationMetadata| key or returns an error.
 	// TODO(ukode): If the returned resultset cannot fit in memory, the api
 	// needs to be tweaked to return ObservationVals in batches.
-	GetObservations(metadata *shufflerpb.ObservationMetadata) ([]*shufflerpb.ObservationVal, error)
+	GetObservations(metadata *cobalt.ObservationMetadata) ([]*shuffler.ObservationVal, error)
 
 	// GetNumObservations returns the total count of ObservationVals in the data
 	// store for the given |ObservationMmetadata| key or returns an error.
-	GetNumObservations(metadata *shufflerpb.ObservationMetadata) (int, error)
+	GetNumObservations(metadata *cobalt.ObservationMetadata) (int, error)
 
 	// GetKeys returns the list of all |ObservationMetadata| keys stored in the
 	// data store or returns an error.
-	GetKeys() ([]*shufflerpb.ObservationMetadata, error)
+	GetKeys() ([]*cobalt.ObservationMetadata, error)
 
 	// DeleteValues deletes the given |ObservationVal|s for |ObservationMetadata|
 	// key from the data store or returns an error.
-	DeleteValues(metadata *shufflerpb.ObservationMetadata, obVals []*shufflerpb.ObservationVal) error
+	DeleteValues(metadata *cobalt.ObservationMetadata, obVals []*shuffler.ObservationVal) error
 }
 
 // GetDayIndexUtc returns the day_index corresponding to the given Time |t|
@@ -60,12 +62,12 @@ func GetDayIndexUtc(t time.Time) uint32 {
 // |encryptedMessage|, |arrivalDayIndex| and |id| which should be a unique
 // identifier for the new |ObservationVal|. Panics if |encryptedMessage|
 // is nil.
-func NewObservationVal(encryptedMessage *shufflerpb.EncryptedMessage, id string, arrivalDayIndex uint32) *shufflerpb.ObservationVal {
+func NewObservationVal(encryptedMessage *cobalt.EncryptedMessage, id string, arrivalDayIndex uint32) *shuffler.ObservationVal {
 	if encryptedMessage == nil {
 		panic("invalid encrypted message")
 	}
 
-	return &shufflerpb.ObservationVal{
+	return &shuffler.ObservationVal{
 		Id:                   id,
 		ArrivalDayIndex:      arrivalDayIndex,
 		EncryptedObservation: encryptedMessage,

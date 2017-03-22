@@ -33,23 +33,17 @@ add_custom_target(build_report_protos
 
 
 # Generate the Go bindings for ReportMaster gRPC service.
-set(GO_PROTO_GEN_DIR "${CMAKE_BINARY_DIR}/go-proto-gen/src")
-file(MAKE_DIRECTORY ${GO_PROTO_GEN_DIR})
-set(REPORT_MASTER_PB_GO "${GO_PROTO_GEN_DIR}/analyzer/report_master/report_master.pb.go")
+set(REPORT_MASTER_PB_GO "${GO_PROTO_GEN_SRC_DIR}/analyzer/report_master/report_master.pb.go")
 
 # This allows us to indicate below that report_master.pb.go depends on observation.pb.go
-set(OBSERVATION_PB_GO "${GO_PROTO_GEN_DIR}/cobalt/observation.pb.go")
 set_source_files_properties(${OBSERVATION_PB_GO} PROPERTIES GENERATED TRUE)
 
-set(PROTOC ${GO_PATH} protoc)
 add_custom_command(OUTPUT "${REPORT_MASTER_PB_GO}"
-    COMMAND ${PROTOC}
+    COMMAND ${GO_PROTOC}
             ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
             -I ${CMAKE_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
-            --go_out=plugins=grpc,Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_DIR}
+            --go_out=plugins=grpc,Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_SRC_DIR}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-    DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
-    DEPENDS ${CMAKE_SOURCE_DIR}/observation.proto
     DEPENDS ${OBSERVATION_PB_GO}
 )
 

@@ -20,10 +20,10 @@ import (
 
 	"github.com/golang/glog"
 
-	shufflerpb "cobalt"
 	"config"
 	"dispatcher"
 	"receiver"
+	"shuffler"
 	"storage"
 )
 
@@ -54,13 +54,13 @@ func main() {
 	flag.Parse()
 
 	// Initialize Shuffler configuration
-	var sConfig *shufflerpb.ShufflerConfig
+	var sConfig *shuffler.ShufflerConfig
 	var err error
 	if *configFile == "" {
 		glog.Warning("Using Shuffler default configuration. Pass -config_file to specify custom config options.")
 		// Use the default config
-		sConfig = &shufflerpb.ShufflerConfig{}
-		sConfig.GlobalConfig = &shufflerpb.Policy{
+		sConfig = &shuffler.ShufflerConfig{}
+		sConfig.GlobalConfig = &shuffler.Policy{
 			FrequencyInHours: 24,
 			PObservationDrop: 0.0,
 			Threshold:        500,

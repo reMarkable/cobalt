@@ -23,12 +23,12 @@ import (
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 
-	shufflerpb "cobalt"
+	"shuffler"
 )
 
 // LoadConfig reads Shuffler configuration params from a text file
 // |configFileName|, deserializes them to |ShufflerConfig| proto and returns it.
-func LoadConfig(configFileName string) (*shufflerpb.ShufflerConfig, error) {
+func LoadConfig(configFileName string) (*shuffler.ShufflerConfig, error) {
 	if configFileName == "" {
 		return nil, errors.New("Provide a valid Shuffler config file")
 	}
@@ -41,7 +41,7 @@ func LoadConfig(configFileName string) (*shufflerpb.ShufflerConfig, error) {
 
 	glog.Info("Read Shuffler configuration from ", configFileName, ".")
 
-	config := &shufflerpb.ShufflerConfig{}
+	config := &shuffler.ShufflerConfig{}
 	serializedBytes, err := ioutil.ReadFile(configFileName)
 	if err != nil {
 		return config, err
@@ -53,11 +53,11 @@ func LoadConfig(configFileName string) (*shufflerpb.ShufflerConfig, error) {
 
 // WriteConfig serializes the input Shuffler configuration params to a
 // output text file |configFileName|.
-func WriteConfig(config *shufflerpb.ShufflerConfig, configFileName string) error {
+func WriteConfig(config *shuffler.ShufflerConfig, configFileName string) error {
 	if config == nil {
 		// Provide default config.
-		config = &shufflerpb.ShufflerConfig{}
-		config.GlobalConfig = &shufflerpb.Policy{
+		config = &shuffler.ShufflerConfig{}
+		config.GlobalConfig = &shuffler.Policy{
 			FrequencyInHours: 24,
 			PObservationDrop: 0.0,
 			Threshold:        10,

@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package cobalt.shuffler;
 
-option go_package = "cobalt";
+option go_package = "shuffler";
 
 ////////////////////////////////////////////////////////////////////////////
 // Messages that describe the shuffler configuration. A global configuration

@@ -37,9 +37,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 
-	shufflerpb "cobalt"
+	"cobalt"
+	"shuffler"
 	"storage"
-	util "util"
+	"util"
 )
 
 var shufflerServer *ShufflerServer
@@ -67,7 +68,7 @@ type ServerConfig struct {
 // a random order. During dispatching, the records get sent to Analyzer and
 // deleted from Shuffler.
 func (s *ShufflerServer) Process(ctx context.Context,
-	encryptedMessage *shufflerpb.EncryptedMessage) (*empty.Empty, error) {
+	encryptedMessage *cobalt.EncryptedMessage) (*empty.Empty, error) {
 	glog.V(4).Infoln("Process() is invoked.")
 	envelope, err := decryptEnvelope(encryptedMessage)
 
@@ -139,21 +140,21 @@ func (s *ShufflerServer) startServer() {
 	}
 
 	grpcServer := grpc.NewServer(opts...)
-	shufflerpb.RegisterShufflerServer(grpcServer, s)
+	shuffler.RegisterShufflerServer(grpcServer, s)
 	glog.Info("Shuffler is listening on port ", s.config.Port, "...")
 	grpcServer.Serve(lis)
 }
 
 // decryptEnvelope decrypts the incoming encoder message and returns the sealed
 // envelope or an error.
-func decryptEnvelope(encryptedMessage *shufflerpb.EncryptedMessage) (*shufflerpb.Envelope, error) {
+func decryptEnvelope(encryptedMessage *cobalt.EncryptedMessage) (*cobalt.Envelope, error) {
 	// TODO(ukode): Add impl for decrypting the sealed envelope.
 	pubKeyHash := encryptedMessage.PubKey
 	ciphertext := encryptedMessage.Ciphertext
 
 	c := util.NoOpCrypter{}
 
-	envelope := &shufflerpb.Envelope{}
+	envelope := &cobalt.Envelope{}
 	err := proto.Unmarshal(c.Decrypt(ciphertext, pubKeyHash), envelope)
 	return envelope, err
 }

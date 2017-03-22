@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	shufflerpb "cobalt"
+	"shuffler"
 )
 
 var configDir = "shuffler/src/config"
@@ -49,8 +49,8 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("Error loading the config file: %v", err)
 	}
 
-	want := &shufflerpb.ShufflerConfig{}
-	want.GlobalConfig = &shufflerpb.Policy{
+	want := &shuffler.ShufflerConfig{}
+	want.GlobalConfig = &shuffler.Policy{
 		FrequencyInHours: 24,
 		PObservationDrop: 0.0,
 		Threshold:        10,
@@ -73,8 +73,8 @@ func TestDefaultConfig(t *testing.T) {
 func TestCustomConfig(t *testing.T) {
 	configFileName := getTmpFile()
 
-	in := &shufflerpb.ShufflerConfig{}
-	in.GlobalConfig = &shufflerpb.Policy{
+	in := &shuffler.ShufflerConfig{}
+	in.GlobalConfig = &shuffler.Policy{
 		FrequencyInHours: 2,
 		PObservationDrop: 0.5,
 		Threshold:        200,

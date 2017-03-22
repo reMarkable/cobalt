@@ -21,7 +21,8 @@ import (
 	"sync"
 	"testing"
 
-	shufflerpb "cobalt"
+	"cobalt"
+	"shuffler"
 )
 
 func TestAddGetAndDeleteObservationsForMemStore(t *testing.T) {
@@ -40,9 +41,9 @@ func TestShuffleObservationsForMemStore(t *testing.T) {
 func TestShuffle(t *testing.T) {
 	num := 10
 	// Create the input test ObservationVals.
-	testObVals := make([][]*shufflerpb.ObservationVal, 2)
+	testObVals := make([][]*shuffler.ObservationVal, 2)
 	// empty list
-	testObVals[0] = append(testObVals[0], &shufflerpb.ObservationVal{})
+	testObVals[0] = append(testObVals[0], &shuffler.ObservationVal{})
 	// list with num vals
 	testObVals[1] = MakeRandomObservationVals(num)
 
@@ -76,7 +77,7 @@ func TestMemStoreConcurrency(t *testing.T) {
 			om := NewObservationMetaData(index)
 			batch := NewObservationBatchForMetadata(om, index /*numMsgs*/)
 
-			if err := store.AddAllObservations([]*shufflerpb.ObservationBatch{batch},
+			if err := store.AddAllObservations([]*cobalt.ObservationBatch{batch},
 				arrivalDayIndex); err != nil {
 				t.Errorf("AddAllObservations: got error %v, expected success", err)
 			}
@@ -95,7 +96,7 @@ func TestMemStoreConcurrency(t *testing.T) {
 	wg.Wait()
 
 	// Verify count of saved keys after concurrent deletion for metric#6
-	var keys []*shufflerpb.ObservationMetadata
+	var keys []*cobalt.ObservationMetadata
 	var err error
 	if keys, err = store.GetKeys(); err != nil {
 		t.Errorf("GetKeys() error: [%v]", err)

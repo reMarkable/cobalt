@@ -15,7 +15,6 @@
 package storage
 
 import (
-	shufflerpb "cobalt"
 	"fmt"
 	"os"
 	"runtime"
@@ -29,6 +28,9 @@ import (
 	leveldb_util "github.com/syndtr/goleveldb/leveldb/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+
+	"cobalt"
+	"shuffler"
 )
 
 // LevelDBStore is an persistent store implementation of the Store interface.
@@ -113,7 +115,7 @@ func (store *LevelDBStore) close() error {
 // rowKeyPrefix returns the leveldb |prefixRange| for the given
 // ObservationMetadata |om| or an error. RowKey prefix is used in generating
 // unique row keys and also as an index into |bucketSizes| map for LevelDBStore.
-func rowKeyPrefix(om *shufflerpb.ObservationMetadata) (prefixRange *leveldb_util.Range, err error) {
+func rowKeyPrefix(om *cobalt.ObservationMetadata) (prefixRange *leveldb_util.Range, err error) {
 	if om == nil {
 		panic("Metadata is nil")
 	}
@@ -130,7 +132,7 @@ func rowKeyPrefix(om *shufflerpb.ObservationMetadata) (prefixRange *leveldb_util
 
 // makeDBVal returns a serialized |ObservationVal| generated from the given
 // |encryptedObservation|, |id| and |arrivalDayIndex|.
-func makeDBVal(encryptedObservation *shufflerpb.EncryptedMessage, id string, arrivalDayIndex uint32) ([]byte, error) {
+func makeDBVal(encryptedObservation *cobalt.EncryptedMessage, id string, arrivalDayIndex uint32) ([]byte, error) {
 	if encryptedObservation == nil {
 		panic("encryptedObservation is nil")
 	}
@@ -146,7 +148,7 @@ func makeDBVal(encryptedObservation *shufflerpb.EncryptedMessage, id string, arr
 // ObservationBatches in |envelopeBatch| to the store. New |ObservationVal|s
 // are created to hold the values and the given |arrivalDayIndex|. Returns a
 // non-nil error if the arguments are invalid or the operation fails.
-func (store *LevelDBStore) AddAllObservations(envelopeBatch []*shufflerpb.ObservationBatch, arrivalDayIndex uint32) error {
+func (store *LevelDBStore) AddAllObservations(envelopeBatch []*cobalt.ObservationBatch, arrivalDayIndex uint32) error {
 	dbBatch := new(leveldb.Batch)
 
 	tmpBucketSizes := make(map[string]uint64)
@@ -222,7 +224,7 @@ func (store *LevelDBStore) AddAllObservations(envelopeBatch []*shufflerpb.Observ
 // data store for the given |ObservationMetadata| key or returns an error.
 // TODO(ukode): If the returned resultset cannot fit in memory, the api
 // needs to be tweaked to return ObservationVals in batches.
-func (store *LevelDBStore) GetObservations(om *shufflerpb.ObservationMetadata) ([]*shufflerpb.ObservationVal, error) {
+func (store *LevelDBStore) GetObservations(om *cobalt.ObservationMetadata) ([]*shuffler.ObservationVal, error) {
 	if om == nil {
 		panic("observation metadata is nil")
 	}
@@ -233,9 +235,9 @@ func (store *LevelDBStore) GetObservations(om *shufflerpb.ObservationMetadata) (
 	}
 
 	iter := store.db.NewIterator(keyPrefix, nil)
-	var obVals []*shufflerpb.ObservationVal
+	var obVals []*shuffler.ObservationVal
 	for iter.Next() {
-		obVal := &shufflerpb.ObservationVal{}
+		obVal := &shuffler.ObservationVal{}
 		if err := proto.Unmarshal(iter.Value(), obVal); err != nil {
 			return nil, grpc.Errorf(codes.Internal, "Error in parsing observation value from datastore: [%v]", err)
 		}
@@ -251,11 +253,11 @@ func (store *LevelDBStore) GetObservations(om *shufflerpb.ObservationMetadata) (
 
 // GetKeys returns the list of all |ObservationMetadata| keys stored in the
 // data store or returns an error.
-func (store *LevelDBStore) GetKeys() ([]*shufflerpb.ObservationMetadata, error) {
+func (store *LevelDBStore) GetKeys() ([]*cobalt.ObservationMetadata, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	keys := []*shufflerpb.ObservationMetadata{}
+	keys := []*cobalt.ObservationMetadata{}
 	for bKey := range store.bucketSizes {
 		om, err := UnmarshalBKey(bKey)
 		if err != nil {
@@ -268,7 +270,7 @@ func (store *LevelDBStore) GetKeys() ([]*shufflerpb.ObservationMetadata, error) 
 
 // DeleteValues deletes the given |ObservationVal|s for |ObservationMetadata|
 // key from the data store or returns an error.
-func (store *LevelDBStore) DeleteValues(om *shufflerpb.ObservationMetadata, obVals []*shufflerpb.ObservationVal) error {
+func (store *LevelDBStore) DeleteValues(om *cobalt.ObservationMetadata, obVals []*shuffler.ObservationVal) error {
 	if om == nil {
 		panic("observation metadata is nil")
 	}
@@ -303,7 +305,7 @@ func (store *LevelDBStore) DeleteValues(om *shufflerpb.ObservationMetadata, obVa
 
 // GetNumObservations returns the total count of ObservationVals in the data
 // store for the given |ObservationMmetadata| key or returns an error.
-func (store *LevelDBStore) GetNumObservations(om *shufflerpb.ObservationMetadata) (int, error) {
+func (store *LevelDBStore) GetNumObservations(om *cobalt.ObservationMetadata) (int, error) {
 	if om == nil {
 		panic("observation metadata is nil")
 	}

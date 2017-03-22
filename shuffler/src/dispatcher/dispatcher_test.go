@@ -19,7 +19,8 @@ import (
 	"testing"
 	"time"
 
-	shufflerpb "cobalt"
+	"cobalt"
+	"shuffler"
 	"storage"
 )
 
@@ -27,11 +28,11 @@ import (
 // in the order they are received. This lets us verify the output of the
 // dispatcher.
 type fakeAnalyzerTransport struct {
-	obBatch []*shufflerpb.ObservationBatch
+	obBatch []*cobalt.ObservationBatch
 	numSent int
 }
 
-func (a *fakeAnalyzerTransport) send(obBatch *shufflerpb.ObservationBatch) error {
+func (a *fakeAnalyzerTransport) send(obBatch *cobalt.ObservationBatch) error {
 	if obBatch == nil {
 		return nil
 	}
@@ -59,7 +60,7 @@ func (a *fakeAnalyzerTransport) reconnect() {
 //
 // The test store created is an in-memory store if |useMemStore| is true.
 // Otherwise, a LevelDB persistent store is used.
-func makeTestStore(numObservations int, currentDayIndex uint32, useMemStore bool) (storage.Store, *shufflerpb.ObservationMetadata, []*shufflerpb.ObservationVal, error) {
+func makeTestStore(numObservations int, currentDayIndex uint32, useMemStore bool) (storage.Store, *cobalt.ObservationMetadata, []*shuffler.ObservationVal, error) {
 	var store storage.Store
 	var err error
 	if useMemStore {
@@ -77,12 +78,12 @@ func makeTestStore(numObservations int, currentDayIndex uint32, useMemStore bool
 		currentDayIndex - 3,
 		currentDayIndex - 4}
 	for _, di := range dayIndexRange {
-		batch := &shufflerpb.ObservationBatch{
+		batch := &cobalt.ObservationBatch{
 			MetaData:             om,
 			EncryptedObservation: storage.MakeRandomEncryptedMsgs(numObservations / 4),
 		}
 
-		if err = store.AddAllObservations([]*shufflerpb.ObservationBatch{batch}, di); err != nil {
+		if err = store.AddAllObservations([]*cobalt.ObservationBatch{batch}, di); err != nil {
 			return nil, nil, nil, err
 		}
 	}
@@ -104,8 +105,8 @@ func newTestDispatcher(store storage.Store, batchSize int, threshold int, freque
 	}
 
 	// testconfig for immediate dispatch for smaller batches
-	testConfig := &shufflerpb.ShufflerConfig{}
-	testConfig.GlobalConfig = &shufflerpb.Policy{
+	testConfig := &shuffler.ShufflerConfig{}
+	testConfig.GlobalConfig = &shuffler.Policy{
 		FrequencyInHours: uint32(frequencyInHours),
 		PObservationDrop: 0.0,
 		Threshold:        uint32(threshold),
@@ -385,7 +386,7 @@ func TestComputeWaitTime(t *testing.T) {
 
 func TestMakeBatch(t *testing.T) {
 	dayIndex := storage.GetDayIndexUtc(time.Now())
-	key := &shufflerpb.ObservationMetadata{
+	key := &cobalt.ObservationMetadata{
 		CustomerId: uint32(1),
 		ProjectId:  uint32(11),
 		MetricId:   uint32(111),

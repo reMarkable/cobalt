@@ -20,19 +20,20 @@ package storage
 import (
 	"strconv"
 	"testing"
+	"util"
 
 	"github.com/golang/protobuf/proto"
 
-	shufflerpb "cobalt"
-	"util"
+	"cobalt"
+	"shuffler"
 )
 
 var r = util.NewDeterministicRandom(int64(1))
 
 // NewObservationMetaData constructs fake observation metadata for testing.
-func NewObservationMetaData(testID int) *shufflerpb.ObservationMetadata {
+func NewObservationMetaData(testID int) *cobalt.ObservationMetadata {
 	id := uint32(testID)
-	return &shufflerpb.ObservationMetadata{
+	return &cobalt.ObservationMetadata{
 		CustomerId: id,
 		ProjectId:  id,
 		MetricId:   id,
@@ -42,8 +43,8 @@ func NewObservationMetaData(testID int) *shufflerpb.ObservationMetadata {
 
 // MakeRandomObservationVals constructs a list of fake |ObservationVal|s for
 // testing.
-func MakeRandomObservationVals(numMsgs int) []*shufflerpb.ObservationVal {
-	var vals []*shufflerpb.ObservationVal
+func MakeRandomObservationVals(numMsgs int) []*shuffler.ObservationVal {
+	var vals []*shuffler.ObservationVal
 	eMsgList := MakeRandomEncryptedMsgs(numMsgs)
 	for i := 0; i < numMsgs; i++ {
 		vals = append(vals, NewObservationVal(eMsgList[i], strconv.Itoa(i), 999))
@@ -54,11 +55,11 @@ func MakeRandomObservationVals(numMsgs int) []*shufflerpb.ObservationVal {
 
 // MakeRandomEncryptedMsgs returns a list of random |EncryptedMessages| using
 // the default Scheme and Analyzer's public key hash.
-func MakeRandomEncryptedMsgs(numMsgs int) []*shufflerpb.EncryptedMessage {
-	var eMsgList []*shufflerpb.EncryptedMessage
+func MakeRandomEncryptedMsgs(numMsgs int) []*cobalt.EncryptedMessage {
+	var eMsgList []*cobalt.EncryptedMessage
 	for i := 0; i < numMsgs; i++ {
 		bytes, _ := r.RandomBytes(10)
-		eMsgList = append(eMsgList, &shufflerpb.EncryptedMessage{
+		eMsgList = append(eMsgList, &cobalt.EncryptedMessage{
 			Ciphertext: bytes,
 		})
 	}
@@ -67,8 +68,8 @@ func MakeRandomEncryptedMsgs(numMsgs int) []*shufflerpb.EncryptedMessage {
 
 // NewObservationBatchForMetadata creates a random |ObservationBatch| for the
 // given metadata |om|.
-func NewObservationBatchForMetadata(om *shufflerpb.ObservationMetadata, numMsgs int) *shufflerpb.ObservationBatch {
-	return &shufflerpb.ObservationBatch{
+func NewObservationBatchForMetadata(om *cobalt.ObservationMetadata, numMsgs int) *cobalt.ObservationBatch {
+	return &cobalt.ObservationBatch{
 		MetaData:             om,
 		EncryptedObservation: MakeRandomEncryptedMsgs(numMsgs),
 	}
@@ -77,8 +78,8 @@ func NewObservationBatchForMetadata(om *shufflerpb.ObservationMetadata, numMsgs 
 // MakeObservationBatches generates a set of ObservationBatches of size
 // |numBatches|. For each i, batch i will have an ObservationMetadata that uses
 // i for all IDs and will contain i encrypted observations.
-func MakeObservationBatches(numBatches int) []*shufflerpb.ObservationBatch {
-	var batches []*shufflerpb.ObservationBatch
+func MakeObservationBatches(numBatches int) []*cobalt.ObservationBatch {
+	var batches []*cobalt.ObservationBatch
 	for i := 1; i <= numBatches; i++ {
 		batches = append(batches, NewObservationBatchForMetadata(NewObservationMetaData(i), i))
 	}
@@ -88,7 +89,7 @@ func MakeObservationBatches(numBatches int) []*shufflerpb.ObservationBatch {
 // CheckKeys tests if the total count of ObservationMetadata keys saved in
 // store is equal to |expectedNumKeys| and the contents of the keys match with
 // the given |expectedKeys| list.
-func CheckKeys(t *testing.T, store Store, expectedKeys []*shufflerpb.ObservationMetadata) {
+func CheckKeys(t *testing.T, store Store, expectedKeys []*cobalt.ObservationMetadata) {
 	if store == nil {
 		panic("store is nil")
 	}
@@ -118,7 +119,7 @@ func CheckKeys(t *testing.T, store Store, expectedKeys []*shufflerpb.Observation
 // CheckNumObservations tests if the total count of observations returned by
 // GetNumObservations() call for a given ObservationMetadata |om| key is equal
 // to |expectedNumObs|.
-func CheckNumObservations(t *testing.T, store Store, om *shufflerpb.ObservationMetadata, expectedNumObs int) {
+func CheckNumObservations(t *testing.T, store Store, om *cobalt.ObservationMetadata, expectedNumObs int) {
 	if store == nil {
 		panic("store is nil")
 	}
@@ -136,7 +137,7 @@ func CheckNumObservations(t *testing.T, store Store, om *shufflerpb.ObservationM
 // CheckObservations tests if the total count of observations returned by
 // GetObservations() for a given ObservationMetadata |om| key is equal to
 // |expectedNumObs|, and returns the fetched list of |ObservationVal|s.
-func CheckObservations(t *testing.T, store Store, om *shufflerpb.ObservationMetadata, expectedNumObs int) []*shufflerpb.ObservationVal {
+func CheckObservations(t *testing.T, store Store, om *cobalt.ObservationMetadata, expectedNumObs int) []*shuffler.ObservationVal {
 	if store == nil {
 		panic("store is nil")
 	}
@@ -161,7 +162,7 @@ func CheckObservations(t *testing.T, store Store, om *shufflerpb.ObservationMeta
 //   length of |expectedEncMsgs|, and
 // - The contents of stored |EncryptedMessages|s match with the given
 //   |expectedEncMsgs| list.
-func CheckGetObservations(t *testing.T, store Store, om *shufflerpb.ObservationMetadata, expectedEncMsgs []*shufflerpb.EncryptedMessage) {
+func CheckGetObservations(t *testing.T, store Store, om *cobalt.ObservationMetadata, expectedEncMsgs []*cobalt.EncryptedMessage) {
 	gotObVals := CheckObservations(t, store, om, len(expectedEncMsgs))
 	if gotObVals == nil && len(expectedEncMsgs) != 0 {
 		t.Errorf("GetObservations() call failed for key: [%v]", om)
@@ -189,7 +190,7 @@ func CheckGetObservations(t *testing.T, store Store, om *shufflerpb.ObservationM
 //   |expectedNumObs|, and
 // - The fetched observations doesn't contain any ObservationVal from the
 //   |expectedDeleteVals| list.
-func CheckDeleteObservations(t *testing.T, store Store, om *shufflerpb.ObservationMetadata, expectedNumObs int, expectedDeleteVals []*shufflerpb.ObservationVal) {
+func CheckDeleteObservations(t *testing.T, store Store, om *cobalt.ObservationMetadata, expectedNumObs int, expectedDeleteVals []*shuffler.ObservationVal) {
 	gotObVals := CheckObservations(t, store, om, expectedNumObs)
 	if gotObVals == nil && expectedNumObs != 0 {
 		t.Errorf("GetObservations() call failed for key: [%v]", om)
