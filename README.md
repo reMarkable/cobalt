@@ -85,7 +85,7 @@ You can run the Analyzer Service locally using an in-memory data store as follow
 
 * `export LD_LIBRARY_PATH=<root>/sysroot/lib`
 
-* `./out/analyzer/analyzer -for_testing_only_use_memstore -port=8080 -cobalt_config_dir="config/registered" -logtostderr`
+* `./out/analyzer/analyzer -for_testing_only_use_memstore -port=8080 -cobalt_config_dir="config/demo" -logtostderr`
 
 ## Bigtable emulator
 
@@ -98,7 +98,7 @@ In a separate console run:
 
 * `export LD_LIBRARY_PATH=<root>/sysroot/lib`
 
-* `./out/analyzer/analyzer -for_testing_only_use_bigtable_emulator -port=8080 -cobalt_config_dir="config/registered" -logtostderr`
+* `./out/analyzer/analyzer -for_testing_only_use_bigtable_emulator -port=8080 -cobalt_config_dir="config/demo" -logtostderr`
 
 ## Shuffler
 

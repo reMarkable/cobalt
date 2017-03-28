@@ -1,6 +1,6 @@
 
 ###########################################################################
-# This is a valid version of the registered_elements.txt file that
+# This is a valid version of the registered_encodings.txt file that
 # is used by TEST(EncodingRegistryFromFile, ValidFile) in config_test.cc
 ##########################################################################
 

@@ -30,7 +30,7 @@ validates the report.
 
 The test assumes particular contents of the Cobalt registration system.
 By default "tools/process_starter.py" will cause the Cobalt processes to
-use the configuration files located in <source root>/config/registered. Thus
+use the configuration files located in <source root>/config/demo. Thus
 this test must be kept in sync with the contents of those files. Here
 we include a copy of the relevant parts of  those files for reference:
 

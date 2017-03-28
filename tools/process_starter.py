@@ -24,10 +24,10 @@ SRC_ROOT_DIR = os.path.join(THIS_DIR, os.pardir)
 OUT_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'out'))
 SYS_ROOT_DIR = os.path.join(SRC_ROOT_DIR, 'sysroot')
 
-REGISTERED_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
-    'registered'))
-SHUFFLER_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'shuffler',
-    'src', 'config', 'config_demo.txt'))
+DEMO_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
+    'demo'))
+SHUFFLER_DEMO_CONFIG_FILE = os.path.abspath(os.path.join(SRC_ROOT_DIR,
+    'shuffler', 'src', 'config', 'config_demo.txt'))
 SHUFFLER_DB_DIR = os.path.join("/tmp/cobalt_shuffler")
 
 DEFAULT_SHUFFLER_PORT=5001
@@ -87,7 +87,7 @@ def start_bigtable_emulator(wait=True):
 # If db_dir is not set then the shuffler will use the MemStore.
 def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
     analyzer_uri='localhost:%d' % DEFAULT_ANALYZER_SERVICE_PORT,
-    use_memstore=False, erase_db=True, config_file=SHUFFLER_CONFIG_DIR,
+    use_memstore=False, erase_db=True, config_file=SHUFFLER_DEMO_CONFIG_FILE,
     verbose_count=0, wait=True):
   """Starts the Shuffler.
 
@@ -139,7 +139,7 @@ def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
   return execute_command(cmd, wait)
 
 def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
-                        cobalt_config_dir=REGISTERED_CONFIG_DIR,
+                        cobalt_config_dir=DEMO_CONFIG_DIR,
                         verbose_count=0, wait=True):
   print
   print "Starting the analyzer ReportMaster service..."

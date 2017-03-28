@@ -19,6 +19,41 @@
     is presented as a table of numbers. Report 2 is the Basic RAPPOR / hour-of-
     the-day example. In addition to generating a table of numbers a
     column-chart is also generated for visualization.
+
+    This script assumes a particular contents of the Cobalt registration system.
+    It must be kept in sync with the registration files in
+    <source root>/config/demo. Here we include a copy of the relevant parts of
+    those files for reference:
+
+    #### ReportConfig (1, 1, 1)
+    element {
+      customer_id: 1
+      project_id: 1
+      id: 1
+      name: "Fuchsia Popular URLs"
+      description: "A fictional report used for the development of Cobalt."
+      metric_id: 1
+      variable {
+        metric_part: "url"
+      }
+      aggregation_epoch_type: DAY
+      report_delay_days: 1
+    }
+
+    #### ReportConfig (1, 1, 2)
+    element {
+      customer_id: 1
+      project_id: 1
+      id: 2
+      name: "Fuchsia Usage by Hour"
+      description: "A fictional report used for the development of Cobalt."
+      metric_id: 2
+      variable {
+        metric_part: "hour"
+      }
+      aggregation_epoch_type: WEEK
+      report_delay_days: 5
+    }
 """
 
 import os

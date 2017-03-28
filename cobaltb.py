@@ -30,8 +30,8 @@ import tools.test_runner as test_runner
 from tools.process_starter import DEFAULT_SHUFFLER_PORT
 from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from tools.process_starter import DEFAULT_REPORT_MASTER_PORT
-from tools.process_starter import REGISTERED_CONFIG_DIR
-from tools.process_starter import SHUFFLER_CONFIG_DIR
+from tools.process_starter import DEMO_CONFIG_DIR
+from tools.process_starter import SHUFFLER_DEMO_CONFIG_FILE
 
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
@@ -265,7 +265,7 @@ def _gce_build(args):
                "registered_encodings.txt",
                "registered_reports.txt"
               ]:
-    shutil.copy("%s/config/registered/%s" % (THIS_DIR, conf),
+    shutil.copy("%s/config/demo/%s" % (THIS_DIR, conf),
                 "%s/analyzer/" % OUT_DIR)
 
   # Build all images
@@ -412,8 +412,8 @@ def main():
       action='store_true')
   sub_parser.add_argument('--config_file',
       help='Path to the Shuffler configuration file. '
-           'Default=%s' % SHUFFLER_CONFIG_DIR,
-      default=SHUFFLER_CONFIG_DIR)
+           'Default=%s' % SHUFFLER_DEMO_CONFIG_FILE,
+      default=SHUFFLER_DEMO_CONFIG_FILE)
 
   sub_parser = start_subparsers.add_parser('analyzer_service',
       parents=[parent_parser], help='Start the Analyzer Service running locally'
@@ -435,8 +435,8 @@ def main():
       default=DEFAULT_REPORT_MASTER_PORT)
   sub_parser.add_argument('--cobalt_config_dir',
       help='Path of directory containing Cobalt configuration files. '
-           'Default=%s' % REGISTERED_CONFIG_DIR,
-      default=REGISTERED_CONFIG_DIR)
+           'Default=%s' % DEMO_CONFIG_DIR,
+      default=DEMO_CONFIG_DIR)
 
   sub_parser = start_subparsers.add_parser('test_app',
       parents=[parent_parser], help='Start the Cobalt test client app.')

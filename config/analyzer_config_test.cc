@@ -26,8 +26,8 @@ DECLARE_string(cobalt_metrics_file_name);
 DECLARE_string(cobalt_report_configs_file_name);
 
 TEST(AnalyzerConfigTest, ValidFiles) {
-  // Read from the default files in the "registered" directory.
-  FLAGS_cobalt_config_dir = "config/registered";
+  // Read from the default files in the "demo" directory.
+  FLAGS_cobalt_config_dir = "config/demo";
   auto config = AnalyzerConfig::CreateFromFlagsOrDie();
 
   // Read from specified files in the "test_files" directory.
@@ -51,7 +51,7 @@ TEST(AnalyzerConfigTest, BadDirectoryNameDeathTest) {
 }
 
 TEST(AnalyzerConfigTest, BadFileNameDeathTest) {
-  FLAGS_cobalt_config_dir = "config/registered";
+  FLAGS_cobalt_config_dir = "config/demo";
   FLAGS_cobalt_encoding_configs_file_name = "bad_file_name.txt";
   ASSERT_DEATH(AnalyzerConfig::CreateFromFlagsOrDie(), "Unable to open file");
 }

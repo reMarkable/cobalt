@@ -138,7 +138,7 @@ void PrintHelp(std::ostream* ostream) {
   *ostream << std::endl;
 }
 
-// Returns the path to the standard Cobalt registered configuration directory
+// Returns the path to the standard Cobalt demo configuration directory
 // based on the presumed location of this binary.
 std::string FindConfigRegistrationDirectory(char* argv[]) {
   char path[PATH_MAX], path2[PATH_MAX];
@@ -150,7 +150,7 @@ std::string FindConfigRegistrationDirectory(char* argv[]) {
   char* dir = dirname(path);
 
   // Set the relative path to the registry.
-  snprintf(path2, sizeof(path2), "%s/../../../config/registered", dir);
+  snprintf(path2, sizeof(path2), "%s/../../../config/demo", dir);
 
   // Get the absolute path to the registry.
   if (!realpath(path2, path)) {

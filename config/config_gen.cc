@@ -17,7 +17,7 @@
 // the production cobalt system and it is not part of any automated unit
 // test.  The intended use is to aid in the understanding of what the
 // text format of protocol buffer messages look like in order to facilitate
-// the manual editing of the files in the |registered| folder. This
+// the manual editing of cobalt registration files. This
 // program writes its output to the console. An operator may edit this
 // file to add additional messages in order to see what their text format
 // looks like.

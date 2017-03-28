@@ -208,7 +208,7 @@ TEST(ReportRegistryFromFile, ValidFile) {
 // file, registered_encodings.txt. The purpose is to validate that file.
 TEST(EncodingRegistryFromFile, CheckRegisteredEncodings) {
   auto result = EncodingRegistry::FromFile(
-      "config/registered/registered_encodings.txt", nullptr);
+      "config/demo/registered_encodings.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
@@ -216,7 +216,7 @@ TEST(EncodingRegistryFromFile, CheckRegisteredEncodings) {
 // file, registered_metrics.txt. The purpose is to validate that file.
 TEST(MetricRegistryFromFile, CheckRegisteredMetrics) {
   auto result = MetricRegistry::FromFile(
-      "config/registered/registered_metrics.txt", nullptr);
+      "config/demo/registered_metrics.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
@@ -224,7 +224,7 @@ TEST(MetricRegistryFromFile, CheckRegisteredMetrics) {
 // file, registered_reports.txt. The purpose is to validate that file.
 TEST(ReportRegistryFromFile, CheckRegisteredReports) {
   auto result = ReportRegistry::FromFile(
-      "config/registered/registered_reports.txt", nullptr);
+      "config/demo/registered_reports.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
