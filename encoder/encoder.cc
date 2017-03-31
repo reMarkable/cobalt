@@ -302,6 +302,18 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
         break;
       }
 
+      case EncodingConfig::kNoOpEncoding: {
+        VLOG(4) << "WARNING: Using the NoOpEncoding. No privacy-protection is "
+                   "being applied.";
+        // TODO(rudominer) Notice we are copying the value here. If we pass
+        // the parameter |value| to this method by pointer instead of by
+        // const ref then we could Swap() here instead.
+        observation_part.mutable_unencoded()->set_allocated_unencoded_value(
+            new ValuePart(value_part_data.value_part));
+        status = kOK;
+        break;
+      }
+
       default:
         status = kInvalidConfig;
         break;

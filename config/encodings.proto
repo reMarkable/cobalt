@@ -125,6 +125,12 @@ message BasicRapporConfig {
   }
 }
 
+// The NoOpEncoding specifies that no encoding will be performed. Unencoded
+// raw input-values will be used as observations.
+message NoOpEncodingConfig {
+  // There is no configuration to specify.
+}
+
 message EncodingConfig {
   uint32 customer_id = 1;
   uint32 project_id = 2;
@@ -133,6 +139,7 @@ message EncodingConfig {
     ForculusConfig forculus = 4;
     RapporConfig rappor = 5;
     BasicRapporConfig basic_rappor = 6;
+    NoOpEncodingConfig no_op_encoding = 99;
   }
 }
 

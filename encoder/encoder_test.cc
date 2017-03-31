@@ -190,6 +190,15 @@ element {
   }
 }
 
+# EncodingConfig 7 is the NoOp encoding.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 7
+  no_op_encoding {
+  }
+}
+
 )";
 
 // Returns a ProjectContext obtained by parsing the above configuration
@@ -268,6 +277,10 @@ void CheckSinglePartResult(
       EXPECT_NE("", obs_part.basic_rappor().data());
       break;
     }
+    case ObservationPart::kUnencoded: {
+      EXPECT_TRUE(obs_part.unencoded().has_unencoded_value());
+      break;
+    }
     default:
       EXPECT_TRUE(false) << " Unexpected case";
   }
@@ -277,9 +290,10 @@ void CheckSinglePartResult(
 // metric and encoding. The metric is expected to have a single part named
 // "Part1". We validate that there are no errors and that the
 // produced Observation has the |expected_type| and is non-empty.
-void DoEncodeStringTest(std::string value, uint32_t metric_id,
-                        uint32_t encoding_config_id, bool expect_utc,
-                        const ObservationPart::ValueCase& expected_encoding) {
+// Returns the encoded Observation.
+Observation DoEncodeStringTest(
+    std::string value, uint32_t metric_id, uint32_t encoding_config_id,
+    bool expect_utc, const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
 
@@ -295,6 +309,8 @@ void DoEncodeStringTest(std::string value, uint32_t metric_id,
 
   CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
+
+  return *result.observation;
 }
 
 // Tests the EncodeInt() method using the given |value| and the given
@@ -302,9 +318,10 @@ void DoEncodeStringTest(std::string value, uint32_t metric_id,
 // "Part1". The encoding is expected to be for Basic RAPPOR.
 // We validate that there are no errors and that the
 // produced Observation has the |expected_type| and is non-empty.
-void DoEncodeIntTest(int64_t value, uint32_t metric_id,
-                     uint32_t encoding_config_id, bool expect_utc,
-                     const ObservationPart::ValueCase& expected_encoding) {
+// Returns the encoded Observation.
+Observation DoEncodeIntTest(
+    int64_t value, uint32_t metric_id, uint32_t encoding_config_id,
+    bool expect_utc, const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
 
@@ -320,6 +337,7 @@ void DoEncodeIntTest(int64_t value, uint32_t metric_id,
 
   CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
+  return *result.observation;
 }
 
 // Tests the EncodeBlob() method using the given |value| and the given
@@ -327,9 +345,11 @@ void DoEncodeIntTest(int64_t value, uint32_t metric_id,
 // "Part1". The encoding is expected to be for Forculus.
 // We validate that there are no errors and that the
 // produced Observation has the |expected_type| and is non-empty.
-void DoEncodeBlobTest(const void* data, size_t num_bytes, uint32_t metric_id,
-                      uint32_t encoding_config_id, bool expect_utc,
-                      const ObservationPart::ValueCase& expected_encoding) {
+// Returns the encoded Observation.
+Observation DoEncodeBlobTest(
+    const void* data, size_t num_bytes, uint32_t metric_id,
+    uint32_t encoding_config_id, bool expect_utc,
+    const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
 
@@ -345,6 +365,7 @@ void DoEncodeBlobTest(const void* data, size_t num_bytes, uint32_t metric_id,
 
   CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
+  return *result.observation;
 }
 
 // Tests EncodeString() with Forculus as the specified encoding.
@@ -369,12 +390,33 @@ TEST(EncoderTest, EncodeStringBasicRappor) {
   DoEncodeStringTest("Apple", 1, 3, false, ObservationPart::kBasicRappor);
 }
 
+// Tests EncodeString() with NoOp as the specified encoding.
+TEST(EncoderTest, EncodeStringNoOp) {
+  // Metric 1 has a single string part.
+  // EncodingConfig 7 is NoOp.
+  auto obs = DoEncodeStringTest("some value", 1, 7, false,
+                                ObservationPart::kUnencoded);
+
+  EXPECT_EQ(
+      "some value",
+      obs.parts().at("Part1").unencoded().unencoded_value().string_value());
+}
+
 // Tests EncodeInt() with Basic RAPPOR as the specified encoding.
 TEST(EncoderTest, EncodeIntBasicRappor) {
   // Metric 2 has a single integer part.
   // EncodingConfig 4 is Basic RAPPOR with int values. Here we need the value
   // to be one of the categories.
   DoEncodeIntTest(125, 2, 4, true, ObservationPart::kBasicRappor);
+}
+
+// Tests EncodeInt() with NoOp encoding as the specified encoding.
+TEST(EncoderTest, EncodeIntNoOp) {
+  // Metric 2 has a single integer part.
+  // EncodingConfig 7 is NoOp
+  auto obs = DoEncodeIntTest(42, 2, 7, true, ObservationPart::kUnencoded);
+  EXPECT_EQ(42,
+            obs.parts().at("Part1").unencoded().unencoded_value().int_value());
 }
 
 // Tests EncodeBlob() with Forculus as the specified encoding.
@@ -384,6 +426,17 @@ TEST(EncoderTest, EncodeBlobForculus) {
   std::string a_blob("This is a blob");
   DoEncodeBlobTest((const void*)a_blob.data(), a_blob.size(), 3, 1, false,
                    ObservationPart::kForculus);
+}
+
+// Tests EncodeBlob() with NoOp encoding as the specified encoding.
+TEST(EncoderTest, EncodeBlobNoOp) {
+  // Metric 3 has a single blob part.
+  // EncodingConfig 7 is NoOp.
+  std::string a_blob("This is a blob");
+  auto obs = DoEncodeBlobTest((const void*)a_blob.data(), a_blob.size(), 3, 7,
+                              false, ObservationPart::kUnencoded);
+  EXPECT_EQ("This is a blob",
+            obs.parts().at("Part1").unencoded().unencoded_value().blob_value());
 }
 
 // Tests the advanced API, when used corretly.
@@ -512,6 +565,7 @@ TEST(EncoderTest, AdvancedApiWithErrors) {
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  google::InstallFailureSignalHandler();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

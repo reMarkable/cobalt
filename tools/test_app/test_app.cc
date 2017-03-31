@@ -872,6 +872,10 @@ void TestApp::ShowEncodingConfig(const EncodingConfig& encoding) {
       ShowBasicRapporConfig(encoding.basic_rappor());
       return;
 
+    case EncodingConfig::kNoOpEncoding:
+      *ostream_ << "NoOp encoding";
+      return;
+
     case EncodingConfig::CONFIG_NOT_SET:
       *ostream_ << "Invalid Encoding!";
       return;

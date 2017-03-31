@@ -100,6 +100,24 @@ std::string DataToBinaryString(const std::string& data) {
   return output;
 }
 
+std::string ToString(const ValuePart& value) {
+  std::ostringstream stream;
+  switch (value.data_case()) {
+    case ValuePart::kStringValue:
+      stream << "\"" << value.string_value() << "\"";
+      break;
+    case ValuePart::kIntValue:
+      stream << value.int_value();
+      break;
+    case ValuePart::kBlobValue:
+      stream << "<blob of length " << value.blob_value().size() << ">";
+      break;
+    case ValuePart::DATA_NOT_SET:
+      stream << "<ERROR: Invalid ValuePart message!>";
+  }
+  return stream.str();
+}
+
 std::string ToString(const ForculusObservation& obs) {
   std::ostringstream stream;
   stream << "forculus:";
@@ -125,6 +143,13 @@ std::string ToString(const BasicRapporObservation& obs) {
   return stream.str();
 }
 
+std::string ToString(const UnencodedObservation& obs) {
+  std::ostringstream stream;
+  stream << "unencoded:";
+  stream << ToString(obs.unencoded_value());
+  return stream.str();
+}
+
 std::string ToString(const ObservationPart& observation_part) {
   switch (observation_part.value_case()) {
     case ObservationPart::kForculus:
@@ -133,6 +158,8 @@ std::string ToString(const ObservationPart& observation_part) {
       return ToString(observation_part.rappor());
     case ObservationPart::kBasicRappor:
       return ToString(observation_part.basic_rappor());
+    case ObservationPart::kUnencoded:
+      return ToString(observation_part.unencoded());
     case ObservationPart::VALUE_NOT_SET:
       return "value not set";
   }

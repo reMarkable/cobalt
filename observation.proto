@@ -59,12 +59,21 @@ message BasicRapporObservation {
   bytes data = 1;
 }
 
+// Used with the No-op encoding. Note that this offers no client-side privacy-
+// protection. Cobalt may still offer some privacy protection via the Shuffler
+// and via differentially-private release.
+message UnencodedObservation {
+  // The raw-unencoded input value.
+  ValuePart unencoded_value = 1;
+}
+
 // The encoding of a ValuePart. This is produced by an Encoder.
 message ObservationPart {
   oneof value {
-    ForculusObservation forculus = 1;
-    RapporObservation rappor = 2;
-    BasicRapporObservation basic_rappor = 3;
+    UnencodedObservation unencoded = 1;
+    ForculusObservation forculus = 2;
+    RapporObservation rappor = 3;
+    BasicRapporObservation basic_rappor = 4;
   }
 
   // The encoding_config_id, along with the customer_id and project_id
@@ -72,7 +81,7 @@ message ObservationPart {
   // "EncodingConfigs" table in the Cobalt configuration database. The value
   // column is an "EncodingConfg" proto message describing how this
   // ObservationPart is encoded.
-  uint32 encoding_config_id = 4;  // e.g. 114=(Forculus with threshold=50)
+  uint32 encoding_config_id = 5;  // e.g. 114=(Forculus with threshold=50)
 }
 
 // An Observation consists of one or more ObservationParts.
