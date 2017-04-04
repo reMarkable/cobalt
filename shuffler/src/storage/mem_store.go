@@ -35,8 +35,11 @@ var randGen rand_util.Random
 // MemStore is an in-memory implementation of the Store interface.
 type MemStore struct {
 	// ObservationsMap is a map for storing observations. Map keys are serialized
-	// |ObservationMetadata| strings that point to a list of |ObservationVal|s.
-	observationsMap map[string][]*shuffler.ObservationVal
+	// |ObservationMetadata| strings that point to a map of |ObservationVal|s.
+	//
+	// Map keys for |ObservationVal| map are the same identifiers that uniquely
+	// represent the |ObservationVal| in the data store.
+	observationsMap map[string]map[string]*shuffler.ObservationVal
 
 	// mu is the global mutex that protects all elements of the store
 	mu sync.RWMutex
@@ -47,7 +50,7 @@ func NewMemStore() *MemStore {
 	randGen = rand_util.NewDeterministicRandom(int64(1))
 
 	return &MemStore{
-		observationsMap: make(map[string][]*shuffler.ObservationVal),
+		observationsMap: make(map[string]map[string]*shuffler.ObservationVal),
 	}
 }
 
@@ -100,7 +103,14 @@ func (store *MemStore) AddAllObservations(envelopeBatch []*cobalt.ObservationBat
 				if err != nil {
 					return grpc.Errorf(codes.Internal, "Error in generating unique identifier for key [%v]: %v", om, err)
 				}
-				store.observationsMap[key(om)] = append(store.observationsMap[key(om)], NewObservationVal(encryptedObservation, strconv.Itoa(int(id)), dayIndex))
+
+				valMap, ok := store.observationsMap[key(om)]
+				if !ok {
+					valMap = make(map[string]*shuffler.ObservationVal)
+					store.observationsMap[key(om)] = valMap
+				}
+				idStr := strconv.Itoa(int(id))
+				valMap[idStr] = NewObservationVal(encryptedObservation, idStr, dayIndex)
 			}
 		}
 	}
@@ -120,10 +130,18 @@ func (store *MemStore) GetObservations(om *cobalt.ObservationMetadata) ([]*shuff
 		panic("om is nil")
 	}
 
-	obVals, present := store.observationsMap[key(om)]
+	// get ObservationVal map for the given key
+	valMap, present := store.observationsMap[key(om)]
 	if !present {
 		return nil, grpc.Errorf(codes.InvalidArgument, "Key %v not found", om)
 	}
+
+	// make return slice from ObservationVal map
+	var obVals []*shuffler.ObservationVal
+	for _, val := range valMap {
+		obVals = append(obVals, val)
+	}
+
 	// Shuffler data store layer guarantees that the list returned on Get() call
 	// is always shuffled. In memstore, this is acheieved by shuffling the
 	// |ObservationVal| result set.
@@ -158,24 +176,19 @@ func (store *MemStore) DeleteValues(om *cobalt.ObservationMetadata, deleteObVals
 		panic("om is nil")
 	}
 
-	obVals, present := store.observationsMap[key(om)]
+	valMap, present := store.observationsMap[key(om)]
 	if !present {
 		return grpc.Errorf(codes.InvalidArgument, "Key %v not found", om)
 	}
 
-	for _, deleteObVal := range deleteObVals {
-		for i := 0; i < len(obVals); i++ {
-			if deleteObVal.Id == obVals[i].Id {
-				obVals[i] = obVals[len(obVals)-1]
-				obVals[len(obVals)-1] = nil
-				obVals = obVals[:len(obVals)-1]
-			}
-		}
+	for _, obVal := range deleteObVals {
+		delete(valMap, obVal.Id)
 	}
-	store.observationsMap[key(om)] = obVals
-	if len(obVals) == 0 {
+
+	if len(valMap) == 0 {
 		delete(store.observationsMap, key(om))
 	}
+
 	return nil
 }
 
@@ -189,12 +202,12 @@ func (store *MemStore) GetNumObservations(om *cobalt.ObservationMetadata) (int, 
 		panic("om is nil")
 	}
 
-	obVals, present := store.observationsMap[key(om)]
+	valMap, present := store.observationsMap[key(om)]
 	if !present {
 		return 0, grpc.Errorf(codes.InvalidArgument, "Key %v not found", om)
 	}
 
-	return len(obVals), nil
+	return len(valMap), nil
 }
 
 // Reset clears the existing in-memory state for |store|.
@@ -202,5 +215,5 @@ func (store *MemStore) Reset() {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	store.observationsMap = make(map[string][]*shuffler.ObservationVal)
+	store.observationsMap = make(map[string]map[string]*shuffler.ObservationVal)
 }
