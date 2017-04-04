@@ -16,6 +16,7 @@
 #define COBALT_UTIL_CRYPTO_UTIL_CIPHER_H_
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "util/crypto_util/types.h"
@@ -26,7 +27,6 @@ namespace crypto {
 
 class CipherContext;
 class HybridCipherContext;
-
 
 // Provides a C++ interface to an AEAD implementation.
 //
@@ -65,8 +65,8 @@ class SymmetricCipher {
   //
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  bool Encrypt(const byte nonce[NONCE_SIZE], const byte *ptext, int ptext_len,
-      std::vector<byte>* ctext);
+  bool Encrypt(const byte nonce[NONCE_SIZE], const byte* ptext, int ptext_len,
+               std::vector<byte>* ctext);
 
   // Performs AEAD decryption.
   //
@@ -81,8 +81,8 @@ class SymmetricCipher {
   //
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  bool Decrypt(const byte nonce[NONCE_SIZE], const byte *ctext, int ctext_len,
-      std::vector<byte>* ptext);
+  bool Decrypt(const byte nonce[NONCE_SIZE], const byte* ctext, int ctext_len,
+               std::vector<byte>* ptext);
 
  private:
   std::unique_ptr<CipherContext> context_;
@@ -92,7 +92,7 @@ class SymmetricCipher {
 // algorithm implemented is as follows:
 //
 // Public key = g^x in an elliptic curve group (NIST P256) represented in
-// X9.62 serialization with a compressed point repsentation.
+// X9.62 serialization with a compressed point representation.
 //
 // Private key = x stored in bytes and interpreted as a big-endian number (as
 // in the interface of BN_bin2bn in boringssl)
@@ -133,34 +133,50 @@ class SymmetricCipher {
 // compromising security? Probably not.
 class HybridCipher {
  public:
-  // NOTE: All thre sizes below specify a number of bytes (not bits.)
-  static const size_t PUBLIC_KEY_SIZE    = 33;  // One byte extra
-                                                // for X9.62 serialization
-  static const size_t PRIVATE_KEY_SIZE   = 256 / 8;
-  static const size_t SALT_SIZE          = 128 / 8;   // Salt for HKDF
+  // NOTE: All three sizes below specify a number of bytes (not bits.)
+  static const size_t PUBLIC_KEY_SIZE = 33;  // One byte extra
+                                             // for X9.62 serialization
+  static const size_t PRIVATE_KEY_SIZE = 256 / 8;
+  static const size_t SALT_SIZE = 128 / 8;  // Salt for HKDF
+
+  // Generates a cryptographically secure public/private key pair appropriate
+  // for use by an instance of HybridCipher. Returns true on success.
+  static bool GenerateKeyPair(byte public_key[HybridCipher::PUBLIC_KEY_SIZE],
+                              byte private_key[HybridCipher::PRIVATE_KEY_SIZE]);
+
+  static bool GenerateKeyPairPEM(std::string* public_key_pem_out,
+                                 std::string* private_key_pem_out);
 
   HybridCipher();
   ~HybridCipher();
 
-  // Sets the public key for encryption. This must be invoked
-  // at least once before Encrypt is called. Using decryption after
-  // set_public_key is undefined behavior.
+  // Sets the public key for encryption. One of the two set_public_key*
+  // methods must be invoked at least once before Encrypt is called.
+  // Using decryption after set_public_key* is undefined behavior.
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  //
+
   // |key| must have length |PUBLIC_KEY_SIZE| and be
   // X9.62 serialized
   bool set_public_key(const byte key[PUBLIC_KEY_SIZE]);
 
-  // Sets the private key for decryption. This must be invoked
-  // at least once before Decrypt is called. Using encryption after
-  // set_private_key is undefined behavior.
+  // |key_pem| must be a PEM encoding of a public key as would be passed
+  // to |set_public_key|.
+  bool set_public_key_pem(const std::string& key_pem);
+
+  // Sets the private key for decryption. One of the two set_private_key*
+  // methods must be invoked at least once before Decrypt is called. Using
+  // encryption after set_private_key* is undefined behavior.
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  //
+
   // |key| must have length |PRIVATE_KEY_SIZE| and will be
   // interpreted as big-endian big integer.
   bool set_private_key(const byte key[PRIVATE_KEY_SIZE]);
+
+  // |key_pem| must be a PEM encoding of a private key as would be passed
+  // to |set_private_key|.
+  bool set_private_key_pem(const std::string& key_pem);
 
   // Performs ECDH-based hybrid encryption
   //
@@ -173,7 +189,7 @@ class HybridCipher {
   //
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  bool Encrypt(const byte *ptext, int ptext_len,
+  bool Encrypt(const byte* ptext, int ptext_len,
                std::vector<byte>* hybrid_ctext);
 
   // Performs ECDH-based hybrid decryption.
@@ -187,7 +203,7 @@ class HybridCipher {
   //
   // Returns true for success or false for failure. Use the functions
   // in errors.h to obtain error information upon failure.
-  bool Decrypt(const byte *hybrid_ctext, int hybrid_ctext_len,
+  bool Decrypt(const byte* hybrid_ctext, int hybrid_ctext_len,
                std::vector<byte>* ptext);
 
  private:

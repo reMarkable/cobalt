@@ -20,9 +20,9 @@
 #include "third_party/boringssl/src/include/openssl/ec.h"
 #include "third_party/boringssl/src/include/openssl/evp.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
-#include "util/crypto_util/random.h"
 #include "util/crypto_util/cipher.h"
 #include "util/crypto_util/errors.h"
+#include "util/crypto_util/random.h"
 #include "util/crypto_util/types.h"
 
 namespace cobalt {
@@ -41,8 +41,8 @@ const int kNumLines = 4;
 // It encrypts and then decrypts |plain_text| and checks that the
 // recovered text is equal to the plain text. It generates a random
 // key and nonce.
-void doSymmetricCipherTest(SymmetricCipher* cipher,
-    const byte *plain_text, int ptext_len) {
+void doSymmetricCipherTest(SymmetricCipher* cipher, const byte* plain_text,
+                           int ptext_len) {
   // Initialize
   byte key[SymmetricCipher::KEY_SIZE];
   byte nonce[SymmetricCipher::NONCE_SIZE];
@@ -59,12 +59,13 @@ void doSymmetricCipherTest(SymmetricCipher* cipher,
   // Decrypt
   std::vector<byte> recovered_text;
   EXPECT_TRUE(cipher->Decrypt(nonce, cipher_text.data(), cipher_text.size(),
-      &recovered_text)) << GetLastErrorMessage();
+                              &recovered_text))
+      << GetLastErrorMessage();
 
   // Compare
-  EXPECT_EQ(std::string((const char*)recovered_text.data(),
-                        recovered_text.size()),
-            std::string((const char*)plain_text));
+  EXPECT_EQ(
+      std::string((const char*)recovered_text.data(), recovered_text.size()),
+      std::string((const char*)plain_text));
 }
 
 TEST(SymmetricCipherTest, TestManyStrings) {
@@ -72,8 +73,7 @@ TEST(SymmetricCipherTest, TestManyStrings) {
 
   // Test once with each line separately.
   for (int i = 0; i < kNumLines; i++) {
-    doSymmetricCipherTest(&cipher, (const byte*) kLines[i],
-                             strlen(kLines[i]));
+    doSymmetricCipherTest(&cipher, (const byte*)kLines[i], strlen(kLines[i]));
   }
 
   // Test once with all lines together.
@@ -81,44 +81,42 @@ TEST(SymmetricCipherTest, TestManyStrings) {
   for (int i = 0; i < kNumLines; i++) {
     all_lines += kLines[i];
   }
-  doSymmetricCipherTest(&cipher, (const byte*) all_lines.data(),
-                           all_lines.size());
+  doSymmetricCipherTest(&cipher, (const byte*)all_lines.data(),
+                        all_lines.size());
 
   // Test once with a longer string: Repeat string 32 times.
   for (int i = 0; i < 5; i++) {
     all_lines += all_lines;
   }
-  doSymmetricCipherTest(&cipher, (const byte*) all_lines.data(),
-                           all_lines.size());
+  doSymmetricCipherTest(&cipher, (const byte*)all_lines.data(),
+                        all_lines.size());
 }
 
 // This function is invoked by the HybridCipherTest
 // It encrypts and then decrypts |plain_text| and checks that the
 // recovered text is equal to the plain text.
-void doHybridCipherTest(HybridCipher* hybrid_cipher,
-    const byte *plain_text, int ptext_len,
-    const byte public_key[HybridCipher::PUBLIC_KEY_SIZE],
-    const byte private_key[HybridCipher::PRIVATE_KEY_SIZE]) {
-
+void doHybridCipherTest(HybridCipher* hybrid_cipher, const byte* plain_text,
+                        int ptext_len, std::string public_key,
+                        std::string private_key) {
   // Encrypt
   std::vector<byte> cipher_text;
-  ASSERT_TRUE(hybrid_cipher->set_public_key(public_key))
+  ASSERT_TRUE(hybrid_cipher->set_public_key_pem(public_key))
       << GetLastErrorMessage();
   EXPECT_TRUE(hybrid_cipher->Encrypt(plain_text, ptext_len, &cipher_text))
       << GetLastErrorMessage();
 
   // Decrypt
   std::vector<byte> recovered_text;
-  ASSERT_TRUE(hybrid_cipher->set_private_key(private_key))
+  ASSERT_TRUE(hybrid_cipher->set_private_key_pem(private_key))
       << GetLastErrorMessage();
   ASSERT_TRUE(hybrid_cipher->Decrypt(cipher_text.data(), cipher_text.size(),
                                      &recovered_text))
       << GetLastErrorMessage();
 
   // Compare
-  EXPECT_EQ(std::string((const char*)recovered_text.data(),
-                        recovered_text.size()),
-            std::string((const char*)plain_text));
+  EXPECT_EQ(
+      std::string((const char*)recovered_text.data(), recovered_text.size()),
+      std::string((const char*)plain_text));
 
   // Decrypt with flipped salt
   cipher_text.data()[HybridCipher::PUBLIC_KEY_SIZE] ^=
@@ -137,42 +135,23 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher,
       << GetLastErrorMessage();
 }
 
-void doGenerateKeys(byte public_key[HybridCipher::PUBLIC_KEY_SIZE],
-                    byte private_key[HybridCipher::PRIVATE_KEY_SIZE]) {
-  std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
-      EC_KEY_new_by_curve_name(NID_X9_62_prime256v1), EC_KEY_free);
-  ASSERT_TRUE(EC_KEY_generate_key(eckey.get())) << GetLastErrorMessage();
-
-  // Set public_key
-  std::unique_ptr<EC_POINT, decltype(&::EC_POINT_free)> ecpoint(
-      EC_POINT_dup(EC_KEY_get0_public_key(eckey.get()),
-                   EC_KEY_get0_group(eckey.get())), EC_POINT_free);
-  ASSERT_TRUE(EC_POINT_point2oct(EC_KEY_get0_group(eckey.get()),
-                                 ecpoint.get(),
-                                 POINT_CONVERSION_COMPRESSED,
-                                 public_key,
-                                 HybridCipher::PUBLIC_KEY_SIZE,
-                                 nullptr)) << GetLastErrorMessage();
-
-  // Set private_key
-  std::unique_ptr<BIGNUM, decltype(&::BN_free)> bn_private_key(
-      BN_dup(EC_KEY_get0_private_key(eckey.get())), BN_free);
-  ASSERT_TRUE(BN_bn2bin_padded(private_key, HybridCipher::PRIVATE_KEY_SIZE,
-                               bn_private_key.get()));
+void doGenerateKeys(std::string* public_key, std::string* private_key) {
+  ASSERT_TRUE(HybridCipher::GenerateKeyPairPEM(public_key, private_key))
+      << GetLastErrorMessage();
 }
 
 TEST(HybridCipherTest, Test) {
   HybridCipher hybrid_cipher;
-  byte public_key[HybridCipher::PUBLIC_KEY_SIZE];
-  byte private_key[HybridCipher::PRIVATE_KEY_SIZE];
+  std::string public_key;
+  std::string private_key;
 
   // Test with five different key pairs
   for (int times = 0; times < 5; ++times) {
-    doGenerateKeys(public_key, private_key);
+    doGenerateKeys(&public_key, &private_key);
 
     // Test once with each line separately.
     for (int i = 0; i < kNumLines; i++) {
-      doHybridCipherTest(&hybrid_cipher, (const byte*) kLines[i],
+      doHybridCipherTest(&hybrid_cipher, (const byte*)kLines[i],
                          strlen(kLines[i]), public_key, private_key);
     }
 
@@ -181,14 +160,14 @@ TEST(HybridCipherTest, Test) {
     for (int i = 0; i < kNumLines; i++) {
       all_lines += kLines[i];
     }
-    doHybridCipherTest(&hybrid_cipher, (const byte*) all_lines.data(),
+    doHybridCipherTest(&hybrid_cipher, (const byte*)all_lines.data(),
                        all_lines.size(), public_key, private_key);
 
     // Test once with a longer string: Repeat string 32 times.
     for (int i = 0; i < 5; i++) {
       all_lines += all_lines;
     }
-    doHybridCipherTest(&hybrid_cipher, (const byte*) all_lines.data(),
+    doHybridCipherTest(&hybrid_cipher, (const byte*)all_lines.data(),
                        all_lines.size(), public_key, private_key);
   }
 }
@@ -196,4 +175,3 @@ TEST(HybridCipherTest, Test) {
 }  // namespace crypto
 
 }  // namespace cobalt
-

@@ -16,15 +16,18 @@
 
 #include <cstring>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "third_party/boringssl/src/include/openssl/aead.h"
+#include "third_party/boringssl/src/include/openssl/bio.h"
 #include "third_party/boringssl/src/include/openssl/bn.h"
 #include "third_party/boringssl/src/include/openssl/digest.h"
 #include "third_party/boringssl/src/include/openssl/ec.h"
 #include "third_party/boringssl/src/include/openssl/ecdh.h"
 #include "third_party/boringssl/src/include/openssl/evp.h"
 #include "third_party/boringssl/src/include/openssl/hkdf.h"
+#include "third_party/boringssl/src/include/openssl/pem.h"
 #include "util/crypto_util/errors.h"
 #include "util/crypto_util/random.h"
 
@@ -54,6 +57,78 @@ static const size_t GROUP_ELEMENT_SIZE = 256 / 8;  // (g^xy) object length
 // For hybrid mode, we can fix the nonce to all zeroes without losing
 // security. See: https://goto.google.com/aes-gcm-zero-nonce-security
 const byte kAllZeroNonce[SymmetricCipher::NONCE_SIZE] = {0x00};
+
+// Generates a cryptographically secure public/private key pair (g^x, x),
+// appropriate for use by HybridCipher. Returns the pair in two forms:
+// First the pair is represented by the returned EC_KEY. Second, if public_key
+// is not NULL then the public key will be serialized into that buffer and
+// similarly for private_key. Returns NULL to indicate that any of the steps
+// failed. In that case the contents of |public_key| and |private_key| are
+// unspecified and they should not be relied upon.
+std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> GenerateHybridCipherKeyPair(
+    byte public_key[HybridCipher::PUBLIC_KEY_SIZE],
+    byte private_key[HybridCipher::PRIVATE_KEY_SIZE]) {
+  std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
+      EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
+  if (!EC_KEY_generate_key(eckey.get())) {
+    return eckey;
+  }
+
+  // Serialize public_key if requested.
+  if (public_key) {
+    if (EC_POINT_point2oct(EC_KEY_get0_group(eckey.get()),
+                           EC_KEY_get0_public_key(eckey.get()),
+                           POINT_CONVERSION_COMPRESSED, public_key,
+                           HybridCipher::PUBLIC_KEY_SIZE,
+                           nullptr) != HybridCipher::PUBLIC_KEY_SIZE) {
+      eckey.reset();
+      return eckey;
+    }
+  }
+
+  // Serialize private_key if requested.
+  if (private_key) {
+    if (!BN_bn2bin_padded(private_key, HybridCipher::PRIVATE_KEY_SIZE,
+                          EC_KEY_get0_private_key(eckey.get()))) {
+      eckey.reset();
+      return eckey;
+    }
+  }
+  return eckey;
+}
+
+// Builds an ECKEY containing only a public-key using the given byte
+// buffer. Return NULL to indicate failure.
+std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> BuildECKeyPublic(
+    const byte public_key[HybridCipher::PUBLIC_KEY_SIZE]) {
+  std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
+      EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
+  if (!eckey) {
+    return eckey;
+  }
+
+  std::unique_ptr<EC_POINT, decltype(&::EC_POINT_free)> ecpoint(
+      EC_POINT_new(EC_KEY_get0_group(eckey.get())), EC_POINT_free);
+  if (!ecpoint) {
+    eckey.reset();
+    return eckey;
+  }
+
+  // Read bytes from public_key into ecpoint
+  if (!EC_POINT_oct2point(EC_KEY_get0_group(eckey.get()), ecpoint.get(),
+                          public_key, HybridCipher::PUBLIC_KEY_SIZE, nullptr)) {
+    eckey.reset();
+    return eckey;
+  }
+
+  // Setup eckey with public key from ecpoint
+  if (!EC_KEY_set_public_key(eckey.get(), ecpoint.get())) {
+    eckey.reset();
+    return eckey;
+  }
+
+  return eckey;
+}
 
 }  //  namespace
 
@@ -123,38 +198,100 @@ bool SymmetricCipher::Decrypt(const byte nonce[NONCE_SIZE], const byte* ctext,
 
 // HybridCipher methods.
 
+// static
+bool HybridCipher::GenerateKeyPair(
+    byte public_key[HybridCipher::PUBLIC_KEY_SIZE],
+    byte private_key[HybridCipher::PRIVATE_KEY_SIZE]) {
+  auto key = GenerateHybridCipherKeyPair(public_key, private_key);
+  return (key != nullptr);
+}
+
+// static
+bool HybridCipher::GenerateKeyPairPEM(std::string* public_key_pem_out,
+                                      std::string* private_key_pem_out) {
+  auto eckey = GenerateHybridCipherKeyPair(nullptr, nullptr);
+  if (!eckey) {
+    return false;
+  }
+  std::unique_ptr<EVP_PKEY, decltype(&::EVP_PKEY_free)> evpkey(EVP_PKEY_new(),
+                                                               ::EVP_PKEY_free);
+  if (!evpkey) {
+    return false;
+  }
+  if (!EVP_PKEY_set1_EC_KEY(evpkey.get(), eckey.get())) {
+    return false;
+  }
+  std::unique_ptr<BIO, decltype(&::BIO_free)> mem_bio(BIO_new(BIO_s_mem()),
+                                                      ::BIO_free);
+
+  // Write the public key as a pem
+  if (!PEM_write_bio_PUBKEY(mem_bio.get(), evpkey.get())) {
+    return false;
+  }
+  const unsigned char* contents;
+  size_t content_length;
+  if (!BIO_mem_contents(mem_bio.get(), &contents, &content_length)) {
+    return false;
+  }
+  public_key_pem_out->resize(content_length);
+  std::memcpy(&(*public_key_pem_out)[0], contents, content_length);
+
+  // Write the private key as a pem
+  mem_bio.reset(BIO_new(BIO_s_mem()));
+  if (!PEM_write_bio_PrivateKey(mem_bio.get(), evpkey.get(), nullptr, nullptr,
+                                0, nullptr, nullptr)) {
+    return false;
+  }
+  if (!BIO_mem_contents(mem_bio.get(), &contents, &content_length)) {
+    return false;
+  }
+  private_key_pem_out->resize(content_length);
+  std::memcpy(&(*private_key_pem_out)[0], contents, content_length);
+
+  return true;
+}
+
 HybridCipher::HybridCipher()
     : context_(new HybridCipherContext()), symm_cipher_(new SymmetricCipher) {}
 
 HybridCipher::~HybridCipher() {}
 
 bool HybridCipher::set_public_key(const byte public_key[PUBLIC_KEY_SIZE]) {
-  std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
-      EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
+  auto eckey = BuildECKeyPublic(public_key);
   if (!eckey) {
-    return false;
-  }
-
-  std::unique_ptr<EC_POINT, decltype(&::EC_POINT_free)> ecpoint(
-      EC_POINT_new(EC_KEY_get0_group(eckey.get())), EC_POINT_free);
-  if (!ecpoint) {
-    return false;
-  }
-
-  // Read bytes from public_key into ecpoint
-  if (!EC_POINT_oct2point(EC_KEY_get0_group(eckey.get()), ecpoint.get(),
-                          public_key, PUBLIC_KEY_SIZE, nullptr)) {
-    return false;
-  }
-
-  // Setup eckey with public key from ecpoint
-  if (!EC_KEY_set_public_key(eckey.get(), ecpoint.get())) {
     return false;
   }
 
   // Setup pkey with EC public key eckey
   context_->ResetKey();
   if (!EVP_PKEY_set1_EC_KEY(context_->GetKey(), eckey.get())) {
+    return false;
+  }
+
+  // Success
+  return true;
+}
+
+bool HybridCipher::set_public_key_pem(const std::string& key_pem) {
+  // Construct a memory BIO to wrap the string.
+  std::unique_ptr<BIO, decltype(&::BIO_free)> mem_bio(
+      BIO_new_mem_buf(key_pem.data(), key_pem.size()), ::BIO_free);
+  if (!mem_bio.get()) {
+    return false;
+  }
+
+  // Read a public key from the PEM in the memory BIO, construct an EVP_PKEY.
+  std::unique_ptr<EVP_PKEY, decltype(&::EVP_PKEY_free)> evpkey(
+      PEM_read_bio_PUBKEY(mem_bio.get(), nullptr, nullptr, nullptr),
+      ::EVP_PKEY_free);
+  if (!evpkey.get()) {
+    return false;
+  }
+
+  context_->ResetKey();
+
+  if (!EVP_PKEY_set1_EC_KEY(context_->GetKey(),
+                            EVP_PKEY_get0_EC_KEY(evpkey.get()))) {
     return false;
   }
 
@@ -175,14 +312,40 @@ bool HybridCipher::set_private_key(const byte private_key[PRIVATE_KEY_SIZE]) {
     return false;
   }
 
-  // Read bytes from public_key into BIGNUM object
+  // Read bytes from private_key into BIGNUM object
   if (!EC_KEY_set_private_key(eckey.get(), bn_private_key.get())) {
     return false;
   }
 
-  // Setup pkey with EC public key eckey
+  // Setup pkey with EC private key eckey
   context_->ResetKey();
   if (!EVP_PKEY_set1_EC_KEY(context_->GetKey(), eckey.get())) {
+    return false;
+  }
+
+  // Success
+  return true;
+}
+
+bool HybridCipher::set_private_key_pem(const std::string& key_pem) {
+  // Construct a memory BIO to wrap the string.
+  std::unique_ptr<BIO, decltype(&::BIO_free)> mem_bio(
+      BIO_new_mem_buf(key_pem.data(), key_pem.size()), ::BIO_free);
+  if (!mem_bio.get()) {
+    return false;
+  }
+
+  // Read a private key from the PEM in the memory BIO, construct an EVP_PKEY.
+  std::unique_ptr<EVP_PKEY, decltype(&::EVP_PKEY_free)> evpkey(
+      PEM_read_bio_PrivateKey(mem_bio.get(), nullptr, nullptr, nullptr),
+      ::EVP_PKEY_free);
+  if (!evpkey.get()) {
+    return false;
+  }
+
+  context_->ResetKey();
+  if (!EVP_PKEY_set1_EC_KEY(context_->GetKey(),
+                            EVP_PKEY_get0_EC_KEY(evpkey.get()))) {
     return false;
   }
 
@@ -211,24 +374,10 @@ bool HybridCipher::EncryptInternal(const byte* ptext, int ptext_len,
                                    byte public_key_part_out[PUBLIC_KEY_SIZE],
                                    byte salt_out[SALT_SIZE],
                                    std::vector<byte>* symmetric_ctext_out) {
-  std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
-      EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
+  // Generate fresh EC key (g^y, y). The public key part g^y is also serialized
+  // into |public_key_part_out|.
+  auto eckey = GenerateHybridCipherKeyPair(public_key_part_out, nullptr);
   if (!eckey) {
-    return false;
-  }
-
-  // Generate fresh EC key. The public key will be published in
-  // public_key_part and the EC key will be used to generate a symmetric key
-  // that encrypts ptext bytes into symmetric_ctext_out
-  if (!EC_KEY_generate_key(eckey.get())) {
-    return false;
-  }
-
-  // Write EC public key into public_key_part
-  if (EC_POINT_point2oct(EC_KEY_get0_group(eckey.get()),
-                         EC_KEY_get0_public_key(eckey.get()),
-                         POINT_CONVERSION_COMPRESSED, public_key_part_out,
-                         PUBLIC_KEY_SIZE, nullptr) != PUBLIC_KEY_SIZE) {
     return false;
   }
 
@@ -287,33 +436,15 @@ bool HybridCipher::DecryptInternal(const byte public_key_part[PUBLIC_KEY_SIZE],
                                    const byte* symmetric_ctext,
                                    int symmetric_ctext_len,
                                    std::vector<byte>* ptext) {
-  // Read public_key_part into new EVP_PKEY object
-  std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
-      EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
+  auto eckey = BuildECKeyPublic(public_key_part);
   if (!eckey) {
-    return false;
-  }
-  std::unique_ptr<EC_POINT, decltype(&::EC_POINT_free)> ecpoint(
-      EC_POINT_new(EC_KEY_get0_group(eckey.get())), EC_POINT_free);
-  if (!ecpoint) {
-    return false;
-  }
-
-  // Read bytes from public_key_part into ecpoint
-  if (!EC_POINT_oct2point(EC_KEY_get0_group(eckey.get()), ecpoint.get(),
-                          public_key_part, PUBLIC_KEY_SIZE, nullptr)) {
-    return false;
-  }
-
-  // Setup eckey with public key from ecpoint
-  if (!EC_KEY_set_public_key(eckey.get(), ecpoint.get())) {
     return false;
   }
 
   byte shared_key[GROUP_ELEMENT_SIZE];  // To store g^(xy) after ECDH
-  size_t shared_key_len =
-      ECDH_compute_key(shared_key, sizeof(shared_key), ecpoint.get(),
-                       EVP_PKEY_get0_EC_KEY(context_->GetKey()), nullptr);
+  size_t shared_key_len = ECDH_compute_key(
+      shared_key, sizeof(shared_key), EC_KEY_get0_public_key(eckey.get()),
+      EVP_PKEY_get0_EC_KEY(context_->GetKey()), nullptr);
   if (shared_key_len != sizeof(shared_key)) {
     return false;
   }
