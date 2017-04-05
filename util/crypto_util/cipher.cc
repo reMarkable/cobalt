@@ -28,6 +28,7 @@
 #include "third_party/boringssl/src/include/openssl/evp.h"
 #include "third_party/boringssl/src/include/openssl/hkdf.h"
 #include "third_party/boringssl/src/include/openssl/pem.h"
+#include "third_party/boringssl/src/include/openssl/sha.h"
 #include "util/crypto_util/errors.h"
 #include "util/crypto_util/random.h"
 
@@ -58,6 +59,15 @@ static const size_t GROUP_ELEMENT_SIZE = 256 / 8;  // (g^xy) object length
 // security. See: https://goto.google.com/aes-gcm-zero-nonce-security
 const byte kAllZeroNonce[SymmetricCipher::NONCE_SIZE] = {0x00};
 
+// Serializes the public key in |eckey| into |buffer|. Returns true on success.
+bool SerializeECPublicKey(EC_KEY* eckey,
+                          byte buffer[HybridCipher::PUBLIC_KEY_SIZE]) {
+  return EC_POINT_point2oct(
+             EC_KEY_get0_group(eckey), EC_KEY_get0_public_key(eckey),
+             POINT_CONVERSION_COMPRESSED, buffer, HybridCipher::PUBLIC_KEY_SIZE,
+             nullptr) == HybridCipher::PUBLIC_KEY_SIZE;
+}
+
 // Generates a cryptographically secure public/private key pair (g^x, x),
 // appropriate for use by HybridCipher. Returns the pair in two forms:
 // First the pair is represented by the returned EC_KEY. Second, if public_key
@@ -70,17 +80,17 @@ std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> GenerateHybridCipherKeyPair(
     byte private_key[HybridCipher::PRIVATE_KEY_SIZE]) {
   std::unique_ptr<EC_KEY, decltype(&::EC_KEY_free)> eckey(
       EC_KEY_new_by_curve_name(EC_CURVE_CONSTANT), EC_KEY_free);
+  if (!eckey) {
+    return eckey;
+  }
   if (!EC_KEY_generate_key(eckey.get())) {
+    eckey.reset();
     return eckey;
   }
 
   // Serialize public_key if requested.
   if (public_key) {
-    if (EC_POINT_point2oct(EC_KEY_get0_group(eckey.get()),
-                           EC_KEY_get0_public_key(eckey.get()),
-                           POINT_CONVERSION_COMPRESSED, public_key,
-                           HybridCipher::PUBLIC_KEY_SIZE,
-                           nullptr) != HybridCipher::PUBLIC_KEY_SIZE) {
+    if (!SerializeECPublicKey(eckey.get(), public_key)) {
       eckey.reset();
       return eckey;
     }
@@ -367,6 +377,18 @@ bool HybridCipher::Encrypt(const byte* ptext, int ptext_len,
   std::memcpy(hybrid_ctext->data() + PUBLIC_KEY_SIZE, salt, SALT_SIZE);
   std::memcpy(hybrid_ctext->data() + PUBLIC_KEY_SIZE + SALT_SIZE,
               symmetric_ctext.data(), symmetric_ctext.size());
+  return true;
+}
+
+bool HybridCipher::public_key_fingerprint(
+    byte fingerprint[SHA256_DIGEST_LENGTH]) {
+  byte buffer[HybridCipher::PUBLIC_KEY_SIZE];
+  if (!SerializeECPublicKey(EVP_PKEY_get0_EC_KEY(context_->GetKey()), buffer)) {
+    return false;
+  }
+  if (!SHA256(buffer, HybridCipher::PUBLIC_KEY_SIZE, fingerprint)) {
+    return false;
+  }
   return true;
 }
 

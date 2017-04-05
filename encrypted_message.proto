@@ -35,8 +35,9 @@ message EncryptedMessage {
   // Which scheme was used to encrypt this message?
   EncryptionScheme scheme = 1;
 
-  string pub_key = 2;   // Fingerprint (SHA256) of the recipient’s key. This is
-                        // used for key rotation.
+  // 32-byte fingerprint (SHA256) of the recipient’s public key.
+  // This is used to facilitate key rotation.
+  bytes public_key_fingerprint = 2;
 
   bytes ciphertext = 3; // The encryption of the standard serialization of some
                         // proto message. Which message is determined by

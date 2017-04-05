@@ -102,7 +102,10 @@ void doHybridCipherTest(HybridCipher* hybrid_cipher, const byte* plain_text,
   std::vector<byte> cipher_text;
   ASSERT_TRUE(hybrid_cipher->set_public_key_pem(public_key))
       << GetLastErrorMessage();
-  EXPECT_TRUE(hybrid_cipher->Encrypt(plain_text, ptext_len, &cipher_text))
+  ASSERT_TRUE(hybrid_cipher->Encrypt(plain_text, ptext_len, &cipher_text))
+      << GetLastErrorMessage();
+  byte fingerprint[HybridCipher::PUBLIC_KEY_FINGERPRINT_SIZE];
+  ASSERT_TRUE(hybrid_cipher->public_key_fingerprint(fingerprint))
       << GetLastErrorMessage();
 
   // Decrypt

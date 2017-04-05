@@ -12,11 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+
 add_library(datetime_util datetime_util.cc)
 
-add_executable(datetime_util_test datetime_util_test.cc)
-target_link_libraries(datetime_util_test gtest gtest_main datetime_util)
-set_target_properties(datetime_util_test PROPERTIES
+add_library(encrypted_message_util
+            encrypted_message_util.cc
+            ${COBALT_PROTO_SRCS})
+target_link_libraries(encrypted_message_util
+                      cobalt_crypto
+                      ${PROTOBUF_LIBRARY})
+
+add_executable(util_tests
+               datetime_util_test.cc
+               encrypted_message_util_test.cc)
+target_link_libraries(util_tests
+                      gtest gtest_main
+                      datetime_util encrypted_message_util)
+set_target_properties(util_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
 
 add_subdirectory(crypto_util)

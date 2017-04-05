@@ -75,7 +75,7 @@ func doTestProcess(t *testing.T, envelope *shufflerpb.Envelope, store storage.St
 		t.Fatalf("Error in marshalling envelope data: %v", err)
 	}
 	eMsg := &shufflerpb.EncryptedMessage{
-		Ciphertext: c.Encrypt(data, "pubKeyHash"),
+		Ciphertext: c.Encrypt(data),
 	}
 
 	shuffler := &ShufflerServer{

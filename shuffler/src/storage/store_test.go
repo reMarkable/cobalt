@@ -81,7 +81,6 @@ func TestGetDayIndexUtc(t *testing.T) {
 func TestNewObservationVal(t *testing.T) {
 	eMsg := &shufflerpb.EncryptedMessage{
 		Scheme:     shufflerpb.EncryptedMessage_NONE,
-		PubKey:     "analyzer_pub_key",
 		Ciphertext: []byte("ciphertext"),
 	}
 	testDayIndex := uint32(17201)

@@ -24,18 +24,17 @@ import (
 var (
 	plainText  = []byte("plain text")
 	cipherText = []byte("cipher text")
-	key        = "test_key"
 )
 
 func TestEncryptAndDecrypt(t *testing.T) {
 	c := NoOpCrypter{}
 
-	if string(c.Encrypt(plainText, key)) != string(plainText) {
+	if string(c.Encrypt(plainText)) != string(plainText) {
 		t.Error("Encryption error")
 		return
 	}
 
-	if string(cipherText) != string(c.Decrypt(cipherText, key)) {
+	if string(cipherText) != string(c.Decrypt(cipherText)) {
 		t.Error("Decryption error")
 		return
 	}

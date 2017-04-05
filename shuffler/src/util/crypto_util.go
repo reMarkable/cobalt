@@ -16,8 +16,8 @@ package util
 
 // Crypter interface provides functionality to encrypt and decryt text.
 type Crypter interface {
-	Encrypt(plainText []byte, key string) (cipherText []byte)
-	Decrypt(cipherText []byte, key string) (plainText []byte)
+	Encrypt(plainText []byte) (cipherText []byte)
+	Decrypt(cipherText []byte) (plainText []byte)
 }
 
 // NoOpCrypter is a crypter interface that does nothing and is used for testing.
@@ -25,11 +25,11 @@ type Crypter interface {
 type NoOpCrypter struct{}
 
 // Encrypt the encoded serialized msg to generate cipher text
-func (c *NoOpCrypter) Encrypt(plainText []byte, key string) (cipherText []byte) {
+func (c *NoOpCrypter) Encrypt(plainText []byte) (cipherText []byte) {
 	return plainText
 }
 
 // Decrypt the cipher text to encoded serialized msg
-func (c *NoOpCrypter) Decrypt(cipherText []byte, key string) (plainText []byte) {
+func (c *NoOpCrypter) Decrypt(cipherText []byte) (plainText []byte) {
 	return cipherText
 }

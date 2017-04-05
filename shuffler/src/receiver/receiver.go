@@ -149,12 +149,11 @@ func (s *ShufflerServer) startServer() {
 // envelope or an error.
 func decryptEnvelope(encryptedMessage *cobalt.EncryptedMessage) (*cobalt.Envelope, error) {
 	// TODO(ukode): Add impl for decrypting the sealed envelope.
-	pubKeyHash := encryptedMessage.PubKey
 	ciphertext := encryptedMessage.Ciphertext
 
 	c := util.NoOpCrypter{}
 
 	envelope := &cobalt.Envelope{}
-	err := proto.Unmarshal(c.Decrypt(ciphertext, pubKeyHash), envelope)
+	err := proto.Unmarshal(c.Decrypt(ciphertext), envelope)
 	return envelope, err
 }

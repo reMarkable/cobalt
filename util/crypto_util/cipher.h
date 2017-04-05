@@ -138,6 +138,7 @@ class HybridCipher {
                                              // for X9.62 serialization
   static const size_t PRIVATE_KEY_SIZE = 256 / 8;
   static const size_t SALT_SIZE = 128 / 8;  // Salt for HKDF
+  static const size_t PUBLIC_KEY_FINGERPRINT_SIZE = 256 / 8;
 
   // Generates a cryptographically secure public/private key pair appropriate
   // for use by an instance of HybridCipher. Returns true on success.
@@ -159,6 +160,10 @@ class HybridCipher {
   // |key| must have length |PUBLIC_KEY_SIZE| and be
   // X9.62 serialized
   bool set_public_key(const byte key[PUBLIC_KEY_SIZE]);
+
+  // Writes the SHA256 fingerprint of this HybridCipher's public key into
+  // |fingerprint|. Returns true for success or false for failure.
+  bool public_key_fingerprint(byte fingerprint[PUBLIC_KEY_FINGERPRINT_SIZE]);
 
   // |key_pem| must be a PEM encoding of a public key as would be passed
   // to |set_public_key|.
