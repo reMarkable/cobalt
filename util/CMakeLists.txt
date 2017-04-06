@@ -27,7 +27,8 @@ target_link_libraries(encrypted_message_util
 add_library(pem_util
             pem_util.cc)
 target_link_libraries(pem_util
-                      cobalt_crypto)
+                      cobalt_crypto
+                      glog)
 
 add_executable(util_tests
                datetime_util_test.cc

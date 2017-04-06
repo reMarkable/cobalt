@@ -1,4 +1,4 @@
-# Copyright 2016 The Fuchsia Authors
+# Copyright 2017 The Fuchsia Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(key_generator)
-add_subdirectory(go/src)
-add_subdirectory(observation_querier)
-add_subdirectory(test_app)
+# Build the query_observations executable.
+add_executable(key_generator
+               key_generator_main.cc)
+target_link_libraries(key_generator
+                      cobalt_crypto
+                      glog)
