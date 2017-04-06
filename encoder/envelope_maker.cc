@@ -21,29 +21,27 @@
 namespace cobalt {
 namespace encoder {
 
-EnvelopeMaker::EnvelopeMaker(std::string analyzer_public_key,
-                             std::string shuffler_public_key,
-                             EncryptedMessage::EncryptionScheme scheme)
-    : analyzer_public_key_(std::move(analyzer_public_key)),
-      shuffler_public_key_(std::move(shuffler_public_key)),
-      encryption_scheme_(scheme) {}
+EnvelopeMaker::EnvelopeMaker(const std::string& analyzer_public_key_pem,
+                             EncryptedMessage::EncryptionScheme analyzer_scheme,
+                             const std::string& shuffler_public_key_pem,
+                             EncryptedMessage::EncryptionScheme shuffler_scheme)
+    : encrypt_to_analyzer_(analyzer_public_key_pem, analyzer_scheme),
+      encrypt_to_shuffler_(shuffler_public_key_pem, shuffler_scheme) {}
 
 void EnvelopeMaker::AddObservation(
     const Observation& observation,
     std::unique_ptr<ObservationMetadata> metadata) {
-  // Serialize the observation.
-  std::string serialized_observation;
-  observation.SerializeToString(&serialized_observation);
-
-  // Encrypt the observation.
-  // TODO(rudominer) Perform the encryption here. Encrypt using the Analyzer's
-  // public key.
-  std::string ciphertext = serialized_observation;
-
-  // Put the encrypted observation into the appropriate ObservationBatch.
-  EncryptedMessage* encrypted_message =
-      GetBatch(std::move(metadata))->add_encrypted_observation();
-  encrypted_message->mutable_ciphertext()->swap(ciphertext);
+  EncryptedMessage encrypted_message;
+  if (encrypt_to_analyzer_.Encrypt(observation, &encrypted_message)) {
+    // Put the encrypted observation into the appropriate ObservationBatch.
+    GetBatch(std::move(metadata))
+        ->add_encrypted_observation()
+        ->Swap(&encrypted_message);
+  } else {
+    VLOG(1)
+        << "ERROR: Encryption of Observations failed! Observation not added "
+           "to batch.";
+  }
 }
 
 ObservationBatch* EnvelopeMaker::GetBatch(
@@ -66,15 +64,10 @@ ObservationBatch* EnvelopeMaker::GetBatch(
 }
 
 EncryptedMessage EnvelopeMaker::MakeEncryptedEnvelope() const {
-  std::string serialized_envelope;
-  envelope_.SerializeToString(&serialized_envelope);
-
-  // TODO(rudominer) Perform the encryption here. Encrypt using the Shuffler's
-  // public key.
-  std::string ciphertext = serialized_envelope;
-
   EncryptedMessage encrypted_message;
-  encrypted_message.mutable_ciphertext()->swap(ciphertext);
+  if (!encrypt_to_shuffler_.Encrypt(envelope_, &encrypted_message)) {
+    VLOG(1) << "ERROR: Encryption of Envelope to the Shuffler failed!";
+  }
   return encrypted_message;
 }
 

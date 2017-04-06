@@ -21,6 +21,7 @@
 
 #include "./encrypted_message.pb.h"
 #include "./observation.pb.h"
+#include "util/encrypted_message_util.h"
 
 namespace cobalt {
 namespace encoder {
@@ -47,9 +48,27 @@ namespace encoder {
 //   the EnvelopeMaker can be used again.
 class EnvelopeMaker {
  public:
-  EnvelopeMaker(std::string analyzer_public_key,
-                std::string shuffler_public_key,
-                EncryptedMessage::EncryptionScheme scheme);
+  // Constructor
+  //
+  // |analyzer_public_key_pem| is a PEM encoding of the public key of the
+  // Analyzer used for encrypting Observations that will be sent to the
+  // Analyzer (by way of the Shuffler). It must be appropriate for the
+  // encryption scheme specified by |analyzer_scheme|.
+  //
+  // |analyzer_scheme| The public key encryption scheme to use when encrypting
+  // Observations sent to the Analyzer (by way of the Shuffler).
+  //
+  // |shuffler_public_key_pem| is a PEM encoding of the public key of the
+  // Shuffler used for encrypting Envelopes that will be sent to the
+  // Shuffler. It must be appropriate for the encryption scheme specified by
+  // |shuffler_scheme|.
+  //
+  // |shuffler_scheme| The public key encryption scheme to use when encrypting
+  // Envelopes sent to the Shuffler.
+  EnvelopeMaker(const std::string& analyzer_public_key_pem,
+                EncryptedMessage::EncryptionScheme analyzer_scheme,
+                const std::string& shuffler_public_key_pem,
+                EncryptedMessage::EncryptionScheme shuffler_scheme);
 
   void AddObservation(const Observation& observation,
                       std::unique_ptr<ObservationMetadata> metadata);
@@ -73,9 +92,8 @@ class EnvelopeMaker {
   ObservationBatch* GetBatch(std::unique_ptr<ObservationMetadata> metadata);
 
   Envelope envelope_;
-  std::string analyzer_public_key_;
-  std::string shuffler_public_key_;
-  EncryptedMessage::EncryptionScheme encryption_scheme_;
+  util::EncryptedMessageMaker encrypt_to_analyzer_;
+  util::EncryptedMessageMaker encrypt_to_shuffler_;
 
   // The keys of the map are serialized ObservationMetadata. The values
   // are the ObservationBatch containing that Metadata

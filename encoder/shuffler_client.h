@@ -38,7 +38,7 @@ class ShufflerClient {
   // An optional override for the root certificates. If non NULL
   // this must point to a buffer containing a null-terminated PEM encoding of
   // the root CA certificates to use in TLS. If empty then a default will be
-  // used. The default roots can also be erridden using the
+  // used. The default roots can also be overridden using the
   // GRPC_DEFAULT_SSL_ROOTS_FILE_PATH environment variable
   // pointing to a file on the file system containing the roots.
   ShufflerClient(const std::string& uri, bool use_tls,

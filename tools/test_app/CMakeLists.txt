@@ -17,7 +17,8 @@ add_library(test_app test_app.cc)
 target_link_libraries(test_app
                       analyzer_grpc_client
                       encoder
-                      glog)
+                      glog
+                      pem_util)
 
 # Build the cobalt_test_app executable.
 add_executable(cobalt_test_app

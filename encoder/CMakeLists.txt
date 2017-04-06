@@ -27,6 +27,7 @@ add_library(encoder
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 target_link_libraries(encoder
                       client_secret
+                      encrypted_message_util
                       forculus_encrypter
                       glog
                       rappor_encoder

@@ -125,8 +125,8 @@ std::shared_ptr<ProjectContext> GetTestProject() {
 class EnvelopeMakerTest : public ::testing::Test {
  public:
   EnvelopeMakerTest()
-      : envelope_maker_(kAnalyzerPublicKey, kShufflerPublicKey,
-                        EncryptedMessage::NONE),
+      : envelope_maker_(kAnalyzerPublicKey, EncryptedMessage::NONE,
+                        kShufflerPublicKey, EncryptedMessage::NONE),
         project_(GetTestProject()),
         encoder_(project_, ClientSecret::GenerateNewSecret()) {
     // Set a static current time so we can test the day_index computation.
@@ -166,10 +166,11 @@ class EnvelopeMakerTest : public ::testing::Test {
     EXPECT_EQ(metric_id, metadata.metric_id());
     EXPECT_EQ(kUtcDayIndex, metadata.day_index());
 
-    // Decrypt and deserialize the most recently added observation from the
+    // Deserialize the most recently added observation from the
     // expected batch.
-
-    // TODO(rudominer) Do a decryption here when encryption is enabled.
+    EXPECT_EQ(
+        EncryptedMessage::NONE,
+        batch.encrypted_observation(expected_this_batch_size - 1).scheme());
     std::string serialized_observation =
         batch.encrypted_observation(expected_this_batch_size - 1).ciphertext();
     Observation recovered_observation;

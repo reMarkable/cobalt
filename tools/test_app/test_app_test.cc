@@ -36,8 +36,6 @@ using encoder::ProjectContext;
 namespace {
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
-const char kAnalyzerPublicKey[] = "Not Curently Used";
-const char kShufflerPublicKey[] = "Not Curently Used";
 
 const char* const kMetricConfigText = R"(
 # Metric one string part named url.
@@ -210,10 +208,8 @@ class TestAppTest : public ::testing::Test {
  public:
   TestAppTest()
       : fake_sender_(new FakeEnvelopeSender()),
-        test_app_(GetTestProject(), fake_sender_,
-                  std::string(kAnalyzerPublicKey),
-                  std::string(kShufflerPublicKey), EncryptedMessage::NONE,
-                  &output_stream_) {}
+        test_app_(GetTestProject(), fake_sender_, "", EncryptedMessage::NONE,
+                  "", EncryptedMessage::NONE, &output_stream_) {}
 
  protected:
   // Clears the contents of the TestApp's output stream and returns the

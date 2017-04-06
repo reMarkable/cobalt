@@ -74,9 +74,10 @@ class TestApp {
   // Constructor. The |ostream| is used for emitting output in interactive mode.
   TestApp(std::shared_ptr<encoder::ProjectContext> project_context,
           std::shared_ptr<EnvelopeSenderInterface> sender,
-          const std::string& analyzer_public_key,
-          const std::string& shuffler_public_key,
-          EncryptedMessage::EncryptionScheme encryption_scheme,
+          const std::string& analyzer_public_key_pem,
+          EncryptedMessage::EncryptionScheme analyzer_encryption_scheme,
+          const std::string& shuffler_public_key_pem,
+          EncryptedMessage::EncryptionScheme shuffler_encryption_scheme,
           std::ostream* ostream);
 
   void set_mode(Mode mode) { mode_ = mode; }

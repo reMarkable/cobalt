@@ -33,6 +33,7 @@
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "grpc++/grpc++.h"
+#include "util/pem_util.h"
 
 namespace cobalt {
 
@@ -49,6 +50,7 @@ using grpc::ClientContext;
 using grpc::Status;
 using google::protobuf::Empty;
 using shuffler::Shuffler;
+using util::PemUtil;
 
 // There are three modes of operation of the Cobalt TestClient program
 // determined by the value of this flag.
@@ -75,6 +77,14 @@ DEFINE_string(analyzer_uri, "",
 DEFINE_string(shuffler_uri, "",
               "The URI of the Shuffler. Necessary only if sending observations "
               "to the Shuffler.");
+DEFINE_string(analyzer_pk_pem_file, "",
+              "Path to a file containing a PEM encoding of the public key of "
+              "the Analyzer used for Cobalt's internal encryption scheme. If "
+              "not specified then no encryption will be used.");
+DEFINE_string(shuffler_pk_pem_file, "",
+              "Path to a file containing a PEM encoding of the public key of "
+              "the Shuffler used for Cobalt's internal encryption scheme. If "
+              "not specified then no encryption will be used.");
 DEFINE_bool(
     use_tls, false,
     "Should tls be used for the connection to the shuffler or the analyzer?");
@@ -172,6 +182,18 @@ TestApp::Mode ParseMode() {
     return TestApp::kAutomatic;
   }
   LOG(FATAL) << "Unrecognized mode: " << FLAGS_mode;
+}
+
+// Reads the PEM file at the specified path and writes the contents into
+// |*pem_out|. Returns true for success or false for failure.
+bool ReadPublicKeyPem(const std::string& pem_file, std::string* pem_out) {
+  VLOG(1) << "Reading PEM file at " << pem_file;
+  if (PemUtil::ReadTextFile(pem_file, pem_out)) {
+    return true;
+  }
+  LOG(ERROR) << "Unable to open PEM file at " << pem_file
+             << ". Skipping encryption!";
+  return false;
 }
 
 // Reads the config files from the given directory. Returns a ProjectContext
@@ -424,14 +446,29 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
   std::shared_ptr<EnvelopeSender> envelope_sender(new EnvelopeSender(
       std::move(analyzer), std::move(shuffler_client), mode));
 
-  // TODO(rudominer) Enable public key encryption
-  std::string analyzer_public_key;
-  std::string shuffler_public_key;
-  EncryptedMessage::EncryptionScheme encryption_scheme = EncryptedMessage::NONE;
+  auto analyzer_encryption_scheme = EncryptedMessage::NONE;
+  std::string analyzer_public_key_pem = "";
+  if (FLAGS_analyzer_pk_pem_file.empty()) {
+    VLOG(1) << "WARNING: Encryption of Observations to the Analzyer not being "
+               "used. Pass the flag -analyzer_pk_pem_file";
+  } else if (ReadPublicKeyPem(FLAGS_analyzer_pk_pem_file,
+                              &analyzer_public_key_pem)) {
+    analyzer_encryption_scheme = EncryptedMessage::HYBRID_ECDH_V1;
+  }
+  auto shuffler_encryption_scheme = EncryptedMessage::NONE;
+  std::string shuffler_public_key_pem = "";
+  if (FLAGS_shuffler_pk_pem_file.empty()) {
+    VLOG(1) << "WARNING: Encryption of Envelopes to the Shuffler not being "
+               "used. Pass the flag -shuffler_pk_pem_file";
+  } else if (ReadPublicKeyPem(FLAGS_shuffler_pk_pem_file,
+                              &analyzer_public_key_pem)) {
+    shuffler_encryption_scheme = EncryptedMessage::HYBRID_ECDH_V1;
+  }
 
   auto test_app = std::unique_ptr<TestApp>(
-      new TestApp(project_context, envelope_sender, analyzer_public_key,
-                  shuffler_public_key, encryption_scheme, &std::cout));
+      new TestApp(project_context, envelope_sender, analyzer_public_key_pem,
+                  analyzer_encryption_scheme, shuffler_public_key_pem,
+                  shuffler_encryption_scheme, &std::cout));
   test_app->set_metric(FLAGS_metric);
   test_app->set_skip_shuffler(FLAGS_skip_shuffler);
   test_app->set_mode(mode);
@@ -440,17 +477,19 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
 
 TestApp::TestApp(std::shared_ptr<ProjectContext> project_context,
                  std::shared_ptr<EnvelopeSenderInterface> sender,
-                 const std::string& analyzer_public_key,
-                 const std::string& shuffler_public_key,
-                 EncryptedMessage::EncryptionScheme encryption_scheme,
+                 const std::string& analyzer_public_key_pem,
+                 EncryptedMessage::EncryptionScheme analyzer_scheme,
+                 const std::string& shuffler_public_key_pem,
+                 EncryptedMessage::EncryptionScheme shuffler_scheme,
                  std::ostream* ostream)
     : customer_id_(project_context->customer_id()),
       project_id_(project_context->project_id()),
       project_context_(project_context),
       envelope_sender_(sender),
       ostream_(ostream) {
-  envelope_maker_.reset(new EnvelopeMaker(
-      analyzer_public_key, shuffler_public_key, encryption_scheme));
+  envelope_maker_.reset(
+      new EnvelopeMaker(analyzer_public_key_pem, analyzer_scheme,
+                        shuffler_public_key_pem, shuffler_scheme));
 }
 
 void TestApp::Run() {
