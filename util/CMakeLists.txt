@@ -21,7 +21,13 @@ add_library(encrypted_message_util
             ${COBALT_PROTO_SRCS})
 target_link_libraries(encrypted_message_util
                       cobalt_crypto
+                      glog
                       ${PROTOBUF_LIBRARY})
+
+add_library(pem_util
+            pem_util.cc)
+target_link_libraries(pem_util
+                      cobalt_crypto)
 
 add_executable(util_tests
                datetime_util_test.cc

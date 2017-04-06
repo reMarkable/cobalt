@@ -19,6 +19,7 @@
 
 #include "analyzer/store/bigtable_store.h"
 #include "analyzer/store/memory_store.h"
+#include "util/encrypted_message_util.h"
 
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
@@ -44,7 +45,7 @@ class AnalyzerServiceTest : public ::testing::Test {
       : data_store_(new MemoryStore()),
         observation_store_(new ObservationStore(data_store_)),
         analyzer_(observation_store_, kAnalyzerPort,
-                  grpc::InsecureServerCredentials()) {}
+                  grpc::InsecureServerCredentials(), "") {}
 
  protected:
   virtual void SetUp() {
@@ -86,12 +87,6 @@ TEST_F(AnalyzerServiceTest, TestGRPC) {
   Observation observation;
   (*observation.mutable_parts())[kPartName] = std::move(observation_part);
 
-  // Serialize the observation.
-  std::string serialized_observation;
-  EXPECT_TRUE(observation.SerializeToString(&serialized_observation));
-  // TODO(rudominer) Perform encrytpion here
-  std::string ciphertext = serialized_observation;
-
   // Build an ObservationBatch to hold the Observation.
   ObservationBatch observation_batch;
   ObservationMetadata* meta_data = observation_batch.mutable_meta_data();
@@ -99,9 +94,12 @@ TEST_F(AnalyzerServiceTest, TestGRPC) {
   meta_data->set_project_id(kProjectId);
   meta_data->set_metric_id(kMetricId);
   meta_data->set_day_index(1);
+
+  // Write the Observation into an EncryptedMessage and add it to the batch.
   EncryptedMessage* encrypted_observation =
       observation_batch.add_encrypted_observation();
-  encrypted_observation->mutable_ciphertext()->swap(ciphertext);
+  util::EncryptedMessageMaker maker("", EncryptedMessage::NONE);
+  maker.Encrypt(observation, encrypted_observation);
 
   // Execute the RPC
   Empty resp;

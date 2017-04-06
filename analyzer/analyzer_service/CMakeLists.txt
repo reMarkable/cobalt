@@ -59,7 +59,8 @@ add_library(analyzer_service_lib
 target_link_libraries(analyzer_service_lib
                       analyzer_grpc_client
                       analyzer_store
-                      cobalt_crypto
+                      encrypted_message_util
+                      pem_util
                       glog
                       gflags
                       ${PROTOBUF_LIBRARY})

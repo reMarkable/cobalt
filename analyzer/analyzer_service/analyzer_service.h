@@ -23,6 +23,7 @@
 #include "analyzer/store/data_store.h"
 #include "analyzer/store/observation_store.h"
 #include "grpc++/grpc++.h"
+#include "util/encrypted_message_util.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -36,10 +37,21 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
 
   // Constructs an AnalyzerServiceImpl that accessess the given
   // |observation_store|, listens on the given tcp |port|, and uses
-  // the given |server_credentials| for authentication and encryption.
+  // the given TLS |server_credentials|.
+  //
+  // |private_key_pem| is the PEM encoding of the Analyzer's private key used
+  // with Cobalt's encryption scheme in which the Encoder encrypts Observations
+  // before sending them to the Shuffler. The Encoder must encrypt Observations
+  // using the corresponding public key. This parameter may be set to the empty
+  // string in which case the Analyzer will still function perfectly except
+  // that it will only be able to consume Observations that are contained in
+  // EncryptedMessages that uses the EncryptedMessage::NONE scheme, i.e.
+  // Observations that are sent in plain text. This is useful for testing but
+  // should never be done in a production Cobalt environment.
   AnalyzerServiceImpl(
       std::shared_ptr<store::ObservationStore> observation_store, int port,
-      std::shared_ptr<grpc::ServerCredentials> server_credentials);
+      std::shared_ptr<grpc::ServerCredentials> server_credentials,
+      const std::string& private_key_pem);
 
   // Starts the analyzer service
   void Start();
@@ -57,17 +69,11 @@ class AnalyzerServiceImpl final : public Analyzer::Service {
                                google::protobuf::Empty* response) override;
 
  private:
-  // Decrypts the |ciphertext| in |em| and then parses the resulting bytes
-  // as an Observation and writes the result into |observation|. Returns OK
-  // if this succeeds or an error Status containing an appropriate error
-  // message otherwise.
-  grpc::Status ParseEncryptedObservation(Observation* observation,
-                                 const EncryptedMessage& em);
-
   std::shared_ptr<store::ObservationStore> observation_store_;
   int port_;
   std::shared_ptr<grpc::ServerCredentials> server_credentials_;
   std::unique_ptr<grpc::Server> server_;
+  util::MessageDecrypter message_decrypter_;
 };
 
 }  // namespace analyzer

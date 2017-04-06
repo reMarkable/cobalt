@@ -19,7 +19,7 @@
 set -e
 
 # Latest version of sysroot.  Update it after uploading.
-readonly VERSION="53a836c2ac7140f1b72933eac0abcf70b1a4dbdf"
+readonly VERSION="07fa7021d8202d7b7400520910e5ec7a4f4f7b20"
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PREFIX="${SCRIPT_DIR}/sysroot"
@@ -140,6 +140,15 @@ if [ ! -f $PREFIX/lib/libgflags.a ] ; then
     mkdir gflags
     cd gflags
     cmake -DCMAKE_INSTALL_PREFIX=$PREFIX $SCRIPT_DIR/third_party/gflags
+    make install
+fi
+
+# Install glog
+if [ ! -f $PREFIX/lib/libglog.a ] ; then
+    cd $WD
+    mkdir glog
+    cd glog
+    cmake -DCMAKE_INSTALL_PREFIX=$PREFIX $SCRIPT_DIR/third_party/glog
     make install
 fi
 

@@ -52,7 +52,7 @@ link_directories(${DIR_SYSROOT}/lib)
 
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
-include_directories(${DIR_SYSROOT}/include)
+include_directories(BEFORE SYSTEM ${DIR_SYSROOT}/include)
 
 # Defines a command to run protoc on the top-level .proto files.
 find_package(Protobuf REQUIRED QUIET)

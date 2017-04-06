@@ -24,15 +24,24 @@
 
 #include "./observation.pb.h"
 #include "analyzer/store/data_store.h"
+#include "util/encrypted_message_util.h"
+#include "util/pem_util.h"
 
 namespace cobalt {
 namespace analyzer {
 
 using store::DataStore;
 using store::ObservationStore;
+using util::MessageDecrypter;
+using util::PemUtil;
 
 DEFINE_int32(port, 0, "The port that the Analyzer Service should listen on.");
 DEFINE_string(tls_info, "", "TBD: Some info about TLS.");
+DEFINE_string(
+    private_key_pem_file, "",
+    "Path to a file containing a PEM encoding of the private key of "
+    "the Analyzer used for Cobalt's internal encryption scheme. If "
+    "not specified then the Analyzer will not support encrypted Observations.");
 
 std::unique_ptr<AnalyzerServiceImpl>
 AnalyzerServiceImpl::CreateFromFlagsOrDie() {
@@ -51,16 +60,28 @@ AnalyzerServiceImpl::CreateFromFlagsOrDie() {
     // TODO(rudominer) Set up options based on FLAGS_tls_info.
     server_credentials = grpc::SslServerCredentials(options);
   }
+  std::string private_key_pem;
+  PemUtil::ReadTextFile(FLAGS_private_key_pem_file, &private_key_pem);
+  if (private_key_pem.empty()) {
+    LOG(WARNING) << "WARNING: No valid private key PEM was read. The Analyzer "
+                    "will not be able to decrypt encrypted Observations.";
+    LOG(WARNING) << "-private_key_pem_file=" << FLAGS_private_key_pem_file;
+  } else {
+    LOG(INFO) << "Analyzer private key was read from file "
+              << FLAGS_private_key_pem_file;
+  }
   return std::unique_ptr<AnalyzerServiceImpl>(new AnalyzerServiceImpl(
-      observation_store, FLAGS_port, server_credentials));
+      observation_store, FLAGS_port, server_credentials, private_key_pem));
 }
 
 AnalyzerServiceImpl::AnalyzerServiceImpl(
     std::shared_ptr<store::ObservationStore> observation_store, int port,
-    std::shared_ptr<grpc::ServerCredentials> server_credentials)
+    std::shared_ptr<grpc::ServerCredentials> server_credentials,
+    const std::string& private_key_pem)
     : observation_store_(observation_store),
       port_(port),
-      server_credentials_(server_credentials) {}
+      server_credentials_(server_credentials),
+      message_decrypter_(private_key_pem) {}
 
 void AnalyzerServiceImpl::Start() {
   grpc::ServerBuilder builder;
@@ -84,9 +105,10 @@ grpc::Status AnalyzerServiceImpl::AddObservations(
           << " observations.";
   for (const EncryptedMessage& em : batch->encrypted_observation()) {
     Observation observation;
-    auto parse_status = ParseEncryptedObservation(&observation, em);
-    if (!parse_status.ok()) {
-      return parse_status;
+    if (!message_decrypter_.DecryptMessage(em, &observation)) {
+      std::string error_message = "Decryption of an Observation failed.";
+      LOG(ERROR) << error_message;
+      return grpc::Status(grpc::INVALID_ARGUMENT, error_message);
     }
     auto add_status =
         observation_store_->AddObservation(batch->meta_data(), observation);
@@ -102,21 +124,6 @@ grpc::Status AnalyzerServiceImpl::AddObservations(
     }
   }
 
-  return grpc::Status::OK;
-}
-
-grpc::Status AnalyzerServiceImpl::ParseEncryptedObservation(
-    Observation* observation, const EncryptedMessage& em) {
-  // TODO(rudominer) Actually perform a decryption when bytes is encrypted.
-  if (!observation->ParseFromString(em.ciphertext())) {
-    std::string error_message(
-        "An EncryptedMessage was successfully decrypted using "
-        "the public key of the Analyzer, but the contents of "
-        "the decrypted message could not be parsed as an "
-        "Observation.");
-    LOG(ERROR) << error_message;
-    return grpc::Status(grpc::INVALID_ARGUMENT, error_message);
-  }
   return grpc::Status::OK;
 }
 
