@@ -220,11 +220,10 @@ func (store *LevelDBStore) AddAllObservations(envelopeBatch []*cobalt.Observatio
 	return nil
 }
 
-// GetObservations returns the shuffled list of ObservationVals from the
-// data store for the given |ObservationMetadata| key or returns an error.
-// TODO(ukode): If the returned resultset cannot fit in memory, the api
-// needs to be tweaked to return ObservationVals in batches.
-func (store *LevelDBStore) GetObservations(om *cobalt.ObservationMetadata) ([]*shuffler.ObservationVal, error) {
+// GetObservations returns a LevelDBStoreIterator to iterate through the
+// shuffled list of ObservationVals from the data store for the given
+// |ObservationMetadata| key or returns an error.
+func (store *LevelDBStore) GetObservations(om *cobalt.ObservationMetadata) (Iterator, error) {
 	if om == nil {
 		panic("observation metadata is nil")
 	}
@@ -235,20 +234,7 @@ func (store *LevelDBStore) GetObservations(om *cobalt.ObservationMetadata) ([]*s
 	}
 
 	iter := store.db.NewIterator(keyPrefix, nil)
-	var obVals []*shuffler.ObservationVal
-	for iter.Next() {
-		obVal := &shuffler.ObservationVal{}
-		if err := proto.Unmarshal(iter.Value(), obVal); err != nil {
-			return nil, grpc.Errorf(codes.Internal, "Error in parsing observation value from datastore: [%v]", err)
-		}
-		obVals = append(obVals, obVal)
-	}
-	iter.Release()
-	if err := iter.Error(); err != nil {
-		return nil, grpc.Errorf(codes.Internal, "LevelDB iterator error: [%v]", err)
-	}
-
-	return obVals, nil
+	return NewLevelDBStoreIterator(iter), nil
 }
 
 // GetKeys returns the list of all |ObservationMetadata| keys stored in the

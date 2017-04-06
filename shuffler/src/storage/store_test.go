@@ -135,14 +135,11 @@ func doTestAddGetAndDeleteObservations(t *testing.T, store Store) {
 	CheckKeys(t, store, keys)
 
 	// verify delete for metadata with MetricId=7
-	om := batches[7].GetMetaData()
+	deleteMetricID := 7
+	om := batches[deleteMetricID].GetMetaData()
 
 	// Retrieve stored observation contents before deletion for metric 8
-	vals, err := store.GetObservations(om)
-	if err != nil {
-		t.Errorf("GetObservations: got error [%v], expected valid observations", err)
-	}
-
+	vals := CheckObservations(t, store, om, deleteMetricID+1)
 	// call delete for half the observations
 	deleteObVals := vals[0 : len(vals)/2]
 	if err := store.DeleteValues(om, deleteObVals); err != nil {

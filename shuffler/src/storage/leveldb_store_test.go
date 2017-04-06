@@ -17,8 +17,10 @@
 package storage
 
 import (
-	shufflerpb "cobalt"
+	"cobalt"
 	"testing"
+
+	"github.com/golang/protobuf/proto"
 )
 
 // makeLevelDBTestStore creates leveldb |TestStore|.
@@ -50,7 +52,7 @@ func TestLevelDBInitialization(t *testing.T) {
 	const arrivalDayIndex = 10
 	om := NewObservationMetaData(501)
 	batch := NewObservationBatchForMetadata(om, numMsgs)
-	if err := s1.AddAllObservations([]*shufflerpb.ObservationBatch{batch},
+	if err := s1.AddAllObservations([]*cobalt.ObservationBatch{batch},
 		arrivalDayIndex); err != nil {
 		t.Errorf("AddAllObservations: got error %v, expected success", err)
 	}
@@ -71,4 +73,45 @@ func TestLevelDBInitialization(t *testing.T) {
 	// instances by verifying that the store is no longer empty.
 	CheckKeys(t, s2, keys)
 	ResetStoreForTesting(s2, true)
+}
+
+func TestLevelDBStoreIterator(t *testing.T) {
+	s := makeLevelDBTestStore(t)
+
+	// add observations for different metrics
+	const numBatches = 10
+	const arrivalDayIndex = 16
+	batches := MakeObservationBatches(numBatches)
+	if err := s.AddAllObservations(batches, arrivalDayIndex); err != nil {
+		t.Errorf("AddAllObservations: got error %v, expected success", err)
+	}
+
+	// iterate through each metadata bucket and verify the contents
+	for _, batch := range batches {
+		om := batch.GetMetaData()
+		iter, err := s.GetObservations(om)
+		if err != nil {
+			t.Errorf("GetObservations: got error %v for metadata [%v]", err, om)
+		}
+
+		encMsgList := batch.GetEncryptedObservation()
+		gotObVals := CheckIterator(t, iter)
+		if gotObVals == nil && len(encMsgList) != 0 {
+			t.Errorf("GetObservations() call failed for key: [%v]", om)
+			return
+		}
+
+		gotEMsgSet := make(map[string]bool, len(gotObVals))
+		for _, obVal := range gotObVals {
+			gotEMsgSet[proto.CompactTextString(obVal.EncryptedObservation)] = true
+		}
+
+		for _, eMsg := range encMsgList {
+			_, ok := gotEMsgSet[proto.CompactTextString(eMsg)]
+			if !ok {
+				t.Errorf("got [%v], expected encrypted message [%v] for metadata [%v] to be present in the resultset", gotEMsgSet, eMsg, om)
+				return
+			}
+		}
+	}
 }

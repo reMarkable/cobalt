@@ -127,7 +127,7 @@ func CheckNumObservations(t *testing.T, store Store, om *cobalt.ObservationMetad
 		panic("Metadata is nil")
 	}
 
-	if obValsLen, err := store.GetNumObservations(om); err != nil {
+	if obValsLen, err := store.GetNumObservations(om); err != nil && expectedNumObs != 0 {
 		t.Errorf("GetNumObservations: got error [%v] for metadata [%v]", err, om)
 	} else if obValsLen != expectedNumObs {
 		t.Errorf("GetNumObservations: got [%d] ObservationVals, expected [%d] ObservationVals per metadata [%v]", obValsLen, expectedNumObs, om)
@@ -145,17 +145,35 @@ func CheckObservations(t *testing.T, store Store, om *cobalt.ObservationMetadata
 		panic("Metadata is nil")
 	}
 
-	gotObVals, err := store.GetObservations(om)
+	iter, err := store.GetObservations(om)
 	if err != nil {
 		t.Errorf("GetObservations: got error %v for metadata [%v]", err, om)
-	} else if len(gotObVals) != expectedNumObs {
+	}
+
+	if iter == nil {
+		t.Errorf("GetObservations: got empty iterator for metadata [%v]", om)
+	}
+
+	var gotObVals []*shuffler.ObservationVal
+	for iter.Next() {
+		obVal, iErr := iter.Get()
+		if iErr != nil {
+			t.Errorf("got error on iter.Get() for key [%v]: %v", om, err)
+		}
+		gotObVals = append(gotObVals, obVal)
+	}
+	if err := iter.Release(); err != nil {
+		t.Errorf("got error on iter.Release() for metadata [%v]: %v", om, err)
+	}
+
+	if len(gotObVals) != expectedNumObs {
 		t.Errorf("GetObservations: got [%d] observations, expected [%d] observations for metadata [%v]", len(gotObVals), expectedNumObs, om)
 	}
 
 	return gotObVals
 }
 
-// CheckGetObservations tests if the observations fethced from store for a given
+// CheckGetObservations tests if the observations fetched from store for a given
 // ObservationMetadata |om| key are valid. Observations are deemed valid if and
 // only if:
 // - The total count of observations returned by GetObservations() is equal to
@@ -205,6 +223,30 @@ func CheckDeleteObservations(t *testing.T, store Store, om *cobalt.ObservationMe
 			}
 		}
 	}
+}
+
+// CheckIterator tests if the observations fetched using the given iterator
+// |iter| and returns the ObservationVals result set.
+func CheckIterator(t *testing.T, iter Iterator) []*shuffler.ObservationVal {
+	var gotObVals []*shuffler.ObservationVal
+	for iter.Next() {
+		val, err := iter.Get()
+		if err != nil {
+			t.Errorf("iter.Get() returned error: %v", err)
+		}
+		gotObVals = append(gotObVals, val)
+	}
+
+	err := iter.Release()
+	if err != nil {
+		t.Errorf("got error while releasing iterator: %v", err)
+	}
+
+	if iter.Next() {
+		t.Errorf("iterator must be empty after release()")
+	}
+
+	return gotObVals
 }
 
 // ResetStoreForTesting clears any in-memory caches, and deletes all data

@@ -107,9 +107,20 @@ func TestMemStoreConcurrency(t *testing.T) {
 	// Delete 5 keys concurrently
 	deleteAndVerify := func(store *MemStore, index int, t *testing.T) {
 		om := NewObservationMetaData(index)
-		vals, err := store.GetObservations(om)
+		iter, err := store.GetObservations(om)
 		if err != nil {
 			t.Errorf("GetObservations: got error [%v] for metadata [%v]", err, om)
+		}
+		var vals []*shuffler.ObservationVal
+		for iter.Next() {
+			obVal, iErr := iter.Get()
+			if iErr != nil {
+				t.Errorf("got error on iter.Get() for key [%v]: %v", om, err)
+			}
+			vals = append(vals, obVal)
+		}
+		if err := iter.Release(); err != nil {
+			t.Errorf("got error on iter.Release() for metadata [%v]: %v", om, err)
 		}
 
 		// delete all values for this metric
@@ -144,4 +155,16 @@ func TestMemStoreConcurrency(t *testing.T) {
 
 	// Verify total keys after successful deletion of 5 metrics
 	CheckKeys(t, store, keys)
+}
+
+func TestMemStoreIterator(t *testing.T) {
+	testObVals := MakeRandomObservationVals(50)
+
+	// test against a list with only one entry and multiple entries.
+	for _, obVals := range [][]*shuffler.ObservationVal{testObVals[:1], testObVals} {
+		gotObVals := CheckIterator(t, NewMemStoreIterator(obVals))
+		if !reflect.DeepEqual(obVals, gotObVals) {
+			t.Errorf("CheckIterator: got [%v], expected [%v] ObservationVals", len(gotObVals), len(obVals))
+		}
+	}
 }

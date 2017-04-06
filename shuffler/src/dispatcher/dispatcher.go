@@ -300,6 +300,9 @@ func (d *Dispatcher) Dispatch() {
 		glog.Errorf("GetKeys() failed with error: %v", err)
 		return
 	}
+
+	// Each bucket is either dispatched or disposed based on config and if there
+	// are errors, processing proceeds to the next bucket in the pipeline.
 	for _, key := range keys {
 		// Fetch bucket size for each key
 		bucketSize, err := d.store.GetNumObservations(key)
@@ -309,8 +312,13 @@ func (d *Dispatcher) Dispatch() {
 			continue
 		}
 
+		if bucketSize == 0 {
+			continue
+		}
+
 		// Compare bucket size to the configured limit.
 		if uint32(bucketSize) >= d.config.GetGlobalConfig().Threshold {
+			// Dispatch bucket associated with |key| and delete it after sending.
 			err := d.dispatchBucket(key)
 			if err != nil {
 				glog.Errorf("dispatchBucket() failed for key: %v with error: %v", key, err)
@@ -342,7 +350,7 @@ func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata) error {
 	}
 
 	// Retrieve shuffled bucket from store for the given |key|
-	obVals, err := d.store.GetObservations(key)
+	iterator, err := d.store.GetObservations(key)
 	if err != nil {
 		glog.Errorf("GetObservations() failed for key: %v with error: %v", key, err)
 		return err
@@ -351,23 +359,27 @@ func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata) error {
 	// Send the shuffled bucket to Analyzer in chunks. If the bucket is too
 	// big, send it in multiple chunks of size |batchSize|.
 	batchID := 0
-	for i := 0; i < len(obVals); i += d.batchSize {
+	for {
 		batchID++
 		glog.V(4).Infof("Sending observations to Analyzer in chunks, batch [%d] in progress...", batchID)
-		batchToSend := makeBatch(key, obVals, i, i+d.batchSize)
+		obVals, batchToSend := makeBatch(key, iterator, d.batchSize)
+		if len(obVals) == 0 {
+			// If makeBatch() returned an empty batch then the iteration is done.
+			break
+		}
 		sendErr := d.analyzerTransport.send(batchToSend)
-		if sendErr != nil {
+		if sendErr == nil {
+			// After successful send, delete the observations from the local
+			// datastore.
+			if err := d.store.DeleteValues(key, obVals); err != nil {
+				glog.Errorf("Error in deleting dispatched observations from the store for key: %v", key)
+			}
+		} else {
 			// TODO(ukode): Add retry behaviour for 3 or more attempts or use
 			// exponential backoff for errors relating to network issues.
 			glog.Errorf("Error in transmitting data to Analyzer for key [%v]: %v", key, sendErr)
 		}
 		time.Sleep(time.Duration(dispatchDelayInS))
-	}
-
-	// After successful send, delete the observations from the local datastore.
-	if err := d.store.DeleteValues(key, obVals); err != nil {
-		glog.Errorf("Error in deleting dispatched observations from the store for key: %v", key)
-		return err
 	}
 
 	return nil
@@ -376,7 +388,8 @@ func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata) error {
 // deleteOldObservations deletes the observations for a given |key| from the
 // store if the age of the observation is greater than the configured value
 // |disposalAgeInDays|.
-func (d *Dispatcher) deleteOldObservations(key *cobalt.ObservationMetadata, currentDayIndex uint32, disposalAgeInDays uint32) error {
+func (d *Dispatcher) deleteOldObservations(key *cobalt.ObservationMetadata,
+	currentDayIndex uint32, disposalAgeInDays uint32) error {
 	if key == nil {
 		panic("key is nil")
 	}
@@ -385,24 +398,37 @@ func (d *Dispatcher) deleteOldObservations(key *cobalt.ObservationMetadata, curr
 		panic("dispatcher is nil")
 	}
 
-	obVals, err := d.store.GetObservations(key)
+	iterator, err := d.store.GetObservations(key)
 	if err != nil {
 		glog.Errorf("GetObservation call failed for key: %v with error: %v", key, err)
 		return nil
-	} else if len(obVals) == 0 {
-		return nil // nothing to be updated
 	}
 
-	var staleObVals []*shuffler.ObservationVal
-	for _, obVal := range obVals {
-		if currentDayIndex-obVal.ArrivalDayIndex > disposalAgeInDays {
-			staleObVals = append(staleObVals, obVal)
+	// We delete stale Observations iteratively in batches of size at most 1000.
+	const maxDeleteBatchSize = 1000
+	for {
+		var staleObVals []*shuffler.ObservationVal
+		for iterator.Next() {
+			obVal, err := iterator.Get()
+			if err != nil {
+				glog.Errorf("deleteOldObservations: iterator.Get() returned an error: %v", err)
+				continue
+			}
+			if currentDayIndex-obVal.ArrivalDayIndex > disposalAgeInDays {
+				staleObVals = append(staleObVals, obVal)
+				if len(staleObVals) == maxDeleteBatchSize {
+					break
+				}
+			}
+		}
+
+		if len(staleObVals) == 0 {
+			break
+		} else if err := d.store.DeleteValues(key, staleObVals); err != nil {
+			return fmt.Errorf("Error [%v] in deleting old observations for metadata: %v", err, key)
 		}
 	}
 
-	if err := d.store.DeleteValues(key, staleObVals); err != nil {
-		return fmt.Errorf("Error [%v] in deleting old observations for metadata: %v", err, key)
-	}
 	return nil
 }
 
@@ -418,16 +444,32 @@ func (d *Dispatcher) computeWaitTime(currentTime time.Time) (waitTime time.Durat
 	return nextDispatchTime.Sub(currentTime)
 }
 
-// makeBatch returns a new ObservationBatch for |key| consisting of a chunk
-// of observations from |start| to |end| from the given |obVals| list.
-func makeBatch(key *cobalt.ObservationMetadata, obVals []*shuffler.ObservationVal, start int, end int) *cobalt.ObservationBatch {
-	var encryptedMessages []*cobalt.EncryptedMessage
-	for i := start; i < end && i < len(obVals); i++ {
-		encryptedMessages = append(encryptedMessages, obVals[i].EncryptedObservation)
+// makeBatch returns a new ObservationBatch for |key| consisting of the next
+// chunk of observations from |iterator| of size at most |batchSize|.
+func makeBatch(key *cobalt.ObservationMetadata, iterator storage.Iterator, batchSize int) ([]*shuffler.ObservationVal, *cobalt.ObservationBatch) {
+	if batchSize <= 0 {
+		panic("batchSize must be positive.")
 	}
 
-	return &cobalt.ObservationBatch{
+	var encryptedMessages []*cobalt.EncryptedMessage
+	var obVals []*shuffler.ObservationVal
+	for iterator.Next() {
+		obVal, err := iterator.Get()
+		if err != nil {
+			glog.Errorf("makeBatch: iterator.Get() returned an error: %v", err)
+			continue
+		}
+		obVals = append(obVals, obVal)
+		encryptedMessages = append(encryptedMessages, obVal.EncryptedObservation)
+		if len(encryptedMessages) == batchSize {
+			break
+		}
+	}
+
+	batch := cobalt.ObservationBatch{
 		MetaData:             key,
 		EncryptedObservation: encryptedMessages,
 	}
+
+	return obVals, &batch
 }

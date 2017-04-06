@@ -32,11 +32,10 @@ type Store interface {
 	// non-nil error if the arguments are invalid or the operation fails.
 	AddAllObservations(envelopeBatch []*cobalt.ObservationBatch, arrivalDayIndex uint32) error
 
-	// GetObservations returns a *shuffled* list of ObservationVals from the
-	// data store for the given |ObservationMetadata| key or returns an error.
-	// TODO(ukode): If the returned resultset cannot fit in memory, the api
-	// needs to be tweaked to return ObservationVals in batches.
-	GetObservations(metadata *cobalt.ObservationMetadata) ([]*shuffler.ObservationVal, error)
+	// GetObservations returns a storage.Iterator to iterate through the shuffled
+	// list of ObservationVals from the data store for the given
+	// |ObservationMetadata| key or returns an error.
+	GetObservations(metadata *cobalt.ObservationMetadata) (Iterator, error)
 
 	// GetNumObservations returns the total count of ObservationVals in the data
 	// store for the given |ObservationMmetadata| key or returns an error.

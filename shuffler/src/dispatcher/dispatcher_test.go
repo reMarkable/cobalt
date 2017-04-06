@@ -15,6 +15,7 @@
 package dispatcher
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -88,10 +89,28 @@ func makeTestStore(numObservations int, currentDayIndex uint32, useMemStore bool
 		}
 	}
 
-	obVals, err := store.GetObservations(om)
+	// Get all observations in one big chunk
+	iter, err := store.GetObservations(om)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	if iter == nil {
+		return nil, nil, nil, fmt.Errorf("GetObservations: got empty iterator for metadata [%v]", om)
+	}
+
+	var obVals []*shuffler.ObservationVal
+	for iter.Next() {
+		obVal, iErr := iter.Get()
+		if iErr != nil {
+			return nil, nil, nil, iErr
+		}
+		obVals = append(obVals, obVal)
+	}
+	if err := iter.Release(); err != nil {
+		return nil, nil, nil, err
+	}
+
 	return store, om, obVals, nil
 }
 
@@ -144,41 +163,61 @@ func doTestDeleteOldObservations(t *testing.T, useMemStore bool) {
 	const num = 4
 	const currentDayIndex = 10
 
-	store, key, obVals, err := makeTestStore(num, currentDayIndex, useMemStore)
+	store, key, _, err := makeTestStore(num, currentDayIndex, useMemStore)
 	if err != nil {
 		t.Fatalf("got error [%v] in test store setup", err)
 	}
 
-	var obValsLen int
-	if obValsLen, err = store.GetNumObservations(key); err != nil {
-		t.Errorf("got error [%v], expected multiple observations", err)
-	} else {
-		if obValsLen != len(obVals) {
-			t.Errorf("got [%d] ObservationVals, expected [%d] ObservationVal", obValsLen, len(obVals))
-		}
-	}
+	storage.CheckNumObservations(t, store, key, num)
 
 	// make test dispatcher by setting threshold and frequency to "0" and
 	// batchsize to max |num| for immediate dispatch.
 	d := newTestDispatcher(store, num, 0, 0)
 
-	// dispose off any older messages that have a dayIndex less than "2". This
-	// list will contain exactly half the observations that are saved in the
-	// store.
-	disposalAgeInDays := uint32(2)
+	// Dispose off any older messages that have a dayIndex less than "4".
+	disposalAgeInDays := uint32(4)
+	err = d.deleteOldObservations(key, currentDayIndex, disposalAgeInDays)
+	if err != nil {
+		t.Errorf("Expected successful update, got error [%v]", err)
+		return
+	}
+	// none of the stored observations gets deleted
+	storage.CheckNumObservations(t, store, key, num)
+	obValsAfterDeletion := storage.CheckObservations(t, store, key, num)
+	for _, obVal := range obValsAfterDeletion {
+		if obVal.ArrivalDayIndex <= disposalAgeInDays {
+			t.Errorf("Expected ObVal with dayIndex [%d] to be deleted", obVal.Id)
+			return
+		}
+	}
+
+	// Dispose off any older messages that have a dayIndex less than "2".
+	disposalAgeInDays = uint32(2)
+	err = d.deleteOldObservations(key, currentDayIndex, disposalAgeInDays)
+	if err != nil {
+		t.Errorf("Expected successful update, got error [%v]", err)
+		return
+	}
+	// this list must contain exactly half the observations
+	storage.CheckNumObservations(t, store, key, num/2)
+	obValsAfterDeletion = storage.CheckObservations(t, store, key, num/2)
+	for _, obVal := range obValsAfterDeletion {
+		if obVal.ArrivalDayIndex <= disposalAgeInDays {
+			t.Errorf("Expected ObVal with dayIndex [%d] to be deleted", obVal.Id)
+			return
+		}
+	}
+
+	// Dispose off all messages by specifying dayIndex "0".
+	disposalAgeInDays = uint32(0)
 	err = d.deleteOldObservations(key, currentDayIndex, disposalAgeInDays)
 	if err != nil {
 		t.Errorf("Expected successful update, got error [%v]", err)
 		return
 	}
 
-	if obValsLen, err = d.store.GetNumObservations(key); err != nil {
-		t.Errorf("got error [%v], expected [%d] observations", err, num/2)
-	} else {
-		if obValsLen != num/2 {
-			t.Errorf("got [%d] ObservationVals, expected [%d] filtered ObservationVals after disposing older observations", obValsLen, num/2)
-		}
-	}
+	// all the observations for the given key should be deleted
+	storage.CheckNumObservations(t, store, key, 0)
 
 	// reset store
 	storage.ResetStoreForTesting(d.store, true)
@@ -393,11 +432,17 @@ func TestMakeBatch(t *testing.T) {
 		DayIndex:   dayIndex,
 	}
 	obVals := storage.MakeRandomObservationVals(30)
+	iterator := storage.NewMemStoreIterator(obVals)
+
+	// Advance the iterator past the first five elements
+	for i := 0; i < 5; i++ {
+		iterator.Next()
+	}
 
 	// Retrieve a chunk of size 5 and assert the starting msg and the size of the
 	// batch returned.
 	chunkSize := 5
-	obBatch := makeBatch(key, obVals, 5, 10)
+	_, obBatch := makeBatch(key, iterator, chunkSize)
 	encMsgList := obBatch.EncryptedObservation
 	if len(encMsgList) != chunkSize {
 		t.Errorf("Got chunk of size [%v], expected [%d]", len(encMsgList), chunkSize)
@@ -407,7 +452,11 @@ func TestMakeBatch(t *testing.T) {
 		t.Errorf("Got [%v], expected [%v]", encMsgList[0], obVals[5].EncryptedObservation)
 	}
 
-	obBatch = makeBatch(key, obVals, 27, 32)
+	// The iterator is now at elemet 10. Advance the iterator to element 27.
+	for i := 0; i < 17; i++ {
+		iterator.Next()
+	}
+	_, obBatch = makeBatch(key, iterator, chunkSize)
 	encMsgList = obBatch.EncryptedObservation
 	if len(encMsgList) != 3 {
 		t.Errorf("Got chunk size [%v], expected chunk size [3]", len(encMsgList))
@@ -416,5 +465,10 @@ func TestMakeBatch(t *testing.T) {
 
 	if !reflect.DeepEqual(encMsgList[0], obVals[27].EncryptedObservation) {
 		t.Errorf("Got [%v], expected [%v]", encMsgList[0], obVals[27].EncryptedObservation)
+	}
+
+	if err := iterator.Release(); err != nil {
+		t.Errorf("got error while releasing iterator: %v", err)
+		return
 	}
 }

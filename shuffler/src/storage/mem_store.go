@@ -118,11 +118,10 @@ func (store *MemStore) AddAllObservations(envelopeBatch []*cobalt.ObservationBat
 	return nil
 }
 
-// GetObservations returns the shuffled list of ObservationVals from the
-// data store for the given |ObservationMetadata| key or returns an error.
-// TODO(ukode): If the returned resultset cannot fit in memory, the api
-// needs to be tweaked to return ObservationVals in batches.
-func (store *MemStore) GetObservations(om *cobalt.ObservationMetadata) ([]*shuffler.ObservationVal, error) {
+// GetObservations returns a MemStoreIterator to iterate through the shuffled
+// list of ObservationVals from the data store for the given
+// |ObservationMetadata| key or returns an error.
+func (store *MemStore) GetObservations(om *cobalt.ObservationMetadata) (Iterator, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
@@ -145,7 +144,9 @@ func (store *MemStore) GetObservations(om *cobalt.ObservationMetadata) ([]*shuff
 	// Shuffler data store layer guarantees that the list returned on Get() call
 	// is always shuffled. In memstore, this is acheieved by shuffling the
 	// |ObservationVal| result set.
-	return shuffle(obVals), nil
+	iter := NewMemStoreIterator(shuffle(obVals))
+
+	return iter, nil
 }
 
 // GetKeys returns the list of all |ObservationMetadata| keys stored in the
