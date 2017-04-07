@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "./observation.pb.h"
-#include "analyzer/store/data_store.h"
+#include "analyzer/store/bigtable_store.h"
 #include "analyzer/store/observation_store.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -31,7 +31,7 @@
 
 namespace cobalt {
 
-using analyzer::store::DataStore;
+using analyzer::store::BigtableStore;
 using analyzer::store::ObservationStore;
 using crypto::Base64Encode;
 
@@ -183,7 +183,7 @@ std::string ToString(const Observation& observation) {
 
 std::unique_ptr<ObservationQuerier> ObservationQuerier::CreateFromFlagsOrDie() {
   std::shared_ptr<ObservationStore> observation_store(
-      new ObservationStore(DataStore::CreateFromFlagsOrDie()));
+      new ObservationStore(BigtableStore::CreateFromFlagsOrDie()));
   return std::unique_ptr<ObservationQuerier>(new ObservationQuerier(
       FLAGS_customer, FLAGS_project, observation_store, &std::cout));
 }

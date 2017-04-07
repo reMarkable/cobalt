@@ -64,7 +64,6 @@ func main() {
 			FrequencyInHours: 24,
 			PObservationDrop: 0.0,
 			Threshold:        500,
-			AnalyzerUrl:      "localhost:6001",
 			DisposalAgeDays:  4,
 		}
 	} else {

@@ -23,6 +23,7 @@
 #include <string>
 
 #include "./observation.pb.h"
+#include "analyzer/store/bigtable_store.h"
 #include "analyzer/store/data_store.h"
 #include "util/encrypted_message_util.h"
 #include "util/pem_util.h"
@@ -30,6 +31,7 @@
 namespace cobalt {
 namespace analyzer {
 
+using store::BigtableStore;
 using store::DataStore;
 using store::ObservationStore;
 using util::MessageDecrypter;
@@ -46,7 +48,7 @@ DEFINE_string(
 std::unique_ptr<AnalyzerServiceImpl>
 AnalyzerServiceImpl::CreateFromFlagsOrDie() {
   std::shared_ptr<DataStore> data_store(
-      DataStore::CreateFromFlagsOrDie().release());
+      BigtableStore::CreateFromFlagsOrDie().release());
   std::shared_ptr<ObservationStore> observation_store(
       new ObservationStore(data_store));
   CHECK(FLAGS_port) << "--port is a mandatory flag";

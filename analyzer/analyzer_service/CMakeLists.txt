@@ -62,7 +62,6 @@ target_link_libraries(analyzer_service_lib
                       encrypted_message_util
                       pem_util
                       glog
-                      gflags
                       ${PROTOBUF_LIBRARY})
 
 # Build the analyzer_service executable
@@ -71,6 +70,7 @@ target_link_libraries(analyzer_service analyzer_service_lib)
 
 # Build the tests
 add_executable(analyzer_service_tests
+               ${CMAKE_SOURCE_DIR}/analyzer/store/memory_store.cc
                analyzer_service_test.cc)
 target_link_libraries(analyzer_service_tests
                       analyzer_service_lib

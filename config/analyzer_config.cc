@@ -87,13 +87,13 @@ std::string ErrorMessage(Status status) {
 
 std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromFlagsOrDie() {
   CHECK(!FLAGS_cobalt_config_dir.empty())
-      << "--cobalt_config_dir is a mandatory flag";
+      << "-cobalt_config_dir is a mandatory flag";
   CHECK(!FLAGS_cobalt_encoding_configs_file_name.empty())
-      << "--cobalt_encoding_configs_file_name is a mandatory flag";
+      << "-cobalt_encoding_configs_file_name is a mandatory flag";
   CHECK(!FLAGS_cobalt_metrics_file_name.empty())
-      << "--cobalt_metrics_file_name is a mandatory flag";
+      << "-cobalt_metrics_file_name is a mandatory flag";
   CHECK(!FLAGS_cobalt_report_configs_file_name.empty())
-      << "--cobalt_report_configs_file_name is a mandatory flag";
+      << "-cobalt_report_configs_file_name is a mandatory flag";
 
   LoggingErrorCollector error_collector;
 

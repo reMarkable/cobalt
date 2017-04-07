@@ -34,12 +34,11 @@ func LoadConfig(configFileName string) (*shuffler.ShufflerConfig, error) {
 	}
 
 	// detect if file exists
+	glog.Info("Will read Shuffler configuration from ", configFileName, ".")
 	var _, err = os.Stat(configFileName)
 	if err != nil {
 		return nil, err
 	}
-
-	glog.Info("Read Shuffler configuration from ", configFileName, ".")
 
 	config := &shuffler.ShufflerConfig{}
 	serializedBytes, err := ioutil.ReadFile(configFileName)

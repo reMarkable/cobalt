@@ -37,7 +37,7 @@ add_executable(encoder_tests
                client_secret_test.cc
                encoder_test.cc envelope_maker_test.cc shuffler_client_test)
 target_link_libraries(encoder_tests
-                      gflags gtest gtest_main client_secret encoder
+                      gtest gtest_main client_secret encoder
                       ${PROTOBUF_LIBRARY})
 set_target_properties(encoder_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})

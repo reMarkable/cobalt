@@ -14,30 +14,11 @@
 
 #include "analyzer/store/data_store.h"
 
-#include "analyzer/store/bigtable_store.h"
-#include "analyzer/store/memory_store.h"
-#include "gflags/gflags.h"
-#include "glog/logging.h"
-
 namespace cobalt {
 namespace analyzer {
 namespace store {
 
-// Flags used to put the DataStore into testing/debug mode
-DEFINE_bool(for_testing_only_use_memstore, false,
-            "Use MemoryStore as the underlying data store");
-
 DataStore::~DataStore() {}
-
-std::unique_ptr<DataStore> DataStore::CreateFromFlagsOrDie() {
-  if (FLAGS_for_testing_only_use_memstore) {
-    LOG(WARNING)
-        << "**** Using an in-memory data store instead of BigTable. ****";
-    return std::unique_ptr<DataStore>(new MemoryStore());
-  }
-
-  return BigtableStore::CreateFromFlagsOrDie();
-}
 
 }  // namespace store
 }  // namespace analyzer

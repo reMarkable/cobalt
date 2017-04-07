@@ -106,6 +106,8 @@ std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   CHECK(creds);
   LOG(INFO) << "Connecting to CloudBigtable at " << kCloudBigtableUri << ", "
             << kCloudBigtableAdminUri;
+  LOG(INFO) << "project=" << FLAGS_bigtable_project_name
+            << " instance=" << FLAGS_bigtable_instance_name;
   return std::unique_ptr<BigtableStore>(new BigtableStore(
       kCloudBigtableUri, kCloudBigtableAdminUri, creds,
       FLAGS_bigtable_project_name, FLAGS_bigtable_instance_name));

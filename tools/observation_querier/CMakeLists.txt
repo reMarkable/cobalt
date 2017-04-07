@@ -27,6 +27,7 @@ target_link_libraries(query_observations
 
 # Build the tests
 add_executable(observation_querier_tests
+               ${CMAKE_SOURCE_DIR}/analyzer/store/memory_store.cc
                observation_querier_test.cc)
 target_link_libraries(observation_querier_tests
                       observation_querier

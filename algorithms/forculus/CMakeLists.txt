@@ -30,7 +30,7 @@ target_link_libraries(forculus_encrypter
 add_library(forculus_analyzer forculus_analyzer.cc forculus_decrypter.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 target_link_libraries(forculus_analyzer
-                      forculus_utils gflags glog ${PROTOBUF_LIBRARY})
+                      forculus_utils glog ${PROTOBUF_LIBRARY})
 
 # Build an executable test binary. Include gtest headers at compile time
 # and gtest libraries at link time. Write the executable to the

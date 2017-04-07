@@ -17,13 +17,11 @@ set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${REPORT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 # Build the analyzer store library
-# TODO(rudominer) Production Cobalt shouldn't be linked with memory_store.cc.
 add_library(analyzer_store
             bigtable_admin.cc
             bigtable_flags.cc
             bigtable_store.cc
             data_store.cc
-            memory_store.cc
             observation_store.cc
             report_store.cc
             ${COBALT_PROTO_SRCS}
@@ -32,7 +30,6 @@ add_library(analyzer_store
 target_link_libraries(analyzer_store
                       cobalt_crypto
                       glog
-                      gflags
                       googleapis
                       ${PROTOBUF_LIBRARY})
 
@@ -41,6 +38,7 @@ target_link_libraries(report_store_testutils analyzer_store)
 
 # Build the tests
 add_executable(analyzer_store_tests
+               memory_store.cc
                memory_store_test.cc observation_store_test.cc report_store_test.cc)
 target_link_libraries(analyzer_store_tests
                       analyzer_store

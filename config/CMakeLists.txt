@@ -23,7 +23,6 @@ add_library(analyzer_config
 
 target_link_libraries(analyzer_config
                       glog
-                      gflags
                       ${PROTOBUF_LIBRARY})
 
 # Build the config_gen tool

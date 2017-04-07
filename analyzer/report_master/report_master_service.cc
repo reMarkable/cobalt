@@ -25,6 +25,7 @@
 
 #include "analyzer/report_master/report_executor.h"
 #include "analyzer/report_master/report_generator.h"
+#include "analyzer/store/bigtable_store.h"
 #include "analyzer/store/data_store.h"
 #include "config/analyzer_config.h"
 #include "glog/logging.h"
@@ -39,6 +40,7 @@ using crypto::Base64Encode;
 using grpc::ServerContext;
 using grpc::ServerWriter;
 using grpc::WriteOptions;
+using store::BigtableStore;
 using store::DataStore;
 using store::ObservationStore;
 using store::ReportStore;
@@ -204,7 +206,7 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
 std::unique_ptr<ReportMasterService>
 ReportMasterService::CreateFromFlagsOrDie() {
   std::shared_ptr<DataStore> data_store(
-      DataStore::CreateFromFlagsOrDie().release());
+      BigtableStore::CreateFromFlagsOrDie().release());
   std::shared_ptr<ObservationStore> observation_store(
       new ObservationStore(data_store));
   std::shared_ptr<ReportStore> report_store(new ReportStore(data_store));

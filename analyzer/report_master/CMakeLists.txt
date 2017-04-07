@@ -67,7 +67,6 @@ target_link_libraries(analyzer_report_master_lib
                       cobalt_crypto
                       forculus_analyzer
                       glog
-                      gflags
                       rappor_analyzer
                       ${PROTOBUF_LIBRARY})
 
@@ -78,6 +77,7 @@ target_link_libraries(analyzer_report_master
 
 # Build the tests
 add_executable(analyzer_report_master_tests
+               ${CMAKE_SOURCE_DIR}/analyzer/store/memory_store.cc
                encoding_mixer_test.cc
                report_executor_test.cc
                report_generator_test.cc
