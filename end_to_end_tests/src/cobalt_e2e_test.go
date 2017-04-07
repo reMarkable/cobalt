@@ -160,12 +160,15 @@ const (
 )
 
 var (
-	observationQuerierPath = flag.String("observation_querier_path", "", "The full path to the Observation querier binary.")
-	testAppPath            = flag.String("test_app_path", "", "The full path to the Cobalt test app binary.")
+	observationQuerierPath = flag.String("observation_querier_path", "", "The full path to the Observation querier binary")
+	testAppPath            = flag.String("test_app_path", "", "The full path to the Cobalt test app binary")
 
-	analyzerUri     = flag.String("analyzer_uri", "", "The URI of the Analyzer Service.")
-	reportMasterUri = flag.String("report_master_uri", "", "The URI of the Report Master.")
-	shufflerUri     = flag.String("shuffler_uri", "", "The URI of the Shuffler.")
+	analyzerUri     = flag.String("analyzer_uri", "", "The URI of the Analyzer Service")
+	reportMasterUri = flag.String("report_master_uri", "", "The URI of the Report Master")
+	shufflerUri     = flag.String("shuffler_uri", "", "The URI of the Shuffler")
+
+	analyzerPkPemFile = flag.String("analyzer_pk_pem_file", "", "Path to a file containing a PEM encoding of the public key of the Analyzer")
+	shufflerPkPemFile = flag.String("shuffler_pk_pem_file", "", "Path to a file containing a PEM encoding of the public key of the Shuffler")
 
 	subProcessVerbosity = flag.Int("sub_process_v", 0, "-v verbosity level to pass to sub-processes")
 
@@ -273,7 +276,9 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 	cmd := exec.Command(*testAppPath,
 		"-mode", "send-once",
 		"-analyzer_uri", *analyzerUri,
+		"-analyzer_pk_pem_file", *analyzerPkPemFile,
 		"-shuffler_uri", *shufflerUri,
+		"-shuffler_pk_pem_file", *shufflerPkPemFile,
 		"-logtostderr", fmt.Sprintf("-v=%d", *subProcessVerbosity),
 		"-metric", strconv.Itoa(int(metricId)),
 		"-num_clients", strconv.Itoa(int(numClients)),

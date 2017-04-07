@@ -25,8 +25,13 @@ import time
 import tools.process_starter as process_starter
 
 THIS_DIR = os.path.dirname(__file__)
-SRC_ROOT_DIR = os.path.join(THIS_DIR, os.pardir)
+SRC_ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.pardir))
 SYS_ROOT_DIR = os.path.join(SRC_ROOT_DIR, 'sysroot')
+E2E_DIR = os.path.join(SRC_ROOT_DIR, "end_to_end_tests")
+E2E_TEST_ANALYZER_PRIVATE_KEY_PEM = os.path.join(E2E_DIR,
+    "analyzer_private_key.pem.e2e_test")
+E2E_TEST_ANALYZER_PUBLIC_KEY_PEM = os.path.join(E2E_DIR,
+    "analyzer_public_key.pem.e2e_test")
 
 _logger = logging.getLogger()
 
@@ -82,6 +87,7 @@ def run_all_tests(test_dir,
       if start_cobalt_processes:
         time.sleep(1)
         analyzer_service_process=process_starter.start_analyzer_service(
+            private_key_pem_file=E2E_TEST_ANALYZER_PRIVATE_KEY_PEM,
             verbose_count=verbose_count, wait=False)
         time.sleep(1)
         report_master_process=process_starter.start_report_master(

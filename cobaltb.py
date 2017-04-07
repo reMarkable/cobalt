@@ -27,11 +27,14 @@ import tools.golint as golint
 import tools.process_starter as process_starter
 import tools.test_runner as test_runner
 
+from tools.test_runner import E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
+
 from tools.process_starter import DEFAULT_SHUFFLER_PORT
 from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from tools.process_starter import DEFAULT_REPORT_MASTER_PORT
 from tools.process_starter import DEMO_CONFIG_DIR
 from tools.process_starter import SHUFFLER_DEMO_CONFIG_FILE
+from tools.process_starter import DEFAULT_ANALYZER_PUBLIC_KEY_PEM
 
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
@@ -160,6 +163,7 @@ def _test(args):
     if (test_dir == 'e2e_tests'):
       test_args = [
           "-analyzer_uri=localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT,
+          "-analyzer_pk_pem_file=%s" % E2E_TEST_ANALYZER_PUBLIC_KEY_PEM,
           "-shuffler_uri=localhost:%d" % DEFAULT_SHUFFLER_PORT,
           "-report_master_uri=localhost:%d" % DEFAULT_REPORT_MASTER_PORT,
           ("-observation_querier_path=%s" %
@@ -232,7 +236,9 @@ def _start_report_master(args):
 def _start_test_app(args):
   process_starter.start_test_app(shuffler_uri=args.shuffler_uri,
                                  analyzer_uri=args.analyzer_uri,
-                                 verbose_count=_verbose_count)
+                                 # Because it makes the demo more interesting
+                                 # we use verbose_count at least 3.
+                                 verbose_count=max(3, _verbose_count))
 
 def _start_report_client(args):
   process_starter.start_report_client(
@@ -241,6 +247,10 @@ def _start_report_client(args):
 
 def _start_observation_querier(args):
   process_starter.start_observation_querier(verbose_count=_verbose_count)
+
+def _generate_keys(args):
+  path = os.path.join(OUT_DIR, 'tools', 'key_generator', 'key_generator')
+  subprocess.check_call([path])
 
 def _gce_build(args):
   setGCEImages(args)
@@ -422,7 +432,8 @@ def main():
   sub_parser.add_argument('--port',
       help='The port on which the Analyzer service should listen. '
            'Default=%s.' % DEFAULT_ANALYZER_SERVICE_PORT,
-      default=DEFAULT_ANALYZER_SERVICE_PORT)
+      default=DEFAULT_ANALYZER_SERVICE_PORT,
+      )
 
   sub_parser = start_subparsers.add_parser('report_master',
       parents=[parent_parser], help='Start the Analyzer ReportMaster Service '
@@ -464,6 +475,10 @@ def main():
     parents=[parent_parser],
     help='Start the Bigtable Emulator running locally.')
   sub_parser.set_defaults(func=_start_bigtable_emulator)
+
+  sub_parser = subparsers.add_parser('keygen', parents=[parent_parser],
+    help='Generate new public/private key pairs.')
+  sub_parser.set_defaults(func=_generate_keys)
 
   sub_parser = subparsers.add_parser('gce_build', parents=[parent_parser],
     help='Builds Docker images for GCE.')

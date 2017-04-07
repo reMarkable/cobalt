@@ -1,4 +1,5 @@
 *.pyc
+*.pem
 service_account_credentials.json
 /out/
 /sysroot/

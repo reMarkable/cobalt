@@ -20,8 +20,8 @@ import shutil
 import subprocess
 
 THIS_DIR = os.path.dirname(__file__)
-SRC_ROOT_DIR = os.path.join(THIS_DIR, os.pardir)
-OUT_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'out'))
+SRC_ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.pardir))
+OUT_DIR = os.path.join(SRC_ROOT_DIR, 'out')
 SYS_ROOT_DIR = os.path.join(SRC_ROOT_DIR, 'sysroot')
 
 DEMO_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
@@ -33,6 +33,15 @@ SHUFFLER_DB_DIR = os.path.join("/tmp/cobalt_shuffler")
 DEFAULT_SHUFFLER_PORT=5001
 DEFAULT_ANALYZER_SERVICE_PORT=6001
 DEFAULT_REPORT_MASTER_PORT=7001
+
+DEFAULT_ANALYZER_PUBLIC_KEY_PEM=os.path.join(SRC_ROOT_DIR,
+                                             "analyzer_public_key.pem")
+DEFAULT_ANALYZER_PRIVATE_KEY_PEM=os.path.join(SRC_ROOT_DIR,
+                                             "analyzer_private_key.pem")
+DEFAULT_SHUFFLER_PUBLIC_KEY_PEM=os.path.join(SRC_ROOT_DIR,
+                                             "shuffler_public_key.pem")
+DEFAULT_SHUFFLER_PRIVATE_KEY_PEM=os.path.join(SRC_ROOT_DIR,
+                                             "shuffler_private_key.pem")
 
 
 def kill_process(process, name):
@@ -121,18 +130,18 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
   return execute_command(cmd, wait)
 
 def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
-                           verbose_count=0, wait=True):
+    private_key_pem_file=DEFAULT_ANALYZER_PRIVATE_KEY_PEM,
+    verbose_count=0, wait=True):
   print
   print "Starting the analyzer service..."
-  print
   print "Will connect to a local Bigtable Emulator instance."
-  print "Have you already started the Bigtable Emulator?"
   print
   path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'analyzer_service',
       'analyzer_service'))
   cmd = [path,
       "-for_testing_only_use_bigtable_emulator",
       "-port", str(port),
+      "-private_key_pem_file", private_key_pem_file,
       "-logtostderr"]
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
@@ -143,9 +152,7 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
                         verbose_count=0, wait=True):
   print
   print "Starting the analyzer ReportMaster service..."
-  print
   print "Will connect to a local Bigtable Emulator instance."
-  print "Have you already started the Bigtable Emulator?"
   print
   path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'report_master',
       'analyzer_report_master'))
@@ -161,10 +168,14 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
 TEST_APP_PATH = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'test_app',
                                 'cobalt_test_app'))
 def start_test_app(shuffler_uri='', analyzer_uri='',
+                   analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM,
+                   shuffler_pk_pem_file=DEFAULT_SHUFFLER_PUBLIC_KEY_PEM,
                    verbose_count=0, wait=True):
   cmd = [TEST_APP_PATH,
       "-shuffler_uri", shuffler_uri,
       "-analyzer_uri", analyzer_uri,
+      "-analyzer_pk_pem_file", analyzer_pk_pem_file,
+      "-shuffler_pk_pem_file", shuffler_pk_pem_file,
       "-logtostderr"]
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
