@@ -39,6 +39,8 @@ from tools.process_starter import DEFAULT_ANALYZER_PUBLIC_KEY_PEM
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
+SERVICE_ACCOUNT_CREDENTIALS_FILE = os.path.join(THIS_DIR,
+    'service_account_credentials.json')
 
 IMAGES = ["analyzer", "shuffler"]
 
@@ -152,6 +154,11 @@ def _test(args):
     start_cobalt_processes = (test_dir in NEEDS_COBALT_PROCESSES)
     test_args = None
     if (test_dir == 'gtests_cloud_bt'):
+      if not os.path.exists(SERVICE_ACCOUNT_CREDENTIALS_FILE):
+        print ('You must first create the file %s.' %
+               SERVICE_ACCOUNT_CREDENTIALS_FILE)
+        print 'See the instructions in README.md.'
+        return
       if args.bigtable_instance_name == '':
         print '--bigtable_instance_name must be specified'
         success = False
@@ -212,6 +219,7 @@ def _clean(args):
 def _start_bigtable_emulator(args):
   process_starter.start_bigtable_emulator()
 
+
 def _start_shuffler(args):
   process_starter.start_shuffler(port=args.port,
                                  analyzer_uri=args.analyzer_uri,
@@ -251,6 +259,24 @@ def _start_observation_querier(args):
 def _generate_keys(args):
   path = os.path.join(OUT_DIR, 'tools', 'key_generator', 'key_generator')
   subprocess.check_call([path])
+
+def _provision_bigtable(args):
+  if not os.path.exists(SERVICE_ACCOUNT_CREDENTIALS_FILE):
+    print ('You must first create the file %s.' %
+           SERVICE_ACCOUNT_CREDENTIALS_FILE)
+    print 'See the instructions in README.md.'
+    return
+  if args.bigtable_project_name == '':
+    print '--bigtable_project_name must be specified'
+    return
+  if args.bigtable_instance_name == '':
+    print '--bigtable_instance_name must be specified'
+    return
+
+  path = os.path.join(OUT_DIR, 'tools', 'bigtable_tool', 'bigtable_tool')
+  subprocess.check_call([path,
+      "--bigtable_project_name", args.bigtable_project_name,
+      "--bigtable_instance_name", args.bigtable_instance_name])
 
 def _gce_build(args):
   setGCEImages(args)
@@ -480,6 +506,18 @@ def main():
     help='Generate new public/private key pairs.')
   sub_parser.set_defaults(func=_generate_keys)
 
+  sub_parser = subparsers.add_parser('provision_bigtable',
+    parents=[parent_parser],
+    help="Create Cobalt's Cloud BigTables if they don't exit.")
+  sub_parser.set_defaults(func=_generate_keys)
+  sub_parser.add_argument('--bigtable_project_name',
+      help='Specify the Cloud project containing the Bigtable instance '
+      ' to be provisioned.', default='')
+  sub_parser.add_argument('--bigtable_instance_name',
+      help='Specify the Cloud Bigtable instance within the specified Cloud'
+      ' project that is to be provisioned.', default='')
+  sub_parser.set_defaults(func=_provision_bigtable)
+
   sub_parser = subparsers.add_parser('gce_build', parents=[parent_parser],
     help='Builds Docker images for GCE.')
   sub_parser.set_defaults(func=_gce_build)
@@ -532,8 +570,8 @@ def main():
       + os.pathsep + os.environ["PATH"]
   os.environ["LD_LIBRARY_PATH"] = "%s/lib" % SYSROOT_DIR
 
-  os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(os.path.join(
-      THIS_DIR, 'service_account_credentials.json'))
+  os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = \
+      SERVICE_ACCOUNT_CREDENTIALS_FILE
 
   os.environ["GRPC_DEFAULT_SSL_ROOTS_FILE_PATH"] = os.path.abspath(
       os.path.join(SYSROOT_DIR, 'share', 'grpc', 'roots.pem'))
