@@ -19,6 +19,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "./observation.pb.h"
@@ -200,7 +201,7 @@ void ObservationQuerier::Run() {
     CommandLoop();
     return;
   }
-  QueryOnce();
+  CountObservations();
 }
 
 void ObservationQuerier::CommandLoop() {
@@ -214,17 +215,27 @@ void ObservationQuerier::CommandLoop() {
   }
 }
 
-void ObservationQuerier::QueryOnce() {
-  auto query_response = observation_store_->QueryObservations(
-      customer_, project_, FLAGS_metric, 0, INT32_MAX,
-      std::vector<std::string>(), FLAGS_max_num, "");
+// Counts the number of Observations in the Observation store and writes the
+// count to std::cout. We iteratively query in batches of size up to 10000
+// and stop counting when we have seen FLAGS_max_num observations. Thus the
+// result will be <= FLAGS_max_num.
+void ObservationQuerier::CountObservations() {
+  size_t num_observations = 0;
+  const size_t batch_size = std::min(FLAGS_max_num - num_observations, 10000ul);
+  std::string pagination_token = "";
+  do {
+    auto query_response = observation_store_->QueryObservations(
+        customer_, project_, FLAGS_metric, 0, INT32_MAX,
+        std::vector<std::string>(), batch_size, pagination_token);
+    if (query_response.status != analyzer::store::kOK) {
+      LOG(FATAL) << "Query failed with code: " << query_response.status;
+      return;
+    }
+    num_observations += query_response.results.size();
+    pagination_token = std::move(query_response.pagination_token);
+  } while (!pagination_token.empty() && num_observations < FLAGS_max_num);
 
-  if (query_response.status != analyzer::store::kOK) {
-    LOG(FATAL) << "Query failed with code: " << query_response.status;
-    return;
-  }
-
-  std::cout << query_response.results.size();
+  std::cout << num_observations;
 }
 
 bool ObservationQuerier::ProcessCommandLine(const std::string command_line) {

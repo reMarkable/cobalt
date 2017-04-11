@@ -41,7 +41,7 @@ class ObservationQuerier {
       std::ostream* ostream);
 
   // Run() is invoked by main(). It invokes either CommandLoop()
-  // or QueryOnce() depending on the value of the -interactive flag.
+  // or CountObservations() depending on the value of the -interactive flag.
   void Run();
 
   // Processes a single command. The method is public so an instance of
@@ -58,7 +58,7 @@ class ObservationQuerier {
 
   // Implements non-interactive mode. Performs a query based on the flags
   // and writes the results to std out.
-  void QueryOnce();
+  void CountObservations();
 
   bool ProcessCommand(const std::vector<std::string>& command);
   void Query(const std::vector<std::string>& command);
