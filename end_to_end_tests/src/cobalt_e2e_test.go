@@ -282,6 +282,7 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 		"-logtostderr", fmt.Sprintf("-v=%d", *subProcessVerbosity),
 		"-metric", strconv.Itoa(int(metricId)),
 		"-num_clients", strconv.Itoa(int(numClients)),
+		fmt.Sprintf("-skip_shuffler=%t", skipShuffler),
 		"-values", flagString(values))
 	stdoutStderr, err := cmd.CombinedOutput()
 	message := string(stdoutStderr)
