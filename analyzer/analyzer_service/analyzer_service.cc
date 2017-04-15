@@ -105,24 +105,27 @@ grpc::Status AnalyzerServiceImpl::AddObservations(
     google::protobuf::Empty* empty) {
   VLOG(3) << "Received batch of " << batch->encrypted_observation_size()
           << " observations.";
+  std::vector<Observation> observations(batch->encrypted_observation_size());
+  size_t index = 0;
   for (const EncryptedMessage& em : batch->encrypted_observation()) {
-    Observation observation;
-    if (!message_decrypter_.DecryptMessage(em, &observation)) {
+    if (!message_decrypter_.DecryptMessage(em, &observations[index++])) {
       std::string error_message = "Decryption of an Observation failed.";
       LOG(ERROR) << error_message;
       return grpc::Status(grpc::INVALID_ARGUMENT, error_message);
     }
-    auto add_status =
-        observation_store_->AddObservation(batch->meta_data(), observation);
-    if (add_status != store::kOK) {
-      LOG(ERROR) << "AddObservations() failed with status code " << add_status;
-      switch (add_status) {
-        case store::kInvalidArguments:
-          return grpc::Status(grpc::INVALID_ARGUMENT, "");
+  }
 
-        default:
-          return grpc::Status(grpc::INTERNAL, "");
-      }
+  auto add_status =
+      observation_store_->AddObservationBatch(batch->meta_data(), observations);
+  if (add_status != store::kOK) {
+    LOG(ERROR) << "AddObservationBatch() failed with status code "
+               << add_status;
+    switch (add_status) {
+      case store::kInvalidArguments:
+        return grpc::Status(grpc::INVALID_ARGUMENT, "");
+
+      default:
+        return grpc::Status(grpc::INTERNAL, "");
     }
   }
 
