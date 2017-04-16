@@ -15,16 +15,16 @@
 package main
 
 import (
-	"flag"
-	"path/filepath"
-
-	"github.com/golang/glog"
-
 	"config"
 	"dispatcher"
+	"flag"
+	"path/filepath"
 	"receiver"
 	"shuffler"
 	"storage"
+	"time"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -43,7 +43,7 @@ var (
 
 	// shuffler dispatch configuration flags
 	configFile = flag.String("config_file", "", "The Shuffler config file")
-	batchSize  = flag.Int("batch_size", 100, "The size of ObservationBatch to be sent to Analyzer")
+	batchSize  = flag.Int("batch_size", 1000, "The size of ObservationBatch to be sent to Analyzer")
 
 	// shuffler db configuration flags
 	useMemStore = flag.Bool("use_memstore", false, "Shuffler uses in memory store if true, else persistent store")
@@ -100,7 +100,7 @@ func main() {
 	grpcAnalyzerClient := dispatcher.NewGrpcAnalyzerTransport(&dispatcher.GrpcClientConfig{
 		EnableTLS: *tls,
 		CAFile:    *caFile,
-		Timeout:   *timeout,
+		Timeout:   time.Duration(*timeout) * time.Second,
 		URL:       url,
 	})
 

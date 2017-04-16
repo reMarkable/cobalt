@@ -118,7 +118,7 @@ func makeTestStore(numObservations int, currentDayIndex uint32, useMemStore bool
 // the given |batchSize|, |threshold|, |frequencyInHours| and |store| values.
 //
 // Panics if |store| is not set.
-func newTestDispatcher(store storage.Store, batchSize int, threshold int, frequencyInHours int) *Dispatcher {
+func newTestDispatcher(store storage.Store, batchSize int, threshold int) *Dispatcher {
 	if store == nil {
 		panic("store is nil")
 	}
@@ -126,7 +126,7 @@ func newTestDispatcher(store storage.Store, batchSize int, threshold int, freque
 	// testconfig for immediate dispatch for smaller batches
 	testConfig := &shuffler.ShufflerConfig{}
 	testConfig.GlobalConfig = &shuffler.Policy{
-		FrequencyInHours: uint32(frequencyInHours),
+		FrequencyInHours: 0,
 		PObservationDrop: 0.0,
 		Threshold:        uint32(threshold),
 		AnalyzerUrl:      "localhost",
@@ -172,7 +172,7 @@ func doTestDeleteOldObservations(t *testing.T, useMemStore bool) {
 
 	// make test dispatcher by setting threshold and frequency to "0" and
 	// batchsize to max |num| for immediate dispatch.
-	d := newTestDispatcher(store, num, 0, 0)
+	d := newTestDispatcher(store, num, 0)
 
 	// Dispose off any older messages that have a dayIndex less than "4".
 	disposalAgeInDays := uint32(4)
@@ -243,9 +243,9 @@ func doTestDispatchInBatches(t *testing.T, useMemStore bool) {
 
 		// run dispatcher by setting threshold and frequency to "0" and different
 		// batchsizes.
-		d := newTestDispatcher(store, batchSize, 0, 0)
+		d := newTestDispatcher(store, batchSize, 0)
 		analyzer := getAnalyzerTransport(d)
-		d.Dispatch()
+		d.dispatch(1 * time.Millisecond)
 
 		// Assert that last timestamp has been modified to the current time.
 		now := time.Now()
@@ -306,9 +306,9 @@ func doTestDispatchBasedOnThresholds(t *testing.T, useMemStore bool) {
 
 		// run dispatcher with frequency set to "0" and batchsize set to the max
 		// chunk size - "num" for sending all messages at once in one large batch.
-		d := newTestDispatcher(store, num, threshold, 0)
+		d := newTestDispatcher(store, num, threshold)
 		analyzer := getAnalyzerTransport(d)
-		d.Dispatch()
+		d.dispatch(1 * time.Millisecond)
 
 		// Assert that last timestamp has been modified to the current time.
 		now := time.Now()
@@ -367,7 +367,7 @@ func TestThresholdBasedDispatchForLevelDBStore(t *testing.T) {
 
 func TestComputeWaitTime(t *testing.T) {
 	// create a test dispatcher with all defaults
-	d := newTestDispatcher(storage.NewMemStore(), 1, 0, 0)
+	d := newTestDispatcher(storage.NewMemStore(), 1, 0)
 
 	// Case 1
 	// lastDispatchTime = 0

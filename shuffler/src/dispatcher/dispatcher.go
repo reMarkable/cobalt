@@ -36,12 +36,12 @@ import (
 	"storage"
 )
 
-// dispatchDelayInS adds a tiny delay between grpc calls to Analyzer.
-const dispatchDelayInS = 2
+// We sleep for this amount of time between buckets and between batches within a bucket
+const dispatchDelay = 1 * time.Second
 
-// In the case that FrequencyInHours has been set to zero we pause for this
-// many seconds between each invocation of Dispatch().
-const minWaitTimeInS = 3
+// In the case that FrequencyInHours has been set to zero we sleep for this
+// duration between each invocation of Dispatch().
+const minWaitTime = 1 * time.Second
 
 // AnalyzerTransport is an interface for Analyzer where the observations get
 // collected, analyzed and reported.
@@ -62,12 +62,12 @@ type AnalyzerTransport interface {
 //
 // |URL| specifies the url for the analyzer.
 //
-// |Timeout| specifies the time duration in seconds to terminate the client
+// |Timeout| specifies the time duration to terminate the client
 // grpc connection to analyzer.
 type GrpcClientConfig struct {
 	EnableTLS bool
 	CAFile    string
-	Timeout   int
+	Timeout   time.Duration
 	URL       string
 }
 
@@ -130,7 +130,7 @@ func connect(cc *GrpcClientConfig) *grpc.ClientConn {
 		opts = append(opts, grpc.WithInsecure())
 	}
 	opts = append(opts, grpc.WithBlock())
-	opts = append(opts, grpc.WithTimeout(time.Second*time.Duration(cc.Timeout)))
+	opts = append(opts, grpc.WithTimeout(cc.Timeout))
 
 	glog.V(4).Infoln("Dialing", cc.URL, "...")
 	conn, err := grpc.Dial(cc.URL, opts...)
@@ -249,8 +249,8 @@ func (d *Dispatcher) Run() {
 	for {
 		waitTime := d.computeWaitTime(time.Now())
 		shouldDisconnectWhileSleeping := true
-		if waitTime <= time.Duration(minWaitTimeInS)*time.Second {
-			waitTime = time.Duration(minWaitTimeInS) * time.Second
+		if waitTime <= minWaitTime {
+			waitTime = minWaitTime
 			// Don't bother disconnecting and reconnecting for a 3 second sleep.
 			shouldDisconnectWhileSleeping = false
 		}
@@ -268,7 +268,7 @@ func (d *Dispatcher) Run() {
 		}
 
 		d.lastDispatchTime = time.Now()
-		d.Dispatch()
+		d.dispatch(dispatchDelay)
 	}
 }
 
@@ -285,7 +285,10 @@ func (d *Dispatcher) Run() {
 //      because the batch size is too small, the Shuffler will delete those
 //      Observations from the batch whose age is at least |disposal_age_days|
 //      specified in the configuration.
-func (d *Dispatcher) Dispatch() {
+//
+// Between between buckets, and between the batches of a single bucket, we sleep
+// for |sleepDuration|.
+func (d *Dispatcher) dispatch(sleepDuration time.Duration) {
 	if d.store == nil {
 		panic("Store handle is nil.")
 	}
@@ -306,7 +309,7 @@ func (d *Dispatcher) Dispatch() {
 	for _, key := range keys {
 		// Fetch bucket size for each key
 		bucketSize, err := d.store.GetNumObservations(key)
-		glog.V(4).Infoln("Bucket size from store: [%d]", bucketSize)
+		glog.V(4).Infof("Bucket size from store: [%d]", bucketSize)
 		if err != nil {
 			glog.Errorf("GetNumObservations() failed for key: %v with error: %v", key, err)
 			continue
@@ -319,7 +322,7 @@ func (d *Dispatcher) Dispatch() {
 		// Compare bucket size to the configured limit.
 		if uint32(bucketSize) >= d.config.GetGlobalConfig().Threshold {
 			// Dispatch bucket associated with |key| and delete it after sending.
-			err := d.dispatchBucket(key)
+			err := d.dispatchBucket(key, sleepDuration)
 			if err != nil {
 				glog.Errorf("dispatchBucket() failed for key: %v with error: %v", key, err)
 				continue
@@ -334,13 +337,15 @@ func (d *Dispatcher) Dispatch() {
 				glog.Errorf("Error in filtering Observations for key [%v]: %v", key, err)
 			}
 		}
-		time.Sleep(time.Duration(dispatchDelayInS))
+		time.Sleep(sleepDuration)
 	}
 }
 
 // dispatchBucket dispatches the ObservationBatch associated with |key| in
 // chunks of size |batchSize| to Analyzer using grpc transport.
-func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata) error {
+//
+// We sleep for |sleepDuration| between batches.
+func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata, sleepDuration time.Duration) error {
 	if key == nil {
 		panic("key is nil")
 	}
@@ -379,7 +384,7 @@ func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata) error {
 			// exponential backoff for errors relating to network issues.
 			glog.Errorf("Error in transmitting data to Analyzer for key [%v]: %v", key, sendErr)
 		}
-		time.Sleep(time.Duration(dispatchDelayInS))
+		time.Sleep(sleepDuration)
 	}
 
 	return nil
