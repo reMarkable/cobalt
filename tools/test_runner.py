@@ -38,6 +38,8 @@ _logger = logging.getLogger()
 def run_all_tests(test_dir,
                   start_bt_emulator=False,
                   start_cobalt_processes=False,
+                  bigtable_project_name = '',
+                  bigtable_instance_name = '',
                   verbose_count=0,
                   test_args=None):
   """ Runs the tests in the given directory.
@@ -87,10 +89,14 @@ def run_all_tests(test_dir,
       if start_cobalt_processes:
         time.sleep(1)
         analyzer_service_process=process_starter.start_analyzer_service(
+            bigtable_instance_name=bigtable_instance_name,
+            bigtable_project_name=bigtable_project_name,
             private_key_pem_file=E2E_TEST_ANALYZER_PRIVATE_KEY_PEM,
             verbose_count=verbose_count, wait=False)
         time.sleep(1)
         report_master_process=process_starter.start_report_master(
+            bigtable_instance_name=bigtable_instance_name,
+            bigtable_project_name=bigtable_project_name,
             verbose_count=verbose_count, wait=False)
         time.sleep(1)
         shuffler_process=process_starter.start_shuffler(wait=False)

@@ -150,7 +150,8 @@ def _test(args):
   print ("Will run tests in the following directories: %s." %
       ", ".join(test_dirs))
   for test_dir in test_dirs:
-    start_bt_emulator = (test_dir in NEEDS_BT_EMULATOR)
+    start_bt_emulator = ((test_dir in NEEDS_BT_EMULATOR)
+        and not args.bigtable_instance_name)
     start_cobalt_processes = (test_dir in NEEDS_COBALT_PROCESSES)
     test_args = None
     if (test_dir == 'gtests_cloud_bt'):
@@ -159,6 +160,10 @@ def _test(args):
                SERVICE_ACCOUNT_CREDENTIALS_FILE)
         print 'See the instructions in README.md.'
         return
+      if args.bigtable_project_name == '':
+        print '--bigtable_project_name must be specified'
+        success = False
+        break
       if args.bigtable_instance_name == '':
         print '--bigtable_instance_name must be specified'
         success = False
@@ -173,6 +178,8 @@ def _test(args):
           "-analyzer_pk_pem_file=%s" % E2E_TEST_ANALYZER_PUBLIC_KEY_PEM,
           "-shuffler_uri=localhost:%d" % DEFAULT_SHUFFLER_PORT,
           "-report_master_uri=localhost:%d" % DEFAULT_REPORT_MASTER_PORT,
+          "-bigtable_project_name=%s" % args.bigtable_project_name,
+          "-bigtable_instance_name=%s" % args.bigtable_instance_name,
           ("-observation_querier_path=%s" %
               process_starter.OBSERVATION_QUERIER_PATH),
           "-test_app_path=%s" % process_starter.TEST_APP_PATH,
@@ -182,6 +189,8 @@ def _test(args):
     success = (test_runner.run_all_tests(
         test_dir, start_bt_emulator=start_bt_emulator,
         start_cobalt_processes=start_cobalt_processes,
+        bigtable_project_name=args.bigtable_project_name,
+        bigtable_instance_name=args.bigtable_instance_name,
         verbose_count=_verbose_count,
         test_args=test_args) == 0) and success
 
@@ -410,13 +419,16 @@ def main():
       help='Specify a subset of tests to run. Default=all',
       default='all')
   sub_parser.add_argument('--bigtable_project_name',
-      help='Specify a Cloud project against which to run the cloud_bt tests.'
-      ' Optional. Default=google.com:shuffler-test.'
-      ' Only used when --tests=cloud_bt', default='google.com:shuffler-test')
+      help='Specify a Cloud project against which to run some of the tests.'
+      ' Only used for the cloud_bt and e2e tests. Required for the former.'
+      ' The e2e tests will use the local Bigtable Emulator if not specified.',
+      default='')
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud'
-      ' project against which to run the cloud_bt tests.'
-      ' Used and required only when --tests=cloud_bt.', default='')
+      ' project against which to run some of the tests.'
+      ' Only used for the cloud_bt and e2e tests. Required for the former.'
+      ' The e2e tests will use the local Bigtable Emulator if not specified.',
+      default='')
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')

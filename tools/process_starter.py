@@ -130,37 +130,56 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
   return execute_command(cmd, wait)
 
 def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
+    bigtable_project_name='', bigtable_instance_name='',
     private_key_pem_file=DEFAULT_ANALYZER_PRIVATE_KEY_PEM,
+
     verbose_count=0, wait=True):
   print
   print "Starting the analyzer service..."
-  print "Will connect to a local Bigtable Emulator instance."
   print
   path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'analyzer_service',
       'analyzer_service'))
   cmd = [path,
-      "-for_testing_only_use_bigtable_emulator",
       "-port", str(port),
       "-private_key_pem_file", private_key_pem_file,
       "-logtostderr"]
+  if bigtable_project_name != '' and bigtable_instance_name != '':
+    cmd = cmd + [
+      "-bigtable_project_name",
+      bigtable_project_name,
+      "-bigtable_instance_name",
+      bigtable_instance_name,
+    ]
+  else:
+    print "Will connect to a local Bigtable Emulator instance."
+    cmd.append("-for_testing_only_use_bigtable_emulator")
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
 
 def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
+                        bigtable_project_name='', bigtable_instance_name='',
                         cobalt_config_dir=DEMO_CONFIG_DIR,
                         verbose_count=0, wait=True):
   print
   print "Starting the analyzer ReportMaster service..."
-  print "Will connect to a local Bigtable Emulator instance."
   print
   path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'report_master',
       'analyzer_report_master'))
   cmd = [path,
-      "-for_testing_only_use_bigtable_emulator",
       "-port", str(port),
       "-cobalt_config_dir", cobalt_config_dir,
       "-logtostderr"]
+  if bigtable_project_name != '' and bigtable_instance_name != '':
+    cmd = cmd + [
+      "-bigtable_project_name",
+      bigtable_project_name,
+      "-bigtable_instance_name",
+      bigtable_instance_name,
+    ]
+  else:
+    print "Will connect to a local Bigtable Emulator instance."
+    cmd.append("-for_testing_only_use_bigtable_emulator")
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)

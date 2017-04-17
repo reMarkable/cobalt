@@ -172,6 +172,12 @@ var (
 
 	subProcessVerbosity = flag.Int("sub_process_v", 0, "-v verbosity level to pass to sub-processes")
 
+	bigtableProjectName = flag.String("bigtable_project_name", "", "If specified use an instance Cloud Bigtable from this project instead of "+
+		"a local Bigtable Emulator. -bigtable_instance_name must also be specified.")
+
+	bigtableInstanceName = flag.String("bigtable_instance_name", "", "If specified use this instance of Cloud Bigtable instead of a local "+
+		"Bigtable Emulator. -bigtable_project_name must also be specified.")
+
 	reportClient *report_client.ReportClient
 )
 
@@ -221,12 +227,19 @@ func flagString(values []ValuePart) string {
 // given metric. |maxNum| bounds the query so that the returned value will
 // always be less than or equal to maxNum.
 func getNumObservations(metricId uint32, maxNum uint32) (uint32, error) {
-	cmd := exec.Command(*observationQuerierPath,
+	arguments := []string{
 		"-nointeractive",
-		"-for_testing_only_use_bigtable_emulator",
 		"-logtostderr", fmt.Sprintf("-v=%d", *subProcessVerbosity),
 		"-metric", strconv.Itoa(int(metricId)),
-		"-max_num", strconv.Itoa(int(maxNum)))
+		"-max_num", strconv.Itoa(int(maxNum)),
+	}
+	if *bigtableInstanceName != "" && *bigtableProjectName != "" {
+		arguments = append(arguments, "-bigtable_instance_name", *bigtableInstanceName)
+		arguments = append(arguments, "-bigtable_project_name", *bigtableProjectName)
+	} else {
+		arguments = append(arguments, "-for_testing_only_use_bigtable_emulator")
+	}
+	cmd := exec.Command(*observationQuerierPath, arguments...)
 	out, err := cmd.Output()
 	if err != nil {
 		stdErrMessage := ""

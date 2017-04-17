@@ -21,6 +21,7 @@
 #include <glog/logging.h>
 
 #include <string>
+#include <vector>
 
 #include "./observation.pb.h"
 #include "analyzer/store/bigtable_store.h"
