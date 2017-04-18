@@ -45,10 +45,6 @@ import (
 	"report_client"
 )
 
-const (
-	DeadlineSeconds = 10
-)
-
 var (
 	tls    = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
 	caFile = flag.String("ca_file", "", "The file containning the root CA certificate.")
@@ -67,6 +63,8 @@ var (
 
 	csvFile = flag.String("csv_file", "", "If specified then the CSV report will be written to that file."+
 		"Used in non-interactive mode only.")
+
+	deadlineSeconds = flag.Uint("deadline_seconds", 30, "Number of seconds to wait for a report to complete before failing.")
 )
 
 type ReportClientCLI struct {
@@ -91,11 +89,11 @@ func (c *ReportClientCLI) PrintCSVReport(includeStdErr bool) error {
 func (c *ReportClientCLI) PrintReportResults(includeStdErr bool) {
 	switch c.report.Metadata.State {
 	case report_master.ReportState_WAITING_TO_START:
-		fmt.Printf("After %d seconds the report is still waiting to start.\n", DeadlineSeconds)
+		fmt.Printf("After %d seconds the report is still waiting to start.\n", *deadlineSeconds)
 		break
 
 	case report_master.ReportState_IN_PROGRESS:
-		fmt.Printf("After %d seconds the report is still in progress.\n", DeadlineSeconds)
+		fmt.Printf("After %d seconds the report is still in progress.\n", *deadlineSeconds)
 		break
 
 	case report_master.ReportState_COMPLETED_SUCCESSFULLY:
@@ -127,7 +125,7 @@ func (c *ReportClientCLI) RunReportAndPrint(reportConfigId uint32, printErrorCol
 	}
 
 	// Fetch the report repeatedly until it is done.
-	report, err := c.reportClient.GetReport(reportId, DeadlineSeconds*time.Second)
+	report, err := c.reportClient.GetReport(reportId, time.Duration(*deadlineSeconds)*time.Second)
 
 	if err != nil {
 		fmt.Printf("GetReport() returned an error: [%v]\n", err)

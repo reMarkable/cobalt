@@ -242,6 +242,7 @@ grpc::Status ReportGenerator::GenerateSingleVariableReport(
   // We iteratively query in batches of size 1000.
   static const size_t kMaxResultsPerIteration = 1000;
   do {
+    VLOG(4) << "Querying for 1000 observations...";
     query_response = observation_store_->QueryObservations(
         report_config.customer_id(), report_config.project_id(),
         report_config.metric_id(), start_day_index, end_day_index, single_part,
@@ -256,6 +257,8 @@ grpc::Status ReportGenerator::GenerateSingleVariableReport(
       LOG(ERROR) << message;
       return grpc::Status(grpc::ABORTED, message);
     }
+
+    VLOG(4) << "Got " << query_response.results.size() << " observations.";
 
     // Iterate through the received batch.
     for (const auto& query_result : query_response.results) {
@@ -277,6 +280,8 @@ grpc::Status ReportGenerator::GenerateSingleVariableReport(
   if (!status.ok()) {
     return status;
   }
+
+  VLOG(4) << "Generated report with " << report_rows.size() << " rows.";
 
   // Write the report rows to the ReportStore.
   auto store_status = report_store_->AddReportRows(report_id, report_rows);

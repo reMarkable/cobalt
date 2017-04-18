@@ -48,7 +48,7 @@ bool EncryptedMessageMaker::Encrypt(
   message.SerializeToString(&serialized_message);
 
   if (encryption_scheme_ == EncryptedMessage::NONE) {
-    VLOG(4) << "WARNING: Not using encryption!";
+    VLOG(5) << "WARNING: Not using encryption!";
     encrypted_message->set_scheme(EncryptedMessage::NONE);
     encrypted_message->set_ciphertext(serialized_message);
     return true;
@@ -72,7 +72,7 @@ bool EncryptedMessageMaker::Encrypt(
       new std::string((const char*)ciphertext.data(), ciphertext.size()));
   encrypted_message->set_scheme(EncryptedMessage::HYBRID_ECDH_V1);
   byte fingerprint[HybridCipher::PUBLIC_KEY_FINGERPRINT_SIZE];
-  VLOG(4) << "Using encryption.";
+  VLOG(5) << "Using encryption.";
   if (!cipher_->public_key_fingerprint(fingerprint)) {
     return false;
   }
@@ -100,7 +100,7 @@ bool MessageDecrypter::DecryptMessage(
     if (!recovered_message->ParseFromString(encrypted_message.ciphertext())) {
       return false;
     }
-    VLOG(4) << "WARNING: Deserialized unencrypted message!";
+    VLOG(5) << "WARNING: Deserialized unencrypted message!";
     return true;
   }
 
@@ -122,7 +122,7 @@ bool MessageDecrypter::DecryptMessage(
   if (!recovered_message->ParseFromString(serialized_observation)) {
     return false;
   }
-  VLOG(4) << "Successfully decrypted message.";
+  VLOG(5) << "Successfully decrypted message.";
   return true;
 }
 
