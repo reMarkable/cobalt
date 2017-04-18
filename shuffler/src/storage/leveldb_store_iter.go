@@ -42,13 +42,13 @@ func NewLevelDBStoreIterator(it leveldb_iter.Iterator) Iterator {
 }
 
 // Get returns the current entry the Iterator is pointing to or an error if the
-// iterator is invalid or the value is invalid.
+// iterator is invalid or if the iterator value is invalid.
 func (li *LevelDBStoreIterator) Get() (*shuffler.ObservationVal, error) {
 	if li == nil {
 		panic("LevelDBStore Iterator is nil.")
 	}
 
-	if li.iter == nil {
+	if li.iter == nil || !li.iter.Valid() {
 		return nil, grpc.Errorf(codes.Internal, "Invalid iterator")
 	}
 

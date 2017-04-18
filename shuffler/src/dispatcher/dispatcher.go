@@ -307,15 +307,28 @@ func (d *Dispatcher) dispatch(sleepDuration time.Duration) {
 	// Each bucket is either dispatched or disposed based on config and if there
 	// are errors, processing proceeds to the next bucket in the pipeline.
 	for _, key := range keys {
-		// Fetch bucket size for each key
+		// Fetch bucket size for each key.
+		//
+		// We use the value returned from GetNumObservations() to determine whether
+		// or not to dispatch a bucket. But it's important to note that this value
+		// is not necessarily exactly equal to the number of Observations in the
+		// Store. This is because new Observations are being added to the store and
+		// the the count is being incremented asynchronously with this method and
+		// non-transactionally. In particular note that it is possible that the
+		// value returned from GetNumObservations() may, temporarily, be negative.
+		// We do maintain the following invariant: Let n = the value returned from
+		// GetNumObservations(). Then an invocation of GetObservations() by this
+		// same thread immediately afterwards will find at least n Observations.
+		// (The reason this invariant holds is that this is the only thread that
+		// ever deletes from the store or decrements the count. All other threads
+		// first add to the store, commit, and then increment the count.) This
+		// allows us to use the result of GetNumObservations() for conservative
+		// thresholding: We will not dispatch a bucket unless GetNumObservations()
+		// returns a value at least as large as the threshold.
 		bucketSize, err := d.store.GetNumObservations(key)
 		glog.V(4).Infof("Bucket size from store: [%d]", bucketSize)
 		if err != nil {
 			glog.Errorf("GetNumObservations() failed for key: %v with error: %v", key, err)
-			continue
-		}
-
-		if bucketSize == 0 {
 			continue
 		}
 

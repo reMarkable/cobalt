@@ -225,10 +225,14 @@ func CheckDeleteObservations(t *testing.T, store Store, om *cobalt.ObservationMe
 	}
 }
 
-// CheckIterator tests if the observations fetched using the given iterator
-// |iter| and returns the ObservationVals result set.
+// CheckIterator tests if the given |iter| is valid and then fetches all the
+// ObservationVals using |iter| until the iterator gets exhausted.
 func CheckIterator(t *testing.T, iter Iterator) []*shuffler.ObservationVal {
 	var gotObVals []*shuffler.ObservationVal
+	if iter == nil {
+		return gotObVals
+	}
+
 	for iter.Next() {
 		val, err := iter.Get()
 		if err != nil {

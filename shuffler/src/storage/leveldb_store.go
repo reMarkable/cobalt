@@ -48,7 +48,16 @@ type LevelDBStore struct {
 	// the values are the number of entries in |db| corresponding to that
 	// ObservationMetadata. Note that a single bucket is represented by many rows
 	// of |db|.
-	bucketSizes map[string]uint64
+	//
+	// We use a signed integer to represent bucket sizes because it is possible
+	// for the value to temporarily be negative. This might occur in the
+	// following situation:
+	// (a) Thread 1 adds Observations to the Store.
+	// (b) Thread 2 reads these Observations from the Store, deletes them, and
+	//     decrements the bucketSizes value.
+	// (c) Thread 1 increments the bucketSizes value.
+	// Between (b) and (c) the value may be negative.
+	bucketSizes map[string]int64
 
 	// mu is the global mutex that protects all elements of |bucketSizes| in-memory
 	// map.
@@ -69,7 +78,7 @@ func NewLevelDBStore(dbDirPath string) (*LevelDBStore, error) {
 	store := &LevelDBStore{
 		dbDir:       dbDirPath,
 		db:          db,
-		bucketSizes: make(map[string]uint64),
+		bucketSizes: make(map[string]int64),
 	}
 	if err := store.initialize(); err != nil {
 		return nil, err
@@ -151,7 +160,7 @@ func makeDBVal(encryptedObservation *cobalt.EncryptedMessage, id string, arrival
 func (store *LevelDBStore) AddAllObservations(envelopeBatch []*cobalt.ObservationBatch, arrivalDayIndex uint32) error {
 	dbBatch := new(leveldb.Batch)
 
-	tmpBucketSizes := make(map[string]uint64)
+	tmpBucketSizes := make(map[string]int64)
 
 	// process all observations into a tmp |dbBatch|
 	for _, batch := range envelopeBatch {
@@ -285,7 +294,11 @@ func (store *LevelDBStore) DeleteValues(om *cobalt.ObservationMetadata, obVals [
 	if err != nil {
 		return grpc.Errorf(codes.InvalidArgument, "Error in parsing observation metadata [%v]: [%v]", om, err)
 	}
-	store.bucketSizes[bKey] -= uint64(len(obVals))
+
+	// Note that this decrement may cause the value of bucketSizes[bKey] to,
+	// temporarily, be negative. See explanation of how this might occur above.
+	store.bucketSizes[bKey] -= int64(len(obVals))
+
 	return nil
 }
 
@@ -317,7 +330,7 @@ func (store *LevelDBStore) Reset(destroy bool) {
 	// clear bucketSizes map
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	store.bucketSizes = make(map[string]uint64)
+	store.bucketSizes = make(map[string]int64)
 
 	// clear and reset db instance
 	store.close()
