@@ -40,7 +40,6 @@ import (
 	"cobalt"
 	"shuffler"
 	"storage"
-	"util"
 )
 
 var shufflerServer *ShufflerServer
@@ -148,12 +147,11 @@ func (s *ShufflerServer) startServer() {
 // decryptEnvelope decrypts the incoming encoder message and returns the sealed
 // envelope or an error.
 func decryptEnvelope(encryptedMessage *cobalt.EncryptedMessage) (*cobalt.Envelope, error) {
-	// TODO(ukode): Add impl for decrypting the sealed envelope.
 	ciphertext := encryptedMessage.Ciphertext
 
-	c := util.NoOpCrypter{}
-
+	// TODO: Perform PKE decryption on ciphertext	and then unmarshall the
+	// decrypted bytes.
 	envelope := &cobalt.Envelope{}
-	err := proto.Unmarshal(c.Decrypt(ciphertext), envelope)
+	err := proto.Unmarshal([]byte(ciphertext), envelope)
 	return envelope, err
 }

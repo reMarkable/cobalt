@@ -23,7 +23,6 @@ import (
 
 	shufflerpb "cobalt"
 	"storage"
-	"util"
 )
 
 // makeEnvelope creates an Envelope containing |numBatches| ObservationBatches
@@ -69,13 +68,13 @@ func TestLevelDBShuffler(t *testing.T) {
 }
 
 func doTestProcess(t *testing.T, envelope *shufflerpb.Envelope, store storage.Store) {
-	c := util.NoOpCrypter{}
 	data, err := proto.Marshal(envelope)
 	if err != nil {
 		t.Fatalf("Error in marshalling envelope data: %v", err)
 	}
 	eMsg := &shufflerpb.EncryptedMessage{
-		Ciphertext: c.Encrypt(data),
+		Ciphertext: data, // test unencrypted envelope
+		Scheme:     shufflerpb.EncryptedMessage_NONE,
 	}
 
 	shuffler := &ShufflerServer{

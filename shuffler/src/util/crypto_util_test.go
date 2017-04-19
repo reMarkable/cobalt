@@ -15,27 +15,65 @@
 package util
 
 import (
-	// We need to import glog so that the flag --logtostderr is recognized since
-	// our test infrastructre passes this flag to all tests.
-	_ "github.com/golang/glog"
+	"crypto/rand"
+	"io"
 	"testing"
 )
 
-var (
-	plainText  = []byte("plain text")
-	cipherText = []byte("cipher text")
-)
+func TestSymmetricCipherCrypter(t *testing.T) {
+	const nonceSize = 12
 
-func TestEncryptAndDecrypt(t *testing.T) {
-	c := NoOpCrypter{}
-
-	if string(c.Encrypt(plainText)) != string(plainText) {
-		t.Error("Encryption error")
+	// test for an invalid key with length != 16 bytes
+	key := []byte("AES256Key")
+	_, err := NewSymmetricCipherCrypter(key)
+	if err == nil {
+		t.Errorf("expected error for invalid key")
 		return
 	}
 
-	if string(cipherText) != string(c.Decrypt(cipherText)) {
-		t.Error("Decryption error")
+	// Use a 16 byte key to select AES-128
+	key = []byte("AES256Key-16Char")
+	c, err := NewSymmetricCipherCrypter(key)
+	if err != nil {
+		t.Errorf("Unable to initialize test SymmetricCipherCrypter: %v", err)
 		return
+	}
+
+	// test for different plaintexts
+	for _, plaintextSize := range []int{32, 128, 256, 1024} {
+		plaintext := make([]byte, plaintextSize)
+		if _, err := io.ReadFull(rand.Reader, plaintext); err != nil {
+			t.Errorf("got error in generating plaintext: %v", err)
+			return
+		}
+
+		// generate random nonce
+		nonce := make([]byte, nonceSize)
+		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+			t.Errorf("got error in generating nonce: %v", err)
+			return
+		}
+
+		// test encrypt
+		ciphertext, err := c.Encrypt(plaintext, nonce)
+		if err != nil {
+			t.Errorf("got encryption error:%v", err)
+			return
+		}
+		if ciphertext == nil {
+			t.Error("ciphertext after encryption is nil")
+			return
+		}
+
+		// test decrypt
+		decryptedtext, err := c.Decrypt(ciphertext, nonce)
+		if err != nil {
+			t.Errorf("got decryption error:%v", err)
+			return
+		}
+		if string(plaintext) != string(decryptedtext) {
+			t.Errorf("got [%s] after decryption, want [%s]", decryptedtext, plaintext)
+			return
+		}
 	}
 }
