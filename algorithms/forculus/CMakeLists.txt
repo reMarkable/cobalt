@@ -46,3 +46,13 @@ target_link_libraries(forculus_tests
                       gtest gtest_main)
 set_target_properties(forculus_tests PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+
+
+# Build performance test binary
+add_executable(forculus_performance_test
+               forculus_performance_test.cc)
+target_link_libraries(forculus_performance_test
+                      forculus_encrypter forculus_analyzer
+                      gtest gtest_main)
+set_target_properties(forculus_performance_test PROPERTIES
+                      RUNTIME_OUTPUT_DIRECTORY ${DIR_PERF_TESTS})

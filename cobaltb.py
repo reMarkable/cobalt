@@ -93,20 +93,21 @@ def _lint(args):
 
 # Specifiers of subsets of tests to run
 TEST_FILTERS =['all', 'gtests', 'nogtests', 'gotests', 'nogotests',
-               'btemulator', 'nobtemulator', 'e2e', 'noe2e', 'cloud_bt']
+               'btemulator', 'nobtemulator', 'e2e', 'noe2e', 'cloud_bt', 'perf']
 
 # Returns 0 if all tests return 0, otherwise returns 1.
 def _test(args):
   # A map from positive filter specifiers to the list of test directories
-  # it represents. Note that 'cloud_bt' tests are special. They are not
-  # included in 'all'. They are only run if asked for explicitly.
+  # it represents. Note that 'cloud_bt' and 'perf' tests are special. They are
+  # not included in 'all'. They are only run if asked for explicitly.
   FILTER_MAP = {
     'all': ['gtests', 'go_tests', 'gtests_btemulator', 'e2e_tests'],
     'gtests': ['gtests'],
     'gotests' : ['go_tests'],
     'btemulator': ['gtests_btemulator'],
     'e2e': ['e2e_tests'],
-    'cloud_bt' : ['gtests_cloud_bt']
+    'cloud_bt' : ['gtests_cloud_bt'],
+    'perf' : ['perf_tests']
   }
 
   # A list of test directories for which the contained tests assume the
