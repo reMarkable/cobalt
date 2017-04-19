@@ -16,12 +16,14 @@
 """The Cobalt build system command-line interface."""
 
 import argparse
+import json
 import logging
 import os
 import shutil
 import subprocess
 import sys
 
+import tools.container_util as container_util
 import tools.cpplint as cpplint
 import tools.golint as golint
 import tools.process_starter as process_starter
@@ -34,24 +36,13 @@ from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from tools.process_starter import DEFAULT_REPORT_MASTER_PORT
 from tools.process_starter import DEMO_CONFIG_DIR
 from tools.process_starter import SHUFFLER_DEMO_CONFIG_FILE
-from tools.process_starter import DEFAULT_ANALYZER_PUBLIC_KEY_PEM
 
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
 SERVICE_ACCOUNT_CREDENTIALS_FILE = os.path.join(THIS_DIR,
     'service_account_credentials.json')
-
-IMAGES = ["analyzer", "shuffler"]
-
-GCE_PROJECT = "shuffler-test"
-GCE_CLUSTER = "cluster-1"
-GCE_TAG = "us.gcr.io/google.com/%s" % GCE_PROJECT
-
-A_BT_INSTANCE = "cobalt-analyzer"
-A_BT_TABLE = "observations"
-A_BT_TABLE_NAME = "projects/google.com:%s/instances/%s/tables/%s" \
-                % (GCE_PROJECT, A_BT_INSTANCE, A_BT_TABLE)
+PERSONAL_CLUSTER_JSON_FILE = os.path.join(THIS_DIR, 'personal_cluster.json')
 
 _logger = logging.getLogger()
 _verbose_count = 0
@@ -82,18 +73,6 @@ def ensureDir(dir_path):
   """
   if not os.path.exists(dir_path):
     os.makedirs(dir_path)
-
-def setGCEImages(args):
-  """Sets the list of GCE images to be built/deployed/started and stopped.
-
-  Args:
-    args{list} List of parsed command line arguments.
-  """
-  global IMAGES
-  if args.shuffler_gce:
-    IMAGES = ["shuffler"]
-  elif args.analyzer_gce:
-    IMAGES = ["analyzer"]
 
 def _setup(args):
   subprocess.check_call(["git", "submodule", "init"])
@@ -149,9 +128,12 @@ def _test(args):
   success = True
   print ("Will run tests in the following directories: %s." %
       ", ".join(test_dirs))
+
+  bigtable_project_name = ''
+  bigtable_instance_name = ''
   for test_dir in test_dirs:
     start_bt_emulator = ((test_dir in NEEDS_BT_EMULATOR)
-        and not args.bigtable_instance_name)
+        and not args.use_cloud_bt)
     start_cobalt_processes = (test_dir in NEEDS_COBALT_PROCESSES)
     test_args = None
     if (test_dir == 'gtests_cloud_bt'):
@@ -172,25 +154,32 @@ def _test(args):
           "--bigtable_project_name=%s" % args.bigtable_project_name,
           "--bigtable_instance_name=%s" % args.bigtable_instance_name
       ]
+      bigtable_project_name = args.bigtable_project_name
+      bigtable_instance_name = args.bigtable_instance_name
     if (test_dir == 'e2e_tests'):
       test_args = [
           "-analyzer_uri=localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT,
           "-analyzer_pk_pem_file=%s" % E2E_TEST_ANALYZER_PUBLIC_KEY_PEM,
           "-shuffler_uri=localhost:%d" % DEFAULT_SHUFFLER_PORT,
           "-report_master_uri=localhost:%d" % DEFAULT_REPORT_MASTER_PORT,
-          "-bigtable_project_name=%s" % args.bigtable_project_name,
-          "-bigtable_instance_name=%s" % args.bigtable_instance_name,
           ("-observation_querier_path=%s" %
               process_starter.OBSERVATION_QUERIER_PATH),
           "-test_app_path=%s" % process_starter.TEST_APP_PATH,
           "-sub_process_v=%d"%_verbose_count
       ]
+      if args.use_cloud_bt:
+        test_args = test_args + [
+          "-bigtable_project_name=%s" % args.bigtable_project_name,
+          "-bigtable_instance_name=%s" % args.bigtable_instance_name,
+        ]
+        bigtable_project_name = args.bigtable_project_name
+        bigtable_instance_name = args.bigtable_instance_name
     print '********************************************************'
     success = (test_runner.run_all_tests(
         test_dir, start_bt_emulator=start_bt_emulator,
         start_cobalt_processes=start_cobalt_processes,
-        bigtable_project_name=args.bigtable_project_name,
-        bigtable_instance_name=args.bigtable_instance_name,
+        bigtable_project_name=bigtable_project_name,
+        bigtable_instance_name=bigtable_instance_name,
         verbose_count=_verbose_count,
         test_args=test_args) == 0) and success
 
@@ -263,7 +252,15 @@ def _start_report_client(args):
       verbose_count=_verbose_count)
 
 def _start_observation_querier(args):
-  process_starter.start_observation_querier(verbose_count=_verbose_count)
+  bigtable_project_name = ''
+  bigtable_instance_name = ''
+  if args.use_cloud_bt:
+    bigtable_project_name = args.bigtable_project_name
+    bigtable_instance_name = args.bigtable_instance_name
+  process_starter.start_observation_querier(
+      bigtable_project_name=bigtable_project_name,
+      bigtable_instance_name=bigtable_instance_name,
+      verbose_count=_verbose_count)
 
 def _generate_keys(args):
   path = os.path.join(OUT_DIR, 'tools', 'key_generator', 'key_generator')
@@ -287,87 +284,86 @@ def _provision_bigtable(args):
       "--bigtable_project_name", args.bigtable_project_name,
       "--bigtable_instance_name", args.bigtable_instance_name])
 
-def _gce_build(args):
-  setGCEImages(args)
+def _deploy_show(args):
+  container_util.display()
 
-  # Copy over the dependencies for the cobalt base image
-  cobalt = "%s/cobalt" % OUT_DIR
+def _deploy_authenticate(args):
+  container_util.authenticate(args.cluster_name, args.cloud_project_prefix,
+      args.cloud_project_name)
 
-  if not os.path.exists(cobalt):
-    os.mkdir(cobalt)
+def _deploy_build(args):
+  container_util.build_all_docker_images(
+      shuffler_config_file=args.shuffler_config_file)
 
-  for dep in ["lib/libprotobuf.so.10",
-              "lib/libgoogleapis.so",
-              "lib/libgrpc++.so.1",
-              "lib/libgrpc.so.1",
-              "lib/libunwind.so.1",
-              "share/grpc/roots.pem",
-             ]:
-    shutil.copy("%s/%s" % (SYSROOT_DIR, dep), cobalt)
+def _deploy_push(args):
+  if args.job == 'shuffler':
+    container_util.push_shuffler_to_container_registry(
+        args.cloud_project_prefix, args.cloud_project_name)
+  elif args.job == 'analyzer-service':
+    container_util.push_analyzer_service_to_container_registry(
+        args.cloud_project_prefix, args.cloud_project_name)
+  elif args.job == 'report-master':
+    container_util.push_report_master_to_container_registry(
+        args.cloud_project_prefix, args.cloud_project_name)
+  else:
+    print('Unknown job "%s". I only know how to push "shuffler", '
+          '"analyzer-service" and "report-master".' % args.job)
 
-  # Copy configuration files
-  for conf in ["registered_metrics.txt",
-               "registered_encodings.txt",
-               "registered_reports.txt"
-              ]:
-    shutil.copy("%s/config/demo/%s" % (THIS_DIR, conf),
-                "%s/analyzer/" % OUT_DIR)
+def _deploy_start(args):
+  if args.job == 'shuffler':
+    container_util.start_shuffler(args.cloud_project_prefix,
+                                  args.cloud_project_name,
+                                  args.gce_pd_name)
+  elif args.job == 'analyzer-service':
+    if args.bigtable_instance_name == '':
+        print '--bigtable_instance_name must be specified'
+        return
+    container_util.start_analyzer_service(
+        args.cloud_project_prefix, args.cloud_project_name,
+        args.bigtable_instance_name)
+  elif args.job == 'report-master':
+    if args.bigtable_instance_name == '':
+        print '--bigtable_instance_name must be specified'
+        return
+    container_util.start_report_master(
+        args.cloud_project_prefix, args.cloud_project_name,
+        args.bigtable_instance_name)
+  else:
+    print('Unknown job "%s". I only know how to start "shuffler", '
+          '"analyzer-service" and "report-master".' % args.job)
 
-  # Build all images
-  for i in ["cobalt"] + IMAGES:
-    # copy over the dockerfile
-    dstdir = "%s/%s" % (OUT_DIR, i)
-    shutil.copy("%s/docker/%s/Dockerfile" % (THIS_DIR, i), dstdir)
+def _deploy_stop(args):
+  if args.job == 'shuffler':
+    container_util.stop_shuffler()
+  elif args.job == 'analyzer-service':
+    container_util.stop_analyzer_service()
+  elif args.job == 'report-master':
+    container_util.stop_report_master()
+  else:
+    print('Unknown job "%s". I only know how to stop "shuffler", '
+          '"analyzer-service" and "report-master".' % args.job)
 
-    subprocess.check_call(["docker", "build", "-t", i, dstdir])
+def _deploy_upload_secret_key(args):
+  container_util.create_analyzer_private_key_secret()
 
-def _gce_push(args):
-  setGCEImages(args)
-
-  for i in IMAGES:
-    tag = "%s/%s" % (GCE_TAG, i)
-    subprocess.check_call(["docker", "tag", i, tag])
-    subprocess.check_call(["gcloud", "docker", "--", "push", tag])
-
-def kube_setup():
-  subprocess.check_call(["gcloud", "container", "clusters", "get-credentials",
-                         GCE_CLUSTER, "--project",
-                         "google.com:%s" % GCE_PROJECT])
-
-def _gce_start(args):
-  setGCEImages(args)
-
-  kube_setup()
-
-  for i in IMAGES:
-    print("Starting %s" % i)
-
-    if (i == "analyzer"):
-      args = ["-table", A_BT_TABLE_NAME,
-              "-metrics", "/etc/cobalt/registered_metrics.txt",
-              "-reports", "/etc/cobalt/registered_reports.txt",
-              "-encodings", "/etc/cobalt/registered_encodings.txt"]
-
-      subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
-                             "--port=8080", "--"] + args)
-    else:
-      subprocess.check_call(["kubectl", "run", i, "--image=%s/%s" % (GCE_TAG, i),
-                             "--port=50051"])
-
-    subprocess.check_call(["kubectl", "expose", "deployment", i,
-                           "--type=LoadBalancer"])
-
-def _gce_stop(args):
-  setGCEImages(args)
-
-  kube_setup()
-
-  for i in IMAGES:
-    print("Stopping %s" % i)
-
-    subprocess.check_call(["kubectl", "delete", "service,deployment", i,])
+def _deploy_delete_secret_key(args):
+  container_util.delete_analyzer_private_key_secret()
 
 def main():
+  personal_cluster_settings = {
+    'cloud_project_prefix': '',
+    'cloud_project_name': '',
+    'cluster_name': '',
+    'gce_pd_name': '',
+    'bigtable_project_name' : '',
+    'bigtable_instance_name': '',
+  }
+  if os.path.exists(PERSONAL_CLUSTER_JSON_FILE):
+    print ('Default deployment options will be taken from %s.' %
+           PERSONAL_CLUSTER_JSON_FILE)
+    with open(PERSONAL_CLUSTER_JSON_FILE) as f:
+      personal_cluster_settings = json.load(f)
+
   parser = argparse.ArgumentParser(description='The Cobalt command-line '
       'interface.')
 
@@ -418,17 +414,22 @@ def main():
   sub_parser.add_argument('--tests', choices=TEST_FILTERS,
       help='Specify a subset of tests to run. Default=all',
       default='all')
+  sub_parser.add_argument('-use_cloud_bt',
+      help='Causes the end-to-end tests to run against an instance of Cloud '
+      'Bigtable. Otherwise a local instance of the Bigtable Emulator will be '
+      'used.', action='store_true')
   sub_parser.add_argument('--bigtable_project_name',
       help='Specify a Cloud project against which to run some of the tests.'
-      ' Only used for the cloud_bt and e2e tests. Required for the former.'
-      ' The e2e tests will use the local Bigtable Emulator if not specified.',
-      default='')
+      ' Only used for the cloud_bt tests and e2e tests when -use_cloud_bt is'
+      ' specified.'
+      ' default=%s'%personal_cluster_settings['bigtable_project_name'],
+      default=personal_cluster_settings['bigtable_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud'
       ' project against which to run some of the tests.'
-      ' Only used for the cloud_bt and e2e tests. Required for the former.'
-      ' The e2e tests will use the local Bigtable Emulator if not specified.',
-      default='')
+      ' Only used for the cloud_bt tests and e2e tests in cloud mode.'
+      ' default=%s'%personal_cluster_settings['bigtable_instance_name'],
+      default=personal_cluster_settings['bigtable_instance_name'])
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')
@@ -437,6 +438,9 @@ def main():
       help='Delete the entire "out" directory.',
       action='store_true')
 
+  ########################################################
+  # start command
+  ########################################################
   start_parser = subparsers.add_parser('start',
     help='Start one of the Cobalt processes running locally.')
   start_subparsers = start_parser.add_subparsers()
@@ -508,6 +512,20 @@ def main():
       parents=[parent_parser], help='Start the Cobalt ObservationStore '
                                     'querying tool.')
   sub_parser.set_defaults(func=_start_observation_querier)
+  sub_parser.add_argument('-use_cloud_bt',
+      help='Causes the query to be performed against an instance of Cloud '
+      'Bigtable. Otherwise a local instance of the Bigtable Emulator will be '
+      'used.', action='store_true')
+  sub_parser.add_argument('--bigtable_project_name',
+      help='Specify a Cloud project against which to query. '
+      'Only used if -use_cloud_bt is set. '
+      'default=%s'%personal_cluster_settings['bigtable_project_name'],
+      default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--bigtable_instance_name',
+      help='Specify a Cloud Bigtable instance within the specified Cloud '
+      'project against which to query. Only used if -use_cloud_bt is set. '
+      'default=%s'%personal_cluster_settings['bigtable_instance_name'],
+      default=personal_cluster_settings['bigtable_instance_name'])
 
   sub_parser = start_subparsers.add_parser('bigtable_emulator',
     parents=[parent_parser],
@@ -524,51 +542,139 @@ def main():
   sub_parser.set_defaults(func=_generate_keys)
   sub_parser.add_argument('--bigtable_project_name',
       help='Specify the Cloud project containing the Bigtable instance '
-      ' to be provisioned.', default='')
+      ' to be provisioned. '
+      'default=%s'%personal_cluster_settings['bigtable_project_name'],
+      default=personal_cluster_settings['bigtable_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify the Cloud Bigtable instance within the specified Cloud'
-      ' project that is to be provisioned.', default='')
+      ' project that is to be provisioned. '
+      'default=%s'%personal_cluster_settings['bigtable_instance_name'],
+      default=personal_cluster_settings['bigtable_instance_name'])
   sub_parser.set_defaults(func=_provision_bigtable)
 
-  sub_parser = subparsers.add_parser('gce_build', parents=[parent_parser],
-    help='Builds Docker images for GCE.')
-  sub_parser.set_defaults(func=_gce_build)
-  sub_parser.add_argument('--a',
-      help='Builds Analyzer Docker image for GCE.',
-      action='store_true', dest='analyzer_gce')
-  sub_parser.add_argument('--s',
-      help='Builds Shuffler Docker image for GCE.',
-      action='store_true', dest='shuffler_gce')
+  ########################################################
+  # deploy command
+  ########################################################
+  deploy_parser = subparsers.add_parser('deploy',
+    help='Build Docker containers. Push to Container Regitry. Deploy to GKE.')
+  deploy_subparsers = deploy_parser.add_subparsers()
 
-  sub_parser = subparsers.add_parser('gce_push', parents=[parent_parser],
-    help='Push docker images to GCE.')
-  sub_parser.set_defaults(func=_gce_push)
-  sub_parser.add_argument('--a',
-      help='Push Analyzer Docker image to GCE.',
-      action='store_true', dest='analyzer_gce')
-  sub_parser.add_argument('--s',
-      help='Push Shuffler Docker image to GCE.',
-      action='store_true', dest='shuffler_gce')
+  sub_parser = deploy_subparsers.add_parser('show',
+      parents=[parent_parser], help='Display information about currently '
+      'deployed jobs on GKE, including their public URIs.')
+  sub_parser.set_defaults(func=_deploy_show)
 
-  sub_parser = subparsers.add_parser('gce_start', parents=[parent_parser],
-    help='Start GCE instances.')
-  sub_parser.set_defaults(func=_gce_start)
-  sub_parser.add_argument('--a',
-      help='Starts Analyzer GCE instance.',
-      action='store_true', dest='analyzer_gce')
-  sub_parser.add_argument('--s',
-      help='Starts Shuffler GCE instance.',
-      action='store_true', dest='shuffler_gce')
+  sub_parser = deploy_subparsers.add_parser('authenticate',
+      parents=[parent_parser], help='Refresh your authentication token if '
+      'necessary. Also associates your local computer with a particular '
+      'GKE cluster to which you will be deploying.')
+  sub_parser.set_defaults(func=_deploy_authenticate)
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the Cloud project name to which your are '
+           'deploying. This is usually an organization domain name if your '
+           'Cloud project is associated with one. Pass the empty string for no '
+           'prefix. '
+           'Default=%s.' %personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project to which you are '
+           'deploying. This is the full project name if --cloud_project_prefix '
+           'is empty. Otherwise the full project name is '
+           '<cloud_project_prefix>:<cloud_project_name>. '
+           'Default=%s' % personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
+  sub_parser.add_argument('--cluster_name',
+      help='The GKE "container cluster" within your Cloud project to which you '
+           'are deploying. '
+           'Default=%s' % personal_cluster_settings['cluster_name'],
+      default=personal_cluster_settings['cluster_name'])
 
-  sub_parser = subparsers.add_parser('gce_stop', parents=[parent_parser],
-    help='Stop GCE instances.')
-  sub_parser.set_defaults(func=_gce_stop)
-  sub_parser.add_argument('--a',
-      help='Stops Analyzer GCE instance.',
-      action='store_true', dest='analyzer_gce')
-  sub_parser.add_argument('--s',
-      help='Stops Shuffler GCE instance.',
-      action='store_true', dest='shuffler_gce')
+  sub_parser = deploy_subparsers.add_parser('build',
+      parents=[parent_parser], help='Rebuild all Docker images. '
+          'You must have the Docker daemon running.')
+  sub_parser.set_defaults(func=_deploy_build)
+  sub_parser.add_argument('--shuffler_config_file',
+      help='Path to the Shuffler configuration file. '
+           'Default=%s' % SHUFFLER_DEMO_CONFIG_FILE,
+      default=SHUFFLER_DEMO_CONFIG_FILE)
+
+  sub_parser = deploy_subparsers.add_parser('push',
+      parents=[parent_parser], help='Push a Docker image to the Google'
+          'Container Registry.')
+  sub_parser.set_defaults(func=_deploy_push)
+  sub_parser.add_argument('--job',
+      help='The job you wish to push. Valid choices are "shuffler", '
+           '"analyzer-service", "report-master". Required.')
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the Cloud project name to which your are '
+           'deploying. This is usually an organization domain name if your '
+           'Cloud project is associated with one. Pass the empty string for no '
+           'prefix. '
+           'Default=%s.' %personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project to which you are '
+           'deploying. This is the full project name if --cloud_project_prefix '
+           'is empty. Otherwise the full project name is '
+           '<cloud_project_prefix>:<cloud_project_name>. '
+           'Default=%s' % personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
+
+  sub_parser = deploy_subparsers.add_parser('start',
+      parents=[parent_parser], help='Start one of the jobs on GKE.')
+  sub_parser.set_defaults(func=_deploy_start)
+  sub_parser.add_argument('--job',
+      help='The job you wish to start. Valid choices are "shuffler", '
+           '"analyzer-service", "report-master". Required.')
+  sub_parser.add_argument('--bigtable_instance_name',
+      help='Specify a Cloud Bigtable instance within the specified Cloud '
+           'project that the Analyzer should connect to. This is required '
+           'if and only if you are starting one of the two Analyzer jobs. '
+           'Default=%s' % personal_cluster_settings['bigtable_instance_name'],
+      default=personal_cluster_settings['bigtable_instance_name'])
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the Cloud project name to which your are '
+           'deploying. This is usually an organization domain name if your '
+           'Cloud project is associated with one. Pass the empty string for no '
+           'prefix. '
+           'Default=%s.' %personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project to which you are '
+           'deploying. This is the full project name if --cloud_project_prefix '
+           'is empty. Otherwise the full project name is '
+           '<cloud_project_prefix>:<cloud_project_name>. '
+           'Default=%s' % personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
+  sub_parser.add_argument('--gce_pd_name',
+      help='The name of a GCE persistent disk. This is used only when starting '
+           'the Shuffler. The disk must already have been created in the same '
+           'Cloud project in which the Shuffler is being deployed. '
+           'Default=%s' % personal_cluster_settings['gce_pd_name'],
+      default=personal_cluster_settings['gce_pd_name'])
+
+  sub_parser = deploy_subparsers.add_parser('stop',
+      parents=[parent_parser], help='Stop one of the jobs on GKE.')
+  sub_parser.set_defaults(func=_deploy_stop)
+  sub_parser.add_argument('--job',
+      help='The job you wish to stop. Valid choices are "shuffler", '
+           '"analyzer-service", "report-master". Required.')
+
+  sub_parser = deploy_subparsers.add_parser('upload_secret_key',
+      parents=[parent_parser], help='Creates a |secret| object in the '
+      'cluster to store a private key for the Analyzer. The private key must '
+      'first be generated using the "generate_keys" command. This must be done '
+      'at least once before starting the Analyzer Service. To replace the '
+      'key first delete the old one using the "deploy delete_secret_key" '
+      'command.')
+  sub_parser.set_defaults(func=_deploy_upload_secret_key)
+
+  sub_parser = deploy_subparsers.add_parser('delete_secret_key',
+      parents=[parent_parser], help='Deletes a |secret| object in the '
+      'cluster that was created using the "deploy upload_secret_key" '
+      'command.')
+  sub_parser.set_defaults(func=_deploy_delete_secret_key)
+
 
   args = parser.parse_args()
   global _verbose_count

@@ -1,0 +1,86 @@
+# Copyright 2016 The Fuchsia Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This file contans the definitions of the Shuffler's  Deployment object
+# (which includes an embedded defintion of the Shuffler's Pod object) and the
+# Shuffler's Service object.
+#
+# The definitions contain some parameters (indicated by $$PARAMETER_NAME$$)
+# that will be replaced by the script tools/container_util.py prior to being
+# passed to "kubectl create"
+
+# The defintion of the Deployment and Pod
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: shuffler
+  labels:
+    name: shuffler
+# Pod object
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: shuffler
+      labels:
+        name: shuffler
+    spec:
+      containers:
+      - name: shuffler
+        # The URI of a Docker image in a Docker repository.
+        image: $$SHUFFLER_IMAGE_URI$$
+        args:
+          - '-port'
+          - '5001'
+          - '-analyzer_uri'
+          # This must match the defintion of the "analyzer-service" Service
+          # in analyzer_service_deployment.yaml
+          - 'analyzer-service:6001'
+          - '-config_file'
+          # This is the path to where the file is copied in Dockerfile.
+          -  '/etc/cobalt/shuffler_config.txt'
+          - '-db_dir'
+          # This path must match mountPath below.
+          - '/var/lib/cobalt'
+          # TODO(rudominer) Eventually remove this.
+          - '-logtostderr'
+          - '-v=3'
+        ports:
+          - containerPort: 5001
+        volumeMounts:
+            # This name must match the volumes.name below.
+          - name: shuffler-persistent-storage
+            mountPath: /var/lib/cobalt
+      volumes:
+        - name: shuffler-persistent-storage
+          gcePersistentDisk:
+            # The name of a GCe persistent disk that has already been created.
+            pdName: $$GCE_PERSISTENT_DISK_NAME$$
+            fsType: ext4
+---
+# The defintion of the Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: shuffler
+spec:
+  ports:
+    # The port that this service should serve on. This should match the
+    # port used several times above and the port specified in the Dockerfile.
+  - port: 5001
+  selector:
+    # This must match the metadata.labels section of the Deployment above.
+    name: shuffler
+  type: LoadBalancer
+

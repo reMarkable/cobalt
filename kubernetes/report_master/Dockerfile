@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM cobalt
+FROM cobalt-common
 
-COPY analyzer /usr/local/bin/
+COPY analyzer_report_master /usr/local/bin/
+
+# The path to where we are copying the config files must match the path
+# specified in the -cobalt_config_dir flag in report_master_deployment.yaml.
 COPY registered_encodings.txt /etc/cobalt/
 COPY registered_metrics.txt /etc/cobalt/
 COPY registered_reports.txt /etc/cobalt/
 
-ENTRYPOINT ["analyzer"]
-EXPOSE 8080
+ENTRYPOINT ["analyzer_report_master"]
+EXPOSE 7001

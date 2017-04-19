@@ -28,7 +28,7 @@ CPP_LINT = os.path.join(SRC_ROOT_DIR, 'third_party', 'cpplint', 'cpplint.py')
 # tree looking for C++ files to be linted. We also skip directories starting
 # with a "." such as ".git"
 SKIP_LINT_DIRS = [
-    os.path.join(SRC_ROOT_DIR, 'docker'),
+    os.path.join(SRC_ROOT_DIR, 'kubernetes'),
     os.path.join(SRC_ROOT_DIR, 'out'),
     os.path.join(SRC_ROOT_DIR, 'prototype'),
     os.path.join(SRC_ROOT_DIR, 'shuffler'),

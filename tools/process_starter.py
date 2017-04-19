@@ -26,22 +26,32 @@ SYS_ROOT_DIR = os.path.join(SRC_ROOT_DIR, 'sysroot')
 
 DEMO_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
     'demo'))
+# Note(rudominer) Currently we don't have any real customers so our registered
+# config is our demo config
+REGISTERED_CONFIG_DIR = DEMO_CONFIG_DIR
 SHUFFLER_DEMO_CONFIG_FILE = os.path.abspath(os.path.join(SRC_ROOT_DIR,
     'shuffler', 'src', 'config', 'config_demo.txt'))
 SHUFFLER_DB_DIR = os.path.join("/tmp/cobalt_shuffler")
+
+SHUFFLER_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'shuffler',
+    'src', 'config'))
+SHUFFLER_CONFIG_FILE = os.path.join(SHUFFLER_CONFIG_DIR, 'config_v0.txt')
+SHUFFLER_DEMO_CONFIG_FILE = os.path.join(SHUFFLER_CONFIG_DIR, 'config_demo.txt')
+SHUFFLER_TMP_DB_DIR = os.path.join("/tmp/cobalt_shuffler")
 
 DEFAULT_SHUFFLER_PORT=5001
 DEFAULT_ANALYZER_SERVICE_PORT=6001
 DEFAULT_REPORT_MASTER_PORT=7001
 
 DEFAULT_ANALYZER_PUBLIC_KEY_PEM=os.path.join(SRC_ROOT_DIR,
-                                             "analyzer_public_key.pem")
+                                             "analyzer_public.pem")
+ANALYZER_PRIVATE_KEY_PEM_NAME="analyzer_private.pem"
 DEFAULT_ANALYZER_PRIVATE_KEY_PEM=os.path.join(SRC_ROOT_DIR,
-                                             "analyzer_private_key.pem")
+                                             ANALYZER_PRIVATE_KEY_PEM_NAME)
 DEFAULT_SHUFFLER_PUBLIC_KEY_PEM=os.path.join(SRC_ROOT_DIR,
-                                             "shuffler_public_key.pem")
+                                             "shuffler_public.pem")
 DEFAULT_SHUFFLER_PRIVATE_KEY_PEM=os.path.join(SRC_ROOT_DIR,
-                                             "shuffler_private_key.pem")
+                                             "shuffler_private.pem")
 
 
 def kill_process(process, name):
@@ -93,10 +103,11 @@ def start_bigtable_emulator(wait=True):
   cmd = [path]
   return execute_command(cmd, wait)
 
-# If db_dir is not set then the shuffler will use the MemStore.
+SHUFFLER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'shuffler', 'shuffler'))
 def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
     analyzer_uri='localhost:%d' % DEFAULT_ANALYZER_SERVICE_PORT,
-    use_memstore=False, erase_db=True, config_file=SHUFFLER_DEMO_CONFIG_FILE,
+    use_memstore=False, erase_db=True, db_dir=SHUFFLER_TMP_DB_DIR,
+    config_file=SHUFFLER_DEMO_CONFIG_FILE,
     verbose_count=0, wait=True):
   """Starts the Shuffler.
 
@@ -109,8 +120,7 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
     config_file {string} The path to the Shuffler's config file.
   """
   print
-  path = os.path.abspath(os.path.join(OUT_DIR, 'shuffler', 'shuffler'))
-  cmd = [path,
+  cmd = [SHUFFLER_PATH,
         "-port", str(port),
         "-analyzer_uri", analyzer_uri,
         "-config_file", config_file,
@@ -120,15 +130,17 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
   if use_memstore:
     cmd.append("-use_memstore")
   else:
-    cmd = cmd + ["-db_dir", SHUFFLER_DB_DIR]
+    cmd = cmd + ["-db_dir", db_dir]
     if erase_db:
-      print "Erasing Shuffler's LevelDB store at %s." % SHUFFLER_DB_DIR
-      shutil.rmtree(SHUFFLER_DB_DIR, ignore_errors=True)
+      print "Erasing Shuffler's LevelDB store at %s." % db_dir
+      shutil.rmtree(db_dir, ignore_errors=True)
 
   print "Starting the shuffler..."
   print
   return execute_command(cmd, wait)
 
+ANALYZER_SERVICE_PATH = os.path.abspath(os.path.join(OUT_DIR, 'analyzer',
+    'analyzer_service', 'analyzer_service'))
 def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
     bigtable_project_name='', bigtable_instance_name='',
     private_key_pem_file=DEFAULT_ANALYZER_PRIVATE_KEY_PEM,
@@ -137,9 +149,7 @@ def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
   print
   print "Starting the analyzer service..."
   print
-  path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'analyzer_service',
-      'analyzer_service'))
-  cmd = [path,
+  cmd = [ANALYZER_SERVICE_PATH,
       "-port", str(port),
       "-private_key_pem_file", private_key_pem_file,
       "-logtostderr"]
@@ -157,6 +167,8 @@ def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
     cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
 
+REPORT_MASTER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'analyzer',
+    'report_master', 'analyzer_report_master'))
 def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
                         bigtable_project_name='', bigtable_instance_name='',
                         cobalt_config_dir=DEMO_CONFIG_DIR,
@@ -164,9 +176,7 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
   print
   print "Starting the analyzer ReportMaster service..."
   print
-  path = os.path.abspath(os.path.join(OUT_DIR, 'analyzer', 'report_master',
-      'analyzer_report_master'))
-  cmd = [path,
+  cmd = [REPORT_MASTER_PATH,
       "-port", str(port),
       "-cobalt_config_dir", cobalt_config_dir,
       "-logtostderr"]
@@ -212,10 +222,16 @@ def start_report_client(report_master_uri='', verbose_count=0, wait=True):
 OBSERVATION_QUERIER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'tools',
                                            'observation_querier',
                                            'query_observations'))
-def start_observation_querier(verbose_count=0):
+def start_observation_querier(bigtable_project_name='',
+                              bigtable_instance_name='',
+                              verbose_count=0):
   cmd = [OBSERVATION_QUERIER_PATH,
-      "-for_testing_only_use_bigtable_emulator",
       "-logtostderr"]
+  if not bigtable_project_name or not bigtable_instance_name:
+    cmd.append("-for_testing_only_use_bigtable_emulator")
+  else:
+    cmd = cmd + ["-bigtable_project_name", bigtable_project_name,
+                 "-bigtable_instance_name", bigtable_instance_name]
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait=True)

@@ -1,0 +1,82 @@
+# Copyright 2016 The Fuchsia Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This file contans the definitions of the Analyzer Service's  Deployment object
+# (which includes an embedded defintion of the it's Pod object) and the
+# Analyzer Service's Service object.
+#
+# The definitions contain some parameters (indicated by $$PARAMETER_NAME$$)
+# that will be replaced by the script tools/container_util.py prior to being
+# passed to "kubectl create"
+
+# The defintion of the Deployment and Pod
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: analyzer-service
+  labels:
+    name: analyzer-service
+# Pod object
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: analyzer-service
+      labels:
+        name: analyzer-service
+    spec:
+      containers:
+      - name: analyzer-service
+        # The URI of a Docker image in a Docker repository.
+        image: $$ANALYZER_SERVICE_IMAGE_URI$$
+        args:
+          - '-port'
+          - '6001'
+          - '-bigtable_project_name'
+          - $$BIGTABLE_PROJECT_NAME$$
+          - '-bigtable_instance_name'
+          - $$BIGTABLE_INSTANCE_NAME$$
+          - '-private_key_pem_file'
+          # The directory path must match mountPath below.
+          - '/var/lib/cobalt/$$ANALYZER_PRIVATE_PEM_NAME$$'
+          # TODO(rudominer) Eventually remove this.
+          - '-logtostderr'
+          - '-v=3'
+        ports:
+          - containerPort: 6001
+        volumeMounts:
+            # This name must match the volumes.name below.
+          - name: analyzer-key-storage
+            mountPath: /var/lib/cobalt
+            readOnly: true
+      volumes:
+        - name: analyzer-key-storage
+          secret:
+            secretName: $$ANALYZER_PRIVATE_KEY_SECRET_NAME$$
+---
+# The defintion of the Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: analyzer-service
+spec:
+  ports:
+    # The port that this service should serve on. This should match the port
+    # used several times above and the one specified in Dockerfile.
+  - port: 6001
+  selector:
+    # This must match the metadata.labels section of the Deployment above.
+    name: analyzer-service
+  type: LoadBalancer
+

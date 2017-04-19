@@ -1,0 +1,74 @@
+# Copyright 2016 The Fuchsia Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This file contans the definitions of the Analyzer Service's  Deployment object
+# (which includes an embedded defintion of the it's Pod object) and the
+# Analyzer Service's Service object.
+#
+# The definitions contain some parameters (indicated by $$PARAMETER_NAME$$)
+# that will be replaced by the script tools/container_util.py prior to being
+# passed to "kubectl create"
+
+# The defintion of the Deployment and Pod
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: report-master
+  labels:
+    name: report-master
+# Pod object
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: report-master
+      labels:
+        name: report-master
+    spec:
+      containers:
+      - name: report-master
+        # The URI of a Docker image in a Docker repository.
+        image: $$REPORT_MASTER_IMAGE_URI$$
+        args:
+          - '-port'
+          - '7001'
+          - '-bigtable_project_name'
+          - $$BIGTABLE_PROJECT_NAME$$
+          - '-bigtable_instance_name'
+          - $$BIGTABLE_INSTANCE_NAME$$
+          - '-cobalt_config_dir'
+          # This path must match the path to where the config files are copied
+          # in Dockerfile.
+          - '/etc/cobalt'
+          # TODO(rudominer) Eventually remove this.
+          - '-logtostderr'
+          - '-v=3'
+        ports:
+          - containerPort: 7001
+---
+# The defintion of the Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: report-master
+spec:
+  ports:
+    # The port that this service should serve on. This should match the port
+    # used several times above and the one specified in Dockerfile.
+  - port: 7001
+  selector:
+    # This must match the metadata.labels section of the Deployment above.
+    name: report-master
+  type: LoadBalancer
+

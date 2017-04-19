@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM cobalt
+FROM cobalt-common
 
-COPY shuffler /usr/local/bin/
+COPY analyzer_service /usr/local/bin/
 
-ENTRYPOINT ["shuffler"]
-EXPOSE 50051
+ENTRYPOINT ["analyzer_service"]
+# This should match the port specified in analyzer_service_deployment.yaml
+EXPOSE 6001

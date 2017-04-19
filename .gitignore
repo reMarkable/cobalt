@@ -1,5 +1,6 @@
 *.pyc
 *.pem
+personal_cluster.json
 service_account_credentials.json
 /out/
 /sysroot/
