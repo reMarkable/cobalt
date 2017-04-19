@@ -2,171 +2,452 @@
 An extensible, privacy-preserving, user-data analysis pipeline.
 [go/cobalt-for-privacy](https://goto.google.com/cobalt-for-privacy)
 
-* Prerequisites
-  * Currently this repo has only been tested on Ubuntu.
+## Requirements
+  1. We only develop on Ubuntu Linux. You may or may not have success on other
+  systems.
+  2. Python 2.7
 
-* One-time setup:
-    `cobaltb.py setup`
-  * This will setup the git submodules and will install dependencies in the sysroot directory.
-  See the [sysroot](#sysroot) section below for details.
+## One-time setup
+* Fetch the code, for example via
+`git clone https://fuchsia.googlesource.com/cobalt`
 
-* The script cobaltb.py orchestrates building and testing Cobalt.
+* Run `cobaltb.py setup`.
+  * This will set up the git submodules and will download dependencies into the
+  sysroot directory.
+
+## Orchestration Script
+The Python script cobaltb.py in the root directory is used to orchestrate
+building, testing
+and deploying to Google Container Engine. (It was already used above for
+one-time setup.)
+
+* `cobaltb.py -h` for general help
+* `cobaltb.py <command> -h` for help on a command
+* `cobaltb.py <command> <subcommand> -h` for help on a sub-command
+
+## Build
+  * `cobaltb.py clean`
   * `cobaltb.py build`
-  * `cobaltb.py test`
-  * `cobaltb.py lint` to run the linters
-  * `cobaltb.py -h` for general help
 
-## Running the tests
-It is possible to run various subsets of the tests. Run `cobaltb.py test -h` to see the possible subsets.
+## Run the Tests
+  * `cobaltb.py test` This runs the whole suite of tests finally running the
+  the end-to-end test
+  * It is possible to run subsets of the tests by passing the `--tests=`
+  argument.
+  * See `cobaltb.py test -h`
 
-#### Memory-Store tests
-`./cobaltb.py test --tests=gtests`
-This runs all of the gunit tests. For those tests that need a DataStore, the in-memory datastore is used.
-Compare this against the other possibilities for a DataStore listed below.
+### The end-to-end test
+ `cobaltb.py test --tests=e2e --verbose --verbose --verbose`
+This stands up a complete Cobalt system running locally:
+* An instance of Bigtable Emulator
+* The Shuffler
+* The Analyzer Service
+* The Report Master Service
 
-#### Bigtable Emulator tests
-`./cobaltb.py test --tests=btemulator`
-This starts the Bigtable emulator running on the local machine on the default port of 9000. Then it runs various
-gunit tests that need a DataStore and that expect to find the emulator running. These tests use the BigtableStore as
-the DataStore and BigtableStore connects to the Bigtable emulator.
+It then uses the the **test app** to send Observations to the Shuffler, uses the
+**observation querier** to wait until the Observations have arrived at the
+Analyzer, uses the **report client** library to generate a report and
+wait for the report to complete, and finally checks the result of the report.
 
-#### Cloud Bigtable tests
-These are a set of gunit tests that use BigtableStore as the DataStore and connect to the real Google
-Cloud Bigtable. These tests are not run automatically at this time. They are not run on the build machine and they are *not*
-run if you type `./cobaltb.py test --tests=all`. Instead you must explictly invoke them. See below for the command line.
+The code for the end-to-end test is written in Go and is in the
+*end_to_end_tests/src* directory.
 
-**One-time setup:** You must install a credential on your computer in order for the Cobalt code running
-on your computer to be able to access Cobalt's testing Google Cloud Project.
-* Go to the [Credentials page](https://pantheon.corp.google.com/apis/credentials?debugUI=DEVELOPERS&project=google.com:shuffler-test)
-of the project.
+## Generating PEM Files
+Cobalt uses a custom public-key encryption scheme in which the Encoder encrypts
+Observations to the public-key of the Analyzer before sending them to the
+Shuffler. This is a key part of the design of Cobalt and we refer to it
+via the slogan "The Shuffler shuffles sealed envelopes" meaning that the
+Shuffler does not get to see the data that it is shuffling. In order for this
+to work it is necessary for there to be public/private key PEM files that
+can be read by the Encoder and the Analyzer. The end-to-end test uses the
+PEM files located in the *end_to_end_tests* directory named
+*analyzer_private_key.pem.e2e_test* and
+*analyzer_public_key.pem.e2e_test*. But for running Cobalt in any other
+environment we do not want to check-in a private key into source control
+and so we ask each developer to generate thier own key pair.
+
+`./cobaltb.py keygen`
+
+Then follow the instructions to copy the generated contents into files
+named *analyzer_public.pem* and *analyzer_private.pem* in your
+source root directory. These will get used by several of the following
+steps including running the demo manually and deploying to Google Container
+Engine.
+
+
+## Running the Demo Manually
+You can run a complete Cobalt system locally (for example in order to give a
+demo) as follows. Open seven different command-line console windows and run the
+following commands in each one respectively:
+* `./cobaltb.py start bigtable_emulator`
+* ` ./cobaltb.py start analyzer_service`
+* ` ./cobaltb.py start shuffler`
+* `./cobaltb.py start report_master`
+* ` ./cobaltb.py start test_app`
+* `./cobaltb.py start observation_querier`
+* `./tools/demo/demo_reporter.py`
+
+It is a good idea to label the tabs so you can keep track of them.
+
+Instead of the last command `./tools/demo/demo_reporter.py` you could do
+`./cobaltb.py start report_client`.
+The script *demo_reporter.py* invokes the *report_client* but it has been
+custom tailored for a demo: Whereas *report_client* is a generic tool,
+*demo_reporter.py* knows specifically which metrics, encodings and reports are
+being used for the demo and it knows how to generate a visualization of the
+Basic Rappor report.
+
+Note that the `./cobaltb.py start` command automatically sets the flag `-v=3`
+on all of the started processes. This sets the virtual logging level to 3.
+The Cobalt log messages has been specifically tuned to give interesting
+output during a demo at this virtual logging level. For example the Analyzer
+service will log each time it receives a batch of Observations.
+
+To perform the demo follow these steps.
+
+* Use the test_app to send Forculus Observations through the Shuffler to the
+Analyzer
+  * `encode 19 www.AAAA`
+  * `encode 20 www.BBBB`
+  * `send`
+  * See that the Shuffler says it received the Observations but it has not yet
+  forwarded them to the Analyzer because the number of Observations have not
+  yet crossed the Shuffler's threshold (100).
+  * `encode 100 www.CCCC`
+  * `send`
+  * See that the Shuffler says it received another batch of Observations and
+  that it has now forwarded all of the Observations to the Analyzer
+  * See that the Analyzer says it has received the Observations
+
+* Use the observation_querier to inspect the state of the Observation store.
+  * `query 50`
+  * See the debug output that shows the Forculus Observations
+
+* Use the demo_reporter to generate a report
+  * Type `1` to run the Forculus report demo
+  * See that the strings that were encoded at least the Forculus threshold (20)
+  times have been decrypted and the others have not.
+
+* Use the test_app to send Basic RAPPOR Observations through the Shuffler to the
+Analyzer
+  * `set metric 2`
+  * `set encoding 2`
+  * `encode 500 11`
+  * `encode 1000 12`
+  * `encode 500 1`
+  * `send`
+  * See that the Shuffler says it received the Observations and forwarded them
+  to the Analyzer.
+  * See that the Analyzer says it received the Observations.
+
+* Use the observation_querier to inspect the state of the Observation store.
+  * `set metric 2`
+  * `query 50`
+  * See the debug output that shows the Basic RAPPOR Observations
+
+* Use the demo_reporter to generate a report
+  * Type `2` to run the Forculus report demo
+  * Open the displayed URL in your browser and see the visualization.
+
+
+## Using Cloud Bigtable
+You can use [Cloud Bigtable](https://cloud.google.com/bigtable/) instead of a
+local instance of the Bigtable Emulator for
+* Running some of the unit tests
+* Doing the manual demo
+* Running the end-to-end test
+
+In this section we describe a configuration in which the Cobalt processes are
+running locally but connect to Cloud Bigtable. In a later section we describe
+how to run the Cobalt processes themselves on Google Container Engine.
+
+### One-time setup for using Cloud Bigtable
+
+#### Google Cloud Project
+You will need a Google Cloud project in which to create an instance of Cloud
+Bigtable and also in which to create an instance of Google Container Engine if
+you wish to do that later. Create a new one or use an existing one. You will
+need to enable billing. If you are a member of the core Cobalt team you can
+request access to our
+[shared project](https://console.cloud.google.com/home/dashboard?project=google.com:shuffler-test).
+
+#### Create an instance of Cloud Bigtable
+Navigate to the Bigtable section of the Cloud console for your project.
+Here is the link for the core Cobalt team's
+[shared project](https://pantheon.corp.google.com/bigtable/instances?project=google.com:shuffler-test)
+* Select **CREATE INSTANCE**
+* Name your instance whatever you would like
+* If this feature is available to you, select **Development** and
+not *Production*. This is one-third the cost.
+* If you don't plan to use your instance for a few days you may delete it and
+then recreate another one later in order to save money.
+
+#### Optionally install cbt
+[cbt](https://cloud.google.com/bigtable/docs/go/cbt-overview) is a command-line
+program for interacting with Cloud Bigtable. You do not strictly need cbt in order
+to follow the other steps in the document but you may choose to install it anyway.
+
+
+#### Install a Service Account Credential
+You must install a Service Account Credential on your computer in order for the
+Cobalt code running on your computer to be able to access Cloud Bigtable.
+
+* Go to the
+[Credentials page](https://cloud.google.com/storage/docs/authentication#generating-a-private-key)
+of your Cloud project. Here is [the link](https://pantheon.corp.google.com/apis/credentials?debugUI=DEVELOPERS&project=google.com:shuffler-test) for the core
+Cobalt team's shared project.
 * Click `Create Credentials`
 * Select `Service Account Key` as the type of key
-* In the Service Account dropdown select `New Service Account` and assign your service account any name.
+* In the Service Account dropdown select `New Service Account` and assign your
+service account any name.
 * Select `JSON` as the key type
 * Click `Create`
-* A JSON file containing the credentials will be generated and downloaded to your computer. Save it anywhere.
-* Rename and move the JSON file. You must name the file exactly `service_account_credentials.json` and you must put
+* A JSON file containing the credentials will be generated and downloaded to
+your computer. Save it anywhere.
+* Rename and move the JSON file. You must name the file exactly
+`service_account_credentials.json` and you must put
 the file in the Cobalt source root directory (next to this README file.)
-* cobaltb.py sets the environment variable `GOOGLE_APPLICATION_CREDENTIALS` to the path to that file. This is
-necessary for the gRPC code linked with Cobalt to find the credential at run-time during the tests.
+* cobaltb.py sets the environment variable `GOOGLE_APPLICATION_CREDENTIALS` to
+the path to that file. This is necessary for the gRPC C++ code linked with
+Cobalt to find the credential at run-time.
 
-*Side-note:* We are abusing service accounts with this procedure. The more appropriate solution is to use oauth
-tokens in order to authenticate your computer to Google Cloud. However at this time there seems to be a [bug
-that is preventing this from working](https://github.com/grpc/grpc/issues/7131). The symptom is you will see
-the following error message: ` assertion failed: deadline.clock_type == g_clock_type`. If you see this error
-message it means that the oauth flow is being attempted and has hit this bug. This happens if the gRPC code is
-not able to use the service account credential located at `GOOGLE_APPLICATION_CREDENTIALS`.
+*Note:* An alternative solution is to use oauth tokens in order to authenticate
+your computer to Google Cloud Bigtable. However at this time there seems to be a
+[bug](https://github.com/grpc/grpc/issues/7131) that is preventing this from
+working. The symptom is you will see the following error message:
+` assertion failed: deadline.clock_type == g_clock_type`.
+If you see this error message it means that the oauth flow is being attempted
+and has hit this bug. This happens if the gRPC code is
+not able to use the service account credential located at
+`GOOGLE_APPLICATION_CREDENTIALS`.
 
-If you want, it is possible to use a different Google Cloud project besides Cobalt's testing project.
-Follow all the same steps above using any project. Then later you will have to pass the command-line
-flag `--bigtable_project_name` with the name of your project.
+#### Provision the Tables
+`./cobaltb.py provision_bigtable`
+This creates the Cobalt Bigtable tables in your Cloud Bigtable instance.
 
-**Every-time setup** You will also need to create your own personal instance of Cloud Bigtable within
-the Google Cloud project for which you created credentials above. Because it costs our cost center
-money to have have an instance of Google Cloud Bigtable running, we recommend not leaving your personal
-instance running all the time. We recommend creating an instance when you want to test with it and
-then deleting it when you are done.
-
-* Go to the [Bigtable instance creation page](https://pantheon.corp.google.com/bigtable/instances?project=google.com:shuffler-test)
-of Cobalt's testing Google Cloud project, or the project for which you created credentials above.
-* Select `CREATE INSTANCE`
-* Name your instance whatever you would like
-* Important: Please select **Development** and not *Production*. This is one-third the cost.
-* Now run `./cobaltb.py test --tests=cloud_bt --bigtable_instance_name=<your-personal-instance>`
-* You can also pass the flag `--bigtable_project_name=<your-project-name>` if you want to use a different project.
-* If you don't plan to use your instance for a few days please delete it and then recreate another one later.
+**NOTE:** Currently we do not  provide any means of deleting the data from
+the tables. If you want to delete the data the only way to do it is to install
+*cbt*, delete the table using `cbt deletetable` and then recreate the tables
+using `./cobaltb.py provision_bigtable`. In particular this is currently a
+necessary step in order to repeatedly run the end-to-end test against
+Cloud Bigtable because otherwise the test will fail the second time you run it.
 
 
-## Running the Analyzer Service Locally
+### Cloud Bigtable tests
+These are a set of gunit tests that run locally but use Cloud Bigtable. These
+tests are not run automatically, they are not run on the continuous integration
+machine and they are not run if you type `./cobaltb.py test --tests=all`.
+Instead you must explicitly invoke them.
 
-You can run the Analyzer Service locally using an in-memory data store as follows:
+`./cobaltb.py test --tests=cloud_bt --bigtable_project_name=<project_name> --bigtable_instance_name=<instance_name>`
 
-* Let `<root>` be the root of your Cobalt installation.
+### Running the End-to-End Tests Against Cloud Bigtable
+This is also not done automatically but you may do it manually as follows
 
-* `export LD_LIBRARY_PATH=<root>/sysroot/lib`
+`./cobaltb.py test --tests=e2e -use_cloud_bt --bigtable_project_name=<project_name> --bigtable_instance_name=<instance_name>`
 
-* `./out/analyzer/analyzer -for_testing_only_use_memstore -port=8080 -cobalt_config_dir="config/demo" -logtostderr`
-
-## Bigtable emulator
-
-You can run the analyzer locally using the Bigtable emulator as follows.  Start
-the Bigtable emulator:
-
-* `./sysroot/gcloud/google-cloud-sdk/platform/bigtable-emulator/cbtemulator`
-
-In a separate console run:
-
-* `export LD_LIBRARY_PATH=<root>/sysroot/lib`
-
-* `./out/analyzer/analyzer -for_testing_only_use_bigtable_emulator -port=8080 -cobalt_config_dir="config/demo" -logtostderr`
-
-## Shuffler
-
- You can run the shuffler locally as follows:
-
-* `/out/shuffler/shuffler -logtostderr -config_file out/config/shuffler_default.conf -batch_size 100 -vmodule=receiver=2,dispatcher=1,store=2`
+### Running the Demo Manually Against Cloud Bigtable
+Follow the instructions above for running the demo manually with the following
+changes
+* Open only six tabs instead of seven.
+* Do not start the Bigtable Emulator
+* When starting the Analyzer Service, the Report Master and the Observation
+Querier pass the flags
+`--bigtable_project_name=<project_name>`
+and
+`--bigtable_instance_name=<instance_name>`
+so that these processes will connect to your instance of Cloud Bigtable rather
+than attempting to connect to a local instance of Bigtable Emulator.
 
 
-## cgen: Cobalt gRPC generator
-
-The following example sends a single RPC containing an ObservationBatch with 200
-Observations to an Analyzer running locally on port 8080:
-
-* `export LD_LIBRARY_PATH=<root>/sysroot/lib`
-
-* `./out/tools/cgen -analyzer_uri="localhost:8080" -num_observations=200`
-
-The following example sends the RPC instead to the shuffler running locally on port 50051:
+## Google Container Engine (GKE)
+You can deploy the Shuffler, Analyzer Service and Report Master on Google
+Container Engine and then run the the demo or the end-to-end test using your
+cloud instance.
 
 
-* `./out/tools/cgen -analyzer_uri="localhost:8080" -shuffler_uri="localhost:50051" -num_observations=200`
+### One-time setup for using Google Container Engine
 
-## Google Container Engine (GCE)
+#### Install Docker
 
-The cobaltb.py tool is also a helper to interact with GCE.  The following
-commands are supported:
+In order to deploy to Container Engine you need to be able to build Docker
+containers and that requires have the Docker daemon running on your machine.
 
-gce\_build   - Build the docker images for use on GCE.
+Install [Docker](https://docs.docker.com/engine/installation/).
+If you are a Googler the following instructions should work:
 
-gce\_push    - Publish the built docker images to the GCE repository.
+* `sudo apt-get install docker-engine`
+* `sudo usermod -aG docker`
+* Login again to be added to the docker group.
 
-gce\_start   - Start the cobalt components.  To see the external IP of services
-               run, for example: kubectl get service analyzer
+We also will be using the tools [gcloud]( https://cloud.google.com/sdk/)
+and [kubectl](https://kubernetes.io/docs/user-guide/kubectl-overview/).
+You should be able to get away without installing these because they are
+included in Cobalt's *sysroot* directory and when invoked via *cobaltb.py*
+the versions in sysroot will be used. But you may choose to install these
+anyway. The following steps are optional.
 
-gce\_stop    - Stops the cobalt components.
+* Install [gcloud](https://cloud.google.com/sdk/)
+* `gcloud init`
+* `gcloud components install kubectl`
 
-## GCE Prerequisites
+#### Create a GKE Cluster
+Navigate to the Container Clusters section of the Cloud console for your project.
+Here is the link for the core Cobalt team's
+[shared project](https://pantheon.corp.google.com/kubernetes/list?project=google.com:shuffler-test)
+* Click **Create Cluster**
+* Name your cluster whatever you would like
+* Put your cluster in the same zone as your Bigtable instance. If this is not
+possible put it into a different zone in the same region.
+* Click **More** at the bottom of the page to open more options.
+* Find the **Bigtable Data** Project Access drop-down and set it to
+*Read Write*. This is necessary so that code running in your cluster has
+Read/Write access to your Bigtable instance.
+* Select **Create**
 
-* sudo apt-get install docker-engine
+#### Create a GCE Persistent Disk
+Note that GCE stands for *Google Compute Engine* and GKE stands for
+*Google Container Engine*.
+Even though we are deploying Cobalt to GKE we create a persistent disk on GCE.
 
-* sudo usermod -aG docker
-  * You'll have to login again to be added to the docker group.
+We create a GCE persistent disk in order to store the Shuffler's LevelDB
+database. The reason for using a persistent disk is that otherwise the database
+gets blown away between deployments of the Shuffler. (TODO(rudominer) Make
+this optional. It may be desirable to have the option of blowing away the
+database between deployments. The database will still persist between
+*restarts*.)
 
-* Install gcloud: https://cloud.google.com/sdk/
+Navigate to the Compute Engine / Disks section of the Cloud console for your
+project. Here is the link for the core Cobalt team's
+[shared project](https://pantheon.corp.google.com/compute/disks?project=google.com:shuffler-test)
+* Click **CREATE DISK**
+* Name your disk whatever you would like
+* Put your disk in the same zone as your GKE cluster. If this is not possible
+put it into a different zone in the same region.
+* Select **Create**
 
-* gcloud init
+#### Create a personal_cluster.json file
+Optionally create a new file in your Cobalt source root named exactly
+`personal_cluster.json`.
+This will save you having to type many command-line flags refering to your
+personal cluster.
+Its contents should be exactly the following
 
-* gcloud components install kubectl
+```
+{
+  "cloud_project_prefix": "<your-project-prefix>",
+  "cloud_project_name": "<your-project-name>",
+  "cluster_name": "<your-cluster-name>",
+  "gce_pd_name": "<your-persistent-disk-name>",
+  "bigtable_project_name" : "<your-bigtable-project-name>",
+  "bigtable_instance_name": "<your-bigtable-instance-name>"
+}
+```
 
-## GCE Authentication
+For example:
 
-Tasks like gce\_start, gce\_stop or running the Analyzer outside of GCE require
-setting the environment variable GOOGLE\_APPLICATION\_CREDENTIALS to point to
-the JSON file containing credentials.  Follow the instructions of step "1." of
-"How the Application Default Credentials work" from:
+```
+{
+  "cloud_project_prefix": "google.com",
+  "cloud_project_name": "shuffler-test",
+  "cluster_name": "rudominer-test-1",
+  "gce_pd_name": "rudominer-shuffler-1",
+  "bigtable_project_name" : "google.com:shuffler-test",
+  "bigtable_instance_name": "rudominer-test-1"
+}
+```
 
-<https://developers.google.com/identity/protocols/application-default-credentials>
+The script *cobaltb.py* looks for this file and uses it to set defaults for
+flags. It is ok for some of the values to be the empty string but it is not ok
+for any of the keys to be missing. For example if you have not yet created a
+GKE cluster but you have already created a Bigtable instance you can leave
+all fields except `bigtable_project_name` and
+`bigtable_instance_name` empty and then when performing the steps described
+above in the section **Using Cloud Bigtable** you will not have to type the
+flags
+`--bigtable_project_name` and `--bigtable_instance_name`.
 
-## sysroot (Cobalt's dependencies)
+Here is an explanation of each of the entries.
+* *cloud_project_prefix*: This should be the empty string unless you created
+your Google cloud project in such a way that it is part of a custom domain in
+which case this should
+be the custom domain. The fully qualified name of your project will then be
+`<your-project-prefix>:<your-project-name>`
+* *cloud_project_name*: This should be the full name of your project if you
+used the empty string for *cloud_project_prefix* otherwise it should be the
+project name without the prefix and the colon.
+* *cluster_name*: The name of the GKE cluster you created
+* *gce_pd_name*: The name of the GCE persistent disk you created
+* *bigtable_project_name*: This is the fully-qualified name of the project in
+which you created your Bigtable instance. This should be the same as the project
+specified by the two fields *cloud_project_prefix* and *cloud_project_name*
+but here it is specified as a single combined name.
+* *bigtable_instance_name*: The name of the Bigtable instance you created.
 
-All of Cobalt's dependencies (both compile and run-time) are installed in the
-sysroot directory using the `setup.sh` script.  To avoid having to compile the
-dependencies every time, a packaged binary version of sysroot is stored on
-Google storage.  `cobaltb.py setup` will download the pre-built sysroot from
-Google storage.
+### Deploying Cobalt to GKE
 
-To upload a new version of sysroot on Google storage do the following:
+`./cobaltb.py deploy authenticate`
+Run this one time in order associate your computer with your GKE cluster
+and set up authentication.
 
-* `rm -fr sysroot`
-* `./setup.sh -u`
-* Edit setup.sh and modify VERSION to have the SHA of the new sysroot.
+`./cobaltb.py deploy upload_secret_key`
+Run this one time in order to upload the PEM file containing the Analyzer's
+private key. This is the file *analyzer_private.pem* that was created in
+the section **Generating PEM Files** above. To upload a different private key,
+first delete any previously upload secret key by running
+`./cobaltb.py deploy delete_secret_key`
+
+`./cobaltb.py deploy build`
+Run this to build Docker containers for the Shuffler, Analyzer Service and
+Report Master. Run it any time the Cobalt code changes. The generated
+containers are stored on your computer.
+
+`./cobaltb.py deploy push --job=shuffler`
+
+`./cobaltb.py deploy push --job=analyzer-service`
+
+`./cobaltb.py deploy push --job=report-master`
+Run these to push each of the containers built via the previous step
+up to the cloud repository.
+
+`./cobaltb.py deploy start --job=shuffler`
+
+`./cobaltb.py deploy start --job=analyzer-service`
+
+`./cobaltb.py deploy start --job=report-master`
+Run these to start each of the jobs on GKE.
+
+`./cobaltb.py deploy show`
+Run this in order to see the list of running jobs and their
+externally facing IP addresses and ports.
+
+
+### Running the End-to-End test on GKE
+`./cobaltb.py deploy show`
+This will show you the public IP address and port of your Shuffler and
+Report Master.
+
+`./cobaltb.py test --tests=e2e --shuffler_uri=<shuffler-uri> --report_master_uri=<report-master-uri> -use_cloud_cobalt`
+
+Here the *shuffler-uri* and *report-master-uri* are formed from the public IP
+address and port number you found in the output from `./cobaltb.py deploy show`.
+
+If your GKE cluster has been set up correctly and your *personal_cluster.json*
+file is set up correclty, this will run the end-to-end test using your
+personal Cobalt GKE cluster.
+
+### Running Manual Demo on GKE
+
+See the instructions above for running the manual demo. In this configuration
+you do not need to start the Shuffler, Analyzer Service, Report Master or
+Bigtable as these are all running in the cloud. You still need to start
+the test app, the observation querier and the report client. You need to
+pass these processes the URI of the server to which they need to communicate.
+
+`./cobaltb.py deploy show`
+This will show you the public IP address and port of your Shuffler and
+Report Master.
+
+*  ` ./cobaltb.py start test_app --shuffler_uri=<shuffler-url>`
+*  `./cobaltb.py start observation_querier -use_cloud_bt`
+*  `./tools/demo/demo_reporter.py --report_master_uri=<report-master-uri>`
