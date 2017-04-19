@@ -32,6 +32,7 @@ import tools.test_runner as test_runner
 from tools.test_runner import E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
 
 from tools.process_starter import DEFAULT_SHUFFLER_PORT
+from tools.process_starter import DEFAULT_ANALYZER_PUBLIC_KEY_PEM
 from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from tools.process_starter import DEFAULT_REPORT_MASTER_PORT
 from tools.process_starter import DEMO_CONFIG_DIR
@@ -134,8 +135,9 @@ def _test(args):
   bigtable_instance_name = ''
   for test_dir in test_dirs:
     start_bt_emulator = ((test_dir in NEEDS_BT_EMULATOR)
-        and not args.use_cloud_bt)
-    start_cobalt_processes = (test_dir in NEEDS_COBALT_PROCESSES)
+        and not args.use_cloud_bt and not args.cobalt_on_gke)
+    start_cobalt_processes = ((test_dir in NEEDS_COBALT_PROCESSES)
+        and not args.cobalt_on_gke)
     test_args = None
     if (test_dir == 'gtests_cloud_bt'):
       if not os.path.exists(SERVICE_ACCOUNT_CREDENTIALS_FILE):
@@ -158,17 +160,28 @@ def _test(args):
       bigtable_project_name = args.bigtable_project_name
       bigtable_instance_name = args.bigtable_instance_name
     if (test_dir == 'e2e_tests'):
+      analyzer_pk_pem_file=E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
+      if args.cobalt_on_gke:
+        analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+        if args.use_cloud_bt:
+          # use_cloud_bt means to use local instances of the Cobalt processes
+          # connected to a Cloud Bigtable. cobalt_on_gke means to use
+          # Cloud instances of the Cobalt processes. These two options
+          # are inconsistent.
+          print "Do not specify both --use_cloud_bt and --cobalt_on_gke."
+          success = False
+          break
       test_args = [
-          "-analyzer_uri=localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT,
-          "-analyzer_pk_pem_file=%s" % E2E_TEST_ANALYZER_PUBLIC_KEY_PEM,
-          "-shuffler_uri=localhost:%d" % DEFAULT_SHUFFLER_PORT,
-          "-report_master_uri=localhost:%d" % DEFAULT_REPORT_MASTER_PORT,
+          "-analyzer_uri=%s" % args.analyzer_uri,
+          "-analyzer_pk_pem_file=%s" % analyzer_pk_pem_file,
+          "-shuffler_uri=%s" % args.shuffler_uri,
+          "-report_master_uri=%s" % args.report_master_uri,
           ("-observation_querier_path=%s" %
               process_starter.OBSERVATION_QUERIER_PATH),
           "-test_app_path=%s" % process_starter.TEST_APP_PATH,
           "-sub_process_v=%d"%_verbose_count
       ]
-      if args.use_cloud_bt:
+      if args.use_cloud_bt or args.cobalt_on_gke:
         test_args = test_args + [
           "-bigtable_project_name=%s" % args.bigtable_project_name,
           "-bigtable_instance_name=%s" % args.bigtable_instance_name,
@@ -416,21 +429,47 @@ def main():
       help='Specify a subset of tests to run. Default=all',
       default='all')
   sub_parser.add_argument('-use_cloud_bt',
-      help='Causes the end-to-end tests to run against an instance of Cloud '
-      'Bigtable. Otherwise a local instance of the Bigtable Emulator will be '
-      'used.', action='store_true')
+      help='Causes the end-to-end tests to run using local instances of the '
+      'Cobalt processes connected to an instance of Cloud Bigtable. Otherwise '
+      'a local instance of the Bigtable Emulator will be used.',
+      action='store_true')
+  sub_parser.add_argument('-cobalt_on_gke',
+      help='Causes the end-to-end tests to run using an instance of Cobalt '
+      'deployed in Google Container Engine. Otherwise local instances of the '
+      'Cobalt processes are used. When this option is used the flags '
+      '--analyzer_uri, --shuffler_uri and --report_master_uri must be '
+      'overriden to give the URIs of the Cobalt processes running in GKE. '
+      'This option and -use_cloud_bt are mutually inconsistent. Do not use '
+      'both at the same time.',
+      action='store_true')
   sub_parser.add_argument('--bigtable_project_name',
       help='Specify a Cloud project against which to run some of the tests.'
-      ' Only used for the cloud_bt tests and e2e tests when -use_cloud_bt is'
-      ' specified.'
+      ' Only used for the cloud_bt tests and e2e tests when either '
+      '-use_cloud_bt or -cobalt_on_gke are specified.'
       ' default=%s'%personal_cluster_settings['bigtable_project_name'],
       default=personal_cluster_settings['bigtable_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud'
       ' project against which to run some of the tests.'
-      ' Only used for the cloud_bt tests and e2e tests in cloud mode.'
+      ' Only used for the cloud_bt tests and e2e tests when either '
+      '-use_cloud_bt or -cobalt_on_gke are specified.'
       ' default=%s'%personal_cluster_settings['bigtable_instance_name'],
       default=personal_cluster_settings['bigtable_instance_name'])
+  sub_parser.add_argument('--analyzer_uri',
+      help='Specify the Analyzer URI to use for the e2e tests. Should be '
+      'overriden when -cobalt_on_gke is specified. '
+      'Default=localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT,
+      default='localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT)
+  sub_parser.add_argument('--shuffler_uri',
+      help='Specify the Shuffler URI to use for the e2e tests. Should be '
+      'overriden when -cobalt_on_gke is specified. '
+      'Default=localhost:%s' % DEFAULT_SHUFFLER_PORT,
+      default='localhost:%s' % DEFAULT_SHUFFLER_PORT)
+  sub_parser.add_argument('--report_master_uri',
+      help='Specify the ReportMaster URI to use for the e2e tests. Should be '
+      'overriden when -cobalt_on_gke is specified. '
+      'Default=localhost:%s' % DEFAULT_REPORT_MASTER_PORT,
+      default='localhost:%s' % DEFAULT_REPORT_MASTER_PORT)
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')

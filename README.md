@@ -427,7 +427,7 @@ externally facing IP addresses and ports.
 This will show you the public IP address and port of your Shuffler and
 Report Master.
 
-`./cobaltb.py test --tests=e2e --shuffler_uri=<shuffler-uri> --report_master_uri=<report-master-uri> -use_cloud_cobalt`
+`./cobaltb.py test --tests=e2e --shuffler_uri=<shuffler-uri> --report_master_uri=<report-master-uri> -cobalt_on_gke`
 
 Here the *shuffler-uri* and *report-master-uri* are formed from the public IP
 address and port number you found in the output from `./cobaltb.py deploy show`.
