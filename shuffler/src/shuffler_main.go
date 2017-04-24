@@ -46,8 +46,11 @@ var (
 	batchSize  = flag.Int("batch_size", 1000, "The size of ObservationBatch to be sent to Analyzer")
 
 	// shuffler db configuration flags
-	useMemStore = flag.Bool("use_memstore", false, "Shuffler uses in memory store if true, else persistent store")
-	dbDir       = flag.String("db_dir", "", "Path to the Shuffler local datastore")
+	useMemStore   = flag.Bool("use_memstore", false, "Shuffler uses in memory store if true, else persistent store")
+	dbDir         = flag.String("db_dir", "", "Path to the Shuffler local datastore")
+	deleteAllData = flag.Bool("danger_danger_delete_all_data_at_startup", false,
+		"If true then upon startup all data from previous executions of the Shuffler will be deleted. "+
+			"This should not be set true in normal shuffler operation.")
 )
 
 func main() {
@@ -88,6 +91,11 @@ func main() {
 		glog.Infof("Using LevelDB store located at %s.", observationsDBpath)
 		if store, err = storage.NewLevelDBStore(observationsDBpath); err != nil || store == nil {
 			glog.Fatal("Error initializing shuffler datastore: [", *dbDir, "]: ", err)
+		}
+		if *deleteAllData {
+			glog.Warning("*** WARNING: DELETING ALL DATA FROM SHUFFLER'S DATA STORE!!! ***")
+			glog.Warning("The flag -danger_danger_delete_all_data_at_startup was passed.")
+			store.(*storage.LevelDBStore).EraseAllData()
 		}
 	}
 

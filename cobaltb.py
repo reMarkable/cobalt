@@ -341,7 +341,8 @@ def _deploy_start(args):
   if args.job == 'shuffler':
     container_util.start_shuffler(args.cloud_project_prefix,
                                   args.cloud_project_name,
-                                  args.gce_pd_name)
+                                  args.gce_pd_name,
+                                  args.danger_danger_delete_all_data_at_startup)
   elif args.job == 'analyzer-service':
     if args.bigtable_instance_name == '':
         print '--bigtable_instance_name must be specified'
@@ -687,6 +688,11 @@ def main():
            'Cloud project in which the Shuffler is being deployed. '
            'Default=%s' % personal_cluster_settings['gce_pd_name'],
       default=personal_cluster_settings['gce_pd_name'])
+  sub_parser.add_argument('-danger_danger_delete_all_data_at_startup',
+      help='When starting the Shuffler, should all of the Observations '
+      'collected during previous runs of the Shuffler be permanently and '
+      'irrecoverably deleted from the Shuffler\'s store upon startup?',
+      action='store_true')
 
   sub_parser = deploy_subparsers.add_parser('stop',
       parents=[parent_parser], help='Stop one of the jobs on GKE.')

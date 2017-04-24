@@ -295,7 +295,8 @@ def start_report_master(cloud_project_prefix,
 
 def start_shuffler(cloud_project_prefix,
                    cloud_project_name,
-                   gce_pd_name):
+                   gce_pd_name,
+                   danger_danger_delete_all_data_at_startup=False):
   """ Starts the shuffler deployment and service.
   cloud_project_prefix {sring}: For example "google.com"
   cloud_project_name {sring}: For example "shuffler-test". The prefix and
@@ -308,8 +309,12 @@ def start_shuffler(cloud_project_prefix,
                                   SHUFFLER_IMAGE_NAME)
   # These are the token replacements that must be made inside the deployment
   # template file.
+  delete_all_data = 'false'
+  if danger_danger_delete_all_data_at_startup:
+    delete_all_data = 'true'
   token_substitutions = {'$$SHUFFLER_IMAGE_URI$$' : image_uri,
-                         '$$GCE_PERSISTENT_DISK_NAME$$' : gce_pd_name}
+      '$$GCE_PERSISTENT_DISK_NAME$$' : gce_pd_name,
+      '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data}
   _start_gke_service(SHUFFLER_DEPLOYMENT_TEMPLATE_FILE,
                      SHUFFLER_DEPLOYMENT_FILE,
                      token_substitutions)

@@ -53,6 +53,7 @@ spec:
           - '-db_dir'
           # This path must match mountPath below.
           - '/var/lib/cobalt'
+          - '-danger_danger_delete_all_data_at_startup=$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$'
           # TODO(rudominer) Eventually remove this.
           - '-logtostderr'
           - '-v=3'

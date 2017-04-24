@@ -415,7 +415,23 @@ up to the cloud repository.
 `./cobaltb.py deploy start --job=analyzer-service`
 
 `./cobaltb.py deploy start --job=report-master`
-Run these to start each of the jobs on GKE.
+Run these to start each of the jobs on GKE. Each of these will start multiple
+Kubernetes entities on GKE: a *Service*, a *Deployment*, a *Replica Set*,
+and a *Pod*.
+
+`./cobaltb.py deploy start --job=shuffler -danger_danger_delete_all_data_at_startup`
+Run this version of the start command to start the Shuffler while deleting all
+Observations collected during previous runs. This is useful when running the
+end-to-end tests or the demo to ensure that you know exactly what is in the
+Shuffler's datastore.
+
+`./cobaltb.py deploy stop --job=shuffler`
+
+`./cobaltb.py deploy stop --job=analyzer-service`
+
+`./cobaltb.py deploy stop --job=report-master`
+Run these to stop each of the jobs on GKE. Each of these will stop the
+Kubernetes entities that were started by the corresponding *start* command.
 
 `./cobaltb.py deploy show`
 Run this in order to see the list of running jobs and their

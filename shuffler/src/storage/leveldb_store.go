@@ -335,6 +335,11 @@ func (store *LevelDBStore) Reset(destroy bool) {
 	// clear and reset db instance
 	store.close()
 	if destroy {
-		os.RemoveAll(store.dbDir)
+		store.EraseAllData()
 	}
+}
+
+// EraseAllData erases all data in the LevelDB backend.
+func (store *LevelDBStore) EraseAllData() {
+	os.RemoveAll(store.dbDir)
 }
