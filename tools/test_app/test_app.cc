@@ -438,6 +438,7 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
 
   std::unique_ptr<encoder::ShufflerClient> shuffler_client;
   if (!FLAGS_shuffler_uri.empty()) {
+    VLOG(1) << "Connecting to Shuffler at " << FLAGS_shuffler_uri;
     shuffler_client.reset(
         new ShufflerClient(FLAGS_shuffler_uri, FLAGS_use_tls));
   }

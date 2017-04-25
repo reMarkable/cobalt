@@ -421,16 +421,8 @@ Run these to start each of the jobs on GKE.
 Run this in order to see the list of running jobs and their
 externally facing IP addresses and ports.
 
-
 ### Running the End-to-End test on GKE
-`./cobaltb.py deploy show`
-This will show you the public IP address and port of your Shuffler and
-Report Master.
-
-`./cobaltb.py test --tests=e2e --shuffler_uri=<shuffler-uri> --report_master_uri=<report-master-uri> -cobalt_on_gke`
-
-Here the *shuffler-uri* and *report-master-uri* are formed from the public IP
-address and port number you found in the output from `./cobaltb.py deploy show`.
+`./cobaltb.py test --tests=e2e -cobalt_on_gke`
 
 If your GKE cluster has been set up correctly and your *personal_cluster.json*
 file is set up correclty, this will run the end-to-end test using your
@@ -441,13 +433,8 @@ personal Cobalt GKE cluster.
 See the instructions above for running the manual demo. In this configuration
 you do not need to start the Shuffler, Analyzer Service, Report Master or
 Bigtable as these are all running in the cloud. You still need to start
-the test app, the observation querier and the report client. You need to
-pass these processes the URI of the server to which they need to communicate.
+the test app, the observation querier and the report client.
 
-`./cobaltb.py deploy show`
-This will show you the public IP address and port of your Shuffler and
-Report Master.
-
-*  ` ./cobaltb.py start test_app --shuffler_uri=<shuffler-url>`
+*  ` ./cobaltb.py start test_app -cobalt_on_gke`
 *  `./cobaltb.py start observation_querier -use_cloud_bt`
-*  `./tools/demo/demo_reporter.py --report_master_uri=<report-master-uri>`
+*  `./tools/demo/demo_reporter.py -cobalt_on_gke`

@@ -17,6 +17,7 @@
 
 import fileinput
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -335,9 +336,51 @@ def authenticate(cluster_name,
 def display():
    subprocess.check_call(["kubectl", "get", "services"])
 
+def get_public_uris():
+  # Returns a dictionary of the public URIs of the deployed services.
+  #
+  # The returned dictionary will have keys "analyzer",
+  # "report_master", "shuffler". The value for each key will either
+  # be None or a string representing a URI.
+  #
+  output = subprocess.check_output(["kubectl", "get", "services"])
+  # This is an example of what the output of this command might look like.
+  # We are going to parse it and extract the relevent data.
+  #
+  # NAME               CLUSTER-IP       EXTERNAL-IP       PORT(S)          AGE
+  # analyzer-service   10.127.253.149   146.148.107.126   6001:30238/TCP   22h
+  # kubernetes         10.127.240.1     <none>            443/TCP          6d
+  # report-master      10.127.251.229   35.184.143.91     7001:30285/TCP   6d
+  # shuffler           10.127.254.94    104.197.122.2     5001:31703/TCP   27m
+  #
+  values = {}
+  dotted_quad = re.compile("^\d+\.\d+\.\d+\.\d+$")
+  numeric = re.compile("^\d+$")
+  for line in output.split("\n")[1:]:
+    columns = line.split()
+    if len(columns) != 5:
+      continue
+    ip_address = columns[2]
+    if dotted_quad.match(ip_address) is None:
+      continue
+    fields = columns[3].split(":")
+    if len(fields) < 2:
+      continue
+    port = fields[0]
+    if numeric.match(port) is None:
+      continue
+    values[columns[0]] = "%s:%s" % (ip_address, port)
+  uris = {
+    "analyzer" : values.get(ANALYZER_SERVICE_IMAGE_NAME),
+    "report_master" : values.get(REPORT_MASTER_IMAGE_NAME),
+    "shuffler" : values.get(SHUFFLER_IMAGE_NAME),
+  }
+  return uris
+
+
+
 def main():
-  _process_shuffler_yaml_file('cloud_project_prefix', 'cloud_project_name',
-                              'gce_pd_name')
+  print get_public_uris()
 
 if __name__ == '__main__':
   main()

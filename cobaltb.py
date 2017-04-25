@@ -161,8 +161,15 @@ def _test(args):
       bigtable_instance_name = args.bigtable_instance_name
     if (test_dir == 'e2e_tests'):
       analyzer_pk_pem_file=E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
+      analyzer_uri = "localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT
+      report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
+      shuffler_uri = "localhost:%d" % DEFAULT_SHUFFLER_PORT
       if args.cobalt_on_gke:
+        public_uris = container_util.get_public_uris()
         analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+        analyzer_uri = public_uris["analyzer"]
+        report_master_uri = public_uris["report_master"]
+        shuffler_uri = public_uris["shuffler"]
         if args.use_cloud_bt:
           # use_cloud_bt means to use local instances of the Cobalt processes
           # connected to a Cloud Bigtable. cobalt_on_gke means to use
@@ -172,10 +179,10 @@ def _test(args):
           success = False
           break
       test_args = [
-          "-analyzer_uri=%s" % args.analyzer_uri,
+          "-analyzer_uri=%s" % analyzer_uri,
           "-analyzer_pk_pem_file=%s" % analyzer_pk_pem_file,
-          "-shuffler_uri=%s" % args.shuffler_uri,
-          "-report_master_uri=%s" % args.report_master_uri,
+          "-shuffler_uri=%s" % shuffler_uri,
+          "-report_master_uri=%s" % report_master_uri,
           ("-observation_querier_path=%s" %
               process_starter.OBSERVATION_QUERIER_PATH),
           "-test_app_path=%s" % process_starter.TEST_APP_PATH,
@@ -254,8 +261,15 @@ def _start_report_master(args):
                                       verbose_count=_verbose_count)
 
 def _start_test_app(args):
-  process_starter.start_test_app(shuffler_uri=args.shuffler_uri,
-                                 analyzer_uri=args.analyzer_uri,
+  analyzer_uri = "localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT
+  report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
+  shuffler_uri = "localhost:%d" % DEFAULT_SHUFFLER_PORT
+  if args.cobalt_on_gke:
+    public_uris = container_util.get_public_uris()
+    analyzer_uri = public_uris["analyzer"]
+    shuffler_uri = public_uris["shuffler"]
+  process_starter.start_test_app(shuffler_uri=shuffler_uri,
+                                 analyzer_uri=analyzer_uri,
                                  # Because it makes the demo more interesting
                                  # we use verbose_count at least 3.
                                  verbose_count=max(3, _verbose_count))
@@ -436,11 +450,8 @@ def main():
   sub_parser.add_argument('-cobalt_on_gke',
       help='Causes the end-to-end tests to run using an instance of Cobalt '
       'deployed in Google Container Engine. Otherwise local instances of the '
-      'Cobalt processes are used. When this option is used the flags '
-      '--analyzer_uri, --shuffler_uri and --report_master_uri must be '
-      'overriden to give the URIs of the Cobalt processes running in GKE. '
-      'This option and -use_cloud_bt are mutually inconsistent. Do not use '
-      'both at the same time.',
+      'Cobalt processes are used. This option and -use_cloud_bt are mutually '
+      'inconsistent. Do not use both at the same time.',
       action='store_true')
   sub_parser.add_argument('--bigtable_project_name',
       help='Specify a Cloud project against which to run some of the tests.'
@@ -455,21 +466,6 @@ def main():
       '-use_cloud_bt or -cobalt_on_gke are specified.'
       ' default=%s'%personal_cluster_settings['bigtable_instance_name'],
       default=personal_cluster_settings['bigtable_instance_name'])
-  sub_parser.add_argument('--analyzer_uri',
-      help='Specify the Analyzer URI to use for the e2e tests. Should be '
-      'overriden when -cobalt_on_gke is specified. '
-      'Default=localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT,
-      default='localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT)
-  sub_parser.add_argument('--shuffler_uri',
-      help='Specify the Shuffler URI to use for the e2e tests. Should be '
-      'overriden when -cobalt_on_gke is specified. '
-      'Default=localhost:%s' % DEFAULT_SHUFFLER_PORT,
-      default='localhost:%s' % DEFAULT_SHUFFLER_PORT)
-  sub_parser.add_argument('--report_master_uri',
-      help='Specify the ReportMaster URI to use for the e2e tests. Should be '
-      'overriden when -cobalt_on_gke is specified. '
-      'Default=localhost:%s' % DEFAULT_REPORT_MASTER_PORT,
-      default='localhost:%s' % DEFAULT_REPORT_MASTER_PORT)
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')
@@ -534,12 +530,11 @@ def main():
   sub_parser = start_subparsers.add_parser('test_app',
       parents=[parent_parser], help='Start the Cobalt test client app.')
   sub_parser.set_defaults(func=_start_test_app)
-  sub_parser.add_argument('--shuffler_uri',
-      help='Default=localhost:%s' % DEFAULT_SHUFFLER_PORT,
-      default='localhost:%s' % DEFAULT_SHUFFLER_PORT)
-  sub_parser.add_argument('--analyzer_uri',
-      help='Default=localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT,
-      default='localhost:%s'%DEFAULT_ANALYZER_SERVICE_PORT)
+  sub_parser.add_argument('-cobalt_on_gke',
+      help='Causes the test_app to run using an instance of Cobalt '
+      'deployed in Google Container Engine. Otherwise local instances of the '
+      'Cobalt processes are used.',
+      action='store_true')
 
   sub_parser = start_subparsers.add_parser('report_client',
       parents=[parent_parser], help='Start the Cobalt report client.')
