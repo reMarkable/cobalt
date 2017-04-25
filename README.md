@@ -222,16 +222,17 @@ not able to use the service account credential located at
 `GOOGLE_APPLICATION_CREDENTIALS`.
 
 #### Provision the Tables
-`./cobaltb.py provision_bigtable`
+`./cobaltb.py bigtable provision`
 This creates the Cobalt Bigtable tables in your Cloud Bigtable instance.
 
-**NOTE:** Currently we do not  provide any means of deleting the data from
-the tables. If you want to delete the data the only way to do it is to install
-*cbt*, delete the table using `cbt deletetable` and then recreate the tables
-using `./cobaltb.py provision_bigtable`. In particular this is currently a
-necessary step in order to repeatedly run the end-to-end test against
-Cloud Bigtable because otherwise the test will fail the second time you run it.
+#### Delete the data from the Tables
+`./cobaltb.py bigtable delete_observations`
+WARNING: This will permanently delete all data from the Observation Store in
+whichever Cloud Bigtable instance you point it at. Be careful.
 
+`./cobaltb.py bigtable delete_reports`
+WARNING: This will permanently delete all data from the Report Store in
+whichever Cloud Bigtable instance you point it at. Be careful.
 
 ### Cloud Bigtable tests
 These are a set of gunit tests that run locally but use Cloud Bigtable. These
@@ -241,10 +242,24 @@ Instead you must explicitly invoke them.
 
 `./cobaltb.py test --tests=cloud_bt --bigtable_project_name=<project_name> --bigtable_instance_name=<instance_name>`
 
+WARNING: This will modify the contents of the tables in whichever
+Cloud Bigtable instance you point it at. Be careful.
+
+Note that if you follow the instructions below and create a
+*personal_cluster.json* file then this command may be simplified to
+`./cobaltb.py test --tests=cloud_bt`
+
 ### Running the End-to-End Tests Against Cloud Bigtable
 This is also not done automatically but you may do it manually as follows
 
 `./cobaltb.py test --tests=e2e -use_cloud_bt --bigtable_project_name=<project_name> --bigtable_instance_name=<instance_name>`
+
+WARNING: This will modify the contents of the tables in whichever
+Cloud Bigtable instance you point it at. Be careful.
+
+Note that if you follow the instructions below and create a
+*personal_cluster.json* file then this command may be simplified to
+`./cobaltb.py test --tests=e2e -use_cloud_bt`
 
 ### Running the Demo Manually Against Cloud Bigtable
 Follow the instructions above for running the demo manually with the following

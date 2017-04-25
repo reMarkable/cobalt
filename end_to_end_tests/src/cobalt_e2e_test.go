@@ -162,6 +162,7 @@ const (
 var (
 	observationQuerierPath = flag.String("observation_querier_path", "", "The full path to the Observation querier binary")
 	testAppPath            = flag.String("test_app_path", "", "The full path to the Cobalt test app binary")
+	bigtableToolPath       = flag.String("bigtable_tool_path", "", "The full path to the Cobalt bigtable_tool binary")
 
 	analyzerUri     = flag.String("analyzer_uri", "", "The URI of the Analyzer Service")
 	reportMasterUri = flag.String("report_master_uri", "", "The URI of the Report Master")
@@ -185,6 +186,17 @@ func init() {
 	flag.Parse()
 
 	reportClient = report_client.NewReportClient(customerId, projectId, *reportMasterUri, false, "")
+
+	if *bigtableToolPath != "" {
+		fmt.Printf("*** Deleting all observations from the Observation Store at %s;%s.\n", *bigtableProjectName, *bigtableInstanceName)
+		if err := invokeBigtableTool("delete_observations"); err != nil {
+			panic(fmt.Sprintf("Error deleting observations [%v].", err))
+		}
+		fmt.Printf("*** Deleting all reports from the Report Store at %s;%s.\n", *bigtableProjectName, *bigtableInstanceName)
+		if err := invokeBigtableTool("delete_reports"); err != nil {
+			panic(fmt.Sprintf("Error deleting reports [%v].", err))
+		}
+	}
 }
 
 // A ValuePart represents part of an input to the Cobalt encoder. It specifies
@@ -220,6 +232,25 @@ func flagString(values []ValuePart) string {
 		buffer.WriteString(values[i].String())
 	}
 	return buffer.String()
+}
+
+func invokeBigtableTool(command string) error {
+	arguments := []string{
+		"-logtostderr", fmt.Sprintf("-v=%d", *subProcessVerbosity),
+		"-command", command,
+		"-bigtable_instance_name", *bigtableInstanceName,
+		"-bigtable_project_name", *bigtableProjectName,
+	}
+	cmd := exec.Command(*bigtableToolPath, arguments...)
+	_, err := cmd.Output()
+	if err != nil {
+		stdErrMessage := ""
+		if exitError, ok := err.(*exec.ExitError); ok {
+			stdErrMessage = string(exitError.Stderr)
+		}
+		return fmt.Errorf("Error returned from bigtable_tool process: [%v] %s", err, stdErrMessage)
+	}
+	return nil
 }
 
 // Invokes the "query_observations" command in order to query the ObservationStore

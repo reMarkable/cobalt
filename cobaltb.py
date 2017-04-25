@@ -44,6 +44,8 @@ SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
 SERVICE_ACCOUNT_CREDENTIALS_FILE = os.path.join(THIS_DIR,
     'service_account_credentials.json')
 PERSONAL_CLUSTER_JSON_FILE = os.path.join(THIS_DIR, 'personal_cluster.json')
+BIGTABLE_TOOL_PATH = \
+    os.path.join(OUT_DIR, 'tools', 'bigtable_tool', 'bigtable_tool')
 
 _logger = logging.getLogger()
 _verbose_count = 0
@@ -190,6 +192,7 @@ def _test(args):
       ]
       if args.use_cloud_bt or args.cobalt_on_gke:
         test_args = test_args + [
+          "-bigtable_tool_path=%s" % BIGTABLE_TOOL_PATH,
           "-bigtable_project_name=%s" % args.bigtable_project_name,
           "-bigtable_instance_name=%s" % args.bigtable_instance_name,
         ]
@@ -294,7 +297,7 @@ def _generate_keys(args):
   path = os.path.join(OUT_DIR, 'tools', 'key_generator', 'key_generator')
   subprocess.check_call([path])
 
-def _provision_bigtable(args):
+def _invoke_bigtable_tool(args, command):
   if not os.path.exists(SERVICE_ACCOUNT_CREDENTIALS_FILE):
     print ('You must first create the file %s.' %
            SERVICE_ACCOUNT_CREDENTIALS_FILE)
@@ -306,11 +309,19 @@ def _provision_bigtable(args):
   if args.bigtable_instance_name == '':
     print '--bigtable_instance_name must be specified'
     return
-
-  path = os.path.join(OUT_DIR, 'tools', 'bigtable_tool', 'bigtable_tool')
-  subprocess.check_call([path,
+  subprocess.check_call([BIGTABLE_TOOL_PATH,
+      "--command", command,
       "--bigtable_project_name", args.bigtable_project_name,
       "--bigtable_instance_name", args.bigtable_instance_name])
+
+def _provision_bigtable(args):
+  _invoke_bigtable_tool(args, "create_tables")
+
+def _delete_observations(args):
+  _invoke_bigtable_tool(args, "delete_observations")
+
+def _delete_reports(args):
+  _invoke_bigtable_tool(args, "delete_reports")
 
 def _deploy_show(args):
   container_util.display()
@@ -572,21 +583,59 @@ def main():
     help='Generate new public/private key pairs.')
   sub_parser.set_defaults(func=_generate_keys)
 
-  sub_parser = subparsers.add_parser('provision_bigtable',
+  ########################################################
+  # bigtable command
+  ########################################################
+  bigtable_parser = subparsers.add_parser('bigtable',
+    help='Perform an operation on your personal Cloud Bigtable cluster.')
+  bigtable_subparsers = bigtable_parser.add_subparsers()
+
+  sub_parser = bigtable_subparsers.add_parser('provision',
     parents=[parent_parser],
     help="Create Cobalt's Cloud BigTables if they don't exit.")
-  sub_parser.set_defaults(func=_generate_keys)
-  sub_parser.add_argument('--bigtable_project_name',
-      help='Specify the Cloud project containing the Bigtable instance '
-      ' to be provisioned. '
-      'default=%s'%personal_cluster_settings['bigtable_project_name'],
-      default=personal_cluster_settings['bigtable_project_name'])
-  sub_parser.add_argument('--bigtable_instance_name',
-      help='Specify the Cloud Bigtable instance within the specified Cloud'
-      ' project that is to be provisioned. '
-      'default=%s'%personal_cluster_settings['bigtable_instance_name'],
-      default=personal_cluster_settings['bigtable_instance_name'])
   sub_parser.set_defaults(func=_provision_bigtable)
+  sub_parser.add_argument('--bigtable_project_name',
+    help='Specify the Cloud project containing the Bigtable instance '
+    ' to be provisioned. '
+    'default=%s'%personal_cluster_settings['bigtable_project_name'],
+    default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--bigtable_instance_name',
+    help='Specify the Cloud Bigtable instance within the specified Cloud'
+    ' project that is to be provisioned. '
+    'default=%s'%personal_cluster_settings['bigtable_instance_name'],
+    default=personal_cluster_settings['bigtable_instance_name'])
+
+  sub_parser = bigtable_subparsers.add_parser('delete_observations',
+    parents=[parent_parser],
+    help='**WARNING: Permanently delete all data from Cobalt\'s Observation '
+    'store. **')
+  sub_parser.set_defaults(func=_delete_observations)
+  sub_parser.add_argument('--bigtable_project_name',
+    help='Specify the Cloud project containing the Bigtable instance '
+    ' from which all Observation data will be permanently deleted. '
+    'default=%s'%personal_cluster_settings['bigtable_project_name'],
+    default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--bigtable_instance_name',
+    help='Specify the Cloud Bigtable instance within the specified Cloud'
+    ' project from which all Observation data will be permanently deleted. '
+    'default=%s'%personal_cluster_settings['bigtable_instance_name'],
+    default=personal_cluster_settings['bigtable_instance_name'])
+
+  sub_parser = bigtable_subparsers.add_parser('delete_reports',
+    parents=[parent_parser],
+    help='**WARNING: Permanently delete all data from Cobalt\'s Report '
+    'store. **')
+  sub_parser.set_defaults(func=_delete_reports)
+  sub_parser.add_argument('--bigtable_project_name',
+    help='Specify the Cloud project containing the Bigtable instance '
+    ' from which all Report data will be permanently deleted. '
+    'default=%s'%personal_cluster_settings['bigtable_project_name'],
+    default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--bigtable_instance_name',
+    help='Specify the Cloud Bigtable instance within the specified Cloud'
+    ' project from which all Report data will be permanently deleted. '
+    'default=%s'%personal_cluster_settings['bigtable_instance_name'],
+    default=personal_cluster_settings['bigtable_instance_name'])
 
   ########################################################
   # deploy command
