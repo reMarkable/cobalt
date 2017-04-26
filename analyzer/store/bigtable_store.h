@@ -66,6 +66,10 @@ class BigtableStore : public DataStore {
  private:
   std::string TableName(DataStore::Table table);
 
+  // DoWriteRows does the work of WriteRows(). WriteRows() invokes DoWriteRows()
+  // in a loop, retrying with exponential backoff when a retryable error occurs.
+  grpc::Status DoWriteRows(Table table, const std::vector<Row>& rows);
+
   // This method is used to implement ReadRow and ReadRows. It is identical to
   // ReadRows except that instead of limit_row_key it has end_row_key and
   // inclusive_end. In other words it supports intervals that are closed on

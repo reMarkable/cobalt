@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <map>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -78,6 +79,22 @@ store::Status GrpcStatusToStoreStatus(const grpc::Status& status) {
       return kInvalidArguments;
     default:
       return kOperationFailed;
+  }
+}
+
+// Returns whether or not an operation should be retried based on its returned
+// status.
+bool ShouldRetry(const grpc::Status& status) {
+  switch (status.error_code()) {
+    case grpc::ABORTED:
+    case grpc::CANCELLED:
+    case grpc::DEADLINE_EXCEEDED:
+    case grpc::INTERNAL:
+    case grpc::UNAVAILABLE:
+      return true;
+
+    default:
+      return false;
   }
 }
 
@@ -151,13 +168,55 @@ Status BigtableStore::WriteRow(DataStore::Table table, DataStore::Row row) {
 
 Status BigtableStore::WriteRows(DataStore::Table table,
                                 std::vector<DataStore::Row> rows) {
+  // We use the following simplistic strategy to perform retries with
+  // exponential backoff.
+  // (1) If any retryable error occurs we sleep and retry the entire operation.
+  // (2) The sleep period starts with 10ms the first time and doubles each time
+  //     until it reaches about 5 seconds.
+  // (3) If we fail every time the sum of all sleep times is about 10 seconds.
+  //
+  // TODO(rudominer) The exponential backoff strategy can be made more
+  // sophisticated in the following ways:
+  // (a) We could randomize the sleep time up to an exponentially increasing
+  //     maximum value.
+  // (b) Instead of retrying the whole operation we could retry only the failed
+  //     parts of the operation.
+  // (c) Instead of always continuing the procedure up to about 10 seconds we
+  //     could instead consider the pending RPC deadline from our own client.
+  //     Currently the Shuffler does not set an RPC deadline.
+  grpc::Status status;
+  static const size_t kMaxAttempts = 11;
+  int sleepmillis = 10;
+  for (int attempt = 0; attempt < kMaxAttempts; attempt++) {
+    status = DoWriteRows(table, rows);
+    if (status.ok()) {
+      return kOK;
+    }
+    if (!ShouldRetry(status)) {
+      LOG(ERROR) << "Non-retryable error: "
+                 << ErrorMessage(status, "WriteRows");
+      return GrpcStatusToStoreStatus(status);
+    }
+    if (attempt < kMaxAttempts - 1) {
+      VLOG(1) << "Sleeping for " << sleepmillis << " ms.";
+      std::this_thread::sleep_for(std::chrono::milliseconds(sleepmillis));
+      sleepmillis *= 2;
+    }
+  }
+  LOG(ERROR) << "Retried " << kMaxAttempts << " times without success. "
+             << ErrorMessage(status, "WriteRows");
+  return GrpcStatusToStoreStatus(status);
+}
+
+grpc::Status BigtableStore::DoWriteRows(
+    DataStore::Table table, const std::vector<DataStore::Row>& rows) {
   MutateRowsRequest req;
   req.set_table_name(TableName(table));
   for (auto& row : rows) {
     auto entry = req.add_entries();
-    entry->mutable_row_key()->swap(row.key);
+    entry->set_row_key(row.key);
 
-    for (auto& pair : row.column_values) {
+    for (const auto& pair : row.column_values) {
       Mutation_SetCell* cell = entry->add_mutations()->mutable_set_cell();
       cell->set_family_name(kDataColumnFamilyName);
       // We Regex encode all values before using them as column names so that
@@ -166,14 +225,14 @@ Status BigtableStore::WriteRows(DataStore::Table table,
       std::string encoded_column_name;
       if (!RegexEncode(pair.first, &encoded_column_name)) {
         LOG(ERROR) << "RegexEncode failed on '" << pair.first << "'";
-        return kInvalidArguments;
+        return grpc::Status(grpc::INVALID_ARGUMENT, "RegexEncode failed.");
       }
       cell->mutable_column_qualifier()->swap(encoded_column_name);
-      cell->mutable_value()->swap(pair.second);
+      cell->set_value(pair.second);
     }
   }
 
-  Status return_status = kOK;
+  grpc::Status return_status = grpc::Status::OK;
   ClientContext context;
   std::unique_ptr<ClientReader<MutateRowsResponse>> reader(
       stub_->MutateRows(&context, req));
@@ -182,18 +241,19 @@ Status BigtableStore::WriteRows(DataStore::Table table,
   while (reader->Read(&resp)) {
     for (const auto& entry : resp.entries()) {
       if (entry.status().code() != google::rpc::OK) {
-        LOG(ERROR) << "MutateRows failed at entry " << entry.index()
-                   << " with error " << entry.status().message()
-                   << " code=" << entry.status().code();
-        return_status = kOperationFailed;
+        VLOG(1) << "MutateRows failed at entry " << entry.index()
+                << " with error " << entry.status().message()
+                << " code=" << entry.status().code();
+        return_status = grpc::Status(grpc::StatusCode(entry.status().code()),
+                                     entry.status().message());
       }
     }
   }
 
   grpc::Status status = reader->Finish();
   if (!status.ok()) {
-    LOG(ERROR) << ErrorMessage(status, "MutateRows");
-    return_status = GrpcStatusToStoreStatus(status);
+    VLOG(1) << ErrorMessage(status, "MutateRows");
+    return_status = status;
   }
 
   return return_status;
