@@ -28,3 +28,6 @@
 [submodule "third_party/go/src/github.com/golang/snappy"]
 	path = third_party/go/src/github.com/golang/snappy
 	url = https://github.com/golang/snappy
+[submodule "third_party/go/src/golang.org/x/crypto"]
+	path = third_party/go/src/golang.org/x/crypto
+	url = https://github.com/golang/crypto

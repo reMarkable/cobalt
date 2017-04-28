@@ -15,17 +15,18 @@
 package util
 
 import (
+	"crypto/elliptic"
 	"crypto/rand"
 	"io"
 	"testing"
 )
 
-func TestSymmetricCipherCrypter(t *testing.T) {
+func TestSymmetricCipher(t *testing.T) {
 	const nonceSize = 12
 
 	// test for an invalid key with length != 16 bytes
 	key := []byte("AES256Key")
-	_, err := NewSymmetricCipherCrypter(key)
+	_, err := NewSymmetricCipher(key)
 	if err == nil {
 		t.Errorf("expected error for invalid key")
 		return
@@ -33,9 +34,9 @@ func TestSymmetricCipherCrypter(t *testing.T) {
 
 	// Use a 16 byte key to select AES-128
 	key = []byte("AES256Key-16Char")
-	c, err := NewSymmetricCipherCrypter(key)
+	c, err := NewSymmetricCipher(key)
 	if err != nil {
-		t.Errorf("Unable to initialize test SymmetricCipherCrypter: %v", err)
+		t.Errorf("Unable to initialize test SymmetricCipher: %v", err)
 		return
 	}
 
@@ -75,5 +76,106 @@ func TestSymmetricCipherCrypter(t *testing.T) {
 			t.Errorf("got [%s] after decryption, want [%s]", decryptedtext, plaintext)
 			return
 		}
+	}
+}
+
+func TestHybridCipher(t *testing.T) {
+	privateKey, publicKey, _, _, err := generateECKey()
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	hybridCipher := NewHybridCipher(privateKey, publicKey)
+
+	// This is Shakespearean Sonnet number 110.
+	plaintext := `
+  Alas 'tis true, I have gone here and there,
+  And made my self a motley to the view,
+  Gored mine own thoughts, sold cheap what is most dear,
+  Made old offences of affections new.
+
+  Most true it is, that I have looked on truth
+  Askance and strangely: but by all above,
+  These blenches gave my heart another youth,
+  And worse essays proved thee my best of love.
+
+  Now all is done, have what shall have no end,
+  Mine appetite I never more will grind
+  On newer proof, to try an older friend,
+  A god in love, to whom I am confined.
+
+    Then give me welcome, next my heaven the best,
+    Even to thy pure and most most loving breast.`
+	ciphertext, err := hybridCipher.Encrypt([]byte(plaintext))
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	recoveredText, err := hybridCipher.Decrypt(ciphertext)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	if string(recoveredText) != plaintext {
+		t.Errorf("recoveredText=[%s]", string(recoveredText))
+	}
+
+	// Intentionally corrupt the ciphertext by omitting the first byte.
+	corruptedCiphertext := ciphertext[1:]
+	// Check that Decrypt() returns an error but does not crash.
+	_, err = hybridCipher.Decrypt(corruptedCiphertext)
+	if err == nil {
+		t.Errorf("Expected an error.")
+	}
+
+	// Intentionally corrupt the ciphertext by prepending an extra zero byte.
+	corruptedCiphertext = []byte{0}
+	corruptedCiphertext = append(corruptedCiphertext, ciphertext...)
+	// Check that Decrypt() returns an error but does not crash.
+	_, err = hybridCipher.Decrypt(corruptedCiphertext)
+	if err == nil {
+		t.Errorf("Expected an error.")
+	}
+
+	// Intentionally corrupt the ciphertext by appending an extra zero byte.
+	corruptedCiphertext = append(ciphertext, 0)
+	// Check that Decrypt() returns an error but does not crash.
+	_, err = hybridCipher.Decrypt(corruptedCiphertext)
+	if err == nil {
+		t.Errorf("Expected an error.")
+	}
+}
+
+func TestMarshalUnmarshall(t *testing.T) {
+	_, _, pubX, pubY, err := generateECKey()
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	// Test uncompressed
+	uncompressedData := elliptic.Marshal(ellipticCurve, pubX, pubY)
+	if uncompressedData == nil {
+		t.Errorf("Marshal failed.")
+	}
+
+	x, y := Unmarshal(ellipticCurve, uncompressedData)
+	if x.Cmp(pubX) != 0 {
+		t.Errorf("x's don't match")
+	}
+	if y.Cmp(pubY) != 0 {
+		t.Errorf("x's don't match")
+	}
+
+	// Test compressed
+	compressedData := MarshalCompressed(ellipticCurve, pubX, pubY)
+	if compressedData == nil {
+		t.Errorf("Marshal failed.")
+	}
+
+	x, y = Unmarshal(ellipticCurve, compressedData)
+	if x.Cmp(pubX) != 0 {
+		t.Errorf("x's don't match")
+	}
+	if y.Cmp(pubY) != 0 {
+		t.Errorf("x's don't match")
 	}
 }
