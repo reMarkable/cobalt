@@ -43,17 +43,14 @@ namespace {
 // here http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf)
 #define EC_CURVE_CONSTANT NID_X9_62_prime256v1
 
+static const size_t GROUP_ELEMENT_SIZE = 256 / 8;  // (g^xy) object length
+
 const EVP_AEAD* GetAEAD() {
   // Note(rudominer) The constants KEY_SIZE and NONCE_SIZE are set based
   // on the algorithm chosen. If this algorithm changes you must also
   // change those constants accordingly.
-  //
-  // NOTE(pseudorandom) By using a 256-bit curve in EC_CURVE_CONSTANT for
-  // public-key cryptography when SymmetricCipher is used in HybridCipher,
-  // the effective security level is AES-128 and not AES-256.
-  return EVP_aead_aes_256_gcm();
+  return EVP_aead_aes_128_gcm();
 }
-static const size_t GROUP_ELEMENT_SIZE = 256 / 8;  // (g^xy) object length
 
 // For hybrid mode, we can fix the nonce to all zeroes without losing
 // security. See: https://goto.google.com/aes-gcm-zero-nonce-security
