@@ -35,8 +35,8 @@ class HybridCipherContext;
 // any other methods or the other operations will fail or crash.
 class SymmetricCipher {
  public:
-  static const size_t KEY_SIZE = 128/8;
-  static const size_t NONCE_SIZE = 96/8;
+  static const size_t KEY_SIZE = 128 / 8;
+  static const size_t NONCE_SIZE = 96 / 8;
 
   SymmetricCipher();
   ~SymmetricCipher();
@@ -134,8 +134,8 @@ class SymmetricCipher {
 class HybridCipher {
  public:
   // NOTE: All three sizes below specify a number of bytes (not bits.)
-  static const size_t PUBLIC_KEY_SIZE = 1 + 256/8;  // One byte extra
-                                                    // for X9.62 serialization
+  static const size_t PUBLIC_KEY_SIZE = 1 + 256 / 8;  // One byte extra
+                                                      // for X9.62 serialization
   static const size_t PRIVATE_KEY_SIZE = 256 / 8;
   static const size_t SALT_SIZE = 128 / 8;  // Salt for HKDF
   static const size_t PUBLIC_KEY_FINGERPRINT_SIZE = 256 / 8;
