@@ -19,7 +19,6 @@
 
 namespace cobalt {
 namespace rappor {
-namespace testing {
 
 // Returns whether or not the bit with the given |bit_index| is set in
 // |data|. The bits are indexed "from right-to-left", i.e. from least
@@ -43,7 +42,6 @@ std::string CategoryName(uint32_t index);
 std::string BuildBitPatternString(int num_bits, int index, char index_char,
                                   char other_char);
 
-}  // namespace testing
 }  // namespace rappor
 }  // namespace cobalt
 

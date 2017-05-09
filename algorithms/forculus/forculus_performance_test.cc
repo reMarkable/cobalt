@@ -14,13 +14,13 @@
 
 #include "algorithms/forculus/forculus_analyzer.h"
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+
 #include <chrono>
 #include <ctime>
 #include <fstream>
 #include <streambuf>
-
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 
 #include "algorithms/forculus/forculus_encrypter.h"
 #include "encoder/client_secret.h"

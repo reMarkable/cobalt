@@ -17,7 +17,6 @@
 
 namespace cobalt {
 namespace rappor {
-namespace testing {
 
 // Tests the function DataToBinaryString().
 TEST(TestUtilsTest, DataToBinaryString) {
@@ -77,6 +76,5 @@ TEST(TestUtilsTest, BinaryStringToData) {
             BinaryStringToData("000000010000000100000000"));
 }
 
-}  // namespace testing
 }  // namespace rappor
 }  // namespace cobalt

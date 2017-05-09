@@ -30,9 +30,6 @@ namespace cobalt {
 namespace rappor {
 
 using encoder::ClientSecret;
-using testing::BinaryStringToData;
-using testing::BuildBitPatternString;
-using testing::CategoryName;
 
 namespace {
 

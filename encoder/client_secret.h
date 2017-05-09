@@ -19,13 +19,13 @@
 #include <utility>
 #include <vector>
 
+#include "util/crypto_util/random.h"
 #include "util/crypto_util/types.h"
 
 namespace cobalt {
 namespace encoder {
 
 using crypto::byte;
-
 
 // A ClientSecret is a wrapper around an array of bytes containing
 // random bytes from a CSPRNG. Clients should invoke GenerateNewSecret()
@@ -37,14 +37,10 @@ using crypto::byte;
 class ClientSecret {
  public:
   // Move constructor
-  ClientSecret(ClientSecret&& other) {
-    bytes_ = std::move(other.bytes_);
-  }
+  ClientSecret(ClientSecret&& other) { bytes_ = std::move(other.bytes_); }
 
   // Copy constructor
-  ClientSecret(const ClientSecret& other) {
-    bytes_ = other.bytes_;
-  }
+  ClientSecret(const ClientSecret& other) { bytes_ = other.bytes_; }
 
   bool operator==(const ClientSecret& other) const {
     if (!valid() || !other.valid()) {
@@ -66,9 +62,7 @@ class ClientSecret {
 
   // Is this ClientSecret valid? An invalid ClientSecret may occur when an
   // invalid token is passed to FromToken(), or after a move occurs.
-  bool valid() const {
-    return !bytes_.empty();
-  }
+  bool valid() const { return !bytes_.empty(); }
 
   // Returns a token that may be used to reconstitute this ClientSecret
   // using the FromToken() function. Returns the empty string if this
@@ -77,11 +71,13 @@ class ClientSecret {
   // This method is not thread safe.
   std::string GetToken();
 
-  const byte* const  data() {
-    return bytes_.data();
-  }
+  const byte* const data() const { return bytes_.data(); }
 
   static const size_t kNumSecretBytes = 16;
+
+  // For internal testing use only. Does not take ownership of |rand|.
+  // Uses |rand| to generate the new secret.
+  static ClientSecret GenerateNewSecret(crypto::Random* rand);
 
  private:
   // Private default constructor

@@ -17,7 +17,6 @@
 
 namespace cobalt {
 namespace rappor {
-namespace testing {
 
 bool IsSet(const std::string& data, int bit_index) {
   uint32_t num_bytes = data.size();
@@ -73,7 +72,5 @@ std::string BuildBitPatternString(int num_bits, int index, char index_char,
       std::string(index, other_char);
 }
 
-
-}  // namespace testing
 }  // namespace rappor
 }  // namespace cobalt

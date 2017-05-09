@@ -24,10 +24,15 @@ namespace encoder {
 
   // static
   ClientSecret ClientSecret::GenerateNewSecret() {
+    crypto::Random rand;
+    return GenerateNewSecret(&rand);
+  }
+
+  // static
+  ClientSecret ClientSecret::GenerateNewSecret(crypto::Random* rand) {
     ClientSecret client_secret;
     client_secret.bytes_.resize(kNumSecretBytes);
-    crypto::Random rand;
-    rand.RandomBytes(client_secret.bytes_.data(), kNumSecretBytes);
+    rand->RandomBytes(client_secret.bytes_.data(), kNumSecretBytes);
     return client_secret;
   }
 
