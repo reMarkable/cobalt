@@ -55,16 +55,17 @@ message ForculusConfig {
 }
 
 message RapporConfig {
-  // k = the number of Bloom filter bits. This must satisfy
-  // 1 <= h < k < 1024, where h = num_hashes.
+  // k = the number of Bloom filter bits. This must be a power of 2 and
+  // it must satisfy:
+  // 1 <= h < k <= 1024, where h = num_hashes.
   uint32 num_bloom_bits = 1;
 
   // h = the number of hashes. This must satisfy
-  // 1 <= h <  8
+  // 1 <= h <=  8
   uint32 num_hashes = 2;
 
   // m = the number of cohorts. This must satisfy
-  // 1 <= m < 1024
+  // 1 <= m <= 1024
   uint32 num_cohorts = 3;
 
   // All probabilities below must be in the range [0.0, 1.0]

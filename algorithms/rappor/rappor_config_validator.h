@@ -23,6 +23,9 @@
 #include "./observation.pb.h"
 #include "config/encodings.pb.h"
 
+// For the FRIEND_TEST macro.
+#include "third_party/googletest/googletest/include/gtest/gtest_prod.h"
+
 namespace cobalt {
 namespace rappor {
 
@@ -36,13 +39,16 @@ class RapporConfigValidator {
 
   ~RapporConfigValidator();
 
-  float prob_0_becomes_1();
+  float prob_0_becomes_1() { return prob_0_becomes_1_; }
 
-  float prob_1_stays_1();
+  float prob_1_stays_1() { return prob_1_stays_1_; }
 
-  bool valid();
+  bool valid() { return valid_; }
 
-  uint32_t num_bits();
+  uint32_t num_bits() { return num_bits_; }
+  uint32_t num_hashes() { return num_hashes_; }
+  uint32_t num_cohorts() { return num_cohorts_; }
+  uint32_t num_cohorts_2_power() { return num_cohorts_2_power_; }
 
   // Returns the bit-index of |category| or -1 if |category| is not one of the
   // basic RAPPOR categories (or if this object was not initialized with a
@@ -51,9 +57,14 @@ class RapporConfigValidator {
 
   // Gives access to the vector of Categories if this object was initialized
   // with a BasicRapporConfig.
-  std::vector<ValuePart>& categories();
+  std::vector<ValuePart>& categories() { return categories_; }
 
  private:
+  FRIEND_TEST(RapporConfigValidatorTest, TestMinPower2Above);
+
+  // Returns the least power of 2 greater than or equal to x.
+  static uint32_t MinPower2Above(uint16_t x);
+
   bool valid_;
   float prob_0_becomes_1_;
   float prob_1_stays_1_;
@@ -62,6 +73,8 @@ class RapporConfigValidator {
   // Used only in string RAPPOR
   uint32_t num_hashes_;
   uint32_t num_cohorts_;
+  // This is the least power of 2 greater than or equal to num_cohorts_.
+  uint32_t num_cohorts_2_power_;
 
   // Used only in Basic RAPPOR. |categories_| is the list of all
   // categories. The keys to |category_to_bit_index_| are serialized

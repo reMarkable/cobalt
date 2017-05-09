@@ -28,12 +28,6 @@
 namespace cobalt {
 namespace rappor {
 
-namespace testing {
-// Forward declaration of a test in another namespace is necessary in order
-// to make the test a friend class.
-class BasicRapporDeterministicTest;
-}  // namespace testing
-
 enum Status {
   kOK = 0,
   kInvalidConfig,
@@ -53,15 +47,43 @@ class RapporEncoder {
   // kInvalidConfig if the |config| passed to the constructor is not valid.
   Status Encode(const ValuePart& value, RapporObservation* observation_out);
 
+  uint32_t cohort() const { return cohort_num_; }
+
  private:
+  friend class StringRapporEncoderTest;
+
   // Allows Friend classess to set a special RNG for use in tests.
   void SetRandomForTesting(std::unique_ptr<crypto::Random> random) {
     random_ = std::move(random);
   }
 
+  // Generates the array of bloom bits derived from |value|. Returns the
+  // empty string on error.
+  std::string MakeBloomBits(const ValuePart& value);
+
+  // Derives an integer in the range [0, config_.num_cohorts_2_power_) from
+  // |client_secret_| and |attempt_number|. The distribution of values in this
+  // range will be (approximately) uniform as the Client Secret and
+  // |attempt_number| vary uniformly.
+  //
+  // This method is invoked iteratively from DeriveCohortFromSecret() with
+  // increasing attempt_numbers until the returned value is less than
+  // config_.num_cohorts_.
+  //
+  // Returns UINT32_MAX to indicate failure.
+  uint32_t AttemptDeriveCohortFromSecret(size_t attempt_number);
+
+  // Derives an integer in the range [0, config_.num_cohorts_) from
+  // |client_secret_|. The distribution of values in this range will be
+  // (approximately) uniform as the Client Secret varies uniformly.
+  //
+  // Returns UINT32_MAX to indicate failure.
+  uint32_t DeriveCohortFromSecret();
+
   std::unique_ptr<RapporConfigValidator> config_;
   std::unique_ptr<crypto::Random> random_;
   encoder::ClientSecret client_secret_;
+  uint32_t cohort_num_;
 };
 
 // Performs encoding for Basic RAPPOR, a.k.a Categorical RAPPOR. No cohorts
@@ -84,7 +106,7 @@ class BasicRapporEncoder {
 
  private:
   friend class BasicRapporAnalyzerTest;
-  friend class testing::BasicRapporDeterministicTest;
+  friend class BasicRapporDeterministicTest;
 
   // Allows Friend classess to set a special RNG for use in tests.
   void SetRandomForTesting(std::unique_ptr<crypto::Random> random) {

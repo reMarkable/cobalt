@@ -15,13 +15,17 @@
 #include "algorithms/rappor/rappor_config_validator.h"
 
 #include <glog/logging.h>
+
 #include <string>
 #include <vector>
 
 #include "./observation.pb.h"
+#include "util/crypto_util/hash.h"
 
 namespace cobalt {
 namespace rappor {
+
+using crypto::hash::DIGEST_SIZE;
 
 namespace {
 // Factors out some common validation logic.
@@ -88,25 +92,59 @@ bool ExtractCategories(const BasicRapporConfig& config,
 
 }  // namespace
 
+uint32_t RapporConfigValidator::MinPower2Above(uint16_t x) {
+  // See http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+  if (x == 0) {
+    return 1;
+  }
+  uint32_t v = x - 1;
+  v |= v >> 1;
+  v |= v >> 2;
+  v |= v >> 4;
+  v |= v >> 8;
+  return v + 1;
+}
+
+// Constructor for String RAPPOR
 RapporConfigValidator::RapporConfigValidator(const RapporConfig& config)
     : prob_0_becomes_1_(config.prob_0_becomes_1()),
       prob_1_stays_1_(config.prob_1_stays_1()),
       num_bits_(config.num_bloom_bits()),
       num_hashes_(config.num_hashes()),
-      num_cohorts_(config.num_cohorts()) {
+      num_cohorts_(config.num_cohorts()),
+      // num_cohorts_2_power_ is computed below.
+      num_cohorts_2_power_(0) {
   valid_ = false;
   if (!CommonValidate(prob_0_becomes_1_, prob_1_stays_1_, config.prob_rr())) {
     return;
   }
-  if (num_bits_ < 1 || num_bits_ >= 1024) {
+  if (num_bits_ <= 1 || num_bits_ > 1024) {
+    VLOG(1) << "For k = num_bits we require 1 < k <= 1024.";
     return;
   }
-  if (num_hashes_ < 1 || num_hashes_ >= 8 || num_hashes_ >= num_bits_) {
+  if ((num_bits_ & (num_bits_ - 1)) != 0) {
+    VLOG(1) << "k = num_bits must be a power of 2.";
     return;
   }
-  if (num_cohorts_ < 1 || num_cohorts_ >= 1024) {
+  if (num_hashes_ < 1 || num_hashes_ > 8 || num_hashes_ >= num_bits_) {
+    VLOG(1) << "For k = num_bits and h = num_hashes we require  1 <= h <= 8 "
+               "and h < k.";
     return;
   }
+  // We consume 2 bytes of the digest per hash.
+  if (num_hashes_ * 2 > DIGEST_SIZE) {
+    // This should not happen unless DIGEST_SIZE is changed to a value that is
+    // too small.
+    VLOG(1) << "DIGEST_SIZE too small for number of hashes: " << DIGEST_SIZE;
+    return;
+  }
+  if (num_cohorts_ < 1 || num_cohorts_ > 1024) {
+    VLOG(1) << "For m = num_cohorts we require 1 <= m <= 1024.";
+    return;
+  }
+  num_cohorts_2_power_ = MinPower2Above((uint16_t(num_cohorts_)));
+  CHECK_GT(num_cohorts_2_power_, 0);
+  CHECK_LE(num_cohorts_2_power_, 1024);
   valid_ = true;
 }
 
@@ -143,14 +181,6 @@ RapporConfigValidator::RapporConfigValidator(const BasicRapporConfig& config)
 
 RapporConfigValidator::~RapporConfigValidator() {}
 
-float RapporConfigValidator::prob_0_becomes_1() { return prob_0_becomes_1_; }
-
-float RapporConfigValidator::prob_1_stays_1() { return prob_1_stays_1_; }
-
-bool RapporConfigValidator::valid() { return valid_; }
-
-uint32_t RapporConfigValidator::num_bits() { return num_bits_; }
-
 // Returns the bit-index of |category| or -1 if |category| is not one of the
 // basic RAPPOR categories (or if this object was not initialized with a
 // BasicRapporConfig.)
@@ -162,10 +192,6 @@ int RapporConfigValidator::bit_index(const ValuePart& category) {
     return -1;
   }
   return iterator->second;
-}
-
-std::vector<ValuePart>& RapporConfigValidator::categories() {
-  return categories_;
 }
 
 }  // namespace rappor
