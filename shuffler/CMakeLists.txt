@@ -48,6 +48,7 @@ set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
 set(RECEIVER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/receiver/receiver.go")
 set(CRYPTO_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util.go")
 set(ELLIPTIC_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/elliptic_util.go")
+set(ENCRYPTED_MESSAGE_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/encrypted_message_util.go")
 set(RAND_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/rand_util.go")
 set(CONFIG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_util.go")
 set(STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/store.go")
@@ -68,6 +69,7 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     DEPENDS ${RECEIVER_SRC}
     DEPENDS ${CRYPTO_UTIL_SRC}
     DEPENDS ${ELLIPTIC_UTIL_SRC}
+    DEPENDS ${ENCRYPTED_MESSAGE_UTIL_SRC}
     DEPENDS ${RAND_UTIL_SRC}
     DEPENDS ${STORE_SRC}
     DEPENDS ${KEY_UTIL_SRC}
@@ -115,6 +117,18 @@ add_custom_command(OUTPUT ${UTIL_TEST_BIN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Build encrypted message util unit tests
+set(ENCRYPTED_MESSAGE_UTIL_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/encrypted_message_util_test.go")
+set(ENCRYPTED_MESSAGE_UTIL_TEST_BIN ${GO_TESTS}/encrypted_message_util_test)
+add_custom_command(OUTPUT ${ENCRYPTED_MESSAGE_UTIL_TEST_BIN}
+    COMMAND ${GO_BIN} test -c -o ${ENCRYPTED_MESSAGE_UTIL_TEST_BIN} ${ENCRYPTED_MESSAGE_UTIL_TEST_SRC}
+            ${ENCRYPTED_MESSAGE_UTIL_SRC} ${CRYPTO_UTIL_SRC} ${ELLIPTIC_UTIL_SRC} ${RAND_UTIL_SRC}
+    DEPENDS ${ENCRYPTED_MESSAGE_UTIL_TEST_SRC}  ${ENCRYPTED_MESSAGE_UTIL_SRC}
+    DEPENDS ${CRYPTO_UTIL_SRC} ${CRYPTO_UTIL_TEST_SRC} ${ELLIPTIC_UTIL_SRC}
+            ${RAND_UTIL_SRC} ${RAND_UTIL_TEST_SRC}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 # Build config unit tests
 set(CONFIG_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_util_test.go")
 set(CONFIG_TEST_BIN ${GO_TESTS}/config_test)
@@ -154,6 +168,7 @@ add_custom_target(shuffler_all ALL
             ${DISPATCHER_TEST_BIN}
             ${RECEIVER_TEST_BIN}
             ${UTIL_TEST_BIN}
+            ${ENCRYPTED_MESSAGE_UTIL_TEST_BIN}
             ${CONFIG_TEST_BIN}
             ${STORAGE_TEST_BIN}
 )
