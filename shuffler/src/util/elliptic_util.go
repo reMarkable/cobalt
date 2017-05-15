@@ -16,8 +16,35 @@ package util
 
 import (
 	"crypto/elliptic"
+	"fmt"
 	"math/big"
 )
+
+// The elliptic curve we are using.
+var ellipticCurve elliptic.Curve
+
+// The number of bytes used in the serialized representation of a point on
+// the elliptic curve.
+var ecSerializationSize int
+
+// The maximum number of bytes needed to store a representation of an element of
+// the field over which the elliptic curve group is defined. (Currently this
+// will be 32 bytes.)
+var ecFieldElementSize int
+
+func init() {
+	// If the choice of curve changes we must change the numerical constants
+	// above.
+	ellipticCurve = elliptic.P256()
+
+	// 32 bytes if we are using P256.
+	ecFieldElementSize = (ellipticCurve.Params().BitSize + 7) >> 3
+
+	// We use the "compressed" form in which a point is represented by its
+	// x-coordinate (32 bytes, big-endian) with a leading byte indicating
+	// which of the two square roots to use for the y-coordinate.
+	ecSerializationSize = ecFieldElementSize + 1
+}
 
 // Routines for working with Elliptic curves.
 //
@@ -43,16 +70,14 @@ func ySquared(curve *elliptic.CurveParams, x *big.Int) *big.Int {
 // MarshalCompressed returns the X9.62 compressed serialization of the point
 // (x, y), which must be a point on the given |curve|. Returns nil on failure.
 func MarshalCompressed(curve elliptic.Curve, x, y *big.Int) []byte {
-	byteLen := (curve.Params().BitSize + 7) >> 3
-
-	ret := make([]byte, 1+byteLen)
+	ret := make([]byte, ecSerializationSize)
 	ret[0] = 2 // compressed point
 
 	xBytes := x.Bytes()
-	if len(xBytes) > byteLen {
+	if len(xBytes) > ecFieldElementSize {
 		return nil
 	}
-	copy(ret[1+byteLen-len(xBytes):], xBytes)
+	copy(ret[ecSerializationSize-len(xBytes):], xBytes)
 	// The first byte of the encoding indicates which square root of y² y is.
 	ret[0] += byte(y.Bit(0))
 	return ret
@@ -95,4 +120,43 @@ func Unmarshal(curve elliptic.Curve, data []byte) (x, y *big.Int) {
 
 	x, y = tx, ty // valid point: return it
 	return
+}
+
+// computeSharedKey returns the ECDH shared key corresponding to the given
+// public and private keys.
+//
+// If the public key is g^alpha and the private key is beta then the shared key is
+// g^{alpha*beta}.
+//
+// Since elliptic curve groups use additive notion this will be a scalar
+// multiplication instead of an exponentiation. Thus if the public key is
+// alpha*g and the private key is beta then the shared key is beta*alpha*g.
+//
+// More precisely, let (x, y) be the affine coordinates of beta*alpha*g. So
+// x and y are elements of the underlying field and so they are integers in
+// the range [0, ecFieldElementSize). The shared key is the big-endian bytes
+// of x, padded with leading zeroes so as to have length ecFieldElementSize.
+func computeSharedKey(publicX, publicY *big.Int, privateKey []byte) []byte {
+	xCoord, _ := ellipticCurve.ScalarMult(publicX, publicY, privateKey)
+	sharedKey, err := padFieldElement(xCoord.Bytes())
+	if err != nil {
+		panic(fmt.Sprintf("Cannot compute sharedKey: %v", err))
+	}
+	return sharedKey
+}
+
+// padFieldElement pads |fieldElement| with leading zeroes to a length of
+// ecFieldElementSize. Returns the padded value or an error if len(fieldElement)
+// is greater than ecFieldElementSize.
+func padFieldElement(fieldElement []byte) ([]byte, error) {
+	// Pad with leading zeroes to ecFieldElementSize.
+	if len(fieldElement) == ecFieldElementSize {
+		return fieldElement, nil
+	}
+	if len(fieldElement) > ecFieldElementSize {
+		return nil, fmt.Errorf("len(fieldElement)=%d", len(fieldElement))
+	}
+	fieldElementPadded := make([]byte, ecFieldElementSize)
+	copy(fieldElementPadded[ecFieldElementSize-len(fieldElement):], fieldElement)
+	return fieldElementPadded, nil
 }

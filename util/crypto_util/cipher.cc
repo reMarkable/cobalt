@@ -43,7 +43,10 @@ namespace {
 // here http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf)
 #define EC_CURVE_CONSTANT NID_X9_62_prime256v1
 
-static const size_t GROUP_ELEMENT_SIZE = 256 / 8;  // (g^xy) object length
+// The size in bytes of the representation of the shared key g^xy. This
+// is just the maximum number of bytes needed to store an element of the
+// underlying field.
+static const size_t ECDH_SHARED_KEY_SIZE = 256 / 8;
 
 const EVP_AEAD* GetAEAD() {
   // Note(rudominer) The constants KEY_SIZE and NONCE_SIZE are set based
@@ -400,7 +403,7 @@ bool HybridCipher::EncryptInternal(const byte* ptext, int ptext_len,
     return false;
   }
 
-  byte shared_key[GROUP_ELEMENT_SIZE];  // To store g^(xy) after ECDH
+  byte shared_key[ECDH_SHARED_KEY_SIZE];  // To store g^(xy) after ECDH
   const EC_POINT* ec_pub_point =
       EC_KEY_get0_public_key(EVP_PKEY_get0_EC_KEY(context_->GetKey()));
   size_t shared_key_len = ECDH_compute_key(shared_key, sizeof(shared_key),
@@ -415,10 +418,10 @@ bool HybridCipher::EncryptInternal(const byte* ptext, int ptext_len,
 
   // Derive hkdf_derived_key by running HKDF with SHA512 and random salt
   byte hkdf_derived_key[SymmetricCipher::KEY_SIZE];
-  std::vector<byte> hkdf_input(PUBLIC_KEY_SIZE + GROUP_ELEMENT_SIZE);
+  std::vector<byte> hkdf_input(PUBLIC_KEY_SIZE + ECDH_SHARED_KEY_SIZE);
   std::memcpy(hkdf_input.data(), public_key_part_out, PUBLIC_KEY_SIZE);
   std::memcpy(hkdf_input.data() + PUBLIC_KEY_SIZE, shared_key,
-              GROUP_ELEMENT_SIZE);
+              ECDH_SHARED_KEY_SIZE);
   if (!HKDF(hkdf_derived_key, SymmetricCipher::KEY_SIZE, EVP_sha512(),
             hkdf_input.data(), hkdf_input.size(), salt_out, SALT_SIZE, nullptr,
             0)) {
@@ -460,7 +463,7 @@ bool HybridCipher::DecryptInternal(const byte public_key_part[PUBLIC_KEY_SIZE],
     return false;
   }
 
-  byte shared_key[GROUP_ELEMENT_SIZE];  // To store g^(xy) after ECDH
+  byte shared_key[ECDH_SHARED_KEY_SIZE];  // To store g^(xy) after ECDH
   size_t shared_key_len = ECDH_compute_key(
       shared_key, sizeof(shared_key), EC_KEY_get0_public_key(eckey.get()),
       EVP_PKEY_get0_EC_KEY(context_->GetKey()), nullptr);
@@ -470,10 +473,10 @@ bool HybridCipher::DecryptInternal(const byte public_key_part[PUBLIC_KEY_SIZE],
 
   // Derive hkdf_derived_key by running HKDF with SHA512 and given salt
   byte hkdf_derived_key[SymmetricCipher::KEY_SIZE];
-  std::vector<byte> hkdf_input(PUBLIC_KEY_SIZE + GROUP_ELEMENT_SIZE);
+  std::vector<byte> hkdf_input(PUBLIC_KEY_SIZE + ECDH_SHARED_KEY_SIZE);
   std::memcpy(hkdf_input.data(), public_key_part, PUBLIC_KEY_SIZE);
   std::memcpy(hkdf_input.data() + PUBLIC_KEY_SIZE, shared_key,
-              GROUP_ELEMENT_SIZE);
+              ECDH_SHARED_KEY_SIZE);
   if (!HKDF(hkdf_derived_key, SymmetricCipher::KEY_SIZE, EVP_sha512(),
             hkdf_input.data(), hkdf_input.size(), salt, SALT_SIZE, nullptr,
             0)) {

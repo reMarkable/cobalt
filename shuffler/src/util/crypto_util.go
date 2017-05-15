@@ -40,23 +40,11 @@ const symmetricCipherKeySize = 128 / 8
 // symmetricCipherNonceSize is the size in bytes of the nonce used by SymmetricCipher.
 const symmetricCipherNonceSize = 96 / 8
 
-// The number of bytes used in the serialized representation of a point on
-// the elliptic curve. We use the "compressed" form in which a point is represented
-// by its x-coordinate (32 bytes, big-endian) with a leading byte indicating
-// which of the two square roots to use for the y-coordinate.
-const ecSerializationSize = 1 + 256/8
-
 const hybridCipherSaltSize = 128 / 8 // Salt for HKDF
-
-// The elliptic curve we are using.
-var ellipticCurve elliptic.Curve
 
 var allZeroNonce []byte
 
 func init() {
-	// If the choice of curve changes we must change the numerical constants
-	// above.
-	ellipticCurve = elliptic.P256()
 	allZeroNonce = make([]byte, symmetricCipherNonceSize)
 }
 
@@ -253,11 +241,8 @@ func (c *HybridCipher) Encrypt(plaintext []byte) (hybridCiphertext []byte, err e
 	// Generate fresh EC key (privateKeyPart, publicKeyPart) = (beta, g^beta).
 	privateKeyPart, publicKeyPart, _, _, err := generateECKey()
 
-	// Compute sharedKey = g^(alpha*beta) by computing (g^alpha)^beta.
-	// Since elliptic curve groups use additive notion this will be a scalar
-	// multiplication instead of an exponentiation
-	sharedKeyX, sharedKeyY := ellipticCurve.ScalarMult(c.publicKeyX, c.publicKeyY, privateKeyPart)
-	sharedKey := MarshalCompressed(ellipticCurve, sharedKeyX, sharedKeyY)
+	// Compute the shared key g^{alpha*beta}
+	sharedKey := computeSharedKey(c.publicKeyX, c.publicKeyY, privateKeyPart)
 
 	// Generate a random salt
 	salt := make([]byte, hybridCipherSaltSize)
@@ -315,16 +300,13 @@ func (c *HybridCipher) Decrypt(hybridCiphertext []byte) (plaintext []byte, err e
 	symmetricCiphertext := hybridCiphertext[ecSerializationSize+hybridCipherSaltSize:]
 
 	// The publicKeyPart is g^beta.
-	// Compute sharedKey = g^(alpha*beta) by computing (g^beta)^alpha, where alpha is the private key.
-	// Since elliptic curve groups use additive notion this will be a scalar
-	// multiplication instead of an exponentiation
 	publicX, publicY := Unmarshal(ellipticCurve, publicKeyPart)
 	if publicX == nil || publicY == nil {
 		err = fmt.Errorf("Unable to parse publicKeyPart as a group element.")
 		return
 	}
-	sharedKeyX, sharedKeyY := ellipticCurve.ScalarMult(publicX, publicY, c.privateKey)
-	sharedKey := MarshalCompressed(ellipticCurve, sharedKeyX, sharedKeyY)
+	// Compute sharedKey g^{alpha*beta}
+	sharedKey := computeSharedKey(publicX, publicY, c.privateKey)
 
 	// Derive hkdfDerivedKey by running HKDF with SHA512 and the salt.
 	hkdfDerivedKey, err := deriveKey(publicKeyPart, sharedKey, salt)
