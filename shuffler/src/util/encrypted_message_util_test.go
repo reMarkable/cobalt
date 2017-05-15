@@ -15,12 +15,26 @@
 package util
 
 import (
-	"encoding/pem"
 	"reflect"
 	"testing"
 
 	"cobalt"
 )
+
+var privateKeyPem, publicKeyPem string
+
+func init() {
+	privateKeyPem = `-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg1kZxvT81qrRWg2Y8
+g/M7YNtiHaC14/fbevhy/hgXcByhRANCAASkbLO+7iLLaPayYIr3YVmY0jkbwalG
+sOB9Tf3R8TR7Ow43cHlGjX3HALV1z4Lxs1v2K13yeegBJF8lU88cdAqY
+-----END PRIVATE KEY-----`
+
+	publicKeyPem = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEpGyzvu4iy2j2smCK92FZmNI5G8Gp
+RrDgfU390fE0ezsON3B5Ro19xwC1dc+C8bNb9itd8nnoASRfJVPPHHQKmA==
+-----END PUBLIC KEY-----`
+}
 
 // Makes and returns an Envelope with some non-default values so that we can recognized
 // when we correctly encrypt and decrypt it.
@@ -43,6 +57,9 @@ func MakeTestEnvelope() cobalt.Envelope {
 func TestNoEncryption(t *testing.T) {
 	// Make an EncryptedMessageMaker
 	encryptedMessageMaker := NewEncryptedMessageMaker("", cobalt.EncryptedMessage_NONE)
+	if encryptedMessageMaker == nil {
+		t.Fatal("Failed to create EncryptedMessageMaker")
+	}
 
 	// Make an Envelope with some non-default values so we can recognize it.
 	envelope1 := MakeTestEnvelope()
@@ -72,24 +89,11 @@ func TestNoEncryption(t *testing.T) {
 // Tests that a MessageDecrypter that is constructed with a valid private key
 // can decrypt messages that use the HYBRID_ECDH_V1 scheme.
 func TestHybridEncryption(t *testing.T) {
-	// Generate a key pair.
-	privateKey, publicKey, _, _, err := generateECKey()
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-
-	// Make privateKeyPem
-	block := pem.Block{
-		Bytes: privateKey,
-	}
-	privateKeyPem := string(pem.EncodeToMemory(&block))
-
-	// Make publicKeyPem
-	block.Bytes = publicKey
-	publicKeyPem := string(pem.EncodeToMemory(&block))
-
 	// Make an EncryptedMessageMaker
 	encryptedMessageMaker := NewEncryptedMessageMaker(publicKeyPem, cobalt.EncryptedMessage_HYBRID_ECDH_V1)
+	if encryptedMessageMaker == nil {
+		t.Fatal("Failed to create EncryptedMessageMaker")
+	}
 
 	// Make an Envelope with some non-default values so we can recognize it.
 	envelope1 := MakeTestEnvelope()
@@ -119,20 +123,11 @@ func TestHybridEncryption(t *testing.T) {
 // Tests that a MessageDecrypter that is constructed with an invalid private key
 // can fail gracefully.
 func TestFailedHybridEncryption(t *testing.T) {
-	// Generate a key pair.
-	_, publicKey, _, _, err := generateECKey()
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-
-	// Make publicKeyPem
-	block := pem.Block{
-		Bytes: publicKey,
-	}
-	publicKeyPem := string(pem.EncodeToMemory(&block))
-
 	// Make an EncryptedMessageMaker
 	encryptedMessageMaker := NewEncryptedMessageMaker(publicKeyPem, cobalt.EncryptedMessage_HYBRID_ECDH_V1)
+	if encryptedMessageMaker == nil {
+		t.Fatal("Failed to create EncryptedMessageMaker")
+	}
 
 	// Make an Envelope with some non-default values so we can recognize it.
 	envelope1 := MakeTestEnvelope()
@@ -157,24 +152,11 @@ func TestFailedHybridEncryption(t *testing.T) {
 // Tests that a MessageDecrypter that is constructed with a valid private key
 // and is given a corrupted ciphertext can fail gracefully.
 func TestCorruptedHybridEncryption(t *testing.T) {
-	// Generate a key pair.
-	privateKey, publicKey, _, _, err := generateECKey()
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-
-	// Make privateKeyPem
-	block := pem.Block{
-		Bytes: privateKey,
-	}
-	privateKeyPem := string(pem.EncodeToMemory(&block))
-
-	// Make publicKeyPem
-	block.Bytes = publicKey
-	publicKeyPem := string(pem.EncodeToMemory(&block))
-
 	// Make an EncryptedMessageMaker
 	encryptedMessageMaker := NewEncryptedMessageMaker(publicKeyPem, cobalt.EncryptedMessage_HYBRID_ECDH_V1)
+	if encryptedMessageMaker == nil {
+		t.Fatal("Failed to create EncryptedMessageMaker")
+	}
 
 	// Make an Envelope with some non-default values so we can recognize it.
 	envelope1 := MakeTestEnvelope()

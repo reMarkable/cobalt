@@ -15,7 +15,10 @@
 package util
 
 import (
+	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"math/big"
 )
@@ -159,4 +162,55 @@ func padFieldElement(fieldElement []byte) ([]byte, error) {
 	fieldElementPadded := make([]byte, ecFieldElementSize)
 	copy(fieldElementPadded[ecFieldElementSize-len(fieldElement):], fieldElement)
 	return fieldElementPadded, nil
+}
+
+// ParseECPrivateKeyPem parses a PEM encoded private EC key. The PEM should contain
+// an unencrypted PKCS#8 (see RFC 5208) private key of type ECDSA (see RFC 5480).
+func ParseECPrivateKeyPem(privateKeyPem string) (privateKey []byte, err error) {
+	block, _ := pem.Decode([]byte(privateKeyPem))
+	if block == nil {
+		err = fmt.Errorf("Private key PEM could not be parsed.")
+		return
+	}
+	result, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err2 != nil {
+		err = err2
+		return
+	}
+	ecPrivateKey, ok := result.(*ecdsa.PrivateKey)
+	if !ok {
+		err = fmt.Errorf("The private key PEM file did not contain an EC private key but rather a %T.", result)
+		return
+	}
+	privateKey, err = padFieldElement(ecPrivateKey.D.Bytes())
+	if err != nil {
+		err = fmt.Errorf("Cannot parse hybrid cipher private key PEM: %d.", err)
+		return
+	}
+	return
+}
+
+// ParseECPublicKeyPem parses a PEM encoded public EC key. The PEM should contain a
+// PKCS#8 public key of type ECDSA.
+func ParseECPublicKeyPem(publicKeyPEM string) (publicKey []byte, err error) {
+	block, _ := pem.Decode([]byte(publicKeyPEM))
+	if block == nil {
+		err = fmt.Errorf("Public key PEM could not be parsed.")
+		return
+	}
+	result, err2 := x509.ParsePKIXPublicKey(block.Bytes)
+	if err2 != nil {
+		err = err2
+		return
+	}
+	ecPublicKey, ok := result.(*ecdsa.PublicKey)
+	if !ok {
+		err = fmt.Errorf("The public key PEM file did not contain an EC public key but rather a %T.", result)
+		return
+	}
+	if ecPublicKey.Curve != ellipticCurve {
+		err = fmt.Errorf("The public key PEM contained an EC public key for the wrong curve: %v", ecPublicKey.Curve)
+		return
+	}
+	return elliptic.Marshal(ecPublicKey.Curve, ecPublicKey.X, ecPublicKey.Y), nil
 }

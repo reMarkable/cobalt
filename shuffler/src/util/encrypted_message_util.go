@@ -15,8 +15,6 @@
 package util
 
 import (
-	"encoding/pem"
-
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
@@ -62,12 +60,11 @@ func NewEncryptedMessageMaker(publicKeyPem string,
 	scheme cobalt.EncryptedMessage_EncryptionScheme) *EncryptedMessageMaker {
 	var cipher *HybridCipher
 	if scheme == cobalt.EncryptedMessage_HYBRID_ECDH_V1 {
-		block, _ := pem.Decode([]byte(publicKeyPem))
-		if block == nil {
-			glog.Errorln("Failed to decode publicKeyPem.")
+		publicKey, err := ParseECPublicKeyPem(publicKeyPem)
+		if err != nil {
+			glog.Errorf("Failed to decode public key PEM: %v.", err)
 			return nil
 		}
-		publicKey := block.Bytes
 		cipher = NewHybridCipher(nil, publicKey)
 		if cipher == nil {
 			glog.Errorln("Failed to construct a HybridCipher.")
@@ -136,11 +133,18 @@ type MessageDecrypter struct {
 // key.
 func NewMessageDecrypter(privateKeyPem string) *MessageDecrypter {
 	var hybridCipher *HybridCipher
-	block, _ := pem.Decode([]byte(privateKeyPem))
-	if block == nil {
-		glog.V(1).Infoln("Failed to decode privateKeyPem.")
+	if privateKeyPem == "" {
+		// We use glog.V() here becuase we don't want to print an error message if the
+		// Shuffler is being used in a test without encryption.
+		glog.V(3).Infoln("No privateKeyPem provided. Shuffler will not be able to decrypt EncryptedMessages.")
 	} else {
-		hybridCipher = NewHybridCipher(block.Bytes, nil)
+		privateKey, err := ParseECPrivateKeyPem(privateKeyPem)
+		if err != nil {
+			glog.Errorf("Failed to decode private key PEM: %v, Shuffler will not be able to decrypt EncryptedMessages.", err)
+		} else {
+			hybridCipher = NewHybridCipher(privateKey, nil)
+			glog.Infoln("Successfully parsed the private key PEM file.")
+		}
 	}
 	return &MessageDecrypter{
 		hybridCipher: hybridCipher,
@@ -179,6 +183,7 @@ func (m *MessageDecrypter) DecryptMessage(encryptedMessage *cobalt.EncryptedMess
 	if err = proto.Unmarshal(recoveredText, outMessage); err != nil {
 		return grpc.Errorf(codes.InvalidArgument, "Unable to unmarshal decrypted text: %v", err)
 	}
+	glog.V(4).Infoln("Decryption of Envelope succeeded.")
 	return nil
 
 }
