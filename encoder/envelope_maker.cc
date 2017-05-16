@@ -63,12 +63,13 @@ ObservationBatch* EnvelopeMaker::GetBatch(
   return observation_batch;
 }
 
-EncryptedMessage EnvelopeMaker::MakeEncryptedEnvelope() const {
-  EncryptedMessage encrypted_message;
-  if (!encrypt_to_shuffler_.Encrypt(envelope_, &encrypted_message)) {
+bool EnvelopeMaker::MakeEncryptedEnvelope(
+    EncryptedMessage* encrypted_message) const {
+  if (!encrypt_to_shuffler_.Encrypt(envelope_, encrypted_message)) {
     VLOG(1) << "ERROR: Encryption of Envelope to the Shuffler failed!";
+    return false;
   }
-  return encrypted_message;
+  return true;
 }
 
 }  // namespace encoder

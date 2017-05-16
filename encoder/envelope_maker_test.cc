@@ -225,7 +225,8 @@ class EnvelopeMakerTest : public ::testing::Test {
                          expected_this_batch_index, expected_this_batch_size);
 
     // Make the encrypted Envelope.
-    auto encrypted_message = envelope_maker_.MakeEncryptedEnvelope();
+    EncryptedMessage encrypted_message;
+    EXPECT_TRUE(envelope_maker_.MakeEncryptedEnvelope(&encrypted_message));
 
     // Decrypt and check the encrypted Envelope.
     // TODO(rudominer) Do a decryption here when encryption is enabled.

@@ -73,7 +73,9 @@ class EnvelopeMaker {
   void AddObservation(const Observation& observation,
                       std::unique_ptr<ObservationMetadata> metadata);
 
-  EncryptedMessage MakeEncryptedEnvelope() const;
+  // Populates |*encrypted_message| with the encryption of the current
+  // value of the Envelope. Returns true for success or false for failure.
+  bool MakeEncryptedEnvelope(EncryptedMessage* encrypted_message) const;
 
   // Gives direct read-only access to the internal instance of Envelope.
   const Envelope& envelope() const { return envelope_; }

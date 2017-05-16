@@ -382,13 +382,19 @@ class EnvelopeSender : public EnvelopeSenderInterface {
               << FLAGS_deadline_seconds << " seconds...";
     }
 
+    // Encrypt the envelope.
+    EncryptedMessage encrypted_envelope;
+    if (!envelope_maker.MakeEncryptedEnvelope(&encrypted_envelope)) {
+      LOG(ERROR) << "Encryption of Envelope failed.";
+      return;
+    }
+
     for (int attempt = 0; attempt < 3; attempt++) {
       std::unique_ptr<grpc::ClientContext> context(new grpc::ClientContext());
       context->set_deadline(std::chrono::system_clock::now() +
                             std::chrono::seconds(FLAGS_deadline_seconds));
-
-      auto status = shuffler_client_->SendToShuffler(
-          envelope_maker.MakeEncryptedEnvelope(), context.get());
+      auto status =
+          shuffler_client_->SendToShuffler(encrypted_envelope, context.get());
       if (status.ok()) {
         if (mode_ == TestApp::kInteractive) {
           std::cout << "Sent to Shuffler." << std::endl;
@@ -462,7 +468,7 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
     VLOG(1) << "WARNING: Encryption of Envelopes to the Shuffler not being "
                "used. Pass the flag -shuffler_pk_pem_file";
   } else if (ReadPublicKeyPem(FLAGS_shuffler_pk_pem_file,
-                              &analyzer_public_key_pem)) {
+                              &shuffler_public_key_pem)) {
     shuffler_encryption_scheme = EncryptedMessage::HYBRID_ECDH_V1;
   }
 
