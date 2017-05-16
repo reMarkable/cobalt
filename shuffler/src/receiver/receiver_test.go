@@ -23,6 +23,7 @@ import (
 
 	shufflerpb "cobalt"
 	"storage"
+	"util"
 )
 
 // makeEnvelope creates an Envelope containing |numBatches| ObservationBatches
@@ -85,6 +86,7 @@ func doTestProcess(t *testing.T, envelope *shufflerpb.Envelope, store storage.St
 			KeyFile:   "",
 			Port:      0,
 		},
+		decrypter: util.NewMessageDecrypter(""),
 	}
 
 	_, err = shuffler.Process(context.Background(), eMsg)

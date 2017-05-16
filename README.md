@@ -54,7 +54,7 @@ The code for the end-to-end test is written in Go and is in the
 
 ## Generating PEM Files
 Cobalt uses a custom public-key encryption scheme in which the Encoder encrypts
-Observations to the public-key of the Analyzer before sending them to the
+Observations to the public key of the Analyzer before sending them to the
 Shuffler. This is a key part of the design of Cobalt and we refer to it
 via the slogan "The Shuffler shuffles sealed envelopes" meaning that the
 Shuffler does not get to see the data that it is shuffling. In order for this
@@ -63,7 +63,7 @@ can be read by the Encoder and the Analyzer. The end-to-end test uses the
 PEM files located in the *end_to_end_tests* directory named
 *analyzer_private_key.pem.e2e_test* and
 *analyzer_public_key.pem.e2e_test*. But for running Cobalt in any other
-environment we do not want to check-in a private key into source control
+environment we do not want to check in a private key into source control
 and so we ask each developer to generate thier own key pair.
 
 `./cobaltb.py keygen`
@@ -73,6 +73,19 @@ named *analyzer_public.pem* and *analyzer_private.pem* in your
 source root directory. These will get used by several of the following
 steps including running the demo manually and deploying to Google Container
 Engine.
+
+### Encryption to the Shuffler
+In addition to the encryption to the Analyzer mentioned above there is a second
+layer of encryption in which *Envelopes* are encrypted to the public key of the
+*Shuffler*. The purpose of this layer of encryption is that TLS between the
+Encoder and the Shuffler may be terminated prior to reaching the Shuffler in
+some load-balanced environments. We need a second public/private key pair for
+this encryption. The end-to-end test uses the PEM files located in the
+*end_to_end_tests* directory named *shuffler_private_key.pem.e2e_test* and
+*shuffler_public_key.pem.e2e_test*. But for running Cobalt in any other
+environment follow the instructions above for generating *analyzer_public.pem*
+and *analyzer_private.pem* but this time create two new files named
+*shuffler_public.pem* and *shuffler_private.pem*
 
 
 ## Running the Demo Manually
@@ -405,12 +418,13 @@ but here it is specified as a single combined name.
 Run this one time in order associate your computer with your GKE cluster
 and set up authentication.
 
-`./cobaltb.py deploy upload_secret_key`
-Run this one time in order to upload the PEM file containing the Analyzer's
-private key. This is the file *analyzer_private.pem* that was created in
-the section **Generating PEM Files** above. To upload a different private key,
-first delete any previously upload secret key by running
-`./cobaltb.py deploy delete_secret_key`
+`./cobaltb.py deploy upload_secret_keys`
+Run this one time in order to upload the PEM files containing the Analyzer's
+and Shuffler's private keys. These are the files *analyzer_private.pem* and
+*shuffler_private.pem* that were created in the section
+**Generating PEM Files** above. To upload different private keys,
+first delete any previously upload secret keys by running
+`./cobaltb.py deploy delete_secret_keys`
 
 `./cobaltb.py deploy build`
 Run this to build Docker containers for the Shuffler, Analyzer Service and

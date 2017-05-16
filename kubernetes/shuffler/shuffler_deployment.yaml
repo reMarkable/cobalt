@@ -51,8 +51,13 @@ spec:
           # This is the path to where the file is copied in Dockerfile.
           -  '/etc/cobalt/shuffler_config.txt'
           - '-db_dir'
-          # This path must match mountPath below.
-          - '/var/lib/cobalt'
+          # This path must match mountPath for shuffler-persistent-storage
+          # below.
+          - '/var/lib/cobalt/db'
+          - '-private_key_pem_file'
+          # The directory path must match mountPath for shuffler-key-storage
+          # below.
+          - '/var/lib/cobalt/key/$$SHUFFLER_PRIVATE_PEM_NAME$$'
           - '-danger_danger_delete_all_data_at_startup=$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$'
           # TODO(rudominer) Eventually remove this.
           - '-logtostderr'
@@ -60,15 +65,24 @@ spec:
         ports:
           - containerPort: 5001
         volumeMounts:
-            # This name must match the volumes.name below.
+            # This name must match the volumes.name for
+            # shuffler-persistent-storage below.
           - name: shuffler-persistent-storage
-            mountPath: /var/lib/cobalt
+            mountPath: /var/lib/cobalt/db
+             # This name must match the volumes.name for shuffler-key-storage
+             # below.
+          - name: shuffler-key-storage
+            mountPath: /var/lib/cobalt/key
+            readOnly: true
       volumes:
         - name: shuffler-persistent-storage
           gcePersistentDisk:
-            # The name of a GCe persistent disk that has already been created.
+            # The name of a GCE persistent disk that has already been created.
             pdName: $$GCE_PERSISTENT_DISK_NAME$$
             fsType: ext4
+        - name: shuffler-key-storage
+          secret:
+            secretName: $$SHUFFLER_PRIVATE_KEY_SECRET_NAME$$
 ---
 # The defintion of the Service
 apiVersion: v1

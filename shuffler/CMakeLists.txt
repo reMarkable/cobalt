@@ -60,7 +60,7 @@ set(MEM_STORE_ITER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store_iter.g
 set(LEVELDB_STORE_ITER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/leveldb_store_iter.go")
 add_custom_command(OUTPUT ${SHUFFLER_BIN}
     # Compiles shuffler_main and all its dependencies
-    COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN} shuffler_main.go
+    COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN}
     DEPENDS ${SHUFFLER_PB_GO}
     DEPENDS ${SHUFFLER_DB_PB_GO}
     DEPENDS ${ANALYZER_PB_GO}

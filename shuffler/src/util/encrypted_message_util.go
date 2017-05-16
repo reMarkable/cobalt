@@ -174,7 +174,7 @@ func (m *MessageDecrypter) DecryptMessage(encryptedMessage *cobalt.EncryptedMess
 		return grpc.Errorf(codes.InvalidArgument, "Unrecognized encryption scheme specified in EncryptedMessage: %v", encryptedMessage.Scheme)
 	}
 	if m.hybridCipher == nil {
-		return grpc.Errorf(codes.Internal, "m.hybridCipher is nil")
+		return grpc.Errorf(codes.Internal, "Cannot decrypt: Decryption was not successfully initialized.")
 	}
 	recoveredText, err := m.hybridCipher.Decrypt(encryptedMessage.Ciphertext)
 	if err != nil {

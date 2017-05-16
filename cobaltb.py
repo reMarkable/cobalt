@@ -30,10 +30,12 @@ import tools.process_starter as process_starter
 import tools.test_runner as test_runner
 
 from tools.test_runner import E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
+from tools.test_runner import E2E_TEST_SHUFFLER_PUBLIC_KEY_PEM
 
-from tools.process_starter import DEFAULT_SHUFFLER_PORT
 from tools.process_starter import DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+from tools.process_starter import DEFAULT_SHUFFLER_PUBLIC_KEY_PEM
 from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
+from tools.process_starter import DEFAULT_SHUFFLER_PORT
 from tools.process_starter import DEFAULT_REPORT_MASTER_PORT
 from tools.process_starter import DEMO_CONFIG_DIR
 from tools.process_starter import SHUFFLER_DEMO_CONFIG_FILE
@@ -165,12 +167,14 @@ def _test(args):
       analyzer_pk_pem_file=E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
       analyzer_uri = "localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT
       report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
+      shuffler_pk_pem_file=E2E_TEST_SHUFFLER_PUBLIC_KEY_PEM
       shuffler_uri = "localhost:%d" % DEFAULT_SHUFFLER_PORT
       if args.cobalt_on_gke:
         public_uris = container_util.get_public_uris()
         analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM
         analyzer_uri = public_uris["analyzer"]
         report_master_uri = public_uris["report_master"]
+        shuffler_pk_pem_file=DEFAULT_SHUFFLER_PUBLIC_KEY_PEM
         shuffler_uri = public_uris["shuffler"]
         if args.use_cloud_bt:
           # use_cloud_bt means to use local instances of the Cobalt processes
@@ -184,6 +188,7 @@ def _test(args):
           "-analyzer_uri=%s" % analyzer_uri,
           "-analyzer_pk_pem_file=%s" % analyzer_pk_pem_file,
           "-shuffler_uri=%s" % shuffler_uri,
+          "-shuffler_pk_pem_file=%s" % shuffler_pk_pem_file,
           "-report_master_uri=%s" % report_master_uri,
           ("-observation_querier_path=%s" %
               process_starter.OBSERVATION_QUERIER_PATH),
@@ -383,11 +388,13 @@ def _deploy_stop(args):
     print('Unknown job "%s". I only know how to stop "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
 
-def _deploy_upload_secret_key(args):
+def _deploy_upload_secret_keys(args):
   container_util.create_analyzer_private_key_secret()
+  container_util.create_shuffler_private_key_secret()
 
-def _deploy_delete_secret_key(args):
+def _deploy_delete_secret_keys(args):
   container_util.delete_analyzer_private_key_secret()
+  container_util.delete_shuffler_private_key_secret()
 
 def main():
   personal_cluster_settings = {
@@ -750,20 +757,21 @@ def main():
       help='The job you wish to stop. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
 
-  sub_parser = deploy_subparsers.add_parser('upload_secret_key',
-      parents=[parent_parser], help='Creates a |secret| object in the '
-      'cluster to store a private key for the Analyzer. The private key must '
-      'first be generated using the "generate_keys" command. This must be done '
-      'at least once before starting the Analyzer Service. To replace the '
-      'key first delete the old one using the "deploy delete_secret_key" '
-      'command.')
-  sub_parser.set_defaults(func=_deploy_upload_secret_key)
+  sub_parser = deploy_subparsers.add_parser('upload_secret_keys',
+      parents=[parent_parser], help='Creates |secret| objects in the '
+      'cluster to store the private keys for the Analyzer and the Shuffler. '
+      'The private keys must first be generated using the "generate_keys" '
+      'command (once for the Analyzer and once for the Shuffler). This must be '
+      'done at least once before starting the Analyzer Service or the '
+      'Shuffler. To replace the keys first delete the old ones using the '
+      '"deploy delete_secret_keys" command.')
+  sub_parser.set_defaults(func=_deploy_upload_secret_keys)
 
-  sub_parser = deploy_subparsers.add_parser('delete_secret_key',
-      parents=[parent_parser], help='Deletes a |secret| object in the '
-      'cluster that was created using the "deploy upload_secret_key" '
+  sub_parser = deploy_subparsers.add_parser('delete_secret_keys',
+      parents=[parent_parser], help='Deletes the |secret| objects in the '
+      'cluster that were created using the "deploy upload_secret_keys" '
       'command.')
-  sub_parser.set_defaults(func=_deploy_delete_secret_key)
+  sub_parser.set_defaults(func=_deploy_delete_secret_keys)
 
 
   args = parser.parse_args()

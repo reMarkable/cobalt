@@ -31,6 +31,8 @@ from process_starter import DEFAULT_REPORT_MASTER_PORT
 from process_starter import DEFAULT_SHUFFLER_PORT
 from process_starter import REGISTERED_CONFIG_DIR
 from process_starter import REPORT_MASTER_PATH
+from process_starter import SHUFFLER_PRIVATE_KEY_PEM_NAME
+from process_starter import DEFAULT_SHUFFLER_PRIVATE_KEY_PEM
 from process_starter import SHUFFLER_CONFIG_FILE
 from process_starter import SHUFFLER_PATH
 
@@ -108,6 +110,7 @@ ANALYZER_CONFIG_FILES = [os.path.join(REGISTERED_CONFIG_DIR, f) for f in
     ]]
 
 ANALYZER_PRIVATE_KEY_SECRET_NAME = "analyzer-private-key"
+SHUFFLER_PRIVATE_KEY_SECRET_NAME = "shuffler-private-key"
 
 def _ensure_dir(dir_path):
   """Ensures that the directory at |dir_path| exists. If not it is created.
@@ -226,6 +229,12 @@ def create_analyzer_private_key_secret(
                            ANALYZER_PRIVATE_KEY_PEM_NAME,
                            path_to_pem)
 
+def create_shuffler_private_key_secret(
+    path_to_pem=DEFAULT_SHUFFLER_PRIVATE_KEY_PEM):
+  _create_secret_from_file(SHUFFLER_PRIVATE_KEY_SECRET_NAME,
+                           SHUFFLER_PRIVATE_KEY_PEM_NAME,
+                           path_to_pem)
+
 def delete_analyzer_private_key_secret():
   _delete_secret(ANALYZER_PRIVATE_KEY_SECRET_NAME)
 
@@ -314,6 +323,8 @@ def start_shuffler(cloud_project_prefix,
     delete_all_data = 'true'
   token_substitutions = {'$$SHUFFLER_IMAGE_URI$$' : image_uri,
       '$$GCE_PERSISTENT_DISK_NAME$$' : gce_pd_name,
+      '$$SHUFFLER_PRIVATE_PEM_NAME$$' : SHUFFLER_PRIVATE_KEY_PEM_NAME,
+      '$$SHUFFLER_PRIVATE_KEY_SECRET_NAME$$' : SHUFFLER_PRIVATE_KEY_SECRET_NAME,
       '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data}
   _start_gke_service(SHUFFLER_DEPLOYMENT_TEMPLATE_FILE,
                      SHUFFLER_DEPLOYMENT_FILE,

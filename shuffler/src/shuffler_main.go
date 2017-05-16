@@ -18,6 +18,7 @@ import (
 	"config"
 	"dispatcher"
 	"flag"
+	"io/ioutil"
 	"path/filepath"
 	"receiver"
 	"shuffler"
@@ -35,6 +36,11 @@ var (
 	certFile = flag.String("cert_file", "", "The TLS cert file")
 	keyFile  = flag.String("key_file", "", "The TLS key file")
 	port     = flag.Int("port", 50051, "The server port")
+
+	privateKeyPemFile = flag.String("private_key_pem_file", "",
+		"Path to a file containing a PEM encoding of the private key of "+
+			"the Shuffler used for Cobalt's internal encryption scheme. If "+
+			"not specified then the Shuffler will not support encrypted Envelopes.")
 
 	// shuffler client configuration flags to connect to analyzer
 	caFile      = flag.String("ca_file", "", "The file containing the CA root certificate")
@@ -73,6 +79,20 @@ func main() {
 		if sConfig, err = config.LoadConfig(*configFile); err != nil {
 			glog.Fatal("Error loading shuffler config file: [", *configFile, "]: ", err)
 		}
+	}
+
+	// Read the private key PEM file
+	privateKeyPem := ""
+	if *privateKeyPemFile != "" {
+		if fileContents, err := ioutil.ReadFile(*privateKeyPemFile); err != nil {
+			glog.Errorf("Error attempting to read private key PEM file %s: %v. "+
+				"The shuffler will not be able to decrypt EncryptedMessages.", *privateKeyPemFile, err)
+		} else {
+			glog.Infof("Successfully read private key PEM file %s.", *privateKeyPemFile)
+			privateKeyPem = string(fileContents)
+		}
+	} else {
+		glog.Warning("The flag -private_key_pem_file was not provided. The shuffler will not be able to decrypt EncryptedMessages.")
 	}
 
 	// Initialize Shuffler data store
@@ -117,9 +137,10 @@ func main() {
 
 	// Start listening on receiver for incoming requests from Encoder
 	receiver.Run(store, &receiver.ServerConfig{
-		EnableTLS: *tls,
-		CertFile:  *certFile,
-		KeyFile:   *keyFile,
-		Port:      *port,
+		EnableTLS:     *tls,
+		CertFile:      *certFile,
+		KeyFile:       *keyFile,
+		Port:          *port,
+		PrivateKeyPem: privateKeyPem,
 	})
 }

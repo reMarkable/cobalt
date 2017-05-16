@@ -50,8 +50,9 @@ DEFAULT_ANALYZER_PRIVATE_KEY_PEM=os.path.join(SRC_ROOT_DIR,
                                              ANALYZER_PRIVATE_KEY_PEM_NAME)
 DEFAULT_SHUFFLER_PUBLIC_KEY_PEM=os.path.join(SRC_ROOT_DIR,
                                              "shuffler_public.pem")
+SHUFFLER_PRIVATE_KEY_PEM_NAME="shuffler_private.pem"
 DEFAULT_SHUFFLER_PRIVATE_KEY_PEM=os.path.join(SRC_ROOT_DIR,
-                                             "shuffler_private.pem")
+                                              SHUFFLER_PRIVATE_KEY_PEM_NAME)
 
 
 def kill_process(process, name):
@@ -108,6 +109,7 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
     analyzer_uri='localhost:%d' % DEFAULT_ANALYZER_SERVICE_PORT,
     use_memstore=False, erase_db=True, db_dir=SHUFFLER_TMP_DB_DIR,
     config_file=SHUFFLER_DEMO_CONFIG_FILE,
+    private_key_pem_file=DEFAULT_SHUFFLER_PRIVATE_KEY_PEM,
     verbose_count=0, wait=True):
   """Starts the Shuffler.
 
@@ -122,6 +124,7 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
   print
   cmd = [SHUFFLER_PATH,
         "-port", str(port),
+        "-private_key_pem_file", private_key_pem_file,
         "-analyzer_uri", analyzer_uri,
         "-config_file", config_file,
         "-logtostderr"]

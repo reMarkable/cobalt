@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -40,14 +39,16 @@ import (
 	"cobalt"
 	"shuffler"
 	"storage"
+	"util"
 )
 
-var shufflerServer *ShufflerServer
+var shufflerServerSingleton *ShufflerServer
 
 // ShufflerServer implements the Shufffler service.
 type ShufflerServer struct {
-	store  storage.Store
-	config ServerConfig
+	store     storage.Store
+	config    ServerConfig
+	decrypter *util.MessageDecrypter
 }
 
 // ServerConfig specifies the configuration options for setting up a Grpc
@@ -61,6 +62,11 @@ type ServerConfig struct {
 	KeyFile string
 	// The server port
 	Port int
+	// A PEM encoding of the Shuffler's private key for use in Cobalt's custom
+	// hybrid encryption scheme.
+	// TODO(rudominer) Support key rotation: Rather than a single private key
+	// this should be a set of (public-key-hash, private-key) pairs.
+	PrivateKeyPem string
 }
 
 // Process processes the incoming encoder requests and persists them locally in
@@ -69,10 +75,9 @@ type ServerConfig struct {
 func (s *ShufflerServer) Process(ctx context.Context,
 	encryptedMessage *cobalt.EncryptedMessage) (*empty.Empty, error) {
 	glog.V(4).Infoln("Process() is invoked.")
-	envelope, err := decryptEnvelope(encryptedMessage)
-
+	envelope, err := s.decryptEnvelope(encryptedMessage)
 	if err != nil {
-		return nil, grpc.Errorf(codes.InvalidArgument, "Failed to decrypt encrypted message: %v", err)
+		return nil, err
 	}
 
 	// TODO(ukode): Some notes here for future development:
@@ -108,16 +113,17 @@ func Run(dataStore storage.Store, config *ServerConfig) {
 		glog.Fatal("Invalid server config, exiting.")
 	}
 
-	if shufflerServer != nil {
+	if shufflerServerSingleton != nil {
 		glog.Fatal("Run() must not be invoked twice, exiting.")
 	}
 
 	// Start shuffler service
-	shufflerServer := &ShufflerServer{
-		store:  dataStore,
-		config: *config,
+	shufflerServerSingleton = &ShufflerServer{
+		store:     dataStore,
+		config:    *config,
+		decrypter: util.NewMessageDecrypter(config.PrivateKeyPem),
 	}
-	shufflerServer.startServer()
+	shufflerServerSingleton.startServer()
 }
 
 // startServer sets up and starts the grpc server using configuration from
@@ -144,14 +150,15 @@ func (s *ShufflerServer) startServer() {
 	grpcServer.Serve(lis)
 }
 
-// decryptEnvelope decrypts the incoming encoder message and returns the sealed
-// envelope or an error.
-func decryptEnvelope(encryptedMessage *cobalt.EncryptedMessage) (*cobalt.Envelope, error) {
-	ciphertext := encryptedMessage.Ciphertext
-
-	// TODO: Perform PKE decryption on ciphertext	and then unmarshall the
-	// decrypted bytes.
-	envelope := &cobalt.Envelope{}
-	err := proto.Unmarshal([]byte(ciphertext), envelope)
-	return envelope, err
+// decryptEnvelope decrypts the incoming EncryptedMessage and returns an Envelope or an error.
+func (s *ShufflerServer) decryptEnvelope(encryptedMessage *cobalt.EncryptedMessage) (*cobalt.Envelope, error) {
+	if s.decrypter == nil {
+		return nil, grpc.Errorf(codes.Internal, "s.decrypter is nil")
+	}
+	envelope := new(cobalt.Envelope)
+	if err := s.decrypter.DecryptMessage(encryptedMessage, envelope); err != nil {
+		glog.Errorf("Decryption failed: %v", err)
+		return nil, err
+	}
+	return envelope, nil
 }

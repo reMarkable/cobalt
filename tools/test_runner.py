@@ -32,6 +32,10 @@ E2E_TEST_ANALYZER_PRIVATE_KEY_PEM = os.path.join(E2E_DIR,
     "analyzer_private_key.pem.e2e_test")
 E2E_TEST_ANALYZER_PUBLIC_KEY_PEM = os.path.join(E2E_DIR,
     "analyzer_public_key.pem.e2e_test")
+E2E_TEST_SHUFFLER_PRIVATE_KEY_PEM = os.path.join(E2E_DIR,
+    "shuffler_private_key.pem.e2e_test")
+E2E_TEST_SHUFFLER_PUBLIC_KEY_PEM = os.path.join(E2E_DIR,
+    "shuffler_public_key.pem.e2e_test")
 
 _logger = logging.getLogger()
 
@@ -99,7 +103,9 @@ def run_all_tests(test_dir,
             bigtable_project_name=bigtable_project_name,
             verbose_count=verbose_count, wait=False)
         time.sleep(1)
-        shuffler_process=process_starter.start_shuffler(wait=False)
+        shuffler_process=process_starter.start_shuffler(
+          private_key_pem_file=E2E_TEST_SHUFFLER_PRIVATE_KEY_PEM,
+          verbose_count=verbose_count, wait=False)
       print "Running %s..." % test_executable
       path = os.path.abspath(os.path.join(tdir, test_executable))
       command = [path] + test_args
