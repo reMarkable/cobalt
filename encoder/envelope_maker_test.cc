@@ -22,6 +22,7 @@
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
+#include "util/encrypted_message_util.h"
 
 namespace cobalt {
 namespace encoder {
@@ -228,11 +229,12 @@ class EnvelopeMakerTest : public ::testing::Test {
     EncryptedMessage encrypted_message;
     EXPECT_TRUE(envelope_maker_.MakeEncryptedEnvelope(&encrypted_message));
 
-    // Decrypt and check the encrypted Envelope.
-    // TODO(rudominer) Do a decryption here when encryption is enabled.
-    std::string serialized_envelope = encrypted_message.ciphertext();
+    // Decrypt encrypted_message. (No actual decryption is involved since
+    // we used the NONE encryption scheme.)
+    util::MessageDecrypter decrypter("");
     Envelope recovered_envelope;
-    EXPECT_TRUE(recovered_envelope.ParseFromString(serialized_envelope));
+    EXPECT_TRUE(
+        decrypter.DecryptMessage(encrypted_message, &recovered_envelope));
 
     // Check that it looks right.
     EXPECT_EQ(2, recovered_envelope.batch_size());
