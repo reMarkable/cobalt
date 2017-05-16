@@ -23,6 +23,12 @@
 namespace cobalt {
 namespace crypto {
 
+// Base64 encodes |num_bytes| from |data| and writes the result into
+// |encoded_out|.
+//
+// Returns true on success and false on failure.
+bool Base64Encode(const byte* data, int num_bytes, std::string* encoded_out);
+
 // Base64 encodes the bytes in |data| and writes the result into |encoded_out|.
 //
 // Returns true on success and false on failure.
