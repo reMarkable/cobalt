@@ -12,9 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
-protobuf_generate_cpp(CONFIG_PROTO_SRCS CONFIG_PROTO_HDRS
-                      encodings.proto metrics.proto report_configs.proto)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/encodings.pb.cc
+                   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/encodings.pb.h
+                   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/metrics.pb.cc
+                   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/metrics.pb.h
+                   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/report_configs.pb.cc
+                   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/report_configs.pb.h
+    COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/encodings.proto
+                   ${CMAKE_CURRENT_SOURCE_DIR}/metrics.proto
+                   ${CMAKE_CURRENT_SOURCE_DIR}/report_configs.proto
+        -I ${CMAKE_SOURCE_DIR}
+        --cpp_out=${CMAKE_BINARY_DIR}
+    DEPENDS encodings.proto
+    DEPENDS metrics.proto
+    DEPENDS report_configs.proto
+)
+
+# Generate Go bindings for the config .proto files.
+set(ENCODINGS_PB_GO "${GO_PROTO_GEN_SRC_DIR}/config/encodings.pb.go")
+set(METRICS_PB_GO "${GO_PROTO_GEN_SRC_DIR}/config/metrics.pb.go")
+set(REPORT_CONFIGS_PB_GO "${GO_PROTO_GEN_SRC_DIR}/config/report_configs.pb.go")
+
+add_custom_command(OUTPUT ${ENCODINGS_PB_GO} ${METRICS_PB_GO} ${REPORT_CONFIGS_PB_GO}
+    COMMAND ${GO_PROTOC}
+        ${CMAKE_CURRENT_SOURCE_DIR}/encodings.proto
+        ${CMAKE_CURRENT_SOURCE_DIR}/metrics.proto
+        ${CMAKE_CURRENT_SOURCE_DIR}/report_configs.proto
+        -I ${CMAKE_SOURCE_DIR}
+        --go_out=plugins=Mencodings.proto=config,Mmetrics.proto=config,Mreport_configs.proto=config:${GO_PROTO_GEN_SRC_DIR}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/encodings.proto
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/metrics.proto
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_configs.proto)
+
+add_custom_target(build_config_go_protos
+                  DEPENDS  ${REPORT_CONFIGS_PB_GO})
 
 # Build the analyzer_config library
 add_library(analyzer_config

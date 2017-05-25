@@ -13,9 +13,11 @@
 // limitations under the License.
 syntax = "proto3";
 
-import "encodings.proto";
-
 package cobalt;
+
+import "config/encodings.proto";
+
+option go_package = "config";
 
 message DifferentialPrivacyConfig {
   float epsilon = 1;

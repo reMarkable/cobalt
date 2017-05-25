@@ -13,15 +13,28 @@
 # limitations under the License.
 
 # Compile report_master.proto and report_internal.proto
-protobuf_generate_cpp(REPORT_PROTO_SRCS REPORT_PROTO_HDRS
-                      report_master.proto report_internal.proto)
+set(REPORT_PROTO_SRCS
+    "${CMAKE_CURRENT_BINARY_DIR}/report_master.pb.cc"
+    "${CMAKE_CURRENT_BINARY_DIR}/report_internal.pb.cc")
+set(REPORT_PROTO_HDRS
+    "${CMAKE_CURRENT_BINARY_DIR}/report_master.pb.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/report_internal.pb.h")
+add_custom_command(OUTPUT ${REPORT_PROTO_HDRS}
+                   OUTPUT ${REPORT_PROTO_SRCS}
+    COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
+                   ${CMAKE_CURRENT_SOURCE_DIR}/report_internal.proto
+        -I ${CMAKE_SOURCE_DIR}
+        --cpp_out=${CMAKE_BINARY_DIR}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_internal.proto
+)
 
 # generate the gRPC service.  CMake doesn't support it by default.
 set(PROTO_GRPC "${CMAKE_CURRENT_BINARY_DIR}/report_master.grpc.pb.cc")
 add_custom_command(OUTPUT ${PROTO_GRPC}
     COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-                -I ${CMAKE_CURRENT_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
-                --grpc_out=.
+                -I ${CMAKE_SOURCE_DIR}
+                --grpc_out=${CMAKE_BINARY_DIR}
                 --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
 )
@@ -34,17 +47,21 @@ add_custom_target(build_report_protos
 
 # Generate the Go bindings for ReportMaster gRPC service.
 set(REPORT_MASTER_PB_GO "${GO_PROTO_GEN_SRC_DIR}/analyzer/report_master/report_master.pb.go")
+set(ENCODINGS_PB_GO "${GO_PROTO_GEN_SRC_DIR}/config/encodings.pb.go")
 
-# This allows us to indicate below that report_master.pb.go depends on observation.pb.go
+# This allows us to indicate below that report_master.pb.go depends on
+# observation.pb.go and encodings.pb.go
 set_source_files_properties(${OBSERVATION_PB_GO} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${ENCODINGS_PB_GO} PROPERTIES GENERATED TRUE)
 
 add_custom_command(OUTPUT "${REPORT_MASTER_PB_GO}"
     COMMAND ${GO_PROTOC}
             ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-            -I ${CMAKE_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
+            -I ${CMAKE_SOURCE_DIR}
             --go_out=plugins=grpc,Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_SRC_DIR}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
     DEPENDS ${OBSERVATION_PB_GO}
+    DEPENDS ${ENCODINGS_PB_GO}
 )
 
 add_custom_target(build_report_master_pb_go

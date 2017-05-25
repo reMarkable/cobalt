@@ -15,6 +15,8 @@ syntax = "proto3";
 
 package cobalt;
 
+option go_package = "config";
+
 // A |Metric| is composed of one or more |MetricParts|. A |MetricPart| has a
 // name which is specified as the key in the |parts| field of |Metric|, a
 // description and a data type which specifies the type of a |ValuePart| that

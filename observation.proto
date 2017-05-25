@@ -79,7 +79,7 @@ message ObservationPart {
   // The encoding_config_id, along with the customer_id and project_id
   // (specified in the containing Observation) form the primary key into the
   // "EncodingConfigs" table in the Cobalt configuration database. The value
-  // column is an "EncodingConfg" proto message describing how this
+  // column is an "EncodingConfig" proto message describing how this
   // ObservationPart is encoded.
   uint32 encoding_config_id = 5;  // e.g. 114=(Forculus with threshold=50)
 }

@@ -21,11 +21,15 @@ protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS analyzer.proto)
 set(PROTO_GRPC "${CMAKE_CURRENT_BINARY_DIR}/analyzer.grpc.pb.cc")
 add_custom_command(OUTPUT ${PROTO_GRPC}
     COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/analyzer.proto
-                -I ${CMAKE_CURRENT_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
-                --grpc_out=.
+                -I ${CMAKE_SOURCE_DIR}
+                --grpc_out=${CMAKE_BINARY_DIR}
                 --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
     DEPENDS analyzer.proto
 )
+
+add_custom_target(build_analyzer_protos
+                  DEPENDS ${PROTO_SRCS}
+                  DEPENDS ${PROTO_GRPC})
 
 # Generate the Go bindings for Analyzer service.
 set(ANALYZER_PB_GO "${GO_PROTO_GEN_SRC_DIR}/analyzer/analyzer_service/analyzer.pb.go")
@@ -36,7 +40,7 @@ set_source_files_properties(${OBSERVATION_PB_GO} PROPERTIES GENERATED TRUE)
 add_custom_command(OUTPUT "${ANALYZER_PB_GO}"
     COMMAND ${GO_PROTOC}
             ${CMAKE_CURRENT_SOURCE_DIR}/analyzer.proto
-            -I ${CMAKE_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
+            -I ${CMAKE_SOURCE_DIR}
             --go_out=plugins=grpc,Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_SRC_DIR}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/analyzer.proto
     DEPENDS ${OBSERVATION_PB_GO}

@@ -15,15 +15,16 @@
 package main
 
 import (
-	"config"
-	"dispatcher"
 	"flag"
 	"io/ioutil"
 	"path/filepath"
 	"receiver"
-	"shuffler"
-	"storage"
 	"time"
+
+	"dispatcher"
+	"shuffler"
+	"shuffler_config"
+	"storage"
 
 	"github.com/golang/glog"
 )
@@ -76,7 +77,7 @@ func main() {
 			DisposalAgeDays:  4,
 		}
 	} else {
-		if sConfig, err = config.LoadConfig(*configFile); err != nil {
+		if sConfig, err = shuffler_config.LoadConfig(*configFile); err != nil {
 			glog.Fatal("Error loading shuffler config file: [", *configFile, "]: ", err)
 		}
 	}

@@ -15,7 +15,9 @@ syntax = "proto3";
 
 package cobalt.analyzer;
 
-import "report_master.proto";
+import "analyzer/report_master/report_master.proto";
+
+option go_package = "config";
 
 /////////////////////////////////////////////////////////////////////////////
 // This file contains report-related proto messages that are used internally

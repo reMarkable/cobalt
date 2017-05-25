@@ -34,7 +34,7 @@ SHUFFLER_DEMO_CONFIG_FILE = os.path.abspath(os.path.join(SRC_ROOT_DIR,
 SHUFFLER_DB_DIR = os.path.join("/tmp/cobalt_shuffler")
 
 SHUFFLER_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'shuffler',
-    'src', 'config'))
+    'src', 'shuffler_config'))
 SHUFFLER_CONFIG_FILE = os.path.join(SHUFFLER_CONFIG_DIR, 'config_v0.txt')
 SHUFFLER_DEMO_CONFIG_FILE = os.path.join(SHUFFLER_CONFIG_DIR, 'config_demo.txt')
 SHUFFLER_TMP_DB_DIR = os.path.join("/tmp/cobalt_shuffler")

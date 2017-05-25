@@ -50,7 +50,7 @@ set(CRYPTO_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/crypto_util.go")
 set(ELLIPTIC_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/elliptic_util.go")
 set(ENCRYPTED_MESSAGE_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/encrypted_message_util.go")
 set(RAND_UTIL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/util/rand_util.go")
-set(CONFIG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_util.go")
+set(CONFIG_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/shuffler_config/config_util.go")
 set(STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/store.go")
 set(MEM_STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/mem_store.go")
 set(LEVELDB_STORE_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/leveldb_store.go")
@@ -130,7 +130,7 @@ add_custom_command(OUTPUT ${ENCRYPTED_MESSAGE_UTIL_TEST_BIN}
 )
 
 # Build config unit tests
-set(CONFIG_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/config/config_util_test.go")
+set(CONFIG_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/shuffler_config/config_util_test.go")
 set(CONFIG_TEST_BIN ${GO_TESTS}/config_test)
 add_custom_command(OUTPUT ${CONFIG_TEST_BIN}
     COMMAND ${GO_BIN} test -c -o ${CONFIG_TEST_BIN} ${CONFIG_TEST_SRC} ${CONFIG_SRC}

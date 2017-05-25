@@ -91,7 +91,7 @@ add_custom_command(OUTPUT ${ENCRYPTED_MESSAGE_PB_GO} ${OBSERVATION_PB_GO}
     COMMAND ${GO_PROTOC}
         ${CMAKE_CURRENT_SOURCE_DIR}/encrypted_message.proto
         ${CMAKE_CURRENT_SOURCE_DIR}/observation.proto
-        -I ${CMAKE_SOURCE_DIR}:${PROTOBUF_IMPORT_DIRS}
+        -I ${CMAKE_SOURCE_DIR}
         --go_out=plugins=Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_SRC_DIR}/cobalt
     DEPENDS ${CMAKE_SOURCE_DIR}/encrypted_message.proto
     DEPENDS ${CMAKE_SOURCE_DIR}/observation.proto
