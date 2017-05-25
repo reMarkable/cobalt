@@ -78,7 +78,7 @@ class ReportExecutor {
   // Enqueues a dependency chain of ReportIds of reports to be generated.
   //
   // Each of the ReportIds given must be a complete ID as returned from
-  // ReportStore::StartNewReport or ReportStore::CreateSecondarySlice.
+  // ReportStore::StartNewReport or ReportStore::StartDependentReport.
   // ReportExecutor will query the metadata for each ReportId from the
   // ReportStore. The metadata must exist and the report must currently be in
   // either the WAITING_TO_START state or the IN_PROGRESS state.
@@ -98,7 +98,7 @@ class ReportExecutor {
   // state of report generation for each report. If a report is in the
   // WAITING_TO_START state then before invoking
   // ReportGenerator::GenerateReport() ReportExecutor will invoke
-  // ReportStore::StartSecondarySlice() in order to put the report into the
+  // ReportStore::StartDependentReport() in order to put the report into the
   // IN_PROGRESS_STATE. After GenerateReport() returns, ReportExecutor will
   // invoke ReportStore::EndReport() in order to put the report into either
   // the COMPLETED_SUCCESSFULLY state or the TERMINATED state as appropriate.
@@ -148,7 +148,7 @@ class ReportExecutor {
   void ProcessDependencyChain(const std::vector<ReportId>& chain);
 
   // Attempts to get the metadata for |report_id|, invoke
-  // ReportGenerator::StartSecondarySlice() if necessary, invoke
+  // ReportGenerator::StartDependentReport() if necessary, invoke
   // ReportGenerator::GenerateReport(), and invoke
   // ReportStore::EndReport() to mark the report as completed either
   // successfully or unsuccessfully as appropriate. Logs an error message and
@@ -159,9 +159,9 @@ class ReportExecutor {
   // a message and returns false.
   bool GetMetadata(const ReportId& report_id, ReportMetadataLite* metadata_out);
 
-  // Invokes ReportGenerator::StartSecondarySlice(). On success returns true. On
-  // error logs a message, sets message_out and returns false.
-  bool StartSecondarySlice(const ReportId& report_id);
+  // Invokes ReportGenerator::StartDependentReport(). On success returns true.
+  // On error logs a message, sets message_out and returns false.
+  bool StartDependentReport(const ReportId& report_id);
 
   // Invokes ReportStore::EndReport. On success returns true. On error logs
   // a message and returns false.

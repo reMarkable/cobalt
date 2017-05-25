@@ -28,6 +28,7 @@ add_library(analyzer_store
             ${REPORT_PROTO_SRCS})
 
 target_link_libraries(analyzer_store
+                      analyzer_config
                       cobalt_crypto
                       glog
                       googleapis

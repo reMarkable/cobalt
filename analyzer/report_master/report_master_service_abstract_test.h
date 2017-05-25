@@ -171,6 +171,7 @@ element {
   project_id: 1
   id: 2
   metric_id: 2
+  report_type: JOINT
   variable {
     metric_part: "Part1"
   }
@@ -381,7 +382,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     if (check_completed && expect_joint_report) {
       ASSERT_NE(0, metadata.info_messages_size());
       EXPECT_NE(-1, metadata.info_messages(0).message().find(
-                        "JOINT report processing not currently implemented"));
+                        "Report type JOINT is not yet implemented"));
       EXPECT_EQ(expected_current_time_seconds,
                 metadata.info_messages(0).timestamp().seconds());
     }
@@ -433,8 +434,9 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
 
   // Invokes ReportMaster::QueryReportsInternal() using our fixed customer and
   // project and the given report_config_id and time interval. The responses
-  // will be written to the given |response_writer|.
-  void QueryReports(uint32_t report_config_id, uint64_t first_time_seconds,
+  // will be written to the given |response_writer|. Returns true for success
+  // or false for failure.
+  bool QueryReports(uint32_t report_config_id, uint64_t first_time_seconds,
                     uint64_t limit_time_seconds,
                     TestingQueryReportsResponseWriter* response_writer) {
     QueryReportsRequest request;
@@ -447,6 +449,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
         nullptr, &request, response_writer);
     EXPECT_TRUE(status.ok()) << "error_code=" << status.error_code()
                              << " error_message=" << status.error_message();
+    return status.ok();
   }
 
   void set_current_time_seconds(int64_t current_time_seconds) {
@@ -461,9 +464,9 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
   // kFixedTimeSeconds + i.
   //
   // The implementation of this function breaks several layers of abstraction
-  // and writes directly into the  underlying ReporStore. This is a convenient
-  // way to efficiently set up the  ReportMetadata table in order test the
-  // QueryReports function. If we were  to use the gRPC API to accomplish this
+  // and writes directly into the underlying ReporStore. This is a convenient
+  // way to efficiently set up the ReportMetadata table in order test the
+  // QueryReports function. If we were to use the gRPC API to accomplish this
   // it would require many RPC roundtrips which would take a long time.
   // There is no reason for the gRPC API to support an efficient implementation
   // of this function as it is not useful outside of a test.
@@ -483,6 +486,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     metadata.set_first_day_index(kDayIndex);
     metadata.set_last_day_index(kDayIndex);
     metadata.set_one_off(true);
+    metadata.add_variable_indices(0);
     std::vector<ReportMetadataLite> report_metadata(num_reports, metadata);
 
     std::vector<std::string> string_report_ids(num_reports);
@@ -689,8 +693,8 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, QueryReportsTest) {
   // first three and the last 3 reports. So there should be 204 reports
   // returned.
   TestingQueryReportsResponseWriter response_writer;
-  this->QueryReports(kReportConfigId1, kFixedTimeSeconds + 3,
-                     kFixedTimeSeconds + 207, &response_writer);
+  ASSERT_TRUE(this->QueryReports(kReportConfigId1, kFixedTimeSeconds + 3,
+                                 kFixedTimeSeconds + 207, &response_writer));
 
   // Since we know that reports are returned in batches of 100 we expect there
   // to be 3 batches: Two batches of size 100 and one batch of size 4.

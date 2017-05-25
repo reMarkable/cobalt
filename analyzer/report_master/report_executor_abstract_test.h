@@ -337,24 +337,26 @@ TYPED_TEST_P(ReportExecutorAbstractTest, EnqueueReportGeneration) {
                         kBasicRapporIntEncodingConfigId,
                         kForculusThreshold - 1);
 
-  // Register the start of report 1, variable-slice 1.
+  // Register the start of report 1, sequence_num 0, variable 0.
   ReportId report_id11 = this->report_id1_;
-  this->report_store_->StartNewReport(kDayIndex, kDayIndex, true, &report_id11);
+  this->report_store_->StartNewReport(kDayIndex, kDayIndex, true, HISTOGRAM,
+                                      {0}, &report_id11);
 
-  // Register the creation of report1, variable-slice 2.
+  // Register the creation of report1, sequence_num 1, variable 1.
   ReportId report_id12 = report_id11;
-  this->report_store_->CreateSecondarySlice(VARIABLE_2, &report_id12);
+  this->report_store_->CreateDependentReport(1, HISTOGRAM, {1}, &report_id12);
 
-  // Register the start of report2, variable-slice 1.
+  // Register the start of report2, sequence_num 0, variable 0.
   ReportId report_id21 = this->report_id2_;
-  this->report_store_->StartNewReport(kDayIndex, kDayIndex, true, &report_id21);
+  this->report_store_->StartNewReport(kDayIndex, kDayIndex, true, HISTOGRAM,
+                                      {0}, &report_id21);
 
-  // Register the creation of eport2, variable-slice 2.
+  // Register the creation of report2, sequence_num 1, variable 1.
   ReportId report_id22 = report_id21;
-  this->report_store_->CreateSecondarySlice(VARIABLE_2, &report_id22);
+  this->report_store_->CreateDependentReport(1, HISTOGRAM, {1}, &report_id22);
 
-  // Create two dependency chains of reports. We have variable-slice 2
-  // depend on variable-slice 1 for both report IDs.
+  // Create two dependency chains of reports. We have the variable 1 report
+  // depend on the variable 0 report for both report IDs.
   std::vector<ReportId> chain1;
   chain1.push_back(report_id11);
   chain1.push_back(report_id12);
@@ -380,21 +382,21 @@ TYPED_TEST_P(ReportExecutorAbstractTest, EnqueueReportGeneration) {
   // Wait for the processing to stop.
   this->report_executor_->WaitUntilIdle();
 
-  // Slice 1 of report 1 analyzed Part 1 of metric 1 which received
+  // report_id11 analyzed Part 1 of metric 1 which received
   // Basic RAPPOR string observations with 3 categories.
   this->CheckReport(report_id11, 3);
 
-  // Slice 2 of report 1 analyzed Part 2 of metric 1 which received
+  // report_id12 analyzed Part 2 of metric 1 which received
   // Basic RAPPOR int observations with 10 categories.
   this->CheckReport(report_id12, 10);
 
-  // Slice 1 of report 2 analyzed Part 1 of metric 1 which received
+  // report_id21 analyzed Part 1 of metric 1 which received
   // Forculus observations in which there were 20 observations of Apple
   // but only 19 observations of Banana. So there should only be 1 row in
   // the report.
   this->CheckReport(report_id21, 1);
 
-  // Slice 2 of report 2 analyzes Part 2 of metric 2 which received
+  // report_id22 of report 2 analyzes Part 2 of metric 2 which received
   // Basic RAPPOR int observations with 10 categories.
   this->CheckReport(report_id22, 10);
 }

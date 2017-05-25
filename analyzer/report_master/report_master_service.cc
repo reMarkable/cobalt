@@ -1,3 +1,4 @@
+
 // Copyright 2017 The Fuchsia Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -88,7 +89,7 @@ grpc::Status ReportIdFromString(const std::string& id_string,
 }
 
 // Builds a ReportMetadata to be returned to a client of the public
-// ReportMasterAPI, extracting data from the arguments. The |metadata_lite|
+// ReportMaster API, extracting data from the arguments. The |metadata_lite|
 // argument will be modified as some data will be swapped out of it.
 // Returns OK on success or an error status.
 grpc::Status MakeReportMetadata(const std::string& report_id_string,
@@ -135,46 +136,49 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
 
   metadata->set_first_day_index(metadata_lite->first_day_index());
   metadata->set_last_day_index(metadata_lite->last_day_index());
+  metadata->set_report_type(metadata_lite->report_type());
 
-  // Set the metric_parts
-  bool error_need_two_metric_parts = false;
-  switch (report_id.variable_slice()) {
-    case VARIABLE_1:
-      metadata->add_metric_parts(report_config->variable(0).metric_part());
-      break;
-    case VARIABLE_2:
-      if (report_config->variable_size() == 2) {
-        metadata->add_metric_parts(report_config->variable(1).metric_part());
-      } else {
-        error_need_two_metric_parts = true;
-      }
-      break;
-    case JOINT:
-      if (report_config->variable_size() == 2) {
-        metadata->add_metric_parts(report_config->variable(0).metric_part());
-        metadata->add_metric_parts(report_config->variable(1).metric_part());
-      } else {
-        error_need_two_metric_parts = true;
-      }
-      break;
-    default:
-      CHECK(false) << "Bad variable_slice " << report_id.variable_slice();
-  }
-
-  if (error_need_two_metric_parts) {
+  if (metadata_lite->variable_indices_size() == 0) {
     std::ostringstream stream;
-    stream << "Bad report_id=" << ReportStore::ToString(report_id)
-           << ". ReportConfig does not have two metric_parts.";
+    stream << "Invalid metadata, no variable indices for report_id="
+           << ReportStore::ToString(report_id);
     std::string message = stream.str();
     LOG(ERROR) << message;
     return grpc::Status(grpc::FAILED_PRECONDITION, message);
   }
 
-  // Add the associated_report_ids if this is a joint report.
-  if (report_id.variable_slice() == JOINT) {
+  // Set the metric parts.
+  for (auto index : metadata_lite->variable_indices()) {
+    if (index >= report_config->variable_size()) {
+      std::ostringstream stream;
+      stream << "Invalid variable index encountered while processing report_id="
+             << ReportStore::ToString(report_id) << ". index=" << index
+             << ". variable_size=" << report_config->variable_size();
+      std::string message = stream.str();
+      LOG(ERROR) << message;
+      return grpc::Status(grpc::FAILED_PRECONDITION, message);
+    }
+    metadata->add_metric_parts(report_config->variable(index).metric_part());
+  }
+
+  // Add the associated_report_ids as appropriate. Currently we do this only
+  // in the case tht the report type is JOINT. In this case the ReportId's
+  // sequence_num should be 2 and we add as associated reports the ReportIDs
+  // with sequence_nums 0 and 1 which should be the two one-way marginals.
+  if (metadata->report_type() == JOINT) {
+    if (report_id.sequence_num() != 2) {
+      std::ostringstream stream;
+      stream << "Inconsistent metadata encountered while processing report_id="
+             << ReportStore::ToString(report_id)
+             << ". sequence_num=" << report_id.sequence_num()
+             << " but report_type == JOINT.";
+      std::string message = stream.str();
+      LOG(ERROR) << message;
+      return grpc::Status(grpc::FAILED_PRECONDITION, message);
+    }
     ReportId associated_id = report_id;
     // Make the ID for the marginal report for variable 1.
-    associated_id.set_variable_slice(VARIABLE_1);
+    associated_id.set_sequence_num(0);
     auto status =
         ReportIdToString(associated_id, metadata->add_associated_report_ids());
     if (!status.ok()) {
@@ -184,7 +188,7 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
     }
 
     // Make the ID for the marginal report for variable 2.
-    associated_id.set_variable_slice(VARIABLE_2);
+    associated_id.set_sequence_num(1);
     status =
         ReportIdToString(associated_id, metadata->add_associated_report_ids());
     if (!status.ok()) {
@@ -299,48 +303,92 @@ grpc::Status ReportMasterService::StartReport(ServerContext* context,
   report_id.set_project_id(project_id);
   report_id.set_report_config_id(report_config_id);
 
-  // Register the report for variable one as being in the IN_PROGRESS state.
-  report_id.set_variable_slice(VARIABLE_1);
-  status = StartNewReport(*request, &report_id);
+  switch (report_config->report_type()) {
+    case HISTOGRAM:
+      return StartHistogramReport(*request, &report_id, response);
+      break;
+
+    case JOINT:
+      return StartJointReport(*request, &report_id, response);
+      break;
+
+    default:
+      std::ostringstream stream;
+      stream << "Bad ReportConfig found with id=" << report_config_id
+             << ". Unrecognized report type: " << report_config->report_type();
+      std::string message = stream.str();
+      LOG(ERROR) << message;
+      return grpc::Status(grpc::FAILED_PRECONDITION, message);
+  }
+}
+
+grpc::Status ReportMasterService::StartHistogramReport(
+    const StartReportRequest& request, ReportId* report_id,
+    StartReportResponse* response) {
+  // We will be creating and starting one report only.
+  report_id->set_sequence_num(0);
+  std::vector<uint32_t> variable_indices = {0};
+  auto status = StartNewReport(request, HISTOGRAM, variable_indices, report_id);
   if (!status.ok()) {
     return status;
   }
 
-  // If there is one variable we generate one report. If there are two variables
-  // we generate three reports.
-  size_t num_reports = (report_config->variable_size() == 1 ? 1 : 3);
-  std::vector<ReportId> report_chain(num_reports);
-
-  // The report for variable one will be generated first.
-  report_chain[0] = report_id;
-
-  if (num_reports == 3) {
-    // Register the report for variable two as being in the WAITING_TO_START
-    // state. Note that this updates |report_id| to refer to VARIABLE_2.
-    status = CreateSecondarySlice(VARIABLE_2, &report_id);
-    if (!status.ok()) {
-      return status;
-    }
-    // The report for variable 2 will be generated second.
-    report_chain[1] = report_id;
-
-    // Register the joint report as being in the WAITING_TO_START state.
-    // Note this updates |report_id| to refer to the JOINT report.
-    status = CreateSecondarySlice(JOINT, &report_id);
-    if (!status.ok()) {
-      return status;
-    }
-    // The joint report will be generated third.
-    report_chain[2] = report_id;
+  // Build the public report_id string to return in the repsonse.
+  status = ReportIdToString(*report_id, response->mutable_report_id());
+  if (!status.ok()) {
+    return status;
   }
 
-  // Build the public report_id string to return in the repsonse. In the case
-  // that there are two variables and three reports we now return the report_id
-  // of the joint report as this is the primary report the user is interested
-  // in. He can learn the IDs of the marginal reports by invoking GetReport()
-  // on the primary report and inspecting the |associated_report_ids| in the
-  // ReportMetadata in that response.
-  status = ReportIdToString(report_id, response->mutable_report_id());
+  // Finally enqueue the chain of one report to be generated.
+  std::vector<ReportId> report_chain(1);
+  report_chain[0] = *report_id;
+  return report_executor_->EnqueueReportGeneration(report_chain);
+}
+
+grpc::Status ReportMasterService::StartJointReport(
+    const StartReportRequest& request, ReportId* report_id,
+    StartReportResponse* response) {
+  // We will be creating three reports all together and starting the first one.
+  std::vector<ReportId> report_chain(3);
+
+  // First we create and start the HISTOGRAM report for the first marginal.
+  report_id->set_sequence_num(0);
+  std::vector<uint32_t> variable_indices = {0};  // Specify the first variable.
+  auto status = StartNewReport(request, HISTOGRAM, variable_indices, report_id);
+  if (!status.ok()) {
+    return status;
+  }
+  report_chain[0] = *report_id;
+
+  // Second we create, but don't yet start, the HISTOGRAM report for the second
+  // marginal.
+  variable_indices = {1};  // Specify the second variable
+  size_t sequence_number = 1;
+  // This call will modify report_id to specify the new sequence_number.
+  status = CreateDependentReport(sequence_number, HISTOGRAM, variable_indices,
+                                 report_id);
+  if (!status.ok()) {
+    return status;
+  }
+  report_chain[1] = *report_id;
+
+  // Third we create, but don't yet start, the JOINT report.
+  variable_indices = {0, 1};  // Specify both variables.
+  sequence_number = 2;
+  // This call will modify report_id to specify the new sequence_number.
+  status = CreateDependentReport(sequence_number, JOINT, variable_indices,
+                                 report_id);
+  if (!status.ok()) {
+    return status;
+  }
+  report_chain[2] = *report_id;
+
+  // Build the public report_id string to return in the repsonse. We return the
+  // report_id of the joint report as this is the primary report the user is
+  // interested in. He can learn the IDs of the marginal reports by invoking
+  // GetReport() on the primary report and inspecting the
+  // |associated_report_ids| in the ReportMetadata in that response.
+  status = ReportIdToString(*report_id, response->mutable_report_id());
   if (!status.ok()) {
     return status;
   }
@@ -505,10 +553,12 @@ grpc::Status ReportMasterService::GetAndValidateReportConfig(
 }
 
 grpc::Status ReportMasterService::StartNewReport(
-    const StartReportRequest& request, ReportId* report_id) {
-  // Invoke ReportStore::StartNewRequest().
+    const StartReportRequest& request, ReportType report_type,
+    const std::vector<uint32_t>& variable_indices, ReportId* report_id) {
+  // Invoke ReportStore::StartNewReport().
   auto store_status = report_store_->StartNewReport(
-      request.first_day_index(), request.last_day_index(), true, report_id);
+      request.first_day_index(), request.last_day_index(), true, report_type,
+      variable_indices, report_id);
 
   // Log(ERROR) if not OK.
   if (store_status != store::kOK) {
@@ -522,16 +572,16 @@ grpc::Status ReportMasterService::StartNewReport(
   return grpc::Status::OK;
 }
 
-grpc::Status ReportMasterService::CreateSecondarySlice(
-    VariableSlice variable_slice, ReportId* report_id) {
-  // Invoke ReportStore::CreateSecondarySlice().
-  auto store_status =
-      report_store_->CreateSecondarySlice(variable_slice, report_id);
+grpc::Status ReportMasterService::CreateDependentReport(
+    uint32_t sequence_number, ReportType report_type,
+    const std::vector<uint32_t>& variable_indices, ReportId* report_id) {
+  auto store_status = report_store_->CreateDependentReport(
+      sequence_number, report_type, variable_indices, report_id);
 
   // LOG(ERROR) if not OK.
   if (store_status != store::kOK) {
     std::ostringstream stream;
-    stream << "CreateSecondarySlice failed with status=" << store_status
+    stream << "CreateDependentReport failed with status=" << store_status
            << " for report_id=" << ReportStore::ToString(*report_id);
     std::string message = stream.str();
     LOG(ERROR) << message;

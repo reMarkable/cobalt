@@ -53,19 +53,19 @@ void ParseReportIdFromMetadataRowKey(const std::string row_key,
                                      ReportId* report_id) {
   int32_t customer_id, project_id, report_config_id, instance_id;
   int64_t creation_time_seconds;
-  int slice_index;
-  CHECK_GT(row_key.size(), 65);
+  int sequence_num;
+  CHECK_GT(row_key.size(), 68);
   std::sscanf(&row_key[0], "%10u", &customer_id);
   std::sscanf(&row_key[11], "%10u", &project_id);
   std::sscanf(&row_key[22], "%10u", &report_config_id);
   std::sscanf(&row_key[33], "%20lu", &creation_time_seconds);
   std::sscanf(&row_key[54], "%10u", &instance_id);
-  std::sscanf(&row_key[65], "%1u", &slice_index);
+  std::sscanf(&row_key[65], "%4u", &sequence_num);
   report_id->set_customer_id(customer_id);
   report_id->set_project_id(project_id);
   report_id->set_report_config_id(report_config_id);
   report_id->set_creation_time_seconds(creation_time_seconds);
-  report_id->set_variable_slice((VariableSlice)slice_index);
+  report_id->set_sequence_num(sequence_num);
   report_id->set_instance_id(instance_id);
 }
 
@@ -120,40 +120,50 @@ std::string MakeReportRowKey(const ReportId& report_id, uint32_t suffix) {
   return stream.str();
 }
 
-// Checks that the variable slice specified in |report_id| is consistent
-// with the values set in |report_row|. Returns true if valid or logs
-// and error message and returns false otherwise.
-bool ValidateVariableSlice(const ReportId& report_id,
-                           const ReportRow& report_row) {
-  switch (report_id.variable_slice()) {
-    case VARIABLE_1:
-      if (!report_row.has_value() || report_row.has_value2()) {
-        LOG(ERROR) << "Attempt to AddReportRow for VARIABLE_1 ReportID but "
-                      "report_row does not contain a value for |value| and "
-                      "no value for |value2|: "
-                   << ReportStore::ToString(report_id);
-        return false;
-      }
-      break;
-    case VARIABLE_2:
-      if (report_row.has_value() || !report_row.has_value2()) {
-        LOG(ERROR) << "Attempt to AddReportRow for VARIABLE_2 ReportID but "
-                      "report_row does not contain a value for |value2| and "
-                      "no value for |value|: "
-                   << ReportStore::ToString(report_id);
-        return false;
-      }
-      break;
-    case JOINT:
-      if (!report_row.has_value() || !report_row.has_value2()) {
-        LOG(ERROR) << "Attempt to AddReportRow for JOINT ReportID but "
-                      "report_row does not contain two values: "
-                   << ReportStore::ToString(report_id);
-        return false;
-      }
-      break;
-    default:
-      DCHECK(false) << "missing case";
+// Checks that the presence or absence of |value| and |value2| in |report_row|
+// is consistent with the specification of |variable_indices| in |metadata|.
+bool ValidateVariableIndices(const ReportId& report_id,
+                             const ReportMetadataLite& metadata,
+                             const ReportRow& report_row) {
+  if (metadata.variable_indices().empty() ||
+      metadata.variable_indices_size() > 2) {
+    LOG(ERROR) << "Expected metadata to have 1 or 2 variable indices, has "
+               << metadata.variable_indices_size() << "."
+               << ReportStore::ToString(report_id);
+    return false;
+  }
+  bool expect_value = false;
+  bool expect_value2 = false;
+  for (auto index : metadata.variable_indices()) {
+    if (index == 0) {
+      expect_value = true;
+    } else if (index == 1) {
+      expect_value2 = true;
+    } else {
+      LOG(ERROR) << "Expected only variable indices 0 and 1, got " << index
+                 << "." << ReportStore::ToString(report_id);
+      return false;
+    }
+  }
+  if (expect_value && !report_row.has_value()) {
+    LOG(ERROR) << "Report row is missing |value|. "
+               << ReportStore::ToString(report_id);
+    return false;
+  }
+  if (!expect_value && report_row.has_value()) {
+    LOG(ERROR) << "Report row should not have |value|. "
+               << ReportStore::ToString(report_id);
+    return false;
+  }
+  if (expect_value2 && !report_row.has_value2()) {
+    LOG(ERROR) << "Report row is missing |value2|. "
+               << ReportStore::ToString(report_id);
+    return false;
+  }
+  if (!expect_value2 && report_row.has_value2()) {
+    LOG(ERROR) << "Report row should not have |value2|. "
+               << ReportStore::ToString(report_id);
+    return false;
   }
   return true;
 }
@@ -214,9 +224,10 @@ Status ReportStore::WriteBulkMetadata(
   return kOK;
 }
 
-Status ReportStore::StartNewReport(uint32_t first_day_index,
-                                   uint32_t last_day_index, bool requested,
-                                   ReportId* report_id) {
+Status ReportStore::StartNewReport(
+    uint32_t first_day_index, uint32_t last_day_index, bool one_off,
+    ReportType report_type, const std::vector<uint32_t>& variable_indices,
+    ReportId* report_id) {
   CHECK(report_id);
   // Complete the report_id.
   report_id->set_creation_time_seconds(clock_->CurrentTimeSeconds());
@@ -227,22 +238,27 @@ Status ReportStore::StartNewReport(uint32_t first_day_index,
   metadata.set_state(IN_PROGRESS);
   metadata.set_first_day_index(first_day_index);
   metadata.set_last_day_index(last_day_index);
-  metadata.set_one_off(requested);
+  metadata.set_report_type(report_type);
+  for (auto index : variable_indices) {
+    metadata.add_variable_indices(index);
+  }
+  metadata.set_one_off(one_off);
   // We are not just creating but also starting this report now.
   metadata.set_start_time_seconds(report_id->creation_time_seconds());
 
   return WriteMetadata(*report_id, metadata);
 }
 
-Status ReportStore::CreateSecondarySlice(VariableSlice slice,
-                                         ReportId* report_id) {
+Status ReportStore::CreateDependentReport(
+    uint32_t sequence_number, ReportType report_type,
+    const std::vector<uint32_t>& variable_indices, ReportId* report_id) {
   ReportMetadataLite metadata;
   Status status = GetMetadata(*report_id, &metadata);
   if (status != kOK) {
     return status;
   }
 
-  report_id->set_variable_slice(slice);
+  report_id->set_sequence_num(sequence_number);
   status = GetMetadata(*report_id, &metadata);
   if (status != kNotFound) {
     return kAlreadyExists;
@@ -251,16 +267,24 @@ Status ReportStore::CreateSecondarySlice(VariableSlice slice,
   // Set the state to WAITING_TO_START
   metadata.set_state(WAITING_TO_START);
 
-  // Reset the fields we don't want to copy from the fetched ReportMetadataLite.
+  // Set the report_type and variable_indices
+  metadata.set_report_type(report_type);
+  metadata.clear_variable_indices();
+  for (auto index : variable_indices) {
+    metadata.add_variable_indices(index);
+  }
+
+  // Reset the other fields we don't want to copy from the fetched
+  // ReportMetadataLite.
   metadata.mutable_info_messages()->Clear();
-  // This is a secondary slice report and it has not started yet.
+  // This secondary report is being created but not started.
   metadata.set_start_time_seconds(0);
   metadata.set_finish_time_seconds(0);
 
   return WriteMetadata(*report_id, metadata);
 }
 
-Status ReportStore::StartSecondarySlice(const ReportId& report_id) {
+Status ReportStore::StartDependentReport(const ReportId& report_id) {
   ReportMetadataLite metadata;
   Status status = GetMetadata(report_id, &metadata);
   if (status != kOK) {
@@ -271,8 +295,7 @@ Status ReportStore::StartSecondarySlice(const ReportId& report_id) {
   }
   metadata.set_state(IN_PROGRESS);
 
-  // We are starting a secondary slice report so set the start time to the
-  // current time.
+  // Set the start time to the current time.
   metadata.set_start_time_seconds(clock_->CurrentTimeSeconds());
 
   return WriteMetadata(report_id, metadata);
@@ -307,10 +330,24 @@ Status ReportStore::AddReportRows(const ReportId& report_id,
     return kInvalidArguments;
   }
 
+  ReportMetadataLite metadata;
+  Status status = GetMetadata(report_id, &metadata);
+  if (status != kOK) {
+    LOG(ERROR) << "Failed to get metadata for report_id: "
+               << ToString(report_id);
+    return status;
+  }
+
+  if (metadata.state() != IN_PROGRESS) {
+    LOG(ERROR) << "Report is not IN_PROGRESS. state=" << metadata.state()
+               << " report_id: " << ToString(report_id);
+    return kPreconditionFailed;
+  }
+
   std::vector<DataStore::Row> data_store_rows;
 
   for (const auto& report_row : report_rows) {
-    if (!ValidateVariableSlice(report_id, report_row)) {
+    if (!ValidateVariableIndices(report_id, metadata, report_row)) {
       return kInvalidArguments;
     }
 
@@ -328,7 +365,7 @@ Status ReportStore::AddReportRows(const ReportId& report_id,
   }
 
   // Write the Row to the report_rows table.
-  Status status =
+  status =
       store_->WriteRows(DataStore::kReportRows, std::move(data_store_rows));
   if (status != kOK) {
     LOG(ERROR) << "Error while attempting to write report rows for report_id "
@@ -492,7 +529,7 @@ std::string ReportStore::MetadataRangeStartKey(uint32_t customer_id,
   report_id.set_report_config_id(report_config_id);
   report_id.set_creation_time_seconds(creation_time_seconds);
   report_id.set_instance_id(0);
-  // Leave variable_slice unset because the default value is zero.
+  // Leave sequence_num unset because the default value is zero.
   return MakeMetadataRowKey(report_id);
 }
 
@@ -518,17 +555,17 @@ std::string ReportStore::ReportEndRowKey(const ReportId& report_id) {
 
 std::string ReportStore::ToString(const ReportId& report_id) {
   // We write four ten-digit numbers, plus one twenty-digit number plus one
-  // one digit number plus five coluns. That is 66 characters. The string has
-  // size 67 to accommodate a trailing null character.
-  std::string out(67, 0);
+  // four digit number plus five coluns. That is 69 characters. The string has
+  // size 70 to accommodate a trailing null character.
+  std::string out(70, 0);
 
-  std::snprintf(&out[0], out.size(), "%.10u:%.10u:%.10u:%.20lu:%.10u:%.1u",
+  std::snprintf(&out[0], out.size(), "%.10u:%.10u:%.10u:%.20lu:%.10u:%.4u",
                 report_id.customer_id(), report_id.project_id(),
                 report_id.report_config_id(), report_id.creation_time_seconds(),
-                report_id.instance_id(), report_id.variable_slice());
+                report_id.instance_id(), report_id.sequence_num());
 
   // Discard the trailing null character.
-  out.resize(66);
+  out.resize(69);
 
   return out;
 }

@@ -22,6 +22,7 @@
 #include "./encrypted_message.pb.h"
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"
+#include "analyzer/report_master/report_generator.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
 #include "config/analyzer_config.h"
@@ -40,16 +41,15 @@ class DecoderAdapter;
 // combined into a final result.
 //
 // An instance of EncodingMixer is used just once, for one single-variable
-// report (or a single-variable slice of a two-variable report). It does not
-// know how to deal with two-variable reports. An EncodingMixer is used by
-// a ReportGenerator which knows how to deal with two-variable reports.
+// report. An EncodingMixer is used by a ReportGenerator which knows how to
+// deal with multi-variable reports.
 //
 // usage:
 //   - Construct an EncodingMixer.
 //   - Invoke ProcessObservationPart() multiple times. The ObservationParts
 //     passed in are allowed to have different encoding_config_ids from
-//     each other, but they must all be for the same single-variable report
-//     or variable-slice. (NOTE: Encoding-heterogeneous reports are not yet
+//     each other, but they must all be for the same single-variable report.
+//     (NOTE: Encoding-heterogeneous reports are not yet
 //     supported in V0.1 of Cobalt. Currently all ObservationParts passed
 //     in to ProcessObservationPart() must in fact have the same
 //     encoding_config_id.)
@@ -57,9 +57,10 @@ class DecoderAdapter;
 class EncodingMixer {
  public:
   // Constructs an EncodingMixer for the single-variable report with the
-  // given |report_id|. The |analyzer_config| parameter is used to look up
-  // EncodingConfigs by their ID.
-  EncodingMixer(const ReportId& report_id,
+  // given |report_id| and for the variable |variable|.
+  // The |analyzer_config| parameter is used to look up EncodingConfigs by their
+  // ID.
+  EncodingMixer(const ReportId& report_id, const Variable& variable,
                 std::shared_ptr<config::AnalyzerConfig> analyzer_config);
 
   // Process the given (day_index, ObservationPart) pair. The |day_index|
@@ -90,9 +91,11 @@ class EncodingMixer {
   std::unique_ptr<DecoderAdapter> NewDecoder(
       const EncodingConfig* encoding_config);
 
-  // The ID of the single-variable report (or report-slice) this EncodingMixer
-  // is for.
+  // The ID of the single-variable report this EncodingMixer is for.
   ReportId report_id_;
+
+  // The variable this EncodingMixer is for.
+  Variable variable_;
 
   // The keys to this map are encoding-config IDs and the values are the
   // DecoderAdapters adapting to the decoder/analyzer that knows how to

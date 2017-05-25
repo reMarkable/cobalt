@@ -85,8 +85,8 @@ class ReportStoreAbstractTest : public ::testing::Test {
                                      size_t row_index, uint8_t variable_index) {
     std::ostringstream stream;
     stream << report_id.creation_time_seconds() << ":"
-           << report_id.instance_id() << ":" << report_id.variable_slice()
-           << ":" << row_index << ":" << variable_index;
+           << report_id.instance_id() << ":" << report_id.sequence_num() << ":"
+           << row_index << ":" << variable_index;
     return stream.str();
   }
 
@@ -102,50 +102,32 @@ class ReportStoreAbstractTest : public ::testing::Test {
               value_part.string_value());
   }
 
-  static ReportRow MakeReportRow(const ReportId& report_id, size_t row_index) {
+  static ReportRow MakeReportRow(const ReportId& report_id, bool use_value_2,
+                                 size_t row_index) {
     ReportRow report_row;
     report_row.set_count_estimate(row_index);
     report_row.set_std_error(kStandardError);
-    switch (report_id.variable_slice()) {
-      case VARIABLE_1:
-        FillValuePart(report_id, row_index, 1, report_row.mutable_value());
-        break;
-      case VARIABLE_2:
-        FillValuePart(report_id, row_index, 2, report_row.mutable_value2());
-        break;
-      case JOINT:
-        FillValuePart(report_id, row_index, 1, report_row.mutable_value());
-        FillValuePart(report_id, row_index, 2, report_row.mutable_value2());
-        break;
-      default:
-        EXPECT_TRUE(false) << "missing case";
+    if (use_value_2) {
+      FillValuePart(report_id, row_index, 2, report_row.mutable_value2());
+    } else {
+      FillValuePart(report_id, row_index, 1, report_row.mutable_value());
     }
     return report_row;
   }
 
-  static void CheckReportRow(const ReportRow& row, const ReportId& report_id) {
+  static void CheckReportRow(const ReportRow& row, bool expect_value_2,
+                             const ReportId& report_id) {
     EXPECT_EQ(kStandardError, row.std_error());
-    switch (report_id.variable_slice()) {
-      case VARIABLE_1:
-        EXPECT_TRUE(row.has_value());
-        EXPECT_FALSE(row.has_value2());
-        // Note we use the fact that the count_estimate was set to the
-        // row_index.
-        CheckValue(row.value(), row.count_estimate(), report_id, 1);
-        break;
-      case VARIABLE_2:
-        EXPECT_FALSE(row.has_value());
-        EXPECT_TRUE(row.has_value2());
-        CheckValue(row.value2(), row.count_estimate(), report_id, 2);
-        break;
-      case JOINT:
-        EXPECT_TRUE(row.has_value());
-        EXPECT_TRUE(row.has_value2());
-        CheckValue(row.value(), row.count_estimate(), report_id, 1);
-        CheckValue(row.value2(), row.count_estimate(), report_id, 2);
-        break;
-      default:
-        EXPECT_TRUE(false) << "missing case";
+    if (expect_value_2) {
+      EXPECT_FALSE(row.has_value());
+      EXPECT_TRUE(row.has_value2());
+      CheckValue(row.value2(), row.count_estimate(), report_id, 2);
+    } else {
+      EXPECT_TRUE(row.has_value());
+      EXPECT_FALSE(row.has_value2());
+      // Note we use the fact that the count_estimate was set to the
+      // row_index.
+      CheckValue(row.value(), row.count_estimate(), report_id, 1);
     }
   }
 
@@ -153,31 +135,38 @@ class ReportStoreAbstractTest : public ::testing::Test {
     return report_store_->MakeMetadataRowKey(report_id);
   }
 
-  Status StartNewReport(bool one_off, ReportId* report_id) {
+  Status StartNewReport(bool one_off, ReportType report_type,
+                        const std::vector<uint32_t>& variable_indices,
+                        ReportId* report_id) {
     return this->report_store_->StartNewReport(kFirstDayIndex, kLastDayIndex,
-                                               one_off, report_id);
+                                               one_off, report_type,
+                                               variable_indices, report_id);
   }
 
-  // Starts a new report with one_off=true and our global contstant values
-  // for all of the parameters.
-  ReportId StartNewReport() {
-    bool one_off = true;
+  // Starts a new report of type HISTOGRAM with variable_indices = {0}
+  Status StartNewHistogramReport(bool one_off, ReportId* report_id) {
+    return StartNewReport(one_off, HISTOGRAM, {0}, report_id);
+  }
 
+  // Starts a new report with one_off=true, type=HISTOGRAM,
+  // the specified |variable_index| as the single variable index,
+  // and our global contstant values for all of the numeric IDs.
+  ReportId StartNewHistogramReport() {
     // Make a new ReportID without specifying timestamp or instance_id.
     ReportId report_id = MakeReportId(0, 0);
     EXPECT_EQ(0, report_id.creation_time_seconds());
     EXPECT_EQ(0, report_id.instance_id());
 
-    // Invoke StartNewReport().
-    EXPECT_EQ(kOK, StartNewReport(one_off, &report_id));
+    EXPECT_EQ(kOK, StartNewHistogramReport(true, &report_id));
     return report_id;
   }
 
   // Inserts |num_timestamps| * 6 rows into the report_metadata table.
   // Starting with timestamp=start_timestamp, for |num_timestamps| increments of
-  // |timestamp_delta|, 6 rows are inserted with that timestamp: For each of
-  // the 3 variable slices we insert two rows with two different values of
-  // instance_id. For each insert we store timestamp + instance_id + slice_index
+  // |timestamp_delta|, 6 rows are inserted with that timestamp: For three
+  // sequence_num=0,1,2, we insert two rows with two different values of
+  // instance_id. For each insert we store
+  // timestamp + instance_id + sequence_num
   // into the ReportMetadata's start_timestamp_ms field for later verifaction.
   void WriteManyNewReports(int64_t start_timestamp, uint64_t timestamp_delta,
                            size_t num_timestamps) {
@@ -186,13 +175,13 @@ class ReportStoreAbstractTest : public ::testing::Test {
     int64_t timestamp = start_timestamp;
     for (int ts_index = 0; ts_index < num_timestamps; ts_index++) {
       for (int instance_id = 0; instance_id <= 1; instance_id++) {
-        for (int slice_index = 0; slice_index < 3; slice_index++) {
+        for (int sequence_num = 0; sequence_num < 3; sequence_num++) {
           report_ids.emplace_back(MakeReportId(timestamp, instance_id));
           EXPECT_EQ(report_ids.back().instance_id(), instance_id);
-          report_ids.back().set_variable_slice((VariableSlice)slice_index);
+          report_ids.back().set_sequence_num(sequence_num);
           ReportMetadataLite metadata;
           metadata.set_start_time_seconds(timestamp + instance_id +
-                                          slice_index);
+                                          sequence_num);
           metadata_vector.emplace_back(metadata);
         }
       }
@@ -202,12 +191,13 @@ class ReportStoreAbstractTest : public ::testing::Test {
     test_utils.WriteBulkMetadata(report_ids, metadata_vector);
   }
 
-  void AddReportRows(const ReportId& report_id, size_t num_rows) {
+  Status AddReportRows(const ReportId& report_id, bool use_value_2,
+                       size_t num_rows) {
     std::vector<ReportRow> report_rows;
     for (int index = 0; index < num_rows; index++) {
-      report_rows.emplace_back(MakeReportRow(report_id, index));
+      report_rows.emplace_back(MakeReportRow(report_id, use_value_2, index));
     }
-    EXPECT_EQ(kOK, report_store_->AddReportRows(report_id, report_rows));
+    return report_store_->AddReportRows(report_id, report_rows);
   }
 
   void GetReportAndCheck(const ReportId& report_id, size_t expected_num_rows) {
@@ -216,8 +206,13 @@ class ReportStoreAbstractTest : public ::testing::Test {
     EXPECT_EQ(kOK, report_store_->GetReport(report_id, &read_metadata, &rows));
     EXPECT_EQ(COMPLETED_SUCCESSFULLY, read_metadata.state());
     EXPECT_EQ(expected_num_rows, rows.rows_size());
+    EXPECT_EQ(HISTOGRAM, read_metadata.report_type());
+    EXPECT_EQ(1, read_metadata.variable_indices_size());
+    auto var_index = read_metadata.variable_indices(0);
+    EXPECT_TRUE(var_index == 0 || var_index == 1);
+    bool expect_value_2 = var_index == 1;
     for (const auto& row : rows.rows()) {
-      this->CheckReportRow(row, report_id);
+      this->CheckReportRow(row, expect_value_2, report_id);
     }
   }
 
@@ -247,7 +242,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
   EXPECT_EQ(0, report_id.instance_id());
 
   // Invoke StartNewReport().
-  EXPECT_EQ(kOK, this->StartNewReport(one_off, &report_id));
+  EXPECT_EQ(kOK, this->StartNewHistogramReport(one_off, &report_id));
 
   // Check that the report_id was completed.
   EXPECT_NE(0, report_id.creation_time_seconds());
@@ -302,16 +297,16 @@ TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
   EXPECT_EQ("goodbye", report_metadata.info_messages(1).message());
 }
 
-// Tests the functions CreateSecondarySlice() and StartSecondarySlice.
-TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartSecondarySlice) {
+// Tests the functions CreateDependentReport() and StartDependentReport.
+TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
   bool one_off = false;
 
   // Make a new ReportID without specifying timestamp or instance_id.
   ReportId report_id1 = this->MakeReportId(0, 0);
-  EXPECT_EQ(VARIABLE_1, report_id1.variable_slice());
+  EXPECT_EQ(0, report_id1.sequence_num());
 
   // Invoke StartNewReport().
-  EXPECT_EQ(kOK, this->StartNewReport(one_off, &report_id1));
+  EXPECT_EQ(kOK, this->StartNewHistogramReport(one_off, &report_id1));
 
   // Invoke EndReport()
   EXPECT_EQ(kOK, this->report_store_->EndReport(report_id1, true, "hello"));
@@ -319,12 +314,13 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartSecondarySlice) {
   // Copy the new report_id
   ReportId report_id2(report_id1);
 
-  // Invoke CreateSecondarySlice().
-  EXPECT_EQ(kOK,
-            this->report_store_->CreateSecondarySlice(VARIABLE_2, &report_id2));
+  // Invoke CreateDependentReport() to create a report with sequence_num=2
+  // that analyzes variable 1.
+  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(1, HISTOGRAM, {1},
+                                                            &report_id2));
 
-  // Check that report_id2 had its variable_slice set correctly.
-  EXPECT_EQ(VARIABLE_2, report_id2.variable_slice());
+  // Check that report_id2 had its sequence_num set correctly.
+  EXPECT_EQ(1, report_id2.sequence_num());
   // Creation time should be the same as for the initial report.
   EXPECT_EQ(report_id1.creation_time_seconds(),
             report_id2.creation_time_seconds());
@@ -339,6 +335,8 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartSecondarySlice) {
   EXPECT_EQ(this->first_day_index(), report_metadata.first_day_index());
   EXPECT_EQ(this->last_day_index(), report_metadata.last_day_index());
   EXPECT_EQ(one_off, report_metadata.one_off());
+  ASSERT_EQ(1, report_metadata.variable_indices_size());
+  EXPECT_EQ(1, report_metadata.variable_indices(0));
 
   // start_time_seconds, finish_time_seconds and info_message should not have
   // been copied to this ReportMetadataLite.
@@ -346,8 +344,8 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartSecondarySlice) {
   EXPECT_EQ(0, report_metadata.finish_time_seconds());
   EXPECT_EQ(0, report_metadata.info_messages_size());
 
-  // Now start the secondary slice.
-  EXPECT_EQ(kOK, this->report_store_->StartSecondarySlice(report_id2));
+  // Now start the dependent report.
+  EXPECT_EQ(kOK, this->report_store_->StartDependentReport(report_id2));
 
   // Get the ReportMetatdata for report_id2.
   report_metadata.Clear();
@@ -365,17 +363,21 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartSecondarySlice) {
 // Tests the functions AddReportRow and GetReport
 TYPED_TEST_P(ReportStoreAbstractTest, ReportRows) {
   // We start three reports. Two independent reports, report 1 and report 2.
-  auto report_id1 = this->StartNewReport();
-  auto report_id2 = this->StartNewReport();
-  // And report 2a which is an associated sub-reprot with report 2.
+  auto report_id1 = this->StartNewHistogramReport();
+  auto report_id2 = this->StartNewHistogramReport();
+  // And report 2a which is an associated sub-report with report 2.
   ReportId report_id2a(report_id2);
-  EXPECT_EQ(
-      kOK, this->report_store_->CreateSecondarySlice(VARIABLE_2, &report_id2a));
+  std::vector<uint32_t> variable_indices = {1};
+  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(1, HISTOGRAM, {1},
+                                                            &report_id2a));
+  EXPECT_EQ(kOK, this->report_store_->StartDependentReport(report_id2a));
 
   // Add rows to all three reports.
-  this->AddReportRows(report_id1, 100);
-  this->AddReportRows(report_id2, 200);
-  this->AddReportRows(report_id2a, 300);
+  bool use_value_2 = false;
+  EXPECT_EQ(kOK, this->AddReportRows(report_id1, use_value_2, 100));
+  EXPECT_EQ(kOK, this->AddReportRows(report_id2, use_value_2, 200));
+  use_value_2 = true;
+  EXPECT_EQ(kOK, this->AddReportRows(report_id2a, use_value_2, 300));
 
   // Complete all three reports
   this->report_store_->EndReport(report_id1, true, "");
@@ -424,7 +426,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
     EXPECT_TRUE(timestamp < interval_end_time_seconds);
     // See WriteManyNewReports for how we set
     // report_metadata.start_time_seconds()
-    EXPECT_EQ(timestamp + report_id.instance_id() + report_id.variable_slice(),
+    EXPECT_EQ(timestamp + report_id.instance_id() + report_id.sequence_num(),
               report_record.report_metadata.start_time_seconds());
   }
 
@@ -458,13 +460,13 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
     EXPECT_TRUE(timestamp < interval_end_time_seconds);
     // See WriteManyNewReports for how we set
     // report_metadata.start_time_seconds()
-    EXPECT_EQ(timestamp + report_id.instance_id() + report_id.variable_slice(),
+    EXPECT_EQ(timestamp + report_id.instance_id() + report_id.sequence_num(),
               report_record.report_metadata.start_time_seconds());
   }
 }
 
 REGISTER_TYPED_TEST_CASE_P(ReportStoreAbstractTest, SetAndGetMetadata,
-                           CreateAndStartSecondarySlice, ReportRows,
+                           CreateAndStartDependentReport, ReportRows,
                            QueryReports);
 
 }  // namespace store

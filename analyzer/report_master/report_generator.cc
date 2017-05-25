@@ -83,55 +83,30 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
   }
 }
 
-// Builds the appropriate vector of MetricPart names to analyze given the
-// |report_id| and the |report_config|. Writes the result into |parts|.
+// Builds the appropriate vector of Variables to analyze given the
+// input data. Writes the result into |variables|.
 // On error, does LOG(ERROR) and returns an appropriate status.
-grpc::Status BuildParts(const ReportConfig& report_config,
-                        const ReportId& report_id,
-                        std::vector<std::string>* parts) {
-  switch (report_id.variable_slice()) {
-    case VARIABLE_1:
-      parts->emplace_back(report_config.variable(0).metric_part());
-      return grpc::Status::OK;
-    case VARIABLE_2:
-      if (!(report_config.variable_size() >= 2)) {
-        std::ostringstream stream;
-        stream << "Invalid arguments: report_id.variable_slice specifies "
-                  "VARIABLE_2 but "
-                  "ReportConfig has only one variable. "
-               << ReportConfigIdString(report_id)
-               << " report_id=" << ReportStore::ToString(report_id);
-        std::string message = stream.str();
-        LOG(ERROR) << message;
-        return grpc::Status(grpc::INVALID_ARGUMENT, message);
-      }
-      parts->emplace_back(report_config.variable(1).metric_part());
-      return grpc::Status::OK;
-    case JOINT: {
+grpc::Status BuildVariableList(const ReportConfig& report_config,
+                               const ReportId& report_id,
+                               const ReportMetadataLite& metadata,
+                               std::vector<Variable>* variables) {
+  CHECK(variables);
+  variables->clear();
+  for (auto index : metadata.variable_indices()) {
+    if (index > report_config.variable_size()) {
       std::ostringstream stream;
-      if (!(report_config.variable_size() >= 2)) {
-        stream << "Invalid arguments: report_id.variable_slice specifies JOINT "
-                  "but ReportConfig has only one variable. "
-               << ReportConfigIdString(report_id)
-               << " report_id=" << ReportStore::ToString(report_id);
-        std::string message = stream.str();
-        LOG(ERROR) << message;
-        return grpc::Status(grpc::INVALID_ARGUMENT, message);
-      }
-      parts->emplace_back(report_config.variable(0).metric_part());
-      parts->emplace_back(report_config.variable(1).metric_part());
-
-      // TODO(rudominer) Implement joint two-varaible reports.
-      stream << "JOINT report processing not currently implemented "
-             << ReportConfigIdString(report_id);
+      stream << "Invalid arguments: metadata.variable_indices contains "
+             << "an out of range index: " << index << ". ReportConfig has only "
+             << report_config.variable_size() << " variables. "
+             << ReportConfigIdString(report_id)
+             << " report_id=" << ReportStore::ToString(report_id);
       std::string message = stream.str();
       LOG(ERROR) << message;
-      return grpc::Status(grpc::UNIMPLEMENTED, message);
+      return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
-    default:
-      LOG(FATAL) << "Unexpected value for enum variable_slice: "
-                 << report_id.variable_slice();
+    variables->emplace_back(index, report_config.variable(index).metric_part());
   }
+  return grpc::Status::OK;
 }
 
 }  // namespace
@@ -196,19 +171,18 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     return grpc::Status(grpc::NOT_FOUND, message);
   }
 
-  // Determine which variable slice we are doing and create corresponding
-  // metric parts vector.
-  std::vector<std::string> parts;
-  status = BuildParts(*report_config, report_id, &parts);
+  // Determine which variables we are analyzing.
+  std::vector<Variable> variables;
+  status = BuildVariableList(*report_config, report_id, metadata, &variables);
   if (!status.ok()) {
     return status;
   }
 
-  // Check that each of the part names are valid.
-  for (auto& part : parts) {
-    if (metric->parts().find(part) == metric->parts().end()) {
+  // Check that each of the variable names are valid metric part names.
+  for (auto& variable : variables) {
+    if (metric->parts().find(variable.name) == metric->parts().end()) {
       std::ostringstream stream;
-      stream << "Invalid ReportConfig: variable part name '" << part
+      stream << "Invalid ReportConfig: variable name '" << variable.name
              << "' is not the name of a part of the metric with "
              << MetricIdString(*report_config) << ". "
              << ReportConfigIdString(report_id);
@@ -218,41 +192,70 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     }
   }
 
-  // Note(rudominer) Because joint reports are not yet implemented we know
-  // now that we must generate a single-variable report.
-  return GenerateSingleVariableReport(
-      report_id, *report_config, *metric, std::move(parts),
-      metadata.first_day_index(), metadata.last_day_index());
+  switch (metadata.report_type()) {
+    case HISTOGRAM:
+      return GenerateHistogramReport(
+          report_id, *report_config, *metric, std::move(variables),
+          metadata.first_day_index(), metadata.last_day_index());
+    case JOINT: {
+      std::ostringstream stream;
+      stream << "Report type JOINT is not yet implemented "
+             << ReportConfigIdString(report_id);
+      std::string message = stream.str();
+      LOG(ERROR) << message;
+      return grpc::Status(grpc::UNIMPLEMENTED, message);
+    }
+    default: {
+      std::ostringstream stream;
+      stream << "Invalid ReportMetadata: unrecognized ReportType: "
+             << metadata.report_type()
+             << " for report_id=" << ReportStore::ToString(report_id);
+      std::string message = stream.str();
+      LOG(ERROR) << message;
+      return grpc::Status(grpc::INVALID_ARGUMENT, message);
+    }
+  }
 }
 
-grpc::Status ReportGenerator::GenerateSingleVariableReport(
+grpc::Status ReportGenerator::GenerateHistogramReport(
     const ReportId& report_id, const ReportConfig& report_config,
-    const Metric& metric, std::vector<std::string> single_part,
+    const Metric& metric, std::vector<Variable> variables,
     uint32_t start_day_index, uint32_t end_day_index) {
-  CHECK_EQ(1, single_part.size());
   DCHECK(start_day_index <= end_day_index);
-  const std::string& part_name = single_part[0];
+  if (variables.size() != 1) {
+    std::ostringstream stream;
+    stream << "Invalid arguments: There are " << variables.size()
+           << " variables specified but a HISTOGRAM report analyzes only one "
+              "variable. "
+           << ReportConfigIdString(report_id)
+           << " report_id=" << ReportStore::ToString(report_id);
+    std::string message = stream.str();
+    LOG(ERROR) << message;
+    return grpc::Status(grpc::INVALID_ARGUMENT, message);
+  }
 
   // Construct the EncodingMixer.
-  EncodingMixer encoding_mixer(report_id, analyzer_config_);
+  EncodingMixer encoding_mixer(report_id, variables[0], analyzer_config_);
 
   // We query the ObservationStore for the relevant ObservationParts.
   store::ObservationStore::QueryResponse query_response;
   query_response.pagination_token = "";
+  std::vector<std::string> parts(1);
+  parts[0] = variables[0].name;
   // We iteratively query in batches of size 1000.
   static const size_t kMaxResultsPerIteration = 1000;
   do {
     VLOG(4) << "Querying for 1000 observations...";
     query_response = observation_store_->QueryObservations(
         report_config.customer_id(), report_config.project_id(),
-        report_config.metric_id(), start_day_index, end_day_index, single_part,
+        report_config.metric_id(), start_day_index, end_day_index, parts,
         kMaxResultsPerIteration, query_response.pagination_token);
 
     if (query_response.status != store::kOK) {
       std::ostringstream stream;
       stream << "QueryObservations failed with status=" << query_response.status
              << " for report_id=" << ReportStore::ToString(report_id)
-             << " part=" << part_name;
+             << " part=" << parts[0];
       std::string message = stream.str();
       LOG(ERROR) << message;
       return grpc::Status(grpc::ABORTED, message);
@@ -264,7 +267,7 @@ grpc::Status ReportGenerator::GenerateSingleVariableReport(
     for (const auto& query_result : query_response.results) {
       CHECK_EQ(1, query_result.observation.parts_size());
       const auto& observation_part =
-          query_result.observation.parts().at(part_name);
+          query_result.observation.parts().at(parts[0]);
       // Process each ObservationPart using the EncodingMixer.
       // TODO(rudominer) This method returns false when the Observation was
       // bad in some way. This should be kept track of through a monitoring

@@ -237,17 +237,19 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     ReportRows rows;
   };
 
-  // Uses the ReportGenerator to generate a report that analyzes the specified
-  // variable of our two-variable test metric.
-  GeneratedReport GenerateReport(int variable_index) {
-    // Complete the report_id by specifying the variable slice.
-    report_id_.set_variable_slice((VariableSlice)variable_index);
+  // Uses the ReportGenerator to generate a HISTOGRAM report that analyzes the
+  // specified variable of our two-variable test metric. |variable_index| must
+  // be either 0 or 1. It will also be used for the sequence_num.
+  GeneratedReport GenerateHistogramReport(int variable_index) {
+    // Complete the report_id by specifying the sequence_num.
+    report_id_.set_sequence_num(variable_index);
 
     // Start a report for the specified variable, for the interval of days
     // [kDayIndex, kDayIndex].
     EXPECT_EQ(store::kOK,
               report_store_->StartNewReport(
-                  testing::kDayIndex, testing::kDayIndex, true, &report_id_));
+                  testing::kDayIndex, testing::kDayIndex, true, HISTOGRAM,
+                  {(uint32_t)variable_index}, &report_id_));
 
     // Generate the report
     EXPECT_TRUE(report_generator_->GenerateReport(report_id_).ok());
@@ -336,12 +338,12 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // to validate the Basic RAPPOR algorithm here so we simply test that the
   // all three strings appear with a non-zero count and under the correct
   // variable index.
-  void CheckBasicRapporReport(const ReportRows& report, int slice_index) {
+  void CheckBasicRapporReport(const ReportRows& report, int variable_index) {
     EXPECT_EQ(3, report.rows_size());
     for (const auto& report_row : report.rows()) {
       EXPECT_NE(0, report_row.std_error());
       ValuePart recovered_value;
-      switch (slice_index) {
+      switch (variable_index) {
         case 0:
           EXPECT_FALSE(report_row.has_value2());
           EXPECT_TRUE(report_row.has_value());
@@ -384,13 +386,13 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, Forculus) {
   {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
-    auto report = this->GenerateReport(variable_index);
+    auto report = this->GenerateHistogramReport(variable_index);
     this->CheckForculusReport(report.rows, variable_index);
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
-    auto report = this->GenerateReport(variable_index);
+    auto report = this->GenerateHistogramReport(variable_index);
     this->CheckForculusReport(report.rows, variable_index);
   }
 }
@@ -404,13 +406,13 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, BasicRappor) {
   {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
-    auto report = this->GenerateReport(variable_index);
+    auto report = this->GenerateHistogramReport(variable_index);
     this->CheckBasicRapporReport(report.rows, variable_index);
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
-    auto report = this->GenerateReport(variable_index);
+    auto report = this->GenerateHistogramReport(variable_index);
     this->CheckBasicRapporReport(report.rows, variable_index);
   }
 }

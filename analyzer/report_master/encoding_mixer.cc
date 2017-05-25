@@ -75,9 +75,11 @@ bool CheckConsistentEncoding(const EncodingConfig& encoding_config,
 ///////////////////////////////////////////////////////////////////////////
 class ForculusAdapter : public DecoderAdapter {
  public:
-  ForculusAdapter(const ReportId& report_id,
+  ForculusAdapter(const ReportId& report_id, const Variable& variable,
                   const cobalt::ForculusConfig& config)
-      : report_id_(report_id), analyzer_(new ForculusAnalyzer(config)) {}
+      : report_id_(report_id),
+        variable_(variable),
+        analyzer_(new ForculusAnalyzer(config)) {}
 
   bool ProcessObservationPart(uint32_t day_index,
                               const ObservationPart& obs) override {
@@ -96,16 +98,21 @@ class ForculusAdapter : public DecoderAdapter {
       }
       results->emplace_back();
       auto& row = results->back();
-      switch (report_id_.variable_slice()) {
-        case VARIABLE_1:
+      switch (variable_.index) {
+        case 0:
           row.mutable_value()->Swap(&value_part);
           break;
-        case VARIABLE_2:
+        case 1:
           row.mutable_value2()->Swap(&value_part);
           break;
-        default:
-          LOG(FATAL) << "ForculusAdapter should not be used on variable_slice "
-                     << report_id_.variable_slice();
+        default: {
+          std::ostringstream stream;
+          stream << "Unexpected variable index: " << variable_.index
+                 << ". report_id=" << ReportStore::ToString(report_id_);
+          std::string message = stream.str();
+          LOG(ERROR) << message;
+          return grpc::Status(grpc::INTERNAL, message);
+        }
       }
       row.set_count_estimate(pair.second->total_count);
       // TODO(rudominer) We are not using some of the data that the
@@ -118,6 +125,7 @@ class ForculusAdapter : public DecoderAdapter {
 
  private:
   ReportId report_id_;
+  Variable variable_;
   std::unique_ptr<ForculusAnalyzer> analyzer_;
 };
 
@@ -149,9 +157,11 @@ class RapporAdapter : public DecoderAdapter {
 ///////////////////////////////////////////////////////////////////////////
 class BasicRapporAdapter : public DecoderAdapter {
  public:
-  BasicRapporAdapter(const ReportId& report_id,
+  BasicRapporAdapter(const ReportId& report_id, const Variable& variable,
                      const cobalt::BasicRapporConfig& config)
-      : report_id_(report_id), analyzer_(new BasicRapporAnalyzer(config)) {}
+      : report_id_(report_id),
+        variable_(variable),
+        analyzer_(new BasicRapporAnalyzer(config)) {}
 
   bool ProcessObservationPart(uint32_t day_index,
                               const ObservationPart& obs) override {
@@ -163,17 +173,21 @@ class BasicRapporAdapter : public DecoderAdapter {
     for (auto& category_result : category_results) {
       results->emplace_back();
       auto& row = results->back();
-      switch (report_id_.variable_slice()) {
-        case VARIABLE_1:
+      switch (variable_.index) {
+        case 0:
           row.mutable_value()->Swap(&category_result.category);
           break;
-        case VARIABLE_2:
+        case 1:
           row.mutable_value2()->Swap(&category_result.category);
           break;
-        default:
-          LOG(FATAL)
-              << "BasicRapporAdapter should not be used on variable_slice "
-              << report_id_.variable_slice();
+        default: {
+          std::ostringstream stream;
+          stream << "Unexpected variable index: " << variable_.index
+                 << ". report_id=" << ReportStore::ToString(report_id_);
+          std::string message = stream.str();
+          LOG(ERROR) << message;
+          return grpc::Status(grpc::INTERNAL, message);
+        }
       }
       row.set_count_estimate(category_result.count_estimate);
       row.set_std_error(category_result.std_error);
@@ -186,6 +200,7 @@ class BasicRapporAdapter : public DecoderAdapter {
 
  private:
   ReportId report_id_;
+  Variable variable_;
   std::unique_ptr<BasicRapporAnalyzer> analyzer_;
 };
 
@@ -193,8 +208,11 @@ class BasicRapporAdapter : public DecoderAdapter {
 /// EncodingMixer methods.
 ///////////////////////////////////////////////////////////////////////////
 EncodingMixer::EncodingMixer(const ReportId& report_id,
+                             const Variable& variable,
                              std::shared_ptr<AnalyzerConfig> analyzer_config)
-    : report_id_(report_id), analyzer_config_(analyzer_config) {}
+    : report_id_(report_id),
+      variable_(variable),
+      analyzer_config_(analyzer_config) {}
 
 bool EncodingMixer::ProcessObservationPart(uint32_t day_index,
                                            const ObservationPart& obs) {
@@ -275,13 +293,13 @@ std::unique_ptr<DecoderAdapter> EncodingMixer::NewDecoder(
     const EncodingConfig* encoding_config) {
   switch (encoding_config->config_case()) {
     case EncodingConfig::kForculus:
-      return std::unique_ptr<DecoderAdapter>(
-          new ForculusAdapter(report_id_, encoding_config->forculus()));
+      return std::unique_ptr<DecoderAdapter>(new ForculusAdapter(
+          report_id_, variable_, encoding_config->forculus()));
     case EncodingConfig::kRappor:
       return std::unique_ptr<DecoderAdapter>(new RapporAdapter);
     case EncodingConfig::kBasicRappor:
-      return std::unique_ptr<DecoderAdapter>(
-          new BasicRapporAdapter(report_id_, encoding_config->basic_rappor()));
+      return std::unique_ptr<DecoderAdapter>(new BasicRapporAdapter(
+          report_id_, variable_, encoding_config->basic_rappor()));
     default:
       LOG(FATAL) << "Unexpected EncodingConfig type "
                  << encoding_config->config_case();

@@ -219,8 +219,8 @@ bool ReportExecutor::ProcessReportId(const ReportId& report_id) {
 
   switch (metadata.state()) {
     case WAITING_TO_START: {
-      if (!StartSecondarySlice(report_id)) {
-        EndReport(report_id, false, "Unable to start secondary slice.");
+      if (!StartDependentReport(report_id)) {
+        EndReport(report_id, false, "Unable to start dependent report.");
         return false;
       }
       break;
@@ -256,10 +256,10 @@ bool ReportExecutor::GetMetadata(const ReportId& report_id,
   return true;
 }
 
-bool ReportExecutor::StartSecondarySlice(const ReportId& report_id) {
-  auto status = report_store_->StartSecondarySlice(report_id);
+bool ReportExecutor::StartDependentReport(const ReportId& report_id) {
+  auto status = report_store_->StartDependentReport(report_id);
   if (status != store::kOK) {
-    LOG(ERROR) << "StartSecondarySlice failed with status=" << status
+    LOG(ERROR) << "StartDependentReport failed with status=" << status
                << " for report_id=" << ReportStore::ToString(report_id);
     return false;
   }

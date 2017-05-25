@@ -17,6 +17,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "analyzer/report_master/report_executor.h"
 #include "analyzer/report_master/report_master.grpc.pb.h"
@@ -71,15 +72,48 @@ class ReportMasterService final : public ReportMaster::Service {
       uint32_t customer_id, uint32_t project_id, uint32_t report_config_id,
       const ReportConfig** report_config_out);
 
+  // Encapsulates the logic for starting a HISTOGRAM report. Invoked by
+  // StartReport in the case that the type of report to be started is HISTOGRAM.
+  //
+  // |report_id| will be modified. On input customer_id, project_id and
+  // report_config_id should be set. This method will set the remaining fields
+  // thereby forming a new unique ReportId for the newly started HISTOGRAM
+  // report.
+  grpc::Status StartHistogramReport(const StartReportRequest& request,
+                                    ReportId* report_id,
+                                    StartReportResponse* response);
+
+  // Encapsulates the logic for starting a JOINT report. Invoked by
+  // StartReport in the case that the type of report to be started is JOINT.
+  // Three reports will be created: The joint report itself and the two one-way
+  // marginal reports. The sequence numbers of the three ReportIds will be
+  // as follows:
+  // 0: The one-way marginal for the first variable.
+  // 1: The one-way marginal for the second variable.
+  // 2: The joint report.
+  // The first one-way marginal will be started and the other two will be
+  // created in the WAITING_TO_START state.
+  //
+  // |report_id| will be modified. On input customer_id, project_id and
+  // report_config_id should be set. This method will set the remaining fields
+  // thereby forming a new unique ReportId for the newly started HISTOGRAM
+  // report. On exit the |sequence_num| field will be set to 2.
+  grpc::Status StartJointReport(const StartReportRequest& request,
+                                ReportId* report_id,
+                                StartReportResponse* response);
+
   // Invokes ReportStore::StartNewReport().
   // Does Log(ERROR) and returns an error status on error.
   grpc::Status StartNewReport(const StartReportRequest& request,
+                              ReportType report_type,
+                              const std::vector<uint32_t>& variable_indices,
                               ReportId* report_id);
 
-  // Invokes ReportStore::CreateSecondarySlice().
+  // Invokes ReportStore::CreateDependentReport().
   // Does Log(ERROR) and returns an error status on error.
-  grpc::Status CreateSecondarySlice(VariableSlice variable_slice,
-                                    ReportId* report_id);
+  grpc::Status CreateDependentReport(
+      uint32_t sequence_number, ReportType report_type,
+      const std::vector<uint32_t>& variable_indices, ReportId* report_id);
 
   // Invokes ReportStore::GetReport().
   // Does Log(ERROR) and returns an error status on error.

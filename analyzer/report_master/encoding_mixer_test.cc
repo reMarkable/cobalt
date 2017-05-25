@@ -105,14 +105,13 @@ element {
 
 class EncodingMixerTest : public ::testing::Test {
  protected:
-  // Sets up the test for the given variable_slice. The slice appears as
-  // part of the report_id and the report_id is passed in to the
-  // constructor of the EncodingMixer so the EncodingMixer knows which
-  // variable slice it is for.
-  void SetUpForSlice(int slice_index) {
+  // Sets up the test for the given |variable_index| which must be either 0
+  // or 1. The index will also be used for the sequence_num field of the
+  // ReportId.
+  void SetUpForVariable(int variable_index) {
     report_id_.set_customer_id(kCustomerId);
     report_id_.set_project_id(kProjectId);
-    report_id_.set_variable_slice((VariableSlice)slice_index);
+    report_id_.set_sequence_num(variable_index);
 
     // Parse the metric config string
     auto metric_parse_result =
@@ -134,7 +133,10 @@ class EncodingMixerTest : public ::testing::Test {
     std::shared_ptr<AnalyzerConfig> analyzer_config(
         new AnalyzerConfig(encoding_registry, metric_registry, nullptr));
 
-    encoding_mixer_.reset(new EncodingMixer(report_id_, analyzer_config));
+    std::string variable_name = (variable_index == 0 ? kPartName1 : kPartName2);
+    Variable variable(variable_index, variable_name);
+    encoding_mixer_.reset(
+        new EncodingMixer(report_id_, variable, analyzer_config));
   }
 
   // Makes an Observation with two string parts, both of which have the
@@ -196,9 +198,9 @@ class EncodingMixerTest : public ::testing::Test {
   // Tests the EncodingMixer when it is used on a homogeneous set of
   // Observations, all of which were encoded using the same Forculus
   // EncodingCofig. This can be done on VARIABLE_1 or VARIABLE_2
-  void DoForculusTest(int slice_index) {
-    SetUpForSlice(slice_index);
-    std::string part_name = (slice_index == 0 ? kPartName1 : kPartName2);
+  void DoForculusTest(int variable_index) {
+    SetUpForVariable(variable_index);
+    std::string part_name = (variable_index == 0 ? kPartName1 : kPartName2);
     MakeAndProcessForculusObservations(part_name);
 
     // Perform the analysis.
@@ -210,7 +212,7 @@ class EncodingMixerTest : public ::testing::Test {
     for (const auto& report_row : report_rows) {
       EXPECT_EQ(0, report_row.std_error());
       ValuePart recovered_value;
-      switch (slice_index) {
+      switch (variable_index) {
         case 0:
           EXPECT_FALSE(report_row.has_value2());
           EXPECT_TRUE(report_row.has_value());
@@ -256,9 +258,9 @@ class EncodingMixerTest : public ::testing::Test {
     }
   }
 
-  void DoBasicRapporTest(int slice_index) {
-    SetUpForSlice(slice_index);
-    std::string part_name = (slice_index == 0 ? kPartName1 : kPartName2);
+  void DoBasicRapporTest(int variable_index) {
+    SetUpForVariable(variable_index);
+    std::string part_name = (variable_index == 0 ? kPartName1 : kPartName2);
     MakeAndProcessBasicRapporObservations(part_name);
 
     // Perform the analysis.
@@ -270,7 +272,7 @@ class EncodingMixerTest : public ::testing::Test {
     for (const auto& report_row : report_rows) {
       EXPECT_NE(0, report_row.std_error());
       ValuePart recovered_value;
-      switch (slice_index) {
+      switch (variable_index) {
         case 0:
           EXPECT_FALSE(report_row.has_value2());
           EXPECT_TRUE(report_row.has_value());
@@ -294,9 +296,9 @@ class EncodingMixerTest : public ::testing::Test {
     }
   }
 
-  void DoMixedEncodingTest(int slice_index) {
-    SetUpForSlice(slice_index);
-    std::string part_name = (slice_index == 0 ? kPartName1 : kPartName2);
+  void DoMixedEncodingTest(int variable_index) {
+    SetUpForVariable(variable_index);
+    std::string part_name = (variable_index == 0 ? kPartName1 : kPartName2);
     MakeAndProcessForculusObservations(part_name);
     MakeAndProcessBasicRapporObservations(part_name);
 
@@ -313,40 +315,40 @@ class EncodingMixerTest : public ::testing::Test {
 
 TEST_F(EncodingMixerTest, Forculus) {
   {
-    SCOPED_TRACE("slice_index = 0");
-    int slice_index = 0;
-    DoForculusTest(slice_index);
+    SCOPED_TRACE("variable_index = 0");
+    int variable_index = 0;
+    DoForculusTest(variable_index);
   }
   {
-    SCOPED_TRACE("slice_index = 1");
-    int slice_index = 1;
-    DoForculusTest(slice_index);
+    SCOPED_TRACE("variable_index = 1");
+    int variable_index = 1;
+    DoForculusTest(variable_index);
   }
 }
 
 TEST_F(EncodingMixerTest, BasicRappor) {
   {
-    SCOPED_TRACE("slice_index = 0");
-    int slice_index = 0;
-    DoBasicRapporTest(slice_index);
+    SCOPED_TRACE("variable_index = 0");
+    int variable_index = 0;
+    DoBasicRapporTest(variable_index);
   }
   {
-    SCOPED_TRACE("slice_index = 1");
-    int slice_index = 1;
-    DoBasicRapporTest(slice_index);
+    SCOPED_TRACE("variable_index = 1");
+    int variable_index = 1;
+    DoBasicRapporTest(variable_index);
   }
 }
 
 TEST_F(EncodingMixerTest, MixedEncoding) {
   {
-    SCOPED_TRACE("slice_index = 0");
-    int slice_index = 0;
-    DoMixedEncodingTest(slice_index);
+    SCOPED_TRACE("variable_index = 0");
+    int variable_index = 0;
+    DoMixedEncodingTest(variable_index);
   }
   {
-    SCOPED_TRACE("slice_index = 1");
-    int slice_index = 1;
-    DoMixedEncodingTest(slice_index);
+    SCOPED_TRACE("variable_index = 1");
+    int variable_index = 1;
+    DoMixedEncodingTest(variable_index);
   }
 }
 
