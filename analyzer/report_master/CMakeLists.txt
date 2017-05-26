@@ -73,7 +73,7 @@ set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 
 # Build the ReportMaster library
 add_library(analyzer_report_master_lib
-            encoding_mixer.cc
+            histogram_analysis_engine.cc
             report_executor.cc
             report_generator.cc
             report_master_service.cc
@@ -95,7 +95,7 @@ target_link_libraries(analyzer_report_master
 # Build the tests
 add_executable(analyzer_report_master_tests
                ${CMAKE_SOURCE_DIR}/analyzer/store/memory_store.cc
-               encoding_mixer_test.cc
+               histogram_analysis_engine_test.cc
                report_executor_test.cc
                report_generator_test.cc
                report_master_service_test.cc)

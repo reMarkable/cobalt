@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef COBALT_ANALYZER_REPORT_MASTER_ENCODING_MIXER_H_
-#define COBALT_ANALYZER_REPORT_MASTER_ENCODING_MIXER_H_
+#ifndef COBALT_ANALYZER_REPORT_MASTER_HISTOGRAM_ANALYSIS_ENGINE_H_
+#define COBALT_ANALYZER_REPORT_MASTER_HISTOGRAM_ANALYSIS_ENGINE_H_
 
 #include <map>
 #include <memory>
@@ -34,34 +34,30 @@ namespace analyzer {
 // Forward declaration.
 class DecoderAdapter;
 
-// An EncodingMixer is responsible for coordinating the analysis of a set of
-// observations that are possibly heterogeneous with respect to their encodings.
-// The observations are aggregated into homogeneous groups, the appropriate
-// decoder/analyzer is applied to each group, and the analysis results are
-// combined into a final result.
+// A HistogramAnalysisEngine is responsible for performing the analysis that
+// leads to the generation of a Histogram report.
 //
-// An instance of EncodingMixer is used just once, for one single-variable
-// report. An EncodingMixer is used by a ReportGenerator which knows how to
-// deal with multi-variable reports.
+// The set of observations analyzed are allowed to be heterogeneous with respect
+// to their encoding. The observations are aggregated into homogeneous groups,
+// the appropriate decoder/analyzer is applied to each group, and the analysis
+// results are combined into a final Histogram report.
+//
+// An instance of HistogramAnalysisEngine is used just once, for one Histogram
+// report.
 //
 // usage:
-//   - Construct an EncodingMixer.
-//   - Invoke ProcessObservationPart() multiple times. The ObservationParts
-//     passed in are allowed to have different encoding_config_ids from
-//     each other, but they must all be for the same single-variable report.
-//     (NOTE: Encoding-heterogeneous reports are not yet
-//     supported in V0.1 of Cobalt. Currently all ObservationParts passed
-//     in to ProcessObservationPart() must in fact have the same
-//     encoding_config_id.)
-//   - Invoke PerformAnalysis() to retrieve the results.
-class EncodingMixer {
+//   - Construct a HistogramAnalysisEngine.
+//   - Invoke ProcessObservationPart() multiple times.
+//   - Invoke PerformAnalysis() to retrieve the rows of the Histogram report.
+class HistogramAnalysisEngine {
  public:
-  // Constructs an EncodingMixer for the single-variable report with the
-  // given |report_id| and for the variable |variable|.
-  // The |analyzer_config| parameter is used to look up EncodingConfigs by their
-  // ID.
-  EncodingMixer(const ReportId& report_id, const Variable& variable,
-                std::shared_ptr<config::AnalyzerConfig> analyzer_config);
+  // Constructs a HistogramAnalysisEngine for the Histogram report with the
+  // given |report_id|.
+  //
+  // The |analyzer_config| is used to look up EncodingConfigs by their ID.
+  HistogramAnalysisEngine(
+      const ReportId& report_id,
+      std::shared_ptr<config::AnalyzerConfig> analyzer_config);
 
   // Process the given (day_index, ObservationPart) pair. The |day_index|
   // indicates the day on which the ObservationPart was observed, as specified
@@ -76,7 +72,7 @@ class EncodingMixer {
 
   // Performs the appropriate analyses on the ObservationParts introduced
   // via ProcessObservationPart(). If the set of observations was heterogeneous
-  // then multiple analyses are combined as appropriate. (Again, this is not
+  // then multiple analyses are combined as appropriate. (This is not
   // yet supported in V0.1 of Cobalt.) The results are written
   // into |results| and the returned Status indicates success or error.
   grpc::Status PerformAnalysis(std::vector<ReportRow>* results);
@@ -91,11 +87,8 @@ class EncodingMixer {
   std::unique_ptr<DecoderAdapter> NewDecoder(
       const EncodingConfig* encoding_config);
 
-  // The ID of the single-variable report this EncodingMixer is for.
+  // The ID of the Histogram report this HistogramAnalysisEngine is for.
   ReportId report_id_;
-
-  // The variable this EncodingMixer is for.
-  Variable variable_;
 
   // The keys to this map are encoding-config IDs and the values are the
   // DecoderAdapters adapting to the decoder/analyzer that knows how to
@@ -106,8 +99,8 @@ class EncodingMixer {
   std::shared_ptr<config::AnalyzerConfig> analyzer_config_;
 };
 
-// A DecoderAdapter offers a common interface for the EncodingMixer to use
-// while encapsulating heterogeneous backend interfaces to the underlying
+// A DecoderAdapter offers a common interface for the HistogramAnalysisEngine to
+// use while encapsulating heterogeneous backend interfaces to the underlying
 // privacy-preserving algorithm decoder/analyzers.
 //
 // This is an abstract class. Concrete subclasses adapt to a particular
@@ -123,4 +116,4 @@ class DecoderAdapter {
 }  // namespace analyzer
 }  // namespace cobalt
 
-#endif  // COBALT_ANALYZER_REPORT_MASTER_ENCODING_MIXER_H_
+#endif  // COBALT_ANALYZER_REPORT_MASTER_HISTOGRAM_ANALYSIS_ENGINE_H_

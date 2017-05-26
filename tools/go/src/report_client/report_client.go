@@ -215,19 +215,25 @@ func valuePartToString(val *cobalt.ValuePart) string {
 	return "[blob]"
 }
 
-// reportRowToStrings returns a list of human-readable strings that represent the given |row|.
-// The first one or two elements of the returned list will be the row's |Value|,
-// or its |Value2| or both, depending on which of those is non-nil.
+// ReportRowToStrings returns a list of human-readable strings that represent the given |row|.
+// The format of the row depends on the type of report row it is.
+func ReportRowToStrings(row *report_master.ReportRow, includeStdErr bool) []string {
+	if histogramRow := row.GetHistogram(); histogramRow != nil {
+		return HistogramReportRowToStrings(histogramRow, includeStdErr)
+	}
+	glog.Fatalf("Unknown report row type %t", row)
+	return nil
+}
+
+// HistogramReportRowToStrings returns a list of human-readable strings that represent the given |row|.
+// The first element of the returned list will be the row's |Value|.
 // The next element of the list will be the row's |CountEstimate|.
 // If |includeStdErr| is true the final element of the list will be the row's
 // |StdError|.
-func ReportRowToStrings(row *report_master.ReportRow, includeStdErr bool) []string {
+func HistogramReportRowToStrings(row *report_master.HistogramReportRow, includeStdErr bool) []string {
 	result := []string{}
 	if row.GetValue() != nil {
 		result = append(result, valuePartToString(row.Value))
-	}
-	if row.GetValue2() != nil {
-		result = append(result, valuePartToString(row.Value2))
 	}
 
 	result = append(result, fmt.Sprintf("%.3f", math.Max(0, float64(row.CountEstimate))))
@@ -237,15 +243,16 @@ func ReportRowToStrings(row *report_master.ReportRow, includeStdErr bool) []stri
 	return result
 }
 
-// Compare compares two |ValuePart|s for the purpose of sorting.
+// CompareValueParts compares two |ValuePart|s for the purpose of sorting.
 // Returns -1, 0 or 1 as v1 is respectively less than, equivalent to,
 // or greater than v2.
 //
 // Compares number and strings in natural order. For other comparisons
 // we make the following arbitrary choices for the sake of concreteness:
-// (a) A nil is less than a non-nil
-// (b) A number is less than a string is less than a blob
-func Compare(v1, v2 *cobalt.ValuePart) int {
+// (a) A nil is less than a non-nil, two nils are equivalent
+// (b) A string is less than an integer is less than a blob
+// (c) Two blobs are  equivalent
+func CompareValueParts(v1, v2 *cobalt.ValuePart) int {
 	// If both values are missing they are equal.
 	if (v1 == nil) && (v2 == nil) {
 		return 0
@@ -269,7 +276,7 @@ func Compare(v1, v2 *cobalt.ValuePart) int {
 		return strings.Compare(string1.StringValue, string2.StringValue)
 	}
 
-	// A number is less than a string
+	// A string is less than a non-string
 	if ok1 {
 		return -1
 	}
@@ -292,14 +299,25 @@ func Compare(v1, v2 *cobalt.ValuePart) int {
 		return 0
 	}
 
+	// An int is less than a blob
 	if ok1 {
 		return -1
 	}
 	if ok2 {
 		return 1
 	}
+
+	// Two blobs are equal.
 	return 0
 
+}
+
+func compareHistogramRows(a, b *report_master.HistogramReportRow) int {
+	if a == nil || b == nil {
+		return 1
+	}
+	// We just compare the two values.
+	return CompareValueParts(a.GetValue(), b.GetValue())
 }
 
 // ByValues implements the sort.Interface interface.
@@ -311,16 +329,13 @@ func (v ByValues) Swap(i, j int) { v[i], v[j] = v[j], v[i] }
 
 // We compare ReportRows by their values, lexicographcially.
 func (v ByValues) Less(i, j int) bool {
-	switch Compare(v[i].GetValue(), v[j].GetValue()) {
-	case -1:
-		return true
-	case 1:
-		return false
-	case 0:
-		return Compare(v[i].GetValue2(), v[j].GetValue2()) == -1
-	default:
-		panic("Unexpected output from Compare")
+	var difference int
+	if histogramRow := v[i].GetHistogram(); histogramRow != nil {
+		difference = compareHistogramRows(histogramRow, v[j].GetHistogram())
+	} else {
+		glog.Fatalf("Unknown report row type %t", v[i])
 	}
+	return difference < 0
 }
 
 // ReportRowsSortedByValues returns a sorted slice of ReportRows.

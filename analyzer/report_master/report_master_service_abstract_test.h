@@ -626,8 +626,8 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
   ASSERT_EQ(3, report1.rows().rows_size());
   std::map<std::string, int> report1_results;
   for (int i = 0; i < 3; i++) {
-    report1_results[report1.rows().rows(i).value().string_value()] =
-        report1.rows().rows(i).count_estimate();
+    report1_results[report1.rows().rows(i).histogram().value().string_value()] =
+        report1.rows().rows(i).histogram().count_estimate();
   }
   ASSERT_EQ(3, report1_results.size());
   EXPECT_EQ(20, report1_results["Apple"]);
@@ -650,9 +650,12 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
   ASSERT_EQ(2, first_marginal_report.rows().rows_size());
   std::map<std::string, int> first_marginal_results;
   for (int i = 0; i < 2; i++) {
-    first_marginal_results
-        [first_marginal_report.rows().rows(i).value().string_value()] =
-            first_marginal_report.rows().rows(i).count_estimate();
+    first_marginal_results[first_marginal_report.rows()
+                               .rows(i)
+                               .histogram()
+                               .value()
+                               .string_value()] =
+        first_marginal_report.rows().rows(i).histogram().count_estimate();
   }
   ASSERT_EQ(2, first_marginal_results.size());
   EXPECT_EQ(20, first_marginal_results["Apple"]);
@@ -666,9 +669,12 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
   ASSERT_EQ(10, second_marginal_report.rows().rows_size());
   std::map<int, int> second_marginal_results;
   for (int i = 0; i < 10; i++) {
-    second_marginal_results
-        [second_marginal_report.rows().rows(i).value2().int_value()] =
-            second_marginal_report.rows().rows(i).count_estimate();
+    second_marginal_results[second_marginal_report.rows()
+                                .rows(i)
+                                .histogram()
+                                .value()
+                                .int_value()] =
+        second_marginal_report.rows().rows(i).histogram().count_estimate();
   }
   ASSERT_EQ(10, second_marginal_results.size());
   for (int i = 1; i <= 7; i++) {

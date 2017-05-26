@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "analyzer/report_master/encoding_mixer.h"
+#include "analyzer/report_master/histogram_analysis_engine.h"
 
 #include <string>
 #include <utility>
@@ -42,8 +42,7 @@ const uint32_t kProjectId = 1;
 const uint32_t kMetricId = 1;
 const uint32_t kForculusEncodingConfigId = 1;
 const uint32_t kBasicRapporEncodingConfigId = 2;
-const char kPartName1[] = "Part1";
-const char kPartName2[] = "Part2";
+const char kPartName[] = "Part1";
 const size_t kForculusThreshold = 20;
 
 // This unix timestamp corresponds to Friday Dec 2, 2016 in UTC
@@ -52,7 +51,7 @@ const time_t kSomeTimestamp = 1480647356;
 const uint32_t kDayIndex = 17137;
 
 const char* kMetricConfigText = R"(
-# Metric 1 has two string parts.
+# Metric 1 has one string part.
 element {
   customer_id: 1
   project_id: 1
@@ -60,11 +59,6 @@ element {
   time_zone_policy: UTC
   parts {
     key: "Part1"
-    value {
-    }
-  }
-  parts {
-    key: "Part2"
     value {
     }
   }
@@ -103,15 +97,11 @@ element {
 
 }  // namespace
 
-class EncodingMixerTest : public ::testing::Test {
+class HistogramAnalysisEngineTest : public ::testing::Test {
  protected:
-  // Sets up the test for the given |variable_index| which must be either 0
-  // or 1. The index will also be used for the sequence_num field of the
-  // ReportId.
-  void SetUpForVariable(int variable_index) {
+  void SetUp() {
     report_id_.set_customer_id(kCustomerId);
     report_id_.set_project_id(kProjectId);
-    report_id_.set_sequence_num(variable_index);
 
     // Parse the metric config string
     auto metric_parse_result =
@@ -133,14 +123,12 @@ class EncodingMixerTest : public ::testing::Test {
     std::shared_ptr<AnalyzerConfig> analyzer_config(
         new AnalyzerConfig(encoding_registry, metric_registry, nullptr));
 
-    std::string variable_name = (variable_index == 0 ? kPartName1 : kPartName2);
-    Variable variable(variable_index, variable_name);
-    encoding_mixer_.reset(
-        new EncodingMixer(report_id_, variable, analyzer_config));
+    analysis_engine_.reset(
+        new HistogramAnalysisEngine(report_id_, analyzer_config));
   }
 
-  // Makes an Observation with two string parts, both of which have the
-  // given |string_value|, using the encoding with the given encoding_config_id.
+  // Makes an Observation with one string part which has the given
+  // |string_value|, using the encoding with the given encoding_config_id.
   std::unique_ptr<Observation> MakeObservation(std::string string_value,
                                                uint32_t encoding_config_id) {
     // Construct a new Encoder with a new client secret.
@@ -148,88 +136,70 @@ class EncodingMixerTest : public ::testing::Test {
     // Set a static current time so we know we have a static day_index.
     encoder.set_current_time(kSomeTimestamp);
 
-    Encoder::Value value;
-    value.AddStringPart(encoding_config_id, kPartName1, string_value);
-    value.AddStringPart(encoding_config_id, kPartName2, string_value);
-
     // Encode an observation.
-    Encoder::Result result = encoder.Encode(kMetricId, value);
+    Encoder::Result result = encoder.EncodeString(
+        kMetricId, encoding_config_id, string_value);
     EXPECT_EQ(Encoder::kOK, result.status);
     EXPECT_TRUE(result.observation.get() != nullptr);
-    EXPECT_EQ(2, result.observation->parts_size());
+    EXPECT_EQ(1, result.observation->parts_size());
     return std::move(result.observation);
   }
 
-  // Makes an Observation with two string parts, both of which have the
-  // given |value|, using the encoding with the given encoding_config_id.
-  // Then passes one of the two parts into
-  // EncodingMixer::ProcessObservationPart().
+  // Makes an Observation with one string part which has the given |value|,
+  // using the encoding with the given encoding_config_id.
+  // Then passes the ObservationPart into
+  // HistogramAnalysisEngine::ProcessObservationPart().
   bool MakeAndProcessObservationPart(std::string value,
-                                     uint32_t encoding_config_id,
-                                     std::string part_name) {
+                                     uint32_t encoding_config_id) {
     std::unique_ptr<Observation> observation =
         MakeObservation(value, encoding_config_id);
-    return encoding_mixer_->ProcessObservationPart(
-        kDayIndex, observation->parts().at(part_name));
+    return analysis_engine_->ProcessObservationPart(
+        kDayIndex, observation->parts().at(kPartName));
   }
 
   // Invokes MakeAndProcessObservationPart many times using the Forculus
   // encoding. Three strings are encoded: "hello" 20 times,
   // "goodbye" 19 times and "peace" 21 times. The first and third will be
   // decrypted by Forculus and the 2nd will not.
-  void MakeAndProcessForculusObservations(const std::string part_name) {
+  void MakeAndProcessForculusObservations() {
     // Add the word "hello" 20 times.
     for (int i = 0; i < kForculusThreshold; i++) {
-      EXPECT_TRUE(MakeAndProcessObservationPart(
-          "hello", kForculusEncodingConfigId, part_name));
+      EXPECT_TRUE(
+          MakeAndProcessObservationPart("hello", kForculusEncodingConfigId));
     }
     // Add the word "goodbye" 19 times.
     for (int i = 0; i < kForculusThreshold - 1; i++) {
-      EXPECT_TRUE(MakeAndProcessObservationPart(
-          "goodbye", kForculusEncodingConfigId, part_name));
+      EXPECT_TRUE(
+          MakeAndProcessObservationPart("goodbye", kForculusEncodingConfigId));
     }
     // Add the word "peace" 21 times.
     for (int i = 0; i < kForculusThreshold + 1; i++) {
-      EXPECT_TRUE(MakeAndProcessObservationPart(
-          "peace", kForculusEncodingConfigId, part_name));
+      EXPECT_TRUE(
+          MakeAndProcessObservationPart("peace", kForculusEncodingConfigId));
     }
   }
 
-  // Tests the EncodingMixer when it is used on a homogeneous set of
+  // Tests the HistogramAnalysisEngine when it is used on a homogeneous set of
   // Observations, all of which were encoded using the same Forculus
-  // EncodingCofig. This can be done on VARIABLE_1 or VARIABLE_2
-  void DoForculusTest(int variable_index) {
-    SetUpForVariable(variable_index);
-    std::string part_name = (variable_index == 0 ? kPartName1 : kPartName2);
-    MakeAndProcessForculusObservations(part_name);
+  // EncodingCofig.
+  void DoForculusTest() {
+    MakeAndProcessForculusObservations();
 
     // Perform the analysis.
     std::vector<ReportRow> report_rows;
-    EXPECT_TRUE(encoding_mixer_->PerformAnalysis(&report_rows).ok());
+    EXPECT_TRUE(analysis_engine_->PerformAnalysis(&report_rows).ok());
 
     // Check the results.
     EXPECT_EQ(2, report_rows.size());
     for (const auto& report_row : report_rows) {
-      EXPECT_EQ(0, report_row.std_error());
+      EXPECT_EQ(0, report_row.histogram().std_error());
       ValuePart recovered_value;
-      switch (variable_index) {
-        case 0:
-          EXPECT_FALSE(report_row.has_value2());
-          EXPECT_TRUE(report_row.has_value());
-          recovered_value = report_row.value();
-          break;
-        case 1:
-          EXPECT_TRUE(report_row.has_value2());
-          EXPECT_FALSE(report_row.has_value());
-          recovered_value = report_row.value2();
-          break;
-        default:
-          FAIL();
-      }
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
 
       EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
       std::string string_value = recovered_value.string_value();
-      int count_estimate = report_row.count_estimate();
+      int count_estimate = report_row.histogram().count_estimate();
       switch (count_estimate) {
         case 20:
           EXPECT_EQ("hello", string_value);
@@ -243,114 +213,64 @@ class EncodingMixerTest : public ::testing::Test {
     }
   }
 
-  void MakeAndProcessBasicRapporObservations(const std::string part_name) {
+  void MakeAndProcessBasicRapporObservations() {
     for (int i = 0; i < 100; i++) {
-      EXPECT_TRUE(MakeAndProcessObservationPart(
-          "Apple", kBasicRapporEncodingConfigId, part_name));
+      EXPECT_TRUE(
+          MakeAndProcessObservationPart("Apple", kBasicRapporEncodingConfigId));
     }
     for (int i = 0; i < 200; i++) {
-      EXPECT_TRUE(MakeAndProcessObservationPart(
-          "Banana", kBasicRapporEncodingConfigId, part_name));
+      EXPECT_TRUE(MakeAndProcessObservationPart("Banana",
+                                                kBasicRapporEncodingConfigId));
     }
     for (int i = 0; i < 300; i++) {
-      EXPECT_TRUE(MakeAndProcessObservationPart(
-          "Cantaloupe", kBasicRapporEncodingConfigId, part_name));
+      EXPECT_TRUE(MakeAndProcessObservationPart("Cantaloupe",
+                                                kBasicRapporEncodingConfigId));
     }
   }
 
-  void DoBasicRapporTest(int variable_index) {
-    SetUpForVariable(variable_index);
-    std::string part_name = (variable_index == 0 ? kPartName1 : kPartName2);
-    MakeAndProcessBasicRapporObservations(part_name);
+  void DoBasicRapporTest() {
+    MakeAndProcessBasicRapporObservations();
 
     // Perform the analysis.
     std::vector<ReportRow> report_rows;
-    EXPECT_TRUE(encoding_mixer_->PerformAnalysis(&report_rows).ok());
+    EXPECT_TRUE(analysis_engine_->PerformAnalysis(&report_rows).ok());
 
     // Check the results.
     EXPECT_EQ(3, report_rows.size());
     for (const auto& report_row : report_rows) {
-      EXPECT_NE(0, report_row.std_error());
+      EXPECT_NE(0, report_row.histogram().std_error());
+      EXPECT_GT(report_row.histogram().count_estimate(), 0);
       ValuePart recovered_value;
-      switch (variable_index) {
-        case 0:
-          EXPECT_FALSE(report_row.has_value2());
-          EXPECT_TRUE(report_row.has_value());
-          recovered_value = report_row.value();
-          break;
-        case 1:
-          EXPECT_TRUE(report_row.has_value2());
-          EXPECT_FALSE(report_row.has_value());
-          recovered_value = report_row.value2();
-          break;
-        default:
-          FAIL();
-      }
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
 
       EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
       std::string string_value = recovered_value.string_value();
       EXPECT_TRUE(string_value == "Apple" || string_value == "Banana" ||
                   string_value == "Cantaloupe");
-
-      EXPECT_GT(report_row.count_estimate(), 0);
     }
   }
 
-  void DoMixedEncodingTest(int variable_index) {
-    SetUpForVariable(variable_index);
-    std::string part_name = (variable_index == 0 ? kPartName1 : kPartName2);
-    MakeAndProcessForculusObservations(part_name);
-    MakeAndProcessBasicRapporObservations(part_name);
+  void DoMixedEncodingTest() {
+    MakeAndProcessForculusObservations();
+    MakeAndProcessBasicRapporObservations();
 
     // Perform the analysis.
     std::vector<ReportRow> report_rows;
     EXPECT_EQ(grpc::UNIMPLEMENTED,
-              encoding_mixer_->PerformAnalysis(&report_rows).error_code());
+              analysis_engine_->PerformAnalysis(&report_rows).error_code());
   }
 
   ReportId report_id_;
   std::shared_ptr<ProjectContext> project_;
-  std::unique_ptr<EncodingMixer> encoding_mixer_;
+  std::unique_ptr<HistogramAnalysisEngine> analysis_engine_;
 };
 
-TEST_F(EncodingMixerTest, Forculus) {
-  {
-    SCOPED_TRACE("variable_index = 0");
-    int variable_index = 0;
-    DoForculusTest(variable_index);
-  }
-  {
-    SCOPED_TRACE("variable_index = 1");
-    int variable_index = 1;
-    DoForculusTest(variable_index);
-  }
-}
+TEST_F(HistogramAnalysisEngineTest, Forculus) { DoForculusTest(); }
 
-TEST_F(EncodingMixerTest, BasicRappor) {
-  {
-    SCOPED_TRACE("variable_index = 0");
-    int variable_index = 0;
-    DoBasicRapporTest(variable_index);
-  }
-  {
-    SCOPED_TRACE("variable_index = 1");
-    int variable_index = 1;
-    DoBasicRapporTest(variable_index);
-  }
-}
+TEST_F(HistogramAnalysisEngineTest, BasicRappor) { DoBasicRapporTest(); }
 
-TEST_F(EncodingMixerTest, MixedEncoding) {
-  {
-    SCOPED_TRACE("variable_index = 0");
-    int variable_index = 0;
-    DoMixedEncodingTest(variable_index);
-  }
-  {
-    SCOPED_TRACE("variable_index = 1");
-    int variable_index = 1;
-    DoMixedEncodingTest(variable_index);
-  }
-}
+TEST_F(HistogramAnalysisEngineTest, MixedEncoding) { DoMixedEncodingTest(); }
 
 }  // namespace analyzer
 }  // namespace cobalt

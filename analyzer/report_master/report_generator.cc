@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-#include "analyzer/report_master/encoding_mixer.h"
+#include "analyzer/report_master/histogram_analysis_engine.h"
 #include "glog/logging.h"
 
 namespace cobalt {
@@ -234,8 +234,8 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
 
-  // Construct the EncodingMixer.
-  EncodingMixer encoding_mixer(report_id, variables[0], analyzer_config_);
+  // Construct the HistogramAnalysisEngine.
+  HistogramAnalysisEngine analysis_engine(report_id, analyzer_config_);
 
   // We query the ObservationStore for the relevant ObservationParts.
   store::ObservationStore::QueryResponse query_response;
@@ -268,18 +268,18 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
       CHECK_EQ(1, query_result.observation.parts_size());
       const auto& observation_part =
           query_result.observation.parts().at(parts[0]);
-      // Process each ObservationPart using the EncodingMixer.
+      // Process each ObservationPart using the HistogramAnalysisEngine.
       // TODO(rudominer) This method returns false when the Observation was
       // bad in some way. This should be kept track of through a monitoring
       // counter.
-      encoding_mixer.ProcessObservationPart(query_result.day_index,
-                                            observation_part);
+      analysis_engine.ProcessObservationPart(query_result.day_index,
+                                             observation_part);
     }
   } while (!query_response.pagination_token.empty());
 
-  // Complete the analysis using the EncodingMixer.
+  // Complete the analysis using the HistogramAnalysisEngine.
   std::vector<ReportRow> report_rows;
-  grpc::Status status = encoding_mixer.PerformAnalysis(&report_rows);
+  grpc::Status status = analysis_engine.PerformAnalysis(&report_rows);
   if (!status.ok()) {
     return status;
   }

@@ -286,29 +286,20 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // and then GenerateReport. It checks the generated Report to make sure
   // it is correct given the Observations that were added and the Forculus
   // config.
-  void CheckForculusReport(const ReportRows& report, int variable_index) {
-    EXPECT_EQ(2, report.rows_size());
-    for (const auto& report_row : report.rows()) {
-      EXPECT_EQ(0, report_row.std_error());
+  void CheckForculusReport(const GeneratedReport& report, int variable_index) {
+    EXPECT_EQ(HISTOGRAM, report.metadata.report_type());
+    EXPECT_EQ(1, report.metadata.variable_indices_size());
+    EXPECT_EQ(variable_index, report.metadata.variable_indices(0));
+    EXPECT_EQ(2, report.rows.rows_size());
+    for (const auto& report_row : report.rows.rows()) {
+      EXPECT_EQ(0, report_row.histogram().std_error());
       ValuePart recovered_value;
-      switch (variable_index) {
-        case 0:
-          EXPECT_FALSE(report_row.has_value2());
-          EXPECT_TRUE(report_row.has_value());
-          recovered_value = report_row.value();
-          break;
-        case 1:
-          EXPECT_TRUE(report_row.has_value2());
-          EXPECT_FALSE(report_row.has_value());
-          recovered_value = report_row.value2();
-          break;
-        default:
-          FAIL();
-      }
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
 
       EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
       std::string string_value = recovered_value.string_value();
-      int count_estimate = report_row.count_estimate();
+      int count_estimate = report_row.histogram().count_estimate();
       switch (count_estimate) {
         case 20:
           EXPECT_EQ("hello", string_value);
@@ -338,32 +329,25 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // to validate the Basic RAPPOR algorithm here so we simply test that the
   // all three strings appear with a non-zero count and under the correct
   // variable index.
-  void CheckBasicRapporReport(const ReportRows& report, int variable_index) {
-    EXPECT_EQ(3, report.rows_size());
-    for (const auto& report_row : report.rows()) {
-      EXPECT_NE(0, report_row.std_error());
+  void CheckBasicRapporReport(const GeneratedReport& report,
+                              int variable_index) {
+    EXPECT_EQ(HISTOGRAM, report.metadata.report_type());
+    EXPECT_EQ(1, report.metadata.variable_indices_size());
+    EXPECT_EQ(variable_index, report.metadata.variable_indices(0));
+    EXPECT_EQ(3, report.rows.rows_size());
+    for (const auto& report_row : report.rows.rows()) {
+      EXPECT_NE(0, report_row.histogram().std_error());
       ValuePart recovered_value;
-      switch (variable_index) {
-        case 0:
-          EXPECT_FALSE(report_row.has_value2());
-          EXPECT_TRUE(report_row.has_value());
-          recovered_value = report_row.value();
-          break;
-        case 1:
-          EXPECT_TRUE(report_row.has_value2());
-          EXPECT_FALSE(report_row.has_value());
-          recovered_value = report_row.value2();
-          break;
-        default:
-          FAIL();
-      }
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
+      break;
 
       EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
       std::string string_value = recovered_value.string_value();
       EXPECT_TRUE(string_value == "Apple" || string_value == "Banana" ||
                   string_value == "Cantaloupe");
 
-      EXPECT_GT(report_row.count_estimate(), 0);
+      EXPECT_GT(report_row.histogram().count_estimate(), 0);
     }
   }
 
@@ -387,13 +371,13 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, Forculus) {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
     auto report = this->GenerateHistogramReport(variable_index);
-    this->CheckForculusReport(report.rows, variable_index);
+    this->CheckForculusReport(report, variable_index);
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
     auto report = this->GenerateHistogramReport(variable_index);
-    this->CheckForculusReport(report.rows, variable_index);
+    this->CheckForculusReport(report, variable_index);
   }
 }
 
@@ -407,13 +391,13 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, BasicRappor) {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
     auto report = this->GenerateHistogramReport(variable_index);
-    this->CheckBasicRapporReport(report.rows, variable_index);
+    this->CheckBasicRapporReport(report, variable_index);
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
     auto report = this->GenerateHistogramReport(variable_index);
-    this->CheckBasicRapporReport(report.rows, variable_index);
+    this->CheckBasicRapporReport(report, variable_index);
   }
 }
 

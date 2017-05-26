@@ -102,33 +102,24 @@ class ReportStoreAbstractTest : public ::testing::Test {
               value_part.string_value());
   }
 
-  static ReportRow MakeReportRow(const ReportId& report_id, bool use_value_2,
-                                 size_t row_index) {
+  static ReportRow MakeHistogramReportRow(const ReportId& report_id,
+                                          size_t row_index) {
     ReportRow report_row;
-    report_row.set_count_estimate(row_index);
-    report_row.set_std_error(kStandardError);
-    if (use_value_2) {
-      FillValuePart(report_id, row_index, 2, report_row.mutable_value2());
-    } else {
-      FillValuePart(report_id, row_index, 1, report_row.mutable_value());
-    }
+    report_row.mutable_histogram()->set_count_estimate(row_index);
+    report_row.mutable_histogram()->set_std_error(kStandardError);
+    FillValuePart(report_id, row_index, 1,
+                  report_row.mutable_histogram()->mutable_value());
     return report_row;
   }
 
-  static void CheckReportRow(const ReportRow& row, bool expect_value_2,
-                             const ReportId& report_id) {
-    EXPECT_EQ(kStandardError, row.std_error());
-    if (expect_value_2) {
-      EXPECT_FALSE(row.has_value());
-      EXPECT_TRUE(row.has_value2());
-      CheckValue(row.value2(), row.count_estimate(), report_id, 2);
-    } else {
-      EXPECT_TRUE(row.has_value());
-      EXPECT_FALSE(row.has_value2());
-      // Note we use the fact that the count_estimate was set to the
-      // row_index.
-      CheckValue(row.value(), row.count_estimate(), report_id, 1);
-    }
+  static void CheckHistogramReportRow(const ReportRow& row,
+                                      const ReportId& report_id) {
+    EXPECT_EQ(kStandardError, row.histogram().std_error());
+    EXPECT_TRUE(row.histogram().has_value());
+    // Note we use the fact that the count_estimate was set to the
+    // row_index.
+    CheckValue(row.histogram().value(), row.histogram().count_estimate(),
+               report_id, 1);
   }
 
   std::string ToString(const ReportId& report_id) {
@@ -191,11 +182,10 @@ class ReportStoreAbstractTest : public ::testing::Test {
     test_utils.WriteBulkMetadata(report_ids, metadata_vector);
   }
 
-  Status AddReportRows(const ReportId& report_id, bool use_value_2,
-                       size_t num_rows) {
+  Status AddHistogramReportRows(const ReportId& report_id, size_t num_rows) {
     std::vector<ReportRow> report_rows;
     for (int index = 0; index < num_rows; index++) {
-      report_rows.emplace_back(MakeReportRow(report_id, use_value_2, index));
+      report_rows.emplace_back(MakeHistogramReportRow(report_id, index));
     }
     return report_store_->AddReportRows(report_id, report_rows);
   }
@@ -210,9 +200,8 @@ class ReportStoreAbstractTest : public ::testing::Test {
     EXPECT_EQ(1, read_metadata.variable_indices_size());
     auto var_index = read_metadata.variable_indices(0);
     EXPECT_TRUE(var_index == 0 || var_index == 1);
-    bool expect_value_2 = var_index == 1;
     for (const auto& row : rows.rows()) {
-      this->CheckReportRow(row, expect_value_2, report_id);
+      this->CheckHistogramReportRow(row, report_id);
     }
   }
 
@@ -360,7 +349,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
   EXPECT_EQ(0, report_metadata.finish_time_seconds());
 }
 
-// Tests the functions AddReportRow and GetReport
+// Tests the functions AddReportRow and GetReport, using HistogramReportRows.
 TYPED_TEST_P(ReportStoreAbstractTest, ReportRows) {
   // We start three reports. Two independent reports, report 1 and report 2.
   auto report_id1 = this->StartNewHistogramReport();
@@ -373,11 +362,9 @@ TYPED_TEST_P(ReportStoreAbstractTest, ReportRows) {
   EXPECT_EQ(kOK, this->report_store_->StartDependentReport(report_id2a));
 
   // Add rows to all three reports.
-  bool use_value_2 = false;
-  EXPECT_EQ(kOK, this->AddReportRows(report_id1, use_value_2, 100));
-  EXPECT_EQ(kOK, this->AddReportRows(report_id2, use_value_2, 200));
-  use_value_2 = true;
-  EXPECT_EQ(kOK, this->AddReportRows(report_id2a, use_value_2, 300));
+  EXPECT_EQ(kOK, this->AddHistogramReportRows(report_id1, 100));
+  EXPECT_EQ(kOK, this->AddHistogramReportRows(report_id2, 200));
+  EXPECT_EQ(kOK, this->AddHistogramReportRows(report_id2a, 300));
 
   // Complete all three reports
   this->report_store_->EndReport(report_id1, true, "");

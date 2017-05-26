@@ -34,25 +34,25 @@ const lastDayIndex = 5
 
 var stringValuePart1 = cobalt.ValuePart{
 	Data: &cobalt.ValuePart_StringValue{
-		StringValue: "String Value 2",
+		StringValue: "String Value 11",
 	},
 }
 
 var stringValuePart2 = cobalt.ValuePart{
 	Data: &cobalt.ValuePart_StringValue{
-		StringValue: "String Value 1",
+		StringValue: "String Value 2",
 	},
 }
 
 var intValuePart1 = cobalt.ValuePart{
 	Data: &cobalt.ValuePart_IntValue{
-		IntValue: 43,
+		IntValue: 42,
 	},
 }
 
 var intValuePart2 = cobalt.ValuePart{
 	Data: &cobalt.ValuePart_IntValue{
-		IntValue: 42,
+		IntValue: 43,
 	},
 }
 
@@ -63,36 +63,40 @@ var successfulReport = report_master.Report{
 	Rows: &report_master.ReportRows{
 		Rows: []*report_master.ReportRow{
 			&report_master.ReportRow{
-				Value:         &stringValuePart2,
-				Value2:        &intValuePart2,
-				CountEstimate: 106.6,
-				StdError:      3.14,
+				RowType: &report_master.ReportRow_Histogram{
+					Histogram: &report_master.HistogramReportRow{
+						Value:         &intValuePart1,
+						CountEstimate: 101.1,
+						StdError:      3.14,
+					},
+				},
 			},
 			&report_master.ReportRow{
-				Value:         &stringValuePart1,
-				CountEstimate: 101.1,
-				StdError:      3.14,
+				RowType: &report_master.ReportRow_Histogram{
+					Histogram: &report_master.HistogramReportRow{
+						Value:         &stringValuePart2,
+						CountEstimate: 102.2,
+						StdError:      3.14,
+					},
+				},
 			},
 			&report_master.ReportRow{
-				Value2:        &intValuePart1,
-				CountEstimate: 103.3,
-				StdError:      3.14,
+				RowType: &report_master.ReportRow_Histogram{
+					Histogram: &report_master.HistogramReportRow{
+						Value:         &stringValuePart1,
+						CountEstimate: 103.3,
+						StdError:      3.14,
+					},
+				},
 			},
 			&report_master.ReportRow{
-				Value2:        &intValuePart2,
-				CountEstimate: 104.4,
-				StdError:      3.14,
-			},
-			&report_master.ReportRow{
-				Value:         &stringValuePart1,
-				Value2:        &intValuePart1,
-				CountEstimate: 105.5,
-				StdError:      3.14,
-			},
-			&report_master.ReportRow{
-				Value:         &stringValuePart2,
-				CountEstimate: 102.2,
-				StdError:      3.14,
+				RowType: &report_master.ReportRow_Histogram{
+					Histogram: &report_master.HistogramReportRow{
+						Value:         &intValuePart2,
+						CountEstimate: 104.4,
+						StdError:      3.14,
+					},
+				},
 			},
 		},
 	},
@@ -100,12 +104,10 @@ var successfulReport = report_master.Report{
 
 // To understand why this is the expected CSV report string, see the comments
 // on the Compare() function.
-const expectedCSVReportString = `42,104.400,3.140
-43,103.300,3.140
-String Value 1,102.200,3.140
-String Value 1,42,106.600,3.140
-String Value 2,101.100,3.140
-String Value 2,43,105.500,3.140
+const expectedCSVReportString = `String Value 11,103.300,3.140
+String Value 2,102.200,3.140
+42,101.100,3.140
+43,104.400,3.140
 `
 
 var failedReportPrimary = report_master.Report{

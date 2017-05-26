@@ -92,6 +92,11 @@ message Report {
 
   // The rows of the report. This will only be populated if the |state|
   // of the report in the ReportMetadata is |COMPLETED_SUCCESSFULLY|.
+  //
+  // There are different types of reports and correspondingly different
+  // types of report rows. The type of this report is specified by the
+  // |report_type| field within |metadata|. All of the ReportRows in
+  // |rows| must be of the corresponding type.
   ReportRows rows = 2;
 }
 
@@ -182,20 +187,24 @@ message QueryReportsResponse {
   repeated ReportMetadata reports = 1;
 }
 
-// A single row of a report.
+// A single row of a report. As there are different types of reports, there
+// are different types of ReportRows. A report of a given type will contain
+// only rows of the corresponding type.
 message ReportRow {
-  // The values for this row. A report analyzes either 1 or two variables.
-  // If this is a row of a univariate report then only |value| will be set. If
-  // this is a row of a one-way marginal of a two-variable report then
-  // either |value| or |value2| may be set depending on which marginal this is.
-  // If this is a row of a joint report of two variables then both |value| and
-  // |value2| will be set.
+  oneof row_type {
+    HistogramReportRow histogram = 1;
+    JointReportRow joint = 2;
+  }
+}
+
+// A single row of a Histogram report.
+message HistogramReportRow {
+  // The value for this row.
   ValuePart value = 1;
-  ValuePart value2 = 2;
 
   // This field is the primary output of Cobalt Analysis. It is an estimate
-  // of the true count of the value or values in the user population.
-  float count_estimate = 3;
+  // of the true count of the value in the user population.
+  float count_estimate = 2;
 
   // Multiply this value by z_{alpha/2} to obtain the radius of an approximate
   // 100(1 - alpha)% confidence interval. For example an approximate 95%
@@ -203,7 +212,12 @@ message ReportRow {
   // (count_estimate - 1.96*std_error, count_estimate + 1.96 * std_error)
   // because 1.96 ~= z_{.025} meaning that P(Z > 1.96) ~= 0.025 where
   // Z ~ Normal(0, 1).
-  float std_error = 4;
+  float std_error = 3;
+}
+
+// A single row of a Joint report.
+message JointReportRow {
+  // TODO(rudominer) Implement Joint reports.
 }
 
 

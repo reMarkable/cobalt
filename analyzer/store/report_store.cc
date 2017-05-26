@@ -120,52 +120,22 @@ std::string MakeReportRowKey(const ReportId& report_id, uint32_t suffix) {
   return stream.str();
 }
 
-// Checks that the presence or absence of |value| and |value2| in |report_row|
-// is consistent with the specification of |variable_indices| in |metadata|.
-bool ValidateVariableIndices(const ReportId& report_id,
-                             const ReportMetadataLite& metadata,
-                             const ReportRow& report_row) {
-  if (metadata.variable_indices().empty() ||
-      metadata.variable_indices_size() > 2) {
-    LOG(ERROR) << "Expected metadata to have 1 or 2 variable indices, has "
-               << metadata.variable_indices_size() << "."
-               << ReportStore::ToString(report_id);
-    return false;
-  }
-  bool expect_value = false;
-  bool expect_value2 = false;
-  for (auto index : metadata.variable_indices()) {
-    if (index == 0) {
-      expect_value = true;
-    } else if (index == 1) {
-      expect_value2 = true;
-    } else {
-      LOG(ERROR) << "Expected only variable indices 0 and 1, got " << index
-                 << "." << ReportStore::ToString(report_id);
+// Checks that the type of Row contained in |report_row| matches the type of
+// report specified by the |report_type| field of |metadata|.
+bool CheckRowType(const ReportId& report_id, const ReportMetadataLite& metadata,
+                  const ReportRow& report_row) {
+  switch (metadata.report_type()) {
+    case HISTOGRAM:
+      return report_row.has_histogram();
+    case JOINT: {
+      return report_row.has_joint();
+    }
+    default: {
+      LOG(ERROR) << "Unrecognized ReportType: " << metadata.report_type()
+                 << " for report_id=" << ReportStore::ToString(report_id);
       return false;
     }
   }
-  if (expect_value && !report_row.has_value()) {
-    LOG(ERROR) << "Report row is missing |value|. "
-               << ReportStore::ToString(report_id);
-    return false;
-  }
-  if (!expect_value && report_row.has_value()) {
-    LOG(ERROR) << "Report row should not have |value|. "
-               << ReportStore::ToString(report_id);
-    return false;
-  }
-  if (expect_value2 && !report_row.has_value2()) {
-    LOG(ERROR) << "Report row is missing |value2|. "
-               << ReportStore::ToString(report_id);
-    return false;
-  }
-  if (!expect_value2 && report_row.has_value2()) {
-    LOG(ERROR) << "Report row should not have |value2|. "
-               << ReportStore::ToString(report_id);
-    return false;
-  }
-  return true;
 }
 
 }  // namespace
@@ -347,7 +317,7 @@ Status ReportStore::AddReportRows(const ReportId& report_id,
   std::vector<DataStore::Row> data_store_rows;
 
   for (const auto& report_row : report_rows) {
-    if (!ValidateVariableIndices(report_id, metadata, report_row)) {
+    if (!CheckRowType(report_id, metadata, report_row)) {
       return kInvalidArguments;
     }
 
