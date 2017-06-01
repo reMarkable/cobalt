@@ -194,7 +194,7 @@ class BasicRapporAnalyzerTest : public ::testing::Test {
   void OneCategoryExperiment(int n, int y, double* accumulated_count_estimate,
                              double* accumulated_std_err_estimate,
                              double* accumulated_actual_square_error) {
-    // Construct a fresh analyzer with 8 categories.
+    // Construct a fresh analyzer with 2 categories.
     SetAnalyzer(2);
 
     // Add y encoded observations with a true 1 for category 0.
