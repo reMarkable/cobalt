@@ -333,7 +333,7 @@ def _deploy_show(args):
 
 def _deploy_authenticate(args):
   container_util.authenticate(args.cluster_name, args.cloud_project_prefix,
-      args.cloud_project_name)
+      args.cloud_project_name, args.cluster_zone)
 
 def _deploy_build(args):
   container_util.build_all_docker_images(
@@ -401,6 +401,7 @@ def main():
     'cloud_project_prefix': '',
     'cloud_project_name': '',
     'cluster_name': '',
+    'cluster_zone': '',
     'gce_pd_name': '',
     'bigtable_project_name' : '',
     'bigtable_instance_name': '',
@@ -680,6 +681,10 @@ def main():
            'are deploying. '
            'Default=%s' % personal_cluster_settings['cluster_name'],
       default=personal_cluster_settings['cluster_name'])
+  sub_parser.add_argument('--cluster_zone',
+      help='The zone in which your GKE "container cluster" is located. '
+           'Default=%s' % personal_cluster_settings['cluster_zone'],
+      default=personal_cluster_settings['cluster_zone'])
 
   sub_parser = deploy_subparsers.add_parser('build',
       parents=[parent_parser], help='Rebuild all Docker images. '

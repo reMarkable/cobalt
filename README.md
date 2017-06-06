@@ -184,10 +184,21 @@ need to enable billing. If you are a member of the core Cobalt team you can
 request access to our
 [shared project](https://console.cloud.google.com/home/dashboard?project=google.com:shuffler-test).
 
+#### Enable the Bigtable APIs for your project
+You must enable Cloud Bigtable API and Cloud Bigtable Admin API.
+* Navigate to the [API Manager Library](https://console.cloud.google.com/apis/library).
+* Search for "Bigtable".
+* Select Cloud Bigtable Admin API.
+* Click the "Enable" button.
+* Return to the API Manager Library.
+* Search for "Bigtable".
+* Select Cloud Bigtable API.
+* Click the "Enable" button.
+
 #### Create an instance of Cloud Bigtable
 Navigate to the Bigtable section of the Cloud console for your project.
 Here is the link for the core Cobalt team's
-[shared project](https://pantheon.corp.google.com/bigtable/instances?project=google.com:shuffler-test)
+[shared project](https://console.cloud.google.com/bigtable/instances?project=google.com:shuffler-test)
 * Select **CREATE INSTANCE**
 * Name your instance whatever you would like
 * If this feature is available to you, select **Development** and
@@ -200,19 +211,19 @@ then recreate another one later in order to save money.
 program for interacting with Cloud Bigtable. You do not strictly need cbt in order
 to follow the other steps in the document but you may choose to install it anyway.
 
-
 #### Install a Service Account Credential
 You must install a Service Account Credential on your computer in order for the
 Cobalt code running on your computer to be able to access Cloud Bigtable.
 
 * Go to the
 [Credentials page](https://cloud.google.com/storage/docs/authentication#generating-a-private-key)
-of your Cloud project. Here is [the link](https://pantheon.corp.google.com/apis/credentials?debugUI=DEVELOPERS&project=google.com:shuffler-test) for the core
+of your Cloud project. Here is [the link](https://console.cloud.google.com/apis/credentials?debugUI=DEVELOPERS&project=google.com:shuffler-test) for the core
 Cobalt team's shared project.
 * Click `Create Credentials`
 * Select `Service Account Key` as the type of key
 * In the Service Account dropdown select `New Service Account` and assign your
 service account any name.
+* Select the Bigtable Administrator and the Bigtable User roles.
 * Select `JSON` as the key type
 * Click `Create`
 * A JSON file containing the credentials will be generated and downloaded to
@@ -305,8 +316,9 @@ Install [Docker](https://docs.docker.com/engine/installation/).
 If you are a Googler the following instructions should work:
 
 * `sudo apt-get install docker-engine`
-* `sudo usermod -aG docker`
+* `sudo usermod -aG docker <your username>`
 * Login again to be added to the docker group.
+* `groups | grep docker` to verify you have been added to the docker group.
 
 We also will be using the tools [gcloud]( https://cloud.google.com/sdk/)
 and [kubectl](https://kubernetes.io/docs/user-guide/kubectl-overview/).
@@ -322,7 +334,7 @@ anyway. The following steps are optional.
 #### Create a GKE Cluster
 Navigate to the Container Clusters section of the Cloud console for your project.
 Here is the link for the core Cobalt team's
-[shared project](https://pantheon.corp.google.com/kubernetes/list?project=google.com:shuffler-test)
+[shared project](https://console.cloud.google.com/kubernetes/list?project=google.com:shuffler-test)
 * Click **Create Cluster**
 * Name your cluster whatever you would like
 * Put your cluster in the same zone as your Bigtable instance. If this is not
@@ -347,11 +359,12 @@ database between deployments. The database will still persist between
 
 Navigate to the Compute Engine / Disks section of the Cloud console for your
 project. Here is the link for the core Cobalt team's
-[shared project](https://pantheon.corp.google.com/compute/disks?project=google.com:shuffler-test)
+[shared project](https://console.cloud.google.com/compute/disks?project=google.com:shuffler-test)
 * Click **CREATE DISK**
 * Name your disk whatever you would like
 * Put your disk in the same zone as your GKE cluster. If this is not possible
 put it into a different zone in the same region.
+* Select "None (blank disk) for **Source Type**
 * Select **Create**
 
 #### Create a personal_cluster.json file
@@ -366,6 +379,7 @@ Its contents should be exactly the following
   "cloud_project_prefix": "<your-project-prefix>",
   "cloud_project_name": "<your-project-name>",
   "cluster_name": "<your-cluster-name>",
+  "cluster_zone": "<your-cluster-zone>",
   "gce_pd_name": "<your-persistent-disk-name>",
   "bigtable_project_name" : "<your-bigtable-project-name>",
   "bigtable_instance_name": "<your-bigtable-instance-name>"
@@ -379,6 +393,7 @@ For example:
   "cloud_project_prefix": "google.com",
   "cloud_project_name": "shuffler-test",
   "cluster_name": "rudominer-test-1",
+  "cluster_zone": "us-central1-a",
   "gce_pd_name": "rudominer-shuffler-1",
   "bigtable_project_name" : "google.com:shuffler-test",
   "bigtable_instance_name": "rudominer-test-1"
@@ -405,6 +420,7 @@ be the custom domain. The fully qualified name of your project will then be
 used the empty string for *cloud_project_prefix* otherwise it should be the
 project name without the prefix and the colon.
 * *cluster_name*: The name of the GKE cluster you created
+* *cluster_zone*: The zone in which the GKE cluster was created
 * *gce_pd_name*: The name of the GCE persistent disk you created
 * *bigtable_project_name*: This is the fully-qualified name of the project in
 which you created your Bigtable instance. This should be the same as the project

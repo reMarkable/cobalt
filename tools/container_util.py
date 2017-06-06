@@ -344,10 +344,14 @@ def stop_shuffler():
 
 def authenticate(cluster_name,
                  cloud_project_prefix,
-                 cloud_project_name):
-  subprocess.check_call(["gcloud", "container", "clusters", "get-credentials",
+                 cloud_project_name,
+                 cluster_zone):
+  cmd = ["gcloud", "container", "clusters", "get-credentials",
       cluster_name, "--project",
-      _compound_project_name(cloud_project_prefix, cloud_project_name)])
+      _compound_project_name(cloud_project_prefix, cloud_project_name)]
+  if cluster_zone:
+      cmd.extend(["--zone", cluster_zone])
+  subprocess.check_call(cmd)
 
 def display():
    subprocess.check_call(["kubectl", "get", "services"])
