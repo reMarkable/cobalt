@@ -79,6 +79,16 @@ def ensureDir(dir_path):
   if not os.path.exists(dir_path):
     os.makedirs(dir_path)
 
+def _compound_project_name(args):
+  """ Builds a compound project name such as google.com:my-project
+
+  Args:
+    args: A namespace object as returned from the parse_args() function. It
+          must have one argument named "cloud_project_prefix" and one named
+          "cloud_project_name."
+  """
+  return container_util.compound_project_name(args.cloud_project_prefix,
+                                              args.cloud_project_name)
 def _setup(args):
   subprocess.check_call(["git", "submodule", "init"])
   subprocess.check_call(["git", "submodule", "update"])
@@ -149,8 +159,9 @@ def _test(args):
                SERVICE_ACCOUNT_CREDENTIALS_FILE)
         print 'See the instructions in README.md.'
         return
-      if args.bigtable_project_name == '':
-        print '--bigtable_project_name must be specified'
+      bigtable_project_name_from_args = _compound_project_name(args)
+      if bigtable_project_name_from_args == '':
+        print '--cloud_project_name must be specified'
         success = False
         break
       if args.bigtable_instance_name == '':
@@ -158,10 +169,10 @@ def _test(args):
         success = False
         break
       test_args = [
-          "--bigtable_project_name=%s" % args.bigtable_project_name,
+          "--bigtable_project_name=%s" % bigtable_project_name_from_args,
           "--bigtable_instance_name=%s" % args.bigtable_instance_name
       ]
-      bigtable_project_name = args.bigtable_project_name
+      bigtable_project_name = bigtable_project_name_from_args
       bigtable_instance_name = args.bigtable_instance_name
     if (test_dir == 'e2e_tests'):
       analyzer_pk_pem_file=E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
@@ -196,12 +207,13 @@ def _test(args):
           "-sub_process_v=%d"%_verbose_count
       ]
       if args.use_cloud_bt or args.cobalt_on_gke:
+        bigtable_project_name_from_args = _compound_project_name(args)
         test_args = test_args + [
           "-bigtable_tool_path=%s" % BIGTABLE_TOOL_PATH,
-          "-bigtable_project_name=%s" % args.bigtable_project_name,
+          "-bigtable_project_name=%s" % bigtable_project_name_from_args,
           "-bigtable_instance_name=%s" % args.bigtable_instance_name,
         ]
-        bigtable_project_name = args.bigtable_project_name
+        bigtable_project_name = bigtable_project_name_from_args
         bigtable_instance_name = args.bigtable_instance_name
     print '********************************************************'
     success = (test_runner.run_all_tests(
@@ -258,15 +270,29 @@ def _start_shuffler(args):
                                  verbose_count=max(3, _verbose_count))
 
 def _start_analyzer_service(args):
+  bigtable_project_name = ''
+  bigtable_instance_name = ''
+  if args.use_cloud_bt:
+    bigtable_project_name = _compound_project_name(args)
+    bigtable_instance_name = args.bigtable_instance_name
   process_starter.start_analyzer_service(port=args.port,
+      bigtable_project_name=bigtable_project_name,
+      bigtable_instance_name=bigtable_instance_name,
       # Because it makes the demo more interesting
       # we use verbose_count at least 3.
       verbose_count=max(3, _verbose_count))
 
 def _start_report_master(args):
+  bigtable_project_name = ''
+  bigtable_instance_name = ''
+  if args.use_cloud_bt:
+    bigtable_project_name = _compound_project_name(args)
+    bigtable_instance_name = args.bigtable_instance_name
   process_starter.start_report_master(port=args.port,
-                                      cobalt_config_dir=args.cobalt_config_dir,
-                                      verbose_count=_verbose_count)
+      bigtable_project_name=bigtable_project_name,
+      bigtable_instance_name=bigtable_instance_name,
+      cobalt_config_dir=args.cobalt_config_dir,
+      verbose_count=_verbose_count)
 
 def _start_test_app(args):
   analyzer_uri = "localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT
@@ -291,7 +317,7 @@ def _start_observation_querier(args):
   bigtable_project_name = ''
   bigtable_instance_name = ''
   if args.use_cloud_bt:
-    bigtable_project_name = args.bigtable_project_name
+    bigtable_project_name = _compound_project_name(args)
     bigtable_instance_name = args.bigtable_instance_name
   process_starter.start_observation_querier(
       bigtable_project_name=bigtable_project_name,
@@ -308,15 +334,16 @@ def _invoke_bigtable_tool(args, command):
            SERVICE_ACCOUNT_CREDENTIALS_FILE)
     print 'See the instructions in README.md.'
     return
-  if args.bigtable_project_name == '':
-    print '--bigtable_project_name must be specified'
+  bigtable_project_name_from_args = _compound_project_name(args)
+  if bigtable_project_name_from_args == '':
+    print '--cloud_project_name must be specified'
     return
   if args.bigtable_instance_name == '':
     print '--bigtable_instance_name must be specified'
     return
   subprocess.check_call([BIGTABLE_TOOL_PATH,
       "--command", command,
-      "--bigtable_project_name", args.bigtable_project_name,
+      "--bigtable_project_name", bigtable_project_name_from_args,
       "--bigtable_instance_name", args.bigtable_instance_name])
 
 def _provision_bigtable(args):
@@ -403,14 +430,16 @@ def main():
     'cluster_name': '',
     'cluster_zone': '',
     'gce_pd_name': '',
-    'bigtable_project_name' : '',
     'bigtable_instance_name': '',
   }
   if os.path.exists(PERSONAL_CLUSTER_JSON_FILE):
     print ('Default deployment options will be taken from %s.' %
            PERSONAL_CLUSTER_JSON_FILE)
     with open(PERSONAL_CLUSTER_JSON_FILE) as f:
-      personal_cluster_settings = json.load(f)
+      read_personal_cluster_settings = json.load(f)
+    for key in read_personal_cluster_settings:
+      if key in personal_cluster_settings:
+        personal_cluster_settings[key] = read_personal_cluster_settings[key]
 
   parser = argparse.ArgumentParser(description='The Cobalt command-line '
       'interface.')
@@ -473,12 +502,23 @@ def main():
       'Cobalt processes are used. This option and -use_cloud_bt are mutually '
       'inconsistent. Do not use both at the same time.',
       action='store_true')
-  sub_parser.add_argument('--bigtable_project_name',
-      help='Specify a Cloud project against which to run some of the tests.'
-      ' Only used for the cloud_bt tests and e2e tests when either '
-      '-use_cloud_bt or -cobalt_on_gke are specified.'
-      ' default=%s'%personal_cluster_settings['bigtable_project_name'],
-      default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the name of the Cloud project against which to '
+           'run some of the tests. Only used for the cloud_bt tests and e2e '
+           'tests when either -use_cloud_bt or -cobalt_on_gke are specified. '
+           'This is usually an organization domain name if your Cloud project '
+           'is associated with one. Pass the empty string for no prefix. '
+           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project against which to '
+           'run some of the tests. This is the full project name if '
+           '--cloud_project_prefix is empty. Otherwise the full project name '
+           'is <cloud_project_prefix>:<cloud_project_name>. Only used for the '
+           'cloud_bt tests and e2e tests when either -use_cloud_bt or '
+           '-cobalt_on_gke are specified. '
+           'default=%s'%personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud'
       ' project against which to run some of the tests.'
@@ -527,6 +567,31 @@ def main():
       parents=[parent_parser], help='Start the Analyzer Service running locally'
           ' and connected to a local instance of the Bigtable Emulator.')
   sub_parser.set_defaults(func=_start_analyzer_service)
+  sub_parser.add_argument('-use_cloud_bt',
+      help='Causes the Analyzer service to connect to an instance of Cloud '
+           'Bigtable. Otherwise a local instance of the Bigtable Emulator will '
+           'be used.', action='store_true')
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the name of the Cloud project containing the '
+           'Bigtable instance to which the Analyzer service will connect. Only '
+           'used if -use_cloud_bt is set. '
+           'This is usually an organization domain name if your Cloud project '
+           'is associated with one. Pass the empty string for no prefix. '
+           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project containing the '
+           'Bigtable instance to which the Analyzer service will connect. '
+           'Only used if -use_cloud_bt is set. This is the full project '
+           'name if --cloud_project_prefix is empty. Otherwise the full '
+           'project name is <cloud_project_prefix>:<cloud_project_name>. '
+           'default=%s'%personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
+  sub_parser.add_argument('--bigtable_instance_name',
+      help='Specify a Cloud Bigtable instance within the specified Cloud '
+      'project against which to query. Only used if -use_cloud_bt is set. '
+      'default=%s'%personal_cluster_settings['bigtable_instance_name'],
+      default=personal_cluster_settings['bigtable_instance_name'])
   sub_parser.add_argument('--port',
       help='The port on which the Analyzer service should listen. '
            'Default=%s.' % DEFAULT_ANALYZER_SERVICE_PORT,
@@ -538,6 +603,31 @@ def main():
           'running locally and connected to a local instance of the Bigtable'
           'Emulator.')
   sub_parser.set_defaults(func=_start_report_master)
+  sub_parser.add_argument('-use_cloud_bt',
+      help='Causes the Report Master to connect to an instance of Cloud '
+           'Bigtable. Otherwise a local instance of the Bigtable Emulator will '
+           'be used.', action='store_true')
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the name of the Cloud project containing the '
+           'Bigtable instance to which the Report Master will connect. Only '
+           'used if -use_cloud_bt is set. '
+           'This is usually an organization domain name if your Cloud project '
+           'is associated with one. Pass the empty string for no prefix. '
+           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project containing the '
+           'Bigtable instance to which the Report Master will connect. '
+           'Only used if -use_cloud_bt is set. This is the full project '
+           'name if --cloud_project_prefix is empty. Otherwise the full '
+           'project name is <cloud_project_prefix>:<cloud_project_name>. '
+           'default=%s'%personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
+  sub_parser.add_argument('--bigtable_instance_name',
+      help='Specify a Cloud Bigtable instance within the specified Cloud '
+      'project against which to query. Only used if -use_cloud_bt is set. '
+      'default=%s'%personal_cluster_settings['bigtable_instance_name'],
+      default=personal_cluster_settings['bigtable_instance_name'])
   sub_parser.add_argument('--port',
       help='The port on which the ReportMaster should listen. '
            'Default=%s.' % DEFAULT_REPORT_MASTER_PORT,
@@ -571,11 +661,22 @@ def main():
       help='Causes the query to be performed against an instance of Cloud '
       'Bigtable. Otherwise a local instance of the Bigtable Emulator will be '
       'used.', action='store_true')
-  sub_parser.add_argument('--bigtable_project_name',
-      help='Specify a Cloud project against which to query. '
-      'Only used if -use_cloud_bt is set. '
-      'default=%s'%personal_cluster_settings['bigtable_project_name'],
-      default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the name of the Cloud project containing the '
+           'Bigtable instance against which to '
+           'query. Only used if -use_cloud_bt is set. This is '
+           'usually an organization domain name if your Cloud project is '
+           'associated with one. Pass the empty string for no prefix. '
+           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project containing the '
+           'Bigtable instance against which to '
+           'query. Only used if -use_cloud_bt is set. This is the full project '
+           'name if --cloud_project_prefix is empty. Otherwise the full '
+           'project name is <cloud_project_prefix>:<cloud_project_name>. '
+           'default=%s'%personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
       'project against which to query. Only used if -use_cloud_bt is set. '
@@ -602,11 +703,20 @@ def main():
     parents=[parent_parser],
     help="Create Cobalt's Cloud BigTables if they don't exit.")
   sub_parser.set_defaults(func=_provision_bigtable)
-  sub_parser.add_argument('--bigtable_project_name',
-    help='Specify the Cloud project containing the Bigtable instance '
-    ' to be provisioned. '
-    'default=%s'%personal_cluster_settings['bigtable_project_name'],
-    default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the name of the Cloud project containing the '
+           'Bigtable instance to be provisioned. This is '
+           'usually an organization domain name if your Cloud project is '
+           'associated with one. Pass the empty string for no prefix. '
+           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project containing the '
+           'Bigtable instance to be provisioned. This is the full project '
+           'name if --cloud_project_prefix is empty. Otherwise the full '
+           'project name is <cloud_project_prefix>:<cloud_project_name>. '
+           'default=%s'%personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project that is to be provisioned. '
@@ -618,11 +728,22 @@ def main():
     help='**WARNING: Permanently delete all data from Cobalt\'s Observation '
     'store. **')
   sub_parser.set_defaults(func=_delete_observations)
-  sub_parser.add_argument('--bigtable_project_name',
-    help='Specify the Cloud project containing the Bigtable instance '
-    ' from which all Observation data will be permanently deleted. '
-    'default=%s'%personal_cluster_settings['bigtable_project_name'],
-    default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the name of the Cloud project containing the '
+           'Bigtable instance from which all Observation data will be '
+           'permanently deleted. This is '
+           'usually an organization domain name if your Cloud project is '
+           'associated with one. Pass the empty string for no prefix. '
+           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project containing the '
+           'Bigtable instance from which all Observation data will be '
+           'permanently deleted. This is the full project '
+           'name if --cloud_project_prefix is empty. Otherwise the full '
+           'project name is <cloud_project_prefix>:<cloud_project_name>. '
+           'default=%s'%personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project from which all Observation data will be permanently deleted. '
@@ -634,11 +755,22 @@ def main():
     help='**WARNING: Permanently delete all data from Cobalt\'s Report '
     'store. **')
   sub_parser.set_defaults(func=_delete_reports)
-  sub_parser.add_argument('--bigtable_project_name',
-    help='Specify the Cloud project containing the Bigtable instance '
-    ' from which all Report data will be permanently deleted. '
-    'default=%s'%personal_cluster_settings['bigtable_project_name'],
-    default=personal_cluster_settings['bigtable_project_name'])
+  sub_parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of the name of the Cloud project containing the '
+           'Bigtable instance from which all Report data will be '
+           'permanently deleted. This is '
+           'usually an organization domain name if your Cloud project is '
+           'associated with one. Pass the empty string for no prefix. '
+           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
+      default=personal_cluster_settings['cloud_project_prefix'])
+  sub_parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project containing the '
+           'Bigtable instance from which all Report data will be '
+           'permanently deleted. This is the full project '
+           'name if --cloud_project_prefix is empty. Otherwise the full '
+           'project name is <cloud_project_prefix>:<cloud_project_name>. '
+           'default=%s'%personal_cluster_settings['cloud_project_name'],
+      default=personal_cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project from which all Report data will be permanently deleted. '
@@ -663,7 +795,7 @@ def main():
       'GKE cluster to which you will be deploying.')
   sub_parser.set_defaults(func=_deploy_authenticate)
   sub_parser.add_argument('--cloud_project_prefix',
-      help='The prefix part of the Cloud project name to which your are '
+      help='The prefix part of name of the Cloud project to which your are '
            'deploying. This is usually an organization domain name if your '
            'Cloud project is associated with one. Pass the empty string for no '
            'prefix. '
@@ -703,7 +835,7 @@ def main():
       help='The job you wish to push. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
   sub_parser.add_argument('--cloud_project_prefix',
-      help='The prefix part of the Cloud project name to which your are '
+      help='The prefix part of name of the Cloud project to which your are '
            'deploying. This is usually an organization domain name if your '
            'Cloud project is associated with one. Pass the empty string for no '
            'prefix. '
@@ -730,7 +862,7 @@ def main():
            'Default=%s' % personal_cluster_settings['bigtable_instance_name'],
       default=personal_cluster_settings['bigtable_instance_name'])
   sub_parser.add_argument('--cloud_project_prefix',
-      help='The prefix part of the Cloud project name to which your are '
+      help='The prefix part of the name of the Cloud project to which your are '
            'deploying. This is usually an organization domain name if your '
            'Cloud project is associated with one. Pass the empty string for no '
            'prefix. '

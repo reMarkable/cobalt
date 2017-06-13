@@ -44,7 +44,7 @@ This stands up a complete Cobalt system running locally:
 * The Analyzer Service
 * The Report Master Service
 
-It then uses the the **test app** to send Observations to the Shuffler, uses the
+It then uses the **test app** to send Observations to the Shuffler, uses the
 **observation querier** to wait until the Observations have arrived at the
 Analyzer, uses the **report client** library to generate a report and
 wait for the report to complete, and finally checks the result of the report.
@@ -64,7 +64,7 @@ PEM files located in the *end_to_end_tests* directory named
 *analyzer_private_key.pem.e2e_test* and
 *analyzer_public_key.pem.e2e_test*. But for running Cobalt in any other
 environment we do not want to check in a private key into source control
-and so we ask each developer to generate thier own key pair.
+and so we ask each developer to generate their own key pair.
 
 `./cobaltb.py keygen`
 
@@ -112,7 +112,7 @@ Basic Rappor report.
 
 Note that the `./cobaltb.py start` command automatically sets the flag `-v=3`
 on all of the started processes. This sets the virtual logging level to 3.
-The Cobalt log messages has been specifically tuned to give interesting
+The Cobalt log messages have been specifically tuned to give interesting
 output during a demo at this virtual logging level. For example the Analyzer
 service will log each time it receives a batch of Observations.
 
@@ -147,7 +147,7 @@ Analyzer
   * `set encoding 2`
   * `encode 500 11`
   * `encode 1000 12`
-  * `encode 500 1`
+  * `encode 500 13`
   * `send`
   * See that the Shuffler says it received the Observations and forwarded them
   to the Analyzer.
@@ -264,10 +264,17 @@ tests are not run automatically, they are not run on the continuous integration
 machine and they are not run if you type `./cobaltb.py test --tests=all`.
 Instead you must explicitly invoke them.
 
-`./cobaltb.py test --tests=cloud_bt --bigtable_project_name=<project_name> --bigtable_instance_name=<instance_name>`
+`./cobaltb.py test --tests=cloud_bt --cloud_project_name=<project_name> --bigtable_instance_name=<instance_name>`
 
 WARNING: This will modify the contents of the tables in whichever
 Cloud Bigtable instance you point it at. Be careful.
+
+### Cloud Project Name Prefix
+
+If your Cloud project name has a domain prefix (for example your Cloud project
+name is `google.com:myproject`) then you must specify the prefix separately
+with the flag `--cloud_project_prefix.` For example you would type
+`./cobaltb.py test --tests=cloud_bt --cloud_project_prefix=google.com --cloud_project_name=myproject --bigtable_instance_name=<instance_name>`
 
 Note that if you follow the instructions below and create a
 *personal_cluster.json* file then this command may be simplified to
@@ -276,10 +283,12 @@ Note that if you follow the instructions below and create a
 ### Running the End-to-End Tests Against Cloud Bigtable
 This is also not done automatically but you may do it manually as follows
 
-`./cobaltb.py test --tests=e2e -use_cloud_bt --bigtable_project_name=<project_name> --bigtable_instance_name=<instance_name>`
+`./cobaltb.py test --tests=e2e -use_cloud_bt --cloud_project_name=<project_name> --bigtable_instance_name=<instance_name>`
 
 WARNING: This will modify the contents of the tables in whichever
 Cloud Bigtable instance you point it at. Be careful.
+
+See the note above about the flag `--cloud_project_prefix`.
 
 Note that if you follow the instructions below and create a
 *personal_cluster.json* file then this command may be simplified to
@@ -292,12 +301,15 @@ changes
 * Do not start the Bigtable Emulator
 * When starting the Analyzer Service, the Report Master and the Observation
 Querier pass the flags
-`--bigtable_project_name=<project_name>`
+`-use_cloud_bt`
+`--cloud_project_name=<project_name>`
 and
 `--bigtable_instance_name=<instance_name>`
 so that these processes will connect to your instance of Cloud Bigtable rather
 than attempting to connect to a local instance of Bigtable Emulator.
 
+See the notes above about the flag `--cloud_project_prefix` and
+about creating a *personal_cluster.json* file.
 
 ## Google Container Engine (GKE)
 You can deploy the Shuffler, Analyzer Service and Report Master on Google
@@ -310,7 +322,7 @@ cloud instance.
 #### Install Docker
 
 In order to deploy to Container Engine you need to be able to build Docker
-containers and that requires have the Docker daemon running on your machine.
+containers and that requires having the Docker daemon running on your machine.
 
 Install [Docker](https://docs.docker.com/engine/installation/).
 If you are a Googler the following instructions should work:
@@ -381,7 +393,6 @@ Its contents should be exactly the following
   "cluster_name": "<your-cluster-name>",
   "cluster_zone": "<your-cluster-zone>",
   "gce_pd_name": "<your-persistent-disk-name>",
-  "bigtable_project_name" : "<your-bigtable-project-name>",
   "bigtable_instance_name": "<your-bigtable-instance-name>"
 }
 ```
@@ -395,20 +406,18 @@ For example:
   "cluster_name": "rudominer-test-1",
   "cluster_zone": "us-central1-a",
   "gce_pd_name": "rudominer-shuffler-1",
-  "bigtable_project_name" : "google.com:shuffler-test",
   "bigtable_instance_name": "rudominer-test-1"
 }
 ```
 
 The script *cobaltb.py* looks for this file and uses it to set defaults for
-flags. It is ok for some of the values to be the empty string but it is not ok
-for any of the keys to be missing. For example if you have not yet created a
-GKE cluster but you have already created a Bigtable instance you can leave
-all fields except `bigtable_project_name` and
-`bigtable_instance_name` empty and then when performing the steps described
-above in the section **Using Cloud Bigtable** you will not have to type the
-flags
-`--bigtable_project_name` and `--bigtable_instance_name`.
+flags. It is ok for some of the values to be the empty string or missing.
+For example if you have not yet created a GKE cluster but you have already
+created a Bigtable instance you can omit all fields other than
+`cloud_project_prefix`, `cloud_project_name` and `bigtable_instance_name` and
+then when performing the steps described above in the section
+**Using Cloud Bigtable** you will not have to type the flags
+`--cloud_project_prefix`, `--cloud_project_name` or `--bigtable_instance_name`.
 
 Here is an explanation of each of the entries.
 * *cloud_project_prefix*: This should be the empty string unless you created
@@ -422,10 +431,6 @@ project name without the prefix and the colon.
 * *cluster_name*: The name of the GKE cluster you created
 * *cluster_zone*: The zone in which the GKE cluster was created
 * *gce_pd_name*: The name of the GCE persistent disk you created
-* *bigtable_project_name*: This is the fully-qualified name of the project in
-which you created your Bigtable instance. This should be the same as the project
-specified by the two fields *cloud_project_prefix* and *cloud_project_name*
-but here it is specified as a single combined name.
 * *bigtable_instance_name*: The name of the Bigtable instance you created.
 
 ### Deploying Cobalt to GKE

@@ -210,18 +210,18 @@ def _replace_tokens_in_template(template_file, out_file, token_replacements):
         line = line.replace(token, token_replacements[token])
       f.write(line)
 
-def _compound_project_name(cloud_project_prefix, cloud_project_name):
+def compound_project_name(cloud_project_prefix, cloud_project_name):
   if not cloud_project_prefix:
     return cloud_project_name
   return "%s:%s"%(cloud_project_prefix, cloud_project_name)
 
 
 def _create_secret_from_file(secret_name, data_key, file_path):
-  subprocess.check_call(["kubectl", "create", "secret", "generic", secret_name,
+  subprocess.call(["kubectl", "create", "secret", "generic", secret_name,
     "--from-file", "%s=%s"%(data_key, file_path)])
 
 def _delete_secret(secret_name):
-  subprocess.check_call(["kubectl", "delete", "secret",  secret_name])
+  subprocess.call(["kubectl", "delete", "secret",  secret_name])
 
 def create_analyzer_private_key_secret(
     path_to_pem=DEFAULT_ANALYZER_PRIVATE_KEY_PEM):
@@ -237,6 +237,9 @@ def create_shuffler_private_key_secret(
 
 def delete_analyzer_private_key_secret():
   _delete_secret(ANALYZER_PRIVATE_KEY_SECRET_NAME)
+
+def delete_shuffler_private_key_secret():
+  _delete_secret(SHUFFLER_PRIVATE_KEY_SECRET_NAME)
 
 def _start_gke_service(deployment_template_file, deployment_file,
                        token_substitutions):
@@ -261,7 +264,7 @@ def start_analyzer_service(cloud_project_prefix,
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   ANALYZER_SERVICE_IMAGE_NAME)
 
-  bigtable_project_name = _compound_project_name(cloud_project_prefix,
+  bigtable_project_name = compound_project_name(cloud_project_prefix,
                                                  cloud_project_name)
 
   # These are the token replacements that must be made inside the deployment
@@ -290,7 +293,7 @@ def start_report_master(cloud_project_prefix,
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   REPORT_MASTER_IMAGE_NAME)
 
-  bigtable_project_name = _compound_project_name(cloud_project_prefix,
+  bigtable_project_name = compound_project_name(cloud_project_prefix,
                                                  cloud_project_name)
 
   # These are the token replacements that must be made inside the deployment
@@ -348,7 +351,7 @@ def authenticate(cluster_name,
                  cluster_zone):
   cmd = ["gcloud", "container", "clusters", "get-credentials",
       cluster_name, "--project",
-      _compound_project_name(cloud_project_prefix, cloud_project_name)]
+      compound_project_name(cloud_project_prefix, cloud_project_name)]
   if cluster_zone:
       cmd.extend(["--zone", cluster_zone])
   subprocess.check_call(cmd)
