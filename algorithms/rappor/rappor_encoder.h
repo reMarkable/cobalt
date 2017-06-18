@@ -23,6 +23,7 @@
 #include "algorithms/rappor/rappor_config_validator.h"
 #include "config/encodings.pb.h"
 #include "encoder/client_secret.h"
+#include "util/crypto_util/hash.h"
 #include "util/crypto_util/random.h"
 
 namespace cobalt {
@@ -51,11 +52,38 @@ class RapporEncoder {
 
  private:
   friend class StringRapporEncoderTest;
+  friend class RapporAnalyzer;
 
   // Allows Friend classess to set a special RNG for use in tests.
   void SetRandomForTesting(std::unique_ptr<crypto::Random> random) {
     random_ = std::move(random);
   }
+
+  // Computes a hash of the given |serialized value| and |cohort_num| and writes
+  // the result to |hashed_value|. This plus ExtractBitIndex() are used by
+  // MakeBloomBits() to form the Bloom filter. These two functions have been
+  // extracted from MakeBloomBits() so that they can be shared by RaporAnalyzer.
+  //
+  // |num_hashes| indicates the the upper bound for the values of |hash_index|
+  // that will be passed to ExtractBitIndex() after this method returns.
+  //
+  // Returns true for success or false if the hash operation fails for any
+  // reason.
+  static bool HashValueAndCohort(
+      const std::string serialized_value, uint32_t cohort_num,
+      uint32_t num_hashes,
+      crypto::byte hashed_value[crypto::hash::DIGEST_SIZE]);
+
+  // Extracts a bit index from the given |hashed_value| for the given
+  // |hash_index|. This plus HashValueAndCohort are used by MakeBloomBits()
+  // to form the Bloom filter. These two functions have been extracted from
+  // MakeBloomBits() so that they can be shared by RaporAnalyzer.
+  //
+  // IMPORTANT: We index bits "from the right." This means that bit number zero
+  // is the least significant bit of the last byte of the Bloom filter.
+  static uint32_t ExtractBitIndex(
+      crypto::byte hashed_value[crypto::hash::DIGEST_SIZE], size_t hash_index,
+      uint32_t num_bits);
 
   // Generates the array of bloom bits derived from |value|. Returns the
   // empty string on error.

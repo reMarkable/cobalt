@@ -73,6 +73,34 @@ RapporEncoder::RapporEncoder(const RapporConfig& config,
 
 RapporEncoder::~RapporEncoder() {}
 
+bool RapporEncoder::HashValueAndCohort(
+    const std::string serialized_value, uint32_t cohort_num,
+    uint32_t num_hashes, byte hashed_value[crypto::hash::DIGEST_SIZE]) {
+  // We append the cohort to the value before hashing.
+  std::vector<byte> hash_input(serialized_value.size() + sizeof(cohort_num_));
+  std::memcpy(hash_input.data(), &serialized_value[0], serialized_value.size());
+  std::memcpy(hash_input.data() + serialized_value.size(), &cohort_num,
+              sizeof(cohort_num_));
+
+  // Now we hash |hash_input| into |hashed_value|.
+  // We are going to use two bytes of |hashed_value| for each hash in the Bloom
+  // filter so we need DIGEST_SIZE to be at least num_hashes*2. This should have
+  // already been checked at config validation time.
+  CHECK(crypto::hash::DIGEST_SIZE >= num_hashes * 2);
+  return crypto::hash::Hash(hash_input.data(), hash_input.size(), hashed_value);
+}
+
+uint32_t RapporEncoder::ExtractBitIndex(
+    byte hashed_value[crypto::hash::DIGEST_SIZE], size_t hash_index,
+    uint32_t num_bits) {
+  // Each bloom filter consumes two bytes of |hashed_value|. Note that
+  // num_bits is required to be a power of 2 (this is checked in the
+  // constructor of RapporConfigValidator) so that the mod operation below
+  // preserves the uniform distribution of |hashed_value|.
+  return (*reinterpret_cast<uint16_t*>(&hashed_value[hash_index * 2])) %
+         num_bits;
+}
+
 std::string RapporEncoder::MakeBloomBits(const ValuePart& value) {
   uint32_t num_bits = config_->num_bits();
   uint32_t num_bytes = (num_bits + 7) / 8;
@@ -81,19 +109,9 @@ std::string RapporEncoder::MakeBloomBits(const ValuePart& value) {
   std::string serialized_value;
   value.SerializeToString(&serialized_value);
 
-  // We append the cohort to the value before hashing.
-  std::vector<byte> hash_input(serialized_value.size() + sizeof(cohort_num_));
-  std::memcpy(hash_input.data(), &serialized_value[0], serialized_value.size());
-  std::memcpy(hash_input.data() + serialized_value.size(), &cohort_num_,
-              sizeof(cohort_num_));
-
-  // Now we hash |hash_input| into |hashed_value|.
-  // We are going to use two bytes of |hashed_value| for each hash in the Bloom
-  // filter so we need DIGEST_SIZE to be at least num_hashes*2. This should have
-  // already been checked at config validation time.
-  CHECK(crypto::hash::DIGEST_SIZE >= num_hashes * 2);
   byte hashed_value[crypto::hash::DIGEST_SIZE];
-  if (!crypto::hash::Hash(hash_input.data(), hash_input.size(), hashed_value)) {
+  if (!HashValueAndCohort(serialized_value, cohort_num_, num_hashes,
+                          hashed_value)) {
     VLOG(1) << "Hash() failed";
     return "";
   }
@@ -102,13 +120,7 @@ std::string RapporEncoder::MakeBloomBits(const ValuePart& value) {
   // (The C++ Protocol Buffer API uses string to represent an array of bytes.)
   std::string data(num_bytes, static_cast<char>(0));
   for (size_t hash_index = 0; hash_index < num_hashes; hash_index++) {
-    // Each bloom filter consumes two bytes of |hashed_value|. Note that
-    // num_bits is required to be a power of 2 (this is checked in the
-    // constructor of RapporConfigValidator) so that the mod operation below
-    // preserves the uniform distribution of |hashed_value|.
-    uint32_t bit_index =
-        (*reinterpret_cast<uint16_t*>(&hashed_value[hash_index * 2])) %
-        num_bits;
+    uint32_t bit_index = ExtractBitIndex(hashed_value, hash_index, num_bits);
 
     // Indexed from the right, i.e. the least-significant bit.
     uint32_t byte_index = bit_index / 8;

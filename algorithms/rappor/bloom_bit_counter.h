@@ -69,10 +69,14 @@ class BloomBitCounter {
   // cohort number from 0 to num_cohorts - 1.
   const std::vector<CohortCounts>& EstimateCounts();
 
+  std::shared_ptr<RapporConfigValidator> config() {
+    return config_;
+  }
+
  private:
   friend class BloomBitCounterTest;
 
-  std::unique_ptr<RapporConfigValidator> config_;
+  std::shared_ptr<RapporConfigValidator> config_;
 
   size_t num_observations_ = 0;
   size_t observation_errors_ = 0;
@@ -107,7 +111,7 @@ struct CohortCounts {
   // of |bit_sums|. In the latter case the values are listed
   // in bit order "from right to left". That is, count_estimates[0] and
   // std_error[0] contain values for the right-most bit, i.e. the least
-  // significant bit.
+  // significant bit of the last byte of the Bloom filter.
 
   // The adjusted counts giving our estimate of the true pre-encoded count
   // for each bit.
