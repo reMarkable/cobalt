@@ -39,6 +39,16 @@ std::string DataToBinaryString(const std::string& data) {
   return output;
 }
 
+std::string BuildBinaryString(size_t num_bits,
+                              const std::vector<uint16_t>& index_of_1s) {
+  // Initialize output to a string of all zeroes.
+  std::string output(num_bits, '0');
+  for (auto bit_index : index_of_1s) {
+    output[num_bits - bit_index - 1] = '1';
+  }
+  return output;
+}
+
 std::string BinaryStringToData(const std::string& binary_string) {
   size_t num_bits = binary_string.size();
   EXPECT_EQ(0, num_bits % 8);
@@ -65,11 +75,10 @@ std::string CategoryName(uint32_t index) {
   return std::string(buffer, 12);
 }
 
-
 std::string BuildBitPatternString(int num_bits, int index, char index_char,
-    char other_char ) {
+                                  char other_char) {
   return std::string(num_bits - 1 - index, other_char) + index_char +
-      std::string(index, other_char);
+         std::string(index, other_char);
 }
 
 }  // namespace rappor

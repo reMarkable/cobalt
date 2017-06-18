@@ -16,6 +16,7 @@
 #define COBALT_ALGORITHMS_RAPPOR_RAPPOR_TEST_UTILS_H_
 
 #include <string>
+#include <vector>
 
 namespace cobalt {
 namespace rappor {
@@ -32,6 +33,13 @@ std::string BinaryStringToData(const std::string& binary_string);
 // Returns a string of "0"s and "1"s that gives the binary representation of the
 // bytes in |data|.
 std::string DataToBinaryString(const std::string& data);
+
+// Builds a binary string of length |num_bits| in which there are '1''s in
+// exactly the indices specified by |index_of_1s|. Note that we index bits
+// "from the right" so that an index of zero refers to the least significant
+// bit, i.e. the last character of the returned string.
+std::string BuildBinaryString(size_t num_bits,
+                              const std::vector<uint16_t>& index_of_1s);
 
 // Builds the string "category<index>" using 4 digits from index.
 std::string CategoryName(uint32_t index);
