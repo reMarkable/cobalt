@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <utility>
 #include <vector>
-#include <memory>
 
 #include "config/encoding_config.h"
 #include "config/metric_config.h"
@@ -31,19 +31,17 @@ class TestErrorCollector : public ErrorCollector {
  public:
   virtual ~TestErrorCollector() {}
 
-  void AddError(int line, ColumnNumber column, const std::string & message)
-      override {
+  void AddError(int line, ColumnNumber column,
+                const std::string& message) override {
     line_numbers_.push_back(line);
   }
 
-  void AddWarning(int line, ColumnNumber column, const std::string & message)
-      override {
+  void AddWarning(int line, ColumnNumber column,
+                  const std::string& message) override {
     line_numbers_.push_back(line);
   }
 
-  const std::vector<int>& line_numbers() {
-    return line_numbers_;
-  }
+  const std::vector<int>& line_numbers() { return line_numbers_; }
 
   std::vector<int> line_numbers_;
 };
@@ -154,14 +152,13 @@ TEST(EncodingRegistryFromFile, ValidFile) {
       encoding_config->basic_rappor().int_range_categories().first() + 1;
   EXPECT_EQ(3, num_categories);
 
-
   // (1, 1, 4) Should be not present
   EXPECT_EQ(nullptr, registry->Get(1, 1, 4));
 
   // (2, 1, 1) Should be Basic RAPPOR with string categories
   encoding_config = registry->Get(2, 1, 1);
-  EXPECT_EQ(3,
-      encoding_config->basic_rappor().string_categories().category_size());
+  EXPECT_EQ(
+      3, encoding_config->basic_rappor().string_categories().category_size());
 }
 
 // Tests MetricRegistry::FromFile() on a fully valid file.
@@ -195,6 +192,10 @@ TEST(ReportRegistryFromFile, ValidFile) {
   // (1, 1, 1) should have 2 variables
   auto* report_config = registry->Get(1, 1, 1);
   EXPECT_EQ(2, report_config->variable_size());
+  EXPECT_EQ(2,
+            report_config->variable(0).rappor_candidates().candidates_size());
+  EXPECT_EQ("San Francisco",
+            report_config->variable(0).rappor_candidates().candidates(0));
 
   // (1, 1, 2) Should be "Fuschsia Usage by Hour"
   report_config = registry->Get(1, 1, 2);
@@ -215,16 +216,16 @@ TEST(EncodingRegistryFromFile, CheckRegisteredEncodings) {
 // This test runs MetricRegistry::FromFile() on our official registration
 // file, registered_metrics.txt. The purpose is to validate that file.
 TEST(MetricRegistryFromFile, CheckRegisteredMetrics) {
-  auto result = MetricRegistry::FromFile(
-      "config/demo/registered_metrics.txt", nullptr);
+  auto result =
+      MetricRegistry::FromFile("config/demo/registered_metrics.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
 // This test runs ReportRegistry::FromFile() on our official registration
 // file, registered_reports.txt. The purpose is to validate that file.
 TEST(ReportRegistryFromFile, CheckRegisteredReports) {
-  auto result = ReportRegistry::FromFile(
-      "config/demo/registered_reports.txt", nullptr);
+  auto result =
+      ReportRegistry::FromFile("config/demo/registered_reports.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
@@ -261,7 +262,6 @@ TEST(EncodingRegistryFromString, ValidString) {
   auto& registry = result.first;
   EXPECT_EQ(2, registry->size());
 }
-
 
 const char* kMetricConfigText = R"(
 # Metric 1 has one string part.
@@ -303,4 +303,3 @@ TEST(MetricRegistryFromString, ValidString) {
 
 }  // namespace config
 }  // namespace cobalt
-

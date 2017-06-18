@@ -83,7 +83,10 @@ element {
   metric_id: 1
   variable {
     metric_part: "name"
-    candidate_map_location: "a/path"
+    rappor_candidates {
+      candidates: "Module A"
+      candidates: "Module B"
+    }
   }
   aggregation_epoch_type: MONTH
   report_delay_days: 5

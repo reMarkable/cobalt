@@ -24,6 +24,12 @@ message DifferentialPrivacyConfig {
   float delta = 2;
 }
 
+
+// The list of candidates to use for a particular run of a RAPPOR analysis.
+message RapporCandidateList {
+  repeated string candidates = 1;
+}
+
 // A ReportVariable is used within a |ReportConfig|. It specifies that
 // a generated report should include a named part of a metric and it
 // gives additional information necessary to analyze that metric part.
@@ -31,9 +37,9 @@ message ReportVariable {
   // The named part of the metric to include in the report.
   string metric_part = 1;
 
-  // In case the report includes a String RAPPOR analysis, this field gives
-  // the Analyzer a hint about where to find the RAPPOR map file.
-  string candidate_map_location = 2;
+  // This field should be present if and only if the report is intended to
+  // include some String RAPPOR analysis of this variable.
+  RapporCandidateList rappor_candidates = 2;
 }
 
 // The different types of reports that Cobalt knows how to create. Each

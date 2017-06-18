@@ -13,11 +13,13 @@ element {
   metric_id: 1
   variable {
     metric_part: "city"
-    candidate_map_location: "a/path"
+    rappor_candidates {
+      candidates: "San Francisco"
+      candidates: "Los Angeles"
+    }
   }
   variable {
     metric_part: "rating"
-    candidate_map_location: "a/path"
   }
   aggregation_epoch_type: DAY
   report_delay_days: 1
