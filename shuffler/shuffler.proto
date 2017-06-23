@@ -21,11 +21,13 @@ package cobalt.shuffler;
 option go_package = "shuffler";
 
 import "encrypted_message.proto";
-import "google/protobuf/empty.proto";
+
+message ShufflerResponse {
+}
 
 // Interface exported by the Shuffler service.
 service Shuffler {
   // Processes an incoming Envelope from the encoder.
   // The EncryptedMessage should contain the encryption of an |Envelope|.
-  rpc Process(EncryptedMessage) returns (google.protobuf.Empty) {}
+  rpc Process(EncryptedMessage) returns (ShufflerResponse) {}
 }

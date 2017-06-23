@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -73,11 +72,14 @@ type ServerConfig struct {
 // a random order. During dispatching, the records get sent to Analyzer and
 // deleted from Shuffler.
 func (s *ShufflerServer) Process(ctx context.Context,
-	encryptedMessage *cobalt.EncryptedMessage) (*empty.Empty, error) {
+	encryptedMessage *cobalt.EncryptedMessage) (*shuffler.ShufflerResponse, error) {
 	glog.V(4).Infoln("Process() is invoked.")
 	envelope, err := s.decryptEnvelope(encryptedMessage)
 	if err != nil {
 		return nil, err
+	}
+	if len(envelope.GetBatch()) == 0 {
+			return nil, grpc.Errorf(codes.InvalidArgument, "Empty envelope.")
 	}
 
 	// TODO(ukode): Some notes here for future development:
@@ -97,7 +99,7 @@ func (s *ShufflerServer) Process(ctx context.Context,
 	}
 
 	glog.V(4).Infoln("Process() done, returning OK.")
-	return &empty.Empty{}, nil
+	return &shuffler.ShufflerResponse{}, nil
 }
 
 // Run serves incoming encoder requests and blocks forever unless a fatal error

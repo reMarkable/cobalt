@@ -53,7 +53,7 @@ grpc::Status ShufflerClient::SendToShuffler(
     temp_context.reset(new grpc::ClientContext());
     context = temp_context.get();
   }
-  google::protobuf::Empty resp;
+  shuffler::ShufflerResponse resp;
   return shuffler_stub_->Process(context, encrypted_message, &resp);
 }
 

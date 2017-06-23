@@ -259,7 +259,7 @@ func (d *Dispatcher) Run() {
 			d.analyzerTransport.close()
 		}
 
-		glog.V(4).Infof("Dispatcher sleeping for [%v]...", waitTime)
+		glog.V(5).Infof("Dispatcher sleeping for [%v]...", waitTime)
 		time.Sleep(waitTime)
 
 		if shouldDisconnectWhileSleeping {
@@ -297,7 +297,7 @@ func (d *Dispatcher) dispatch(sleepDuration time.Duration) {
 		panic("Shuffler config is nil.")
 	}
 
-	glog.V(4).Infoln("Start dispatching ...")
+	glog.V(5).Infoln("Start dispatching ...")
 	keys, err := d.store.GetKeys()
 	if err != nil {
 		glog.Errorf("GetKeys() failed with error: %v", err)
@@ -326,7 +326,7 @@ func (d *Dispatcher) dispatch(sleepDuration time.Duration) {
 		// thresholding: We will not dispatch a bucket unless GetNumObservations()
 		// returns a value at least as large as the threshold.
 		bucketSize, err := d.store.GetNumObservations(key)
-		glog.V(4).Infof("Bucket size from store: [%d]", bucketSize)
+		glog.V(5).Infof("Bucket size from store: [%d]", bucketSize)
 		if err != nil {
 			glog.Errorf("GetNumObservations() failed for key: %v with error: %v", key, err)
 			continue
