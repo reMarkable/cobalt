@@ -334,10 +334,11 @@ If you are a Googler the following instructions should work:
 
 We also will be using the tools [gcloud]( https://cloud.google.com/sdk/)
 and [kubectl](https://kubernetes.io/docs/user-guide/kubectl-overview/).
-You should be able to get away without installing these because they are
-included in Cobalt's *sysroot* directory and when invoked via *cobaltb.py*
-the versions in sysroot will be used. But you may choose to install these
-anyway. The following steps are optional.
+These tools are included in Cobalt's *sysroot* directory and when invoked via
+*cobaltb.py* the versions in sysroot will be used. But you still must install
+these tools on your computer anyway so that you can perform the initialization
+step and also because the full functionality of these tools is not exposed
+through *cobatlb.py*.
 
 * Install [gcloud](https://cloud.google.com/sdk/)
 * `gcloud init`
