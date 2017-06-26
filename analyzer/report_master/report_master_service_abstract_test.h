@@ -358,7 +358,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     EXPECT_EQ(kDayIndex, metadata.last_day_index());
 
     // Check the metric parts.
-    size_t expected_num_parts = (expect_joint_report ? 2 : 1);
+    int expected_num_parts = (expect_joint_report ? 2 : 1);
     ASSERT_EQ(expected_num_parts, metadata.metric_parts_size());
     if (expect_part1) {
       EXPECT_EQ("Part1", metadata.metric_parts(0));
@@ -381,8 +381,9 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     // Check info_messages.
     if (check_completed && expect_joint_report) {
       ASSERT_NE(0, metadata.info_messages_size());
-      EXPECT_NE(-1, metadata.info_messages(0).message().find(
-                        "Report type JOINT is not yet implemented"));
+      EXPECT_NE(std::string::npos,
+                metadata.info_messages(0).message().find(
+                    "Report type JOINT is not yet implemented"));
       EXPECT_EQ(expected_current_time_seconds,
                 metadata.info_messages(0).timestamp().seconds());
     }
@@ -490,7 +491,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     std::vector<ReportMetadataLite> report_metadata(num_reports, metadata);
 
     std::vector<std::string> string_report_ids(num_reports);
-    for (int i = 0; i < num_reports; i++) {
+    for (size_t i = 0; i < num_reports; i++) {
       report_ids[i].set_creation_time_seconds(kFixedTimeSeconds + i);
       report_ids[i].set_instance_id(i);
       report_metadata[i].set_start_time_seconds(kFixedTimeSeconds + i);
@@ -629,7 +630,7 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
     report1_results[report1.rows().rows(i).histogram().value().string_value()] =
         report1.rows().rows(i).histogram().count_estimate();
   }
-  ASSERT_EQ(3, report1_results.size());
+  ASSERT_EQ(3u, report1_results.size());
   EXPECT_EQ(20, report1_results["Apple"]);
   EXPECT_EQ(0, report1_results["Banana"]);
   EXPECT_EQ(0, report1_results["Cantaloupe"]);
@@ -657,7 +658,7 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
                                .string_value()] =
         first_marginal_report.rows().rows(i).histogram().count_estimate();
   }
-  ASSERT_EQ(2, first_marginal_results.size());
+  ASSERT_EQ(2u, first_marginal_results.size());
   EXPECT_EQ(20, first_marginal_results["Apple"]);
   EXPECT_EQ(21, first_marginal_results["Cantaloupe"]);
 
@@ -676,7 +677,7 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
                                 .int_value()] =
         second_marginal_report.rows().rows(i).histogram().count_estimate();
   }
-  ASSERT_EQ(10, second_marginal_results.size());
+  ASSERT_EQ(10u, second_marginal_results.size());
   for (int i = 1; i <= 7; i++) {
     EXPECT_EQ(0, second_marginal_results[i]);
   }
@@ -704,7 +705,7 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, QueryReportsTest) {
 
   // Since we know that reports are returned in batches of 100 we expect there
   // to be 3 batches: Two batches of size 100 and one batch of size 4.
-  EXPECT_EQ(3, response_writer.responses.size());
+  EXPECT_EQ(3u, response_writer.responses.size());
 
   // Check the first batch.
   bool expect_part1 = true;

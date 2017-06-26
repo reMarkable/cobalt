@@ -564,7 +564,7 @@ void TestApp::CommandLoop() {
 void TestApp::Encode(const std::vector<uint32_t> encoding_config_ids,
                      const std::vector<std::string>& metric_parts,
                      const std::vector<std::string>& values) {
-  for (int i = 0; i < FLAGS_num_clients; i++) {
+  for (size_t i = 0; i < FLAGS_num_clients; i++) {
     if (!EncodeAsNewClient(encoding_config_ids, metric_parts, values)) {
       break;
     }
@@ -619,7 +619,7 @@ bool TestApp::EncodeAsNewClient(const std::vector<uint32_t> encoding_config_ids,
 // string value specified by the argument and adds the Observations
 // to the EnvelopeMaker.
 void TestApp::EncodeString(const std::string value) {
-  for (int i = 0; i < FLAGS_num_clients; i++) {
+  for (size_t i = 0; i < FLAGS_num_clients; i++) {
     if (!EncodeStringAsNewClient(value)) {
       break;
     }
@@ -649,7 +649,7 @@ bool TestApp::EncodeStringAsNewClient(const std::string value) {
 // int value specified by the argument and adds the Observations
 // to the EnvelopeMaker.
 void TestApp::EncodeInt(int64_t value) {
-  for (int i = 0; i < FLAGS_num_clients; i++) {
+  for (size_t i = 0; i < FLAGS_num_clients; i++) {
     if (!EncodeIntAsNewClient(value)) {
       break;
     }
@@ -755,7 +755,7 @@ void TestApp::Encode(const std::vector<std::string>& command) {
 }
 
 void TestApp::EncodeMulti(const std::vector<std::string>& command) {
-  CHECK_GE(command.size(), 3);
+  CHECK_GE(command.size(), 3u);
 
   int64_t num_clients;
   if (!ParseInt(command[1], true, &num_clients)) {

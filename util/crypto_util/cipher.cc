@@ -184,7 +184,7 @@ bool SymmetricCipher::set_key(const byte key[KEY_SIZE]) {
 }
 
 bool SymmetricCipher::Encrypt(const byte nonce[NONCE_SIZE], const byte* ptext,
-                              int ptext_len, std::vector<byte>* ctext) {
+                              size_t ptext_len, std::vector<byte>* ctext) {
   int max_out_len = EVP_AEAD_max_overhead(GetAEAD()) + ptext_len;
   ctext->resize(max_out_len);
   size_t out_len;
@@ -196,7 +196,7 @@ bool SymmetricCipher::Encrypt(const byte nonce[NONCE_SIZE], const byte* ptext,
 }
 
 bool SymmetricCipher::Decrypt(const byte nonce[NONCE_SIZE], const byte* ctext,
-                              int ctext_len, std::vector<byte>* ptext) {
+                              size_t ctext_len, std::vector<byte>* ptext) {
   ptext->resize(ctext_len);
   size_t out_len;
   int rc =
@@ -363,7 +363,7 @@ bool HybridCipher::set_private_key_pem(const std::string& key_pem) {
   return true;
 }
 
-bool HybridCipher::Encrypt(const byte* ptext, int ptext_len,
+bool HybridCipher::Encrypt(const byte* ptext, size_t ptext_len,
                            std::vector<byte>* hybrid_ctext) {
   byte public_key_part[PUBLIC_KEY_SIZE];
   byte salt[SALT_SIZE];
@@ -392,7 +392,7 @@ bool HybridCipher::public_key_fingerprint(
   return true;
 }
 
-bool HybridCipher::EncryptInternal(const byte* ptext, int ptext_len,
+bool HybridCipher::EncryptInternal(const byte* ptext, size_t ptext_len,
                                    byte public_key_part_out[PUBLIC_KEY_SIZE],
                                    byte salt_out[SALT_SIZE],
                                    std::vector<byte>* symmetric_ctext_out) {
@@ -443,7 +443,7 @@ bool HybridCipher::EncryptInternal(const byte* ptext, int ptext_len,
   return true;
 }
 
-bool HybridCipher::Decrypt(const byte* hybrid_ctext, int ctext_len,
+bool HybridCipher::Decrypt(const byte* hybrid_ctext, size_t ctext_len,
                            std::vector<byte>* ptext) {
   if (!hybrid_ctext || ctext_len < PUBLIC_KEY_SIZE + SALT_SIZE + 1) {
     return false;
@@ -456,7 +456,7 @@ bool HybridCipher::Decrypt(const byte* hybrid_ctext, int ctext_len,
 bool HybridCipher::DecryptInternal(const byte public_key_part[PUBLIC_KEY_SIZE],
                                    const byte salt[SALT_SIZE],
                                    const byte* symmetric_ctext,
-                                   int symmetric_ctext_len,
+                                   size_t symmetric_ctext_len,
                                    std::vector<byte>* ptext) {
   auto eckey = BuildECKeyPublic(public_key_part);
   if (!eckey) {

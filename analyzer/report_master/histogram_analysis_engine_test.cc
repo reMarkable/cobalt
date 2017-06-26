@@ -163,17 +163,17 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
   // decrypted by Forculus and the 2nd will not.
   void MakeAndProcessForculusObservations() {
     // Add the word "hello" 20 times.
-    for (int i = 0; i < kForculusThreshold; i++) {
+    for (size_t i = 0; i < kForculusThreshold; i++) {
       EXPECT_TRUE(
           MakeAndProcessObservationPart("hello", kForculusEncodingConfigId));
     }
     // Add the word "goodbye" 19 times.
-    for (int i = 0; i < kForculusThreshold - 1; i++) {
+    for (size_t i = 0; i < kForculusThreshold - 1; i++) {
       EXPECT_TRUE(
           MakeAndProcessObservationPart("goodbye", kForculusEncodingConfigId));
     }
     // Add the word "peace" 21 times.
-    for (int i = 0; i < kForculusThreshold + 1; i++) {
+    for (size_t i = 0; i < kForculusThreshold + 1; i++) {
       EXPECT_TRUE(
           MakeAndProcessObservationPart("peace", kForculusEncodingConfigId));
     }
@@ -190,7 +190,7 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     EXPECT_TRUE(analysis_engine_->PerformAnalysis(&report_rows).ok());
 
     // Check the results.
-    EXPECT_EQ(2, report_rows.size());
+    EXPECT_EQ(2u, report_rows.size());
     for (const auto& report_row : report_rows) {
       EXPECT_EQ(0, report_row.histogram().std_error());
       ValuePart recovered_value;
@@ -236,7 +236,7 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     EXPECT_TRUE(analysis_engine_->PerformAnalysis(&report_rows).ok());
 
     // Check the results.
-    EXPECT_EQ(3, report_rows.size());
+    EXPECT_EQ(3u, report_rows.size());
     for (const auto& report_row : report_rows) {
       EXPECT_NE(0, report_row.histogram().std_error());
       EXPECT_GT(report_row.histogram().count_estimate(), 0);

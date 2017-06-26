@@ -76,10 +76,10 @@ TEST(ReportRegistryFromFile, BadFilePath) {
 // file is not a valid ASCII proto file.
 TEST(EncodingRegistryFromFile, NotValidAsciiProtoFile) {
   TestErrorCollector collector;
-  EXPECT_EQ(0, collector.line_numbers().size());
+  EXPECT_EQ(0u, collector.line_numbers().size());
   auto result = EncodingRegistry::FromFile("config/config_test.cc", &collector);
   EXPECT_EQ(kParsingError, result.second);
-  EXPECT_EQ(1, collector.line_numbers().size());
+  EXPECT_EQ(1u, collector.line_numbers().size());
   EXPECT_EQ(0, collector.line_numbers()[0]);
 }
 
@@ -87,10 +87,10 @@ TEST(EncodingRegistryFromFile, NotValidAsciiProtoFile) {
 // file is not a valid ASCII proto file.
 TEST(MetricRegistryFromFile, NotValidAsciiProtoFile) {
   TestErrorCollector collector;
-  EXPECT_EQ(0, collector.line_numbers().size());
+  EXPECT_EQ(0u, collector.line_numbers().size());
   auto result = MetricRegistry::FromFile("config/config_test.cc", &collector);
   EXPECT_EQ(kParsingError, result.second);
-  EXPECT_EQ(1, collector.line_numbers().size());
+  EXPECT_EQ(1u, collector.line_numbers().size());
   EXPECT_EQ(0, collector.line_numbers()[0]);
 }
 
@@ -98,10 +98,10 @@ TEST(MetricRegistryFromFile, NotValidAsciiProtoFile) {
 // file is not a valid ASCII proto file.
 TEST(ReportRegistryFromFile, NotValidAsciiProtoFile) {
   TestErrorCollector collector;
-  EXPECT_EQ(0, collector.line_numbers().size());
+  EXPECT_EQ(0u, collector.line_numbers().size());
   auto result = ReportRegistry::FromFile("config/config_test.cc", &collector);
   EXPECT_EQ(kParsingError, result.second);
-  EXPECT_EQ(1, collector.line_numbers().size());
+  EXPECT_EQ(1u, collector.line_numbers().size());
   EXPECT_EQ(0, collector.line_numbers()[0]);
 }
 
@@ -135,11 +135,11 @@ TEST(EncodingRegistryFromFile, ValidFile) {
       "config/test_files/registered_encodings_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(5, registry->size());
+  EXPECT_EQ(5u, registry->size());
 
   // (1, 1, 1) Should be Forculus 20
   auto* encoding_config = registry->Get(1, 1, 1);
-  EXPECT_EQ(20, encoding_config->forculus().threshold());
+  EXPECT_EQ(20u, encoding_config->forculus().threshold());
 
   // (1, 1, 2) Should be RAPPOR
   encoding_config = registry->Get(1, 1, 2);
@@ -167,7 +167,7 @@ TEST(MetricRegistryFromFile, ValidFile) {
       "config/test_files/registered_metrics_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(4, registry->size());
+  EXPECT_EQ(4u, registry->size());
 
   // (1, 1, 1) Should have 2 parts
   auto* metric_config = registry->Get(1, 1, 1);
@@ -187,7 +187,7 @@ TEST(ReportRegistryFromFile, ValidFile) {
       "config/test_files/registered_reports_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(4, registry->size());
+  EXPECT_EQ(4u, registry->size());
 
   // (1, 1, 1) should have 2 variables
   auto* report_config = registry->Get(1, 1, 1);
@@ -260,7 +260,7 @@ TEST(EncodingRegistryFromString, ValidString) {
   auto result = EncodingRegistry::FromString(kEncodingConfigText, nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(2, registry->size());
+  EXPECT_EQ(2u, registry->size());
 }
 
 const char* kMetricConfigText = R"(
@@ -298,7 +298,7 @@ TEST(MetricRegistryFromString, ValidString) {
   auto result = MetricRegistry::FromString(kMetricConfigText, nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(2, registry->size());
+  EXPECT_EQ(2u, registry->size());
 }
 
 }  // namespace config

@@ -59,7 +59,7 @@ class ObservationQuerierTest : public ::testing::Test {
   // Does the current contents of the ObservationQuerier's output stream contain
   // the given text.
   bool OutputContains(const std::string text) {
-    return -1 != output_stream_.str().find(text);
+    return std::string::npos != output_stream_.str().find(text);
   }
 
   // Is the ObservationQuerier's output stream curently empty?

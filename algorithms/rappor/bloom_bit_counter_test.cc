@@ -98,8 +98,8 @@ class BloomBitCounterTest : public ::testing::Test {
   }
 
   // Checks that bit_counter_ has the expected number observations and errors.
-  void CheckState(int expected_num_observations,
-                  int expected_observation_errors) {
+  void CheckState(size_t expected_num_observations,
+                  size_t expected_observation_errors) {
     EXPECT_EQ(expected_num_observations, bit_counter_->num_observations());
     EXPECT_EQ(expected_observation_errors, bit_counter_->observation_errors());
   }
@@ -119,7 +119,8 @@ class BloomBitCounterTest : public ::testing::Test {
 
   // Invokes bit_countr_->EstimateCounts() and checks the count and std_error in
   // the given bit index for the given cohort.
-  void EstimateCountsAndCheck(int cohort, int index, double expected_estimate,
+  void EstimateCountsAndCheck(size_t cohort, size_t index,
+                              double expected_estimate,
                               double expected_std_err) {
     auto estimated_counts = bit_counter_->EstimateCounts();
     ASSERT_GT(estimated_counts.size(), cohort)

@@ -187,7 +187,7 @@ Status BigtableStore::WriteRows(DataStore::Table table,
   grpc::Status status;
   static const size_t kMaxAttempts = 11;
   int sleepmillis = 10;
-  for (int attempt = 0; attempt < kMaxAttempts; attempt++) {
+  for (size_t attempt = 0; attempt < kMaxAttempts; attempt++) {
     status = DoWriteRows(table, rows);
     if (status.ok()) {
       return kOK;

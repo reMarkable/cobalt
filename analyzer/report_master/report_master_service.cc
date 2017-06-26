@@ -148,7 +148,7 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
   }
 
   // Set the metric parts.
-  for (auto index : metadata_lite->variable_indices()) {
+  for (int index : metadata_lite->variable_indices()) {
     if (index >= report_config->variable_size()) {
       std::ostringstream stream;
       stream << "Invalid variable index encountered while processing report_id="

@@ -36,7 +36,7 @@ TEST(ObservationStoreInteralTest, DayIndexFromRowKey) {
       "0000000039:0000000040:0000000041:0000000042:00000000000000000043:"
       "0000000044",
       row_key);
-  EXPECT_EQ(42, DayIndexFromRowKey(row_key));
+  EXPECT_EQ(42u, DayIndexFromRowKey(row_key));
 }
 
 // Tests the function RangeStartKey
@@ -67,7 +67,7 @@ TEST(ObservationStoreInteralTest, RangeLimitKey) {
 TEST(ObservationStoreInteralTest, GenerateNewRowKey) {
   std::string row_key = GenerateNewRowKey(12345, 23456, 34567, 45678);
   // Check that row_key has the right length.
-  EXPECT_EQ(75, row_key.size());
+  EXPECT_EQ(75u, row_key.size());
   // Check that the last two fields are not identically zero.
   EXPECT_NE(
       "0000012345:0000023456:0000034567:0000045678:00000000000000000000:"

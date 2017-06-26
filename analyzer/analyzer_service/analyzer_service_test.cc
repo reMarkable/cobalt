@@ -114,19 +114,19 @@ TEST_F(AnalyzerServiceTest, TestGRPC) {
   ASSERT_EQ(store::kOK, query_response.status);
 
   // There should be one Observation in the response.
-  ASSERT_EQ(1, query_response.results.size());
+  ASSERT_EQ(1u, query_response.results.size());
 
   // It should have day_index = 1;
-  ASSERT_EQ(1, query_response.results[0].day_index);
+  ASSERT_EQ(1u, query_response.results[0].day_index);
 
   // It should have one part
-  ASSERT_EQ(1, query_response.results[0].observation.parts().size());
+  ASSERT_EQ(1u, query_response.results[0].observation.parts().size());
 
   // That part should have the correct encoding_config_id
-  ASSERT_EQ(12345, query_response.results[0]
-                       .observation.parts()
-                       .at("part1")
-                       .encoding_config_id());
+  ASSERT_EQ(12345u, query_response.results[0]
+                        .observation.parts()
+                        .at("part1")
+                        .encoding_config_id());
 }
 
 }  // namespace analyzer

@@ -294,7 +294,7 @@ class ReportExecutorAbstractTest : public ::testing::Test {
 
   // Checks that the report with the given ID completed successfully and has
   // the expected number of rows.
-  void CheckReport(const ReportId report_id, size_t expected_num_rows) {
+  void CheckReport(const ReportId report_id, int expected_num_rows) {
     ReportMetadataLite metadata;
     ReportRows rows;
     ASSERT_EQ(store::kOK, report_store_->GetReport(report_id, &metadata, &rows))

@@ -143,8 +143,8 @@ RapporConfigValidator::RapporConfigValidator(const RapporConfig& config)
     return;
   }
   num_cohorts_2_power_ = MinPower2Above((uint16_t(num_cohorts_)));
-  CHECK_GT(num_cohorts_2_power_, 0);
-  CHECK_LE(num_cohorts_2_power_, 1024);
+  CHECK_GT(num_cohorts_2_power_, 0u);
+  CHECK_LE(num_cohorts_2_power_, 1024u);
   valid_ = true;
 }
 

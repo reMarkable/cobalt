@@ -62,7 +62,7 @@ ForculusDecrypter::Status ForculusDecrypter::Decrypt(
   // Put pointers to the first |threshold_| x and y values into vectors.
   std::vector<const FieldElement*> x_values(threshold_);
   std::vector<const FieldElement*> y_values(threshold_);
-  int point_index = 0;
+  uint32_t point_index = 0;
   for (const auto& point : points_) {
     if (point_index >= threshold_) {
       break;

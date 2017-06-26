@@ -41,7 +41,7 @@ std::string CandidateString(int i) {
 void PopulateRapporCandidateList(uint32_t num_candidates,
                                  RapporCandidateList* candidate_list) {
   candidate_list->Clear();
-  for (int i = 0; i < num_candidates; i++) {
+  for (size_t i = 0; i < num_candidates; i++) {
     candidate_list->add_candidates(CandidateString(i));
   }
 }
@@ -87,14 +87,14 @@ class RapporAnalyzerTest : public ::testing::Test {
               analyzer_->candidate_map_.candidate_cohort_maps.size());
 
     // and for each candidate...
-    for (auto candidate = 0; candidate < num_candidates; candidate++) {
+    for (size_t candidate = 0; candidate < num_candidates; candidate++) {
       // expect the number of cohorts to be correct,
       EXPECT_EQ(num_cohorts,
                 analyzer_->candidate_map_.candidate_cohort_maps[candidate]
                     .cohort_hashes.size());
 
       // and for each cohort...
-      for (auto cohort = 0; cohort < num_cohorts; cohort++) {
+      for (size_t cohort = 0; cohort < num_cohorts; cohort++) {
         // expect the number of hashes to be correct,
         EXPECT_EQ(num_hashes,
                   analyzer_->candidate_map_.candidate_cohort_maps[candidate]
@@ -102,10 +102,10 @@ class RapporAnalyzerTest : public ::testing::Test {
                       .bit_indices.size());
 
         // and for each hash...
-        for (int hash = 0; hash < num_hashes; hash++) {
+        for (size_t hash = 0; hash < num_hashes; hash++) {
           // Expect the bit index to be in the range [0, num_bits).
           auto bit_index = GetCandidateMapValue(candidate, cohort, hash);
-          EXPECT_GE(bit_index, 0);
+          EXPECT_GE(bit_index, 0u);
           EXPECT_LT(bit_index, num_bits);
         }
       }
@@ -178,9 +178,9 @@ TEST_F(RapporAnalyzerTest, BuildCandidateMapSmallTest) {
   };
   // clang-format on
 
-  for (auto candidate = 0; candidate < kNumCandidates; candidate++) {
-    for (auto cohort = 0; cohort < kNumCohorts; cohort++) {
-      for (int hash = 0; hash < kNumHashes; hash++) {
+  for (size_t candidate = 0; candidate < kNumCandidates; candidate++) {
+    for (size_t cohort = 0; cohort < kNumCohorts; cohort++) {
+      for (size_t hash = 0; hash < kNumHashes; hash++) {
         EXPECT_EQ(expected_bit_indices[candidate][cohort * kNumHashes + hash],
                   GetCandidateMapValue(candidate, cohort, hash))
             << "(" << candidate << "," << cohort * kNumHashes + hash << ")";
@@ -218,7 +218,7 @@ TEST_F(RapporAnalyzerTest, BuildCandidateMapCompareWithEncoder) {
   SetAnalyzer(kNumCandidates, kNumBloomBits, kNumCohorts, kNumHashes);
   BuildCandidateMap();
 
-  for (int candidate = 0; candidate < kNumCandidates; candidate++) {
+  for (size_t candidate = 0; candidate < kNumCandidates; candidate++) {
     // Construct a new encoder with a new ClientSecret so that a random
     // cohort is selected.
     RapporEncoder encoder(config_, ClientSecret::GenerateNewSecret());

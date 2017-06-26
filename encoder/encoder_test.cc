@@ -415,7 +415,7 @@ TEST(EncoderTest, EncodeIntNoOp) {
   // Metric 2 has a single integer part.
   // EncodingConfig 7 is NoOp
   auto obs = DoEncodeIntTest(42, 2, 7, true, ObservationPart::kUnencoded);
-  EXPECT_EQ(42,
+  EXPECT_EQ(42u,
             obs.parts().at("Part1").unencoded().unencoded_value().int_value());
 }
 
@@ -463,7 +463,7 @@ TEST(EncoderTest, AdvancedApiNoErrors) {
   ASSERT_NE(nullptr, result.metadata);
   EXPECT_EQ(kCustomerId, result.metadata->customer_id());
   EXPECT_EQ(kProjectId, result.metadata->project_id());
-  EXPECT_EQ(4, result.metadata->metric_id());
+  EXPECT_EQ(4u, result.metadata->metric_id());
   // We did not set the current time to a static value but rather used the
   // real time that the test was run. Sanity test the day index: It should
   // be at least the day on which this test was written and less than

@@ -112,7 +112,7 @@ bool BigtableAdmin::CreateTableIfNecessary(std::string table_id) {
     // return the appropriate error code, ALREADY_EXISTS, but rather returns
     // UNKNOWN. We found that we are able to detect the problem in this case
     // by looking for the text 'already exists'.
-    if (error_message.find("already exists") == -1) {
+    if (error_message.find("already exists") == std::string::npos) {
       LOG(ERROR) << "Can't create table: " << create_s.error_message()
                  << " error code=" << create_s.error_code();
       return false;

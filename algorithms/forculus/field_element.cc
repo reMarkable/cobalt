@@ -215,7 +215,7 @@ const byte* FieldElement::KeyBytes() const {
 
 std::ostream& operator<<(std::ostream& os, const FieldElement& el) {
   const byte* data = el.KeyBytes();
-  for (int i = 0; i < FieldElement::kDataSize; i++) {
+  for (size_t i = 0; i < FieldElement::kDataSize; i++) {
      os << std::hex << std::setfill('0') << std::setw(2) <<
          static_cast<uint32_t>(*data) << " ";
      data++;

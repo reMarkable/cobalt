@@ -146,7 +146,7 @@ class ReportStoreAbstractTest : public ::testing::Test {
     // Make a new ReportID without specifying timestamp or instance_id.
     ReportId report_id = MakeReportId(0, 0);
     EXPECT_EQ(0, report_id.creation_time_seconds());
-    EXPECT_EQ(0, report_id.instance_id());
+    EXPECT_EQ(0u, report_id.instance_id());
 
     EXPECT_EQ(kOK, StartNewHistogramReport(true, &report_id));
     return report_id;
@@ -164,9 +164,9 @@ class ReportStoreAbstractTest : public ::testing::Test {
     std::vector<ReportId> report_ids;
     std::vector<ReportMetadataLite> metadata_vector;
     int64_t timestamp = start_timestamp;
-    for (int ts_index = 0; ts_index < num_timestamps; ts_index++) {
-      for (int instance_id = 0; instance_id <= 1; instance_id++) {
-        for (int sequence_num = 0; sequence_num < 3; sequence_num++) {
+    for (size_t ts_index = 0; ts_index < num_timestamps; ts_index++) {
+      for (size_t instance_id = 0; instance_id <= 1; instance_id++) {
+        for (size_t sequence_num = 0; sequence_num < 3; sequence_num++) {
           report_ids.emplace_back(MakeReportId(timestamp, instance_id));
           EXPECT_EQ(report_ids.back().instance_id(), instance_id);
           report_ids.back().set_sequence_num(sequence_num);
@@ -184,13 +184,13 @@ class ReportStoreAbstractTest : public ::testing::Test {
 
   Status AddHistogramReportRows(const ReportId& report_id, size_t num_rows) {
     std::vector<ReportRow> report_rows;
-    for (int index = 0; index < num_rows; index++) {
+    for (size_t index = 0; index < num_rows; index++) {
       report_rows.emplace_back(MakeHistogramReportRow(report_id, index));
     }
     return report_store_->AddReportRows(report_id, report_rows);
   }
 
-  void GetReportAndCheck(const ReportId& report_id, size_t expected_num_rows) {
+  void GetReportAndCheck(const ReportId& report_id, int expected_num_rows) {
     ReportMetadataLite read_metadata;
     ReportRows rows;
     EXPECT_EQ(kOK, report_store_->GetReport(report_id, &read_metadata, &rows));
@@ -228,14 +228,14 @@ TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
   // Make a new ReportID without specifying timestamp or instance_id.
   ReportId report_id = this->MakeReportId(0, 0);
   EXPECT_EQ(0, report_id.creation_time_seconds());
-  EXPECT_EQ(0, report_id.instance_id());
+  EXPECT_EQ(0u, report_id.instance_id());
 
   // Invoke StartNewReport().
   EXPECT_EQ(kOK, this->StartNewHistogramReport(one_off, &report_id));
 
   // Check that the report_id was completed.
   EXPECT_NE(0, report_id.creation_time_seconds());
-  EXPECT_NE(0, report_id.instance_id());
+  EXPECT_NE(0u, report_id.instance_id());
 
   // Get the ReportMetatdata for this new ID.
   ReportMetadataLite report_metadata;
@@ -292,7 +292,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
 
   // Make a new ReportID without specifying timestamp or instance_id.
   ReportId report_id1 = this->MakeReportId(0, 0);
-  EXPECT_EQ(0, report_id1.sequence_num());
+  EXPECT_EQ(0u, report_id1.sequence_num());
 
   // Invoke StartNewReport().
   EXPECT_EQ(kOK, this->StartNewHistogramReport(one_off, &report_id1));
@@ -309,7 +309,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
                                                             &report_id2));
 
   // Check that report_id2 had its sequence_num set correctly.
-  EXPECT_EQ(1, report_id2.sequence_num());
+  EXPECT_EQ(1u, report_id2.sequence_num());
   // Creation time should be the same as for the initial report.
   EXPECT_EQ(report_id1.creation_time_seconds(),
             report_id2.creation_time_seconds());
@@ -325,7 +325,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
   EXPECT_EQ(this->last_day_index(), report_metadata.last_day_index());
   EXPECT_EQ(one_off, report_metadata.one_off());
   ASSERT_EQ(1, report_metadata.variable_indices_size());
-  EXPECT_EQ(1, report_metadata.variable_indices(0));
+  EXPECT_EQ(1u, report_metadata.variable_indices(0));
 
   // start_time_seconds, finish_time_seconds and info_message should not have
   // been copied to this ReportMetadataLite.
@@ -402,7 +402,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
   // Check the results.
   ASSERT_EQ(kOK, query_reports_response.status);
   EXPECT_TRUE(query_reports_response.pagination_token.empty());
-  ASSERT_EQ(120, query_reports_response.results.size());
+  ASSERT_EQ(120u, query_reports_response.results.size());
   for (const auto& report_record : query_reports_response.results) {
     const ReportId& report_id = report_record.report_id;
     EXPECT_EQ(this->customer_id(), report_id.customer_id());
@@ -414,7 +414,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
     // See WriteManyNewReports for how we set
     // report_metadata.start_time_seconds()
     EXPECT_EQ(timestamp + report_id.instance_id() + report_id.sequence_num(),
-              report_record.report_metadata.start_time_seconds());
+              (uint64_t)report_record.report_metadata.start_time_seconds());
   }
 
   // Query again. This time we set limit_start_timestamp = infinity and
@@ -436,7 +436,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
   } while (!pagination_token.empty());
 
   // Check the results.
-  ASSERT_EQ(270, full_results.size());
+  ASSERT_EQ(270u, full_results.size());
   for (const auto& report_record : full_results) {
     const ReportId& report_id = report_record.report_id;
     EXPECT_EQ(this->customer_id(), report_id.customer_id());
@@ -448,7 +448,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
     // See WriteManyNewReports for how we set
     // report_metadata.start_time_seconds()
     EXPECT_EQ(timestamp + report_id.instance_id() + report_id.sequence_num(),
-              report_record.report_metadata.start_time_seconds());
+              (uint64_t)report_record.report_metadata.start_time_seconds());
   }
 }
 

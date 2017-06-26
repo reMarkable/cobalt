@@ -24,7 +24,7 @@ SET (CMAKE_CXX_COMPILER "clang++")
 
 project(cobalt)
 
-SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
+SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wsign-compare -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
 
 enable_language(C)
 enable_language(CXX)
@@ -108,7 +108,12 @@ add_subdirectory(encoder)
 add_subdirectory(end_to_end_tests)
 add_subdirectory(shuffler)
 add_subdirectory(tools)
-add_subdirectory(third_party/boringssl)
-add_subdirectory(third_party/glog)
-add_subdirectory(third_party/googletest)
 add_subdirectory(util)
+
+# Turn off extra warnings on third_party code we don't control.
+add_compile_options(-Wno-sign-compare)
+add_subdirectory(third_party/boringssl)
+add_subdirectory(third_party/googletest)
+
+add_compile_options(-Wno-deprecated-register -Wno-unused-function -Wno-unused-local-typedef)
+add_subdirectory(third_party/glog)

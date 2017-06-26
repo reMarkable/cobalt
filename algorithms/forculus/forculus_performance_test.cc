@@ -124,9 +124,9 @@ TEST(ForculusPerformanceTest, OneMillionObservations) {
   // The number of rows in the file word_counts.txt.
   static const int kExpectedNumRows = 57792;
   // There are one million observations
-  static const int kExpectedNumObservations = 1000000;
+  static const size_t kExpectedNumObservations = 1000000;
   // The number of rows of word_counts.txt in which the count is at least 20.
-  static const int kExpectedNumResults = 5331;
+  static const size_t kExpectedNumResults = 5331;
 
   EXPECT_EQ(kExpectedNumRows, num_rows);
   EXPECT_EQ(kExpectedNumObservations, forculus_analyzer.num_observations());
@@ -134,7 +134,7 @@ TEST(ForculusPerformanceTest, OneMillionObservations) {
 
   EXPECT_EQ(kExpectedNumResults, results.size());
 
-  EXPECT_EQ(0, forculus_analyzer.observation_errors());
+  EXPECT_EQ(0u, forculus_analyzer.observation_errors());
 
   std::cout << "\n=================================================\n";
   std::cout << "Rows read: " << num_rows << std::endl;

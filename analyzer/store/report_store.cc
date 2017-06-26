@@ -54,7 +54,7 @@ void ParseReportIdFromMetadataRowKey(const std::string row_key,
   int32_t customer_id, project_id, report_config_id, instance_id;
   int64_t creation_time_seconds;
   int sequence_num;
-  CHECK_GT(row_key.size(), 68);
+  CHECK_GT(row_key.size(), 68u);
   std::sscanf(&row_key[0], "%10u", &customer_id);
   std::sscanf(&row_key[11], "%10u", &project_id);
   std::sscanf(&row_key[22], "%10u", &report_config_id);
@@ -178,7 +178,7 @@ Status ReportStore::WriteBulkMetadata(
   size_t num_reports = report_ids.size();
   CHECK_EQ(num_reports, metadata.size());
   std::vector<DataStore::Row> rows;
-  for (int i = 0; i < num_reports; i++) {
+  for (size_t i = 0; i < num_reports; i++) {
     rows.emplace_back(MakeDataStoreRow(report_ids[i], metadata[i]));
   }
 

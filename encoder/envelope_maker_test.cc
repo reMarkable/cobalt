@@ -138,9 +138,9 @@ class EnvelopeMakerTest : public ::testing::Test {
   // to use the UTC timezone.
   void AddStringObservation(std::string value, uint32_t metric_id,
                             uint32_t encoding_config_id,
-                            size_t expected_num_batches,
+                            int expected_num_batches,
                             size_t expected_this_batch_index,
-                            size_t expected_this_batch_size) {
+                            int expected_this_batch_size) {
     // Encode an Observation
     Encoder::Result result =
         encoder_.EncodeString(metric_id, encoding_config_id, value);
@@ -177,7 +177,7 @@ class EnvelopeMakerTest : public ::testing::Test {
     Observation recovered_observation;
     ASSERT_TRUE(recovered_observation.ParseFromString(serialized_observation));
     // Check that it looks right.
-    ASSERT_EQ(1, recovered_observation.parts().size());
+    ASSERT_EQ(1u, recovered_observation.parts().size());
     auto iter = recovered_observation.parts().find("Part1");
     ASSERT_TRUE(iter != recovered_observation.parts().cend());
     const auto& part = iter->second;

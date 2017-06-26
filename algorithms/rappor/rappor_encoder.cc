@@ -55,7 +55,7 @@ std::string DebugString(const ValuePart& value) {
 // p = prob_0_becomes_1
 // q = prob_1_stays_1
 void FlipBits(double p, double q, crypto::Random* random, std::string* data) {
-  for (int i = 0; i < data->size(); i++) {
+  for (size_t i = 0; i < data->size(); i++) {
     byte p_mask = random->RandomBits(p);
     byte q_mask = random->RandomBits(q);
     data->at(i) = (p_mask & ~data->at(i)) | (q_mask & data->at(i));
@@ -155,7 +155,7 @@ uint32_t RapporEncoder::AttemptDeriveCohortFromSecret(size_t attempt_number) {
 
   // Interpret the first two bytes of hashed_value as an unsigned integer
   // and mod by num_cohorts_2_power.
-  CHECK_GT(config_->num_cohorts_2_power(), 0);
+  CHECK_GT(config_->num_cohorts_2_power(), 0u);
   return *(reinterpret_cast<uint16_t*>(hashed_value)) %
          config_->num_cohorts_2_power();
 }
@@ -225,7 +225,7 @@ Status BasicRapporEncoder::Encode(const ValuePart& value,
     VLOG(3) << "client_secret is not valid";
     return kInvalidConfig;
   }
-  size_t bit_index = config_->bit_index(value);
+  auto bit_index = config_->bit_index(value);
   if (bit_index == -1) {
     VLOG(3) << "BasicRapporEncoder::Encode(): The given value was not one of "
             << "the categories: " << DebugString(value);

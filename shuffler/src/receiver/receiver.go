@@ -79,7 +79,7 @@ func (s *ShufflerServer) Process(ctx context.Context,
 		return nil, err
 	}
 	if len(envelope.GetBatch()) == 0 {
-			return nil, grpc.Errorf(codes.InvalidArgument, "Empty envelope.")
+		return nil, grpc.Errorf(codes.InvalidArgument, "Empty envelope.")
 	}
 
 	// TODO(ukode): Some notes here for future development:

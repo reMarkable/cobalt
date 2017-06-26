@@ -27,24 +27,24 @@ namespace rappor {
 using encoder::ClientSecret;
 
 TEST(RapporConfigValidatorTest, TestMinPower2Above) {
-  EXPECT_EQ(1, RapporConfigValidator::MinPower2Above(0));
-  EXPECT_EQ(1, RapporConfigValidator::MinPower2Above(1));
-  EXPECT_EQ(2, RapporConfigValidator::MinPower2Above(2));
-  EXPECT_EQ(4, RapporConfigValidator::MinPower2Above(3));
-  EXPECT_EQ(4, RapporConfigValidator::MinPower2Above(4));
-  EXPECT_EQ(8, RapporConfigValidator::MinPower2Above(5));
-  EXPECT_EQ(8, RapporConfigValidator::MinPower2Above(6));
-  EXPECT_EQ(8, RapporConfigValidator::MinPower2Above(7));
-  EXPECT_EQ(8, RapporConfigValidator::MinPower2Above(8));
-  EXPECT_EQ(16, RapporConfigValidator::MinPower2Above(9));
-  EXPECT_EQ(16, RapporConfigValidator::MinPower2Above(10));
-  EXPECT_EQ(16, RapporConfigValidator::MinPower2Above(11));
-  EXPECT_EQ(16, RapporConfigValidator::MinPower2Above(12));
-  EXPECT_EQ(16, RapporConfigValidator::MinPower2Above(13));
-  EXPECT_EQ(16, RapporConfigValidator::MinPower2Above(14));
-  EXPECT_EQ(16, RapporConfigValidator::MinPower2Above(15));
-  EXPECT_EQ(16, RapporConfigValidator::MinPower2Above(16));
-  EXPECT_EQ(32, RapporConfigValidator::MinPower2Above(17));
+  EXPECT_EQ(1u, RapporConfigValidator::MinPower2Above(0));
+  EXPECT_EQ(1u, RapporConfigValidator::MinPower2Above(1));
+  EXPECT_EQ(2u, RapporConfigValidator::MinPower2Above(2));
+  EXPECT_EQ(4u, RapporConfigValidator::MinPower2Above(3));
+  EXPECT_EQ(4u, RapporConfigValidator::MinPower2Above(4));
+  EXPECT_EQ(8u, RapporConfigValidator::MinPower2Above(5));
+  EXPECT_EQ(8u, RapporConfigValidator::MinPower2Above(6));
+  EXPECT_EQ(8u, RapporConfigValidator::MinPower2Above(7));
+  EXPECT_EQ(8u, RapporConfigValidator::MinPower2Above(8));
+  EXPECT_EQ(16u, RapporConfigValidator::MinPower2Above(9));
+  EXPECT_EQ(16u, RapporConfigValidator::MinPower2Above(10));
+  EXPECT_EQ(16u, RapporConfigValidator::MinPower2Above(11));
+  EXPECT_EQ(16u, RapporConfigValidator::MinPower2Above(12));
+  EXPECT_EQ(16u, RapporConfigValidator::MinPower2Above(13));
+  EXPECT_EQ(16u, RapporConfigValidator::MinPower2Above(14));
+  EXPECT_EQ(16u, RapporConfigValidator::MinPower2Above(15));
+  EXPECT_EQ(16u, RapporConfigValidator::MinPower2Above(16));
+  EXPECT_EQ(32u, RapporConfigValidator::MinPower2Above(17));
 }
 
 TEST(RapporConfigValidatorTest, TestConstructor) {
@@ -56,35 +56,35 @@ TEST(RapporConfigValidatorTest, TestConstructor) {
 
   config.set_num_cohorts(100);
   auto validator = RapporConfigValidator(config);
-  EXPECT_EQ(128, validator.num_cohorts_2_power());
+  EXPECT_EQ(128u, validator.num_cohorts_2_power());
 
   config.set_num_cohorts(200);
   validator = RapporConfigValidator(config);
-  EXPECT_EQ(256, validator.num_cohorts_2_power());
+  EXPECT_EQ(256u, validator.num_cohorts_2_power());
 
   config.set_num_cohorts(300);
   validator = RapporConfigValidator(config);
-  EXPECT_EQ(512, validator.num_cohorts_2_power());
+  EXPECT_EQ(512u, validator.num_cohorts_2_power());
 
   config.set_num_cohorts(400);
   validator = RapporConfigValidator(config);
-  EXPECT_EQ(512, validator.num_cohorts_2_power());
+  EXPECT_EQ(512u, validator.num_cohorts_2_power());
 
   config.set_num_cohorts(500);
   validator = RapporConfigValidator(config);
-  EXPECT_EQ(512, validator.num_cohorts_2_power());
+  EXPECT_EQ(512u, validator.num_cohorts_2_power());
 
   config.set_num_cohorts(600);
   validator = RapporConfigValidator(config);
-  EXPECT_EQ(1024, validator.num_cohorts_2_power());
+  EXPECT_EQ(1024u, validator.num_cohorts_2_power());
 
   config.set_num_cohorts(1023);
   validator = RapporConfigValidator(config);
-  EXPECT_EQ(1024, validator.num_cohorts_2_power());
+  EXPECT_EQ(1024u, validator.num_cohorts_2_power());
 
   config.set_num_cohorts(1024);
   validator = RapporConfigValidator(config);
-  EXPECT_EQ(1024, validator.num_cohorts_2_power());
+  EXPECT_EQ(1024u, validator.num_cohorts_2_power());
 }
 
 // Constructs a RapporEncoder with the given |config|, invokes

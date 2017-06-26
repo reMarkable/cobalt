@@ -38,7 +38,7 @@ FieldElement InterpolateConstant(
 
   // Start by computing to the product of the x_i.
   FieldElement product_of_xi(true);  // initialize to one
-  for (int i = 0; i < num_values; i++) {
+  for (size_t i = 0; i < num_values; i++) {
     product_of_xi*= *x_values[i];
   }
 
@@ -50,9 +50,9 @@ FieldElement InterpolateConstant(
   //
   //
   FieldElement sigma(false);  // initialize to zero
-  for (int i = 0; i < num_values; i++) {
+  for (size_t i = 0; i < num_values; i++) {
     FieldElement prod_delta_ji(true);  // initialize to one
-    for (int j = 0; j < num_values; j++) {
+    for (size_t j = 0; j < num_values; j++) {
       if (j == i) {
         continue;
       }

@@ -118,8 +118,8 @@ class BasicRapporAnalyzerTest : public ::testing::Test {
   }
 
   // Checks that analyzer_ has the expected number observations and errors.
-  void CheckState(int expected_num_observations,
-                  int expected_observation_errors) {
+  void CheckState(size_t expected_num_observations,
+                  size_t expected_observation_errors) {
     EXPECT_EQ(expected_num_observations, analyzer_->num_observations());
     EXPECT_EQ(expected_observation_errors, analyzer_->observation_errors());
   }

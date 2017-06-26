@@ -286,7 +286,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // and then GenerateReport. It checks the generated Report to make sure
   // it is correct given the Observations that were added and the Forculus
   // config.
-  void CheckForculusReport(const GeneratedReport& report, int variable_index) {
+  void CheckForculusReport(const GeneratedReport& report, uint variable_index) {
     EXPECT_EQ(HISTOGRAM, report.metadata.report_type());
     EXPECT_EQ(1, report.metadata.variable_indices_size());
     EXPECT_EQ(variable_index, report.metadata.variable_indices(0));
@@ -330,7 +330,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // all three strings appear with a non-zero count and under the correct
   // variable index.
   void CheckBasicRapporReport(const GeneratedReport& report,
-                              int variable_index) {
+                              uint variable_index) {
     EXPECT_EQ(HISTOGRAM, report.metadata.report_type());
     EXPECT_EQ(1, report.metadata.variable_indices_size());
     EXPECT_EQ(variable_index, report.metadata.variable_indices(0));

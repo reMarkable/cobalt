@@ -92,7 +92,7 @@ grpc::Status BuildVariableList(const ReportConfig& report_config,
                                std::vector<Variable>* variables) {
   CHECK(variables);
   variables->clear();
-  for (auto index : metadata.variable_indices()) {
+  for (int index : metadata.variable_indices()) {
     if (index > report_config.variable_size()) {
       std::ostringstream stream;
       stream << "Invalid arguments: metadata.variable_indices contains "

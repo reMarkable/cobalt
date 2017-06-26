@@ -56,16 +56,16 @@ class ObservationStoreAbstractTest : public ::testing::Test {
   }
 
   void AddObservationBatch(uint32_t metric_id, uint32_t day_index,
-                           int num_parts, size_t num_observations) {
+                           size_t num_parts, size_t num_observations) {
     ObservationMetadata metadata;
     metadata.set_customer_id(kCustomerId);
     metadata.set_project_id(kProjectId);
     metadata.set_metric_id(metric_id);
     metadata.set_day_index(day_index);
     std::vector<Observation> observations;
-    for (int i = 0; i < num_observations; i++) {
+    for (size_t i = 0; i < num_observations; i++) {
       Observation observation;
-      for (int part_index = 0; part_index < num_parts; part_index++) {
+      for (size_t part_index = 0; part_index < num_parts; part_index++) {
         std::string part_name = PartName(part_index);
         ObservationPart observation_part;
         switch (part_index % 3) {
@@ -90,7 +90,8 @@ class ObservationStoreAbstractTest : public ::testing::Test {
   }
 
   void AddObservations(uint32_t metric_id, uint32_t first_day_index,
-                       int32_t last_day_index, int num_per_day, int num_parts) {
+                       uint32_t last_day_index, int num_per_day,
+                       int num_parts) {
     for (uint32_t day_index = first_day_index; day_index <= last_day_index;
          day_index++) {
       AddObservationBatch(metric_id, day_index, num_parts, num_per_day);
@@ -127,12 +128,13 @@ class ObservationStoreAbstractTest : public ::testing::Test {
       size_t expected_num_results, size_t expected_num_results_per_day,
       size_t expected_num_parts, uint32_t expected_first_day_index) {
     EXPECT_EQ(expected_num_results, full_results.size());
-    int result_index = 0;
+    uint result_index = 0;
     uint32_t expected_day_index = expected_first_day_index;
     for (const auto& result : full_results) {
       EXPECT_EQ(expected_day_index, result.day_index);
       EXPECT_EQ(expected_num_parts, result.observation.parts().size());
-      for (int part_index = 0; part_index < expected_num_parts; part_index++) {
+      for (size_t part_index = 0; part_index < expected_num_parts;
+           part_index++) {
         std::string expected_part_name = PartName(part_index);
         switch (part_index % 3) {
           case 0:
@@ -382,7 +384,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   metric_id = 3;
   full_results = this->QueryFullResults(metric_id, 0, UINT32_MAX,
                                         requested_num_parts, 100);
-  EXPECT_EQ(0, full_results.size());
+  EXPECT_EQ(0u, full_results.size());
 
   /////////////////////////////////////////////////////////////////
   // Queries for metric 0
@@ -392,7 +394,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   metric_id = 0;
   full_results = this->QueryFullResults(metric_id, 0, UINT32_MAX,
                                         requested_num_parts, 100);
-  EXPECT_EQ(0, full_results.size());
+  EXPECT_EQ(0u, full_results.size());
 }
 
 TYPED_TEST_P(ObservationStoreAbstractTest, QueryWithInvalidArguments) {

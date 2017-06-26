@@ -71,7 +71,7 @@ ForculusObservation EncryptValue(const ValuePart& value) {
 TEST(ForculusDecrypterTest, TestSuccessfulDecryption) {
   const std::string plaintext("The woods are lovely, dark and deep.");
   ForculusDecrypter* decrypter = nullptr;
-  for (int i = 0; i < kThreshold; i++) {
+  for (size_t i = 0; i < kThreshold; i++) {
     auto observation = Encrypt(plaintext);
     if (!decrypter) {
       decrypter = new ForculusDecrypter(kThreshold, observation.ciphertext());
@@ -90,7 +90,7 @@ TEST(ForculusDecrypterTest, TestSuccessfulDecryption) {
 // TestValueDecryption below.
 void DoDecryptValueTest(const ValuePart& value) {
   ForculusDecrypter* decrypter = nullptr;
-  for (int i = 0; i < kThreshold; i++) {
+  for (size_t i = 0; i < kThreshold; i++) {
     auto observation = EncryptValue(value);
     if (!decrypter) {
       decrypter = new ForculusDecrypter(kThreshold, observation.ciphertext());
@@ -161,7 +161,7 @@ TEST(ForculusDecrypterTest, TestErrors) {
   // second time.
   EXPECT_EQ(ForculusDecrypter::kOK, decrypter.AddObservation(obs1));
   EXPECT_EQ(ForculusDecrypter::kOK, decrypter.AddObservation(obs1));
-  EXPECT_EQ(1, decrypter.size());
+  EXPECT_EQ(1u, decrypter.size());
 
   // Trying to add Obervation 2 will yield kInconsistentPoints.
   EXPECT_EQ(ForculusDecrypter::kInconsistentPoints,
@@ -182,7 +182,7 @@ TEST(ForculusDecrypterTest, TestErrors) {
   obs2.set_ciphertext("A ciphertext");
   obs2.set_point_x("23456");
   EXPECT_EQ(ForculusDecrypter::kOK, decrypter.AddObservation(obs2));
-  EXPECT_EQ(2, decrypter.size());
+  EXPECT_EQ(2u, decrypter.size());
 
   // Still not enough points.
   EXPECT_EQ(ForculusDecrypter::kNotEnoughPoints, decrypter.Decrypt(&plaintext));
@@ -191,7 +191,7 @@ TEST(ForculusDecrypterTest, TestErrors) {
   obs2.set_ciphertext("A ciphertext");
   obs2.set_point_x("45678");
   EXPECT_EQ(ForculusDecrypter::kOK, decrypter.AddObservation(obs2));
-  EXPECT_EQ(3, decrypter.size());
+  EXPECT_EQ(3u, decrypter.size());
 
   // Now there are enough points to try to decrypt but the decryption will
   // fail because the ciphertext is not a real ciphertext.

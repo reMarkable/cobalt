@@ -51,7 +51,7 @@ std::string BuildBinaryString(size_t num_bits,
 
 std::string BinaryStringToData(const std::string& binary_string) {
   size_t num_bits = binary_string.size();
-  EXPECT_EQ(0, num_bits % 8);
+  EXPECT_EQ(0u, num_bits % 8);
   size_t num_bytes = num_bits / 8;
   std::string result(num_bytes, static_cast<char>(0));
   size_t byte_index = 0;

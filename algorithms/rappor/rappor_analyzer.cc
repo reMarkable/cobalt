@@ -85,7 +85,7 @@ grpc::Status RapporAnalyzer::BuildCandidateMap() {
     CohortMap& cohort_map = candidate_map_.candidate_cohort_maps.back();
 
     // Iterate through the cohorts.
-    for (auto cohort = 0; cohort < num_cohorts; cohort++) {
+    for (size_t cohort = 0; cohort < num_cohorts; cohort++) {
       // Append an instance of |Hashes| for this cohort.
       cohort_map.cohort_hashes.emplace_back();
       Hashes& hashes = cohort_map.cohort_hashes.back();

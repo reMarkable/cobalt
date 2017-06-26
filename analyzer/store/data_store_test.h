@@ -59,7 +59,7 @@ class DataStoreTest : public ::testing::Test {
 
   void SetUp() {
     EXPECT_EQ(kOK, data_store_->DeleteAllRows(DataStore::kObservations));
-    EXPECT_EQ(0, GetNumRows());
+    EXPECT_EQ(0u, GetNumRows());
   }
 
   // Adds |num_rows| rows with kNumColumns columns each.
@@ -86,7 +86,7 @@ class DataStoreTest : public ::testing::Test {
   //
   // Set limit_row = -1 to indicate an unbounded range.
   void ReadRowsAndCheck(int num_columns, int start_row, bool inclusive,
-                        int limit_row, int max_rows, int expected_num_rows,
+                        int limit_row, int max_rows, size_t expected_num_rows,
                         bool expect_more_available);
 
   void DeleteRowsWithPrefix(int basis, int suffix_length);
@@ -127,7 +127,7 @@ class DataStoreTest : public ::testing::Test {
   // Makes a vector of column name strings for |num_columns| columns.
   static std::vector<std::string> MakeColumnNames(size_t num_columns) {
     std::vector<std::string> column_names;
-    for (int column_index = 0; column_index < num_columns; column_index++) {
+    for (size_t column_index = 0; column_index < num_columns; column_index++) {
       column_names.push_back(ColumnNameString(column_index));
     }
     return column_names;
@@ -191,7 +191,7 @@ void DataStoreTest<StoreFactoryClass>::ReadSingleRowAndCheck(
 template <class StoreFactoryClass>
 void DataStoreTest<StoreFactoryClass>::ReadRowsAndCheck(
     int num_columns, int start_row, bool inclusive, int limit_row, int max_rows,
-    int expected_num_rows, bool expect_more_available) {
+    size_t expected_num_rows, bool expect_more_available) {
   std::vector<std::string> column_names = MakeColumnNames(num_columns);
 
   std::string limit_row_key;
@@ -206,12 +206,12 @@ void DataStoreTest<StoreFactoryClass>::ReadRowsAndCheck(
 
   EXPECT_EQ(kOK, read_response.status);
   EXPECT_EQ(expected_num_rows, read_response.rows.size());
-  int expected_num_columns = (num_columns == 0 ? kNumColumns : num_columns);
+  size_t expected_num_columns = (num_columns == 0 ? kNumColumns : num_columns);
   int row_index = (inclusive ? start_row : start_row + 1);
   for (const DataStore::Row& row : read_response.rows) {
     EXPECT_EQ(RowKeyString(test_prefix_, row_index), row.key);
     EXPECT_EQ(expected_num_columns, row.column_values.size());
-    for (int column_index = 0; column_index < expected_num_columns;
+    for (size_t column_index = 0; column_index < expected_num_columns;
          column_index++) {
       EXPECT_EQ(ValueString(row_index, column_index),
                 row.column_values.at(ColumnNameString(column_index)));
@@ -308,7 +308,7 @@ TYPED_TEST_P(DataStoreTest, UnboundedRange) {
   this->set_test_prefix("UnboundedRange");
   // Add 1000 rows of 3 columns each.
   this->AddRows(1000);
-  ASSERT_EQ(1000, this->GetNumRows());
+  ASSERT_EQ(1000u, this->GetNumRows());
 
   // Read rows [100, infinity) with max_rows = 50. Expect 50 rows with more
   // available.
@@ -372,7 +372,7 @@ TYPED_TEST_P(DataStoreTest, ReadDifferentNumColumns) {
   this->set_test_prefix("ReadDifferentNumColumns");
   // Add 10 rows of 3 columns each.
   this->AddRows(10);
-  ASSERT_EQ(10, this->GetNumRows());
+  ASSERT_EQ(10u, this->GetNumRows());
 
   // Read rows [3, 6). Expect 3 rows with no more available.
   size_t max_rows = UINT32_MAX;
@@ -395,42 +395,42 @@ TYPED_TEST_P(DataStoreTest, ReadDifferentNumColumns) {
 TYPED_TEST_P(DataStoreTest, DeleteRanges) {
   this->set_test_prefix("DeleteRanges");
   // Initially there should be no rows.
-  ASSERT_EQ(0, this->GetNumRows());
+  ASSERT_EQ(0u, this->GetNumRows());
 
   // Add 3000 rows.
   this->AddRows(3000);
   // Now there should be 3000 rows.
-  ASSERT_EQ(3000, this->GetNumRows());
+  ASSERT_EQ(3000u, this->GetNumRows());
 
   // Delete 10^0 rows starting with row 100.
   // i.e. delete row 100
   this->DeleteRowsWithPrefix(100, 0);
-  ASSERT_EQ(2999, this->GetNumRows());
+  ASSERT_EQ(2999u, this->GetNumRows());
 
   // Delete 10^1 rows starting with row 200.
   // i.e. delete rows [200, 209]
   this->DeleteRowsWithPrefix(200, 1);
-  ASSERT_EQ(2989, this->GetNumRows());
+  ASSERT_EQ(2989u, this->GetNumRows());
 
   // Delete 10^2 rows starting with row 300.
   // i.e. delete rows [300, 399]
   this->DeleteRowsWithPrefix(300, 2);
-  ASSERT_EQ(2889, this->GetNumRows());
+  ASSERT_EQ(2889u, this->GetNumRows());
 
   // Delete 10^3 rows starting with row 0.
   // i.e. delete rows [0, 999]
   this->DeleteRowsWithPrefix(0, 3);
-  ASSERT_EQ(2000, this->GetNumRows());
+  ASSERT_EQ(2000u, this->GetNumRows());
 
   // Delete 10^3 rows starting with row 1000.
   // i.e. delete rows [1000, 1999]
   this->DeleteRowsWithPrefix(1000, 3);
-  ASSERT_EQ(1000, this->GetNumRows());
+  ASSERT_EQ(1000u, this->GetNumRows());
 
   // Delete 10^4 rows starting with row 0.
   // i.e. delete rows [0, 9999]
   this->DeleteRowsWithPrefix(0, 4);
-  ASSERT_EQ(0, this->GetNumRows());
+  ASSERT_EQ(0u, this->GetNumRows());
 }
 
 REGISTER_TYPED_TEST_CASE_P(DataStoreTest, WriteAndReadRows, UnboundedRange,

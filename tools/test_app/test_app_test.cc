@@ -223,7 +223,7 @@ class TestAppTest : public ::testing::Test {
   // Does the current contents of the TestApp's output stream contain the
   // given text.
   bool OutputContains(const std::string text) {
-    return -1 != output_stream_.str().find(text);
+    return std::string::npos != output_stream_.str().find(text);
   }
 
   // Is the TestApp's output stream curently empty?
@@ -443,14 +443,14 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSend) {
   const ObservationBatch& batch = envelope.batch(0);
   EXPECT_EQ(39, batch.encrypted_observation_size());
   // The metric ID should be the default value of 1.
-  EXPECT_EQ(1, batch.meta_data().metric_id());
+  EXPECT_EQ(1u, batch.meta_data().metric_id());
   // All of the Observations should have a single part named "url" that has an
   // encoding config ID of the default value of 1.
   for (const auto& encrypted_message : batch.encrypted_observation()) {
     auto observation = ParseUnencryptedObservation(encrypted_message);
     EXPECT_EQ(1, observation.parts_size());
     auto part = observation.parts().at("url");
-    EXPECT_EQ(1, part.encoding_config_id());
+    EXPECT_EQ(1u, part.encoding_config_id());
   }
 
   // Switch to metric 2 encoding 2 which is Basic RAPPOR with
@@ -474,14 +474,14 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSend) {
   const ObservationBatch& batch2 = envelope.batch(0);
   EXPECT_EQ(300, batch2.encrypted_observation_size());
   // The metric ID should be 2.
-  EXPECT_EQ(2, batch2.meta_data().metric_id());
+  EXPECT_EQ(2u, batch2.meta_data().metric_id());
   // All of the Observations should have a single part named "hour" that has an
   // encoding config ID of 2
   for (const auto& encrypted_message : batch2.encrypted_observation()) {
     auto observation = ParseUnencryptedObservation(encrypted_message);
     EXPECT_EQ(1, observation.parts_size());
     auto part = observation.parts().at("hour");
-    EXPECT_EQ(2, part.encoding_config_id());
+    EXPECT_EQ(2u, part.encoding_config_id());
   }
 }
 
@@ -500,14 +500,14 @@ TEST_F(TestAppTest, ProcessCommandLineMultiEncodeAndSend) {
   const ObservationBatch& batch = envelope.batch(0);
   EXPECT_EQ(39, batch.encrypted_observation_size());
   // The metric ID should be the default value of 1.
-  EXPECT_EQ(1, batch.meta_data().metric_id());
+  EXPECT_EQ(1u, batch.meta_data().metric_id());
   // All of the Observations should have a single part named "url" that has an
   // encoding config ID of the default value of 1.
   for (const auto& encrypted_message : batch.encrypted_observation()) {
     auto observation = ParseUnencryptedObservation(encrypted_message);
     EXPECT_EQ(1, observation.parts_size());
     auto part = observation.parts().at("url");
-    EXPECT_EQ(1, part.encoding_config_id());
+    EXPECT_EQ(1u, part.encoding_config_id());
   }
 
   // Switch to metric 3 which is fruit rating.
@@ -532,15 +532,15 @@ TEST_F(TestAppTest, ProcessCommandLineMultiEncodeAndSend) {
   const ObservationBatch& batch2 = envelope.batch(0);
   EXPECT_EQ(300, batch2.encrypted_observation_size());
   // The metric ID should be 3.
-  EXPECT_EQ(3, batch2.meta_data().metric_id());
+  EXPECT_EQ(3u, batch2.meta_data().metric_id());
   // All of the Observations should have two parts named fruit and rating.
   for (const auto& encrypted_message : batch2.encrypted_observation()) {
     auto observation = ParseUnencryptedObservation(encrypted_message);
     EXPECT_EQ(2, observation.parts_size());
     auto fruit_part = observation.parts().at("fruit");
     auto rating_part = observation.parts().at("rating");
-    EXPECT_EQ(3, fruit_part.encoding_config_id());
-    EXPECT_EQ(4, rating_part.encoding_config_id());
+    EXPECT_EQ(3u, fruit_part.encoding_config_id());
+    EXPECT_EQ(4u, rating_part.encoding_config_id());
   }
 }
 
@@ -576,28 +576,28 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSendMulti) {
   const ObservationBatch& batch = envelope.batch(0);
   EXPECT_EQ(39, batch.encrypted_observation_size());
   // The metric ID should be the default value of 1.
-  EXPECT_EQ(1, batch.meta_data().metric_id());
+  EXPECT_EQ(1u, batch.meta_data().metric_id());
   // All of the Observations should have a single part named "url" that has an
   // encoding config ID of the default value of 1.
   for (const auto& encrypted_message : batch.encrypted_observation()) {
     auto observation = ParseUnencryptedObservation(encrypted_message);
     EXPECT_EQ(1, observation.parts_size());
     auto part = observation.parts().at("url");
-    EXPECT_EQ(1, part.encoding_config_id());
+    EXPECT_EQ(1u, part.encoding_config_id());
   }
 
   // The second batch should contain 300 messages.
   const ObservationBatch& batch2 = envelope.batch(1);
   EXPECT_EQ(300, batch2.encrypted_observation_size());
   // The metric ID should be 2.
-  EXPECT_EQ(2, batch2.meta_data().metric_id());
+  EXPECT_EQ(2u, batch2.meta_data().metric_id());
   // All of the Observations should have a single part named "hour" that has an
   // encoding config ID of 2
   for (const auto& encrypted_message : batch2.encrypted_observation()) {
     auto observation = ParseUnencryptedObservation(encrypted_message);
     EXPECT_EQ(1, observation.parts_size());
     auto part = observation.parts().at("hour");
-    EXPECT_EQ(2, part.encoding_config_id());
+    EXPECT_EQ(2u, part.encoding_config_id());
   }
 }
 
@@ -629,15 +629,15 @@ TEST_F(TestAppTest, RunSendAndQuit) {
   const ObservationBatch& batch = envelope.batch(0);
   EXPECT_EQ(31, batch.encrypted_observation_size());
   // The metric ID should be 3.
-  EXPECT_EQ(3, batch.meta_data().metric_id());
+  EXPECT_EQ(3u, batch.meta_data().metric_id());
   // All of the Observations should have two parts named fruit and rating.
   for (const auto& encrypted_message : batch.encrypted_observation()) {
     auto observation = ParseUnencryptedObservation(encrypted_message);
     EXPECT_EQ(2, observation.parts_size());
     auto fruit_part = observation.parts().at("fruit");
     auto rating_part = observation.parts().at("rating");
-    EXPECT_EQ(3, fruit_part.encoding_config_id());
-    EXPECT_EQ(4, rating_part.encoding_config_id());
+    EXPECT_EQ(3u, fruit_part.encoding_config_id());
+    EXPECT_EQ(4u, rating_part.encoding_config_id());
   }
 }
 

@@ -68,7 +68,7 @@ uint32_t DayIndexFromRowKey(const std::string& row_key) {
   uint32_t day_index = 0;
   // Parse the string produced by the RowKey() function above. We skip three
   // ten-digit integers and three colons and then parse 10 digits.
-  CHECK_GT(row_key.size(), 33);
+  CHECK_GT(row_key.size(), 33u);
   std::sscanf(&row_key[33], "%10u", &day_index);
   return day_index;
 }

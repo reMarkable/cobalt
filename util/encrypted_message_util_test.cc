@@ -47,7 +47,7 @@ TEST(EncryptedMessageUtilTest, NoEncryption) {
   // Decrypt and check.
   observation.Clear();
   EXPECT_TRUE(decrypter.DecryptMessage(encrypted_message, &observation));
-  EXPECT_EQ(1, observation.parts().count("hello"));
+  EXPECT_EQ(1u, observation.parts().count("hello"));
 }
 
 // Tests the use of bad encryption keys
@@ -77,14 +77,14 @@ TEST(EncryptedMessageUtilTest, HybridEncryption) {
   // Encrypt the dummy observation.
   EncryptedMessage encrypted_message;
   ASSERT_TRUE(maker.Encrypt(observation, &encrypted_message));
-  EXPECT_EQ(32, encrypted_message.public_key_fingerprint().size());
+  EXPECT_EQ(32u, encrypted_message.public_key_fingerprint().size());
 
   // Make a MessageDecrypter.
   MessageDecrypter decrypter(private_key);
   // Decrypt and check.
   observation.Clear();
   ASSERT_TRUE(decrypter.DecryptMessage(encrypted_message, &observation));
-  EXPECT_EQ(1, observation.parts().count("hello"));
+  EXPECT_EQ(1u, observation.parts().count("hello"));
 
   // Make a MessageDecrypter that uses a bad private key.
   MessageDecrypter bad_decrypter("dummy_key");
@@ -122,7 +122,7 @@ TEST(EncryptedMessageUtilTest, Crazy) {
   // Decrypt and check.
   observation.Clear();
   EXPECT_TRUE(real_decrypter.DecryptMessage(encrypted_message, &observation));
-  EXPECT_EQ(1, observation.parts().count("hello"));
+  EXPECT_EQ(1u, observation.parts().count("hello"));
 
   // Make a MessageDecrypter that incorrectly uses the public key
   MessageDecrypter bad_decrypter(public_key);
