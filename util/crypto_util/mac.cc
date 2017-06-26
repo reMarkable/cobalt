@@ -14,8 +14,8 @@
 
 #include "util/crypto_util/mac.h"
 
-#include "third_party/boringssl/src/include/openssl/digest.h"
-#include "third_party/boringssl/src/include/openssl/hmac.h"
+#include "third_party/boringssl/include/openssl/digest.h"
+#include "third_party/boringssl/include/openssl/hmac.h"
 
 namespace cobalt {
 

@@ -19,16 +19,16 @@
 #include <string>
 #include <vector>
 
-#include "third_party/boringssl/src/include/openssl/aead.h"
-#include "third_party/boringssl/src/include/openssl/bio.h"
-#include "third_party/boringssl/src/include/openssl/bn.h"
-#include "third_party/boringssl/src/include/openssl/digest.h"
-#include "third_party/boringssl/src/include/openssl/ec.h"
-#include "third_party/boringssl/src/include/openssl/ecdh.h"
-#include "third_party/boringssl/src/include/openssl/evp.h"
-#include "third_party/boringssl/src/include/openssl/hkdf.h"
-#include "third_party/boringssl/src/include/openssl/pem.h"
-#include "third_party/boringssl/src/include/openssl/sha.h"
+#include "third_party/boringssl/include/openssl/aead.h"
+#include "third_party/boringssl/include/openssl/bio.h"
+#include "third_party/boringssl/include/openssl/bn.h"
+#include "third_party/boringssl/include/openssl/digest.h"
+#include "third_party/boringssl/include/openssl/ec.h"
+#include "third_party/boringssl/include/openssl/ecdh.h"
+#include "third_party/boringssl/include/openssl/evp.h"
+#include "third_party/boringssl/include/openssl/hkdf.h"
+#include "third_party/boringssl/include/openssl/pem.h"
+#include "third_party/boringssl/include/openssl/sha.h"
 #include "util/crypto_util/errors.h"
 #include "util/crypto_util/random.h"
 
@@ -38,7 +38,7 @@ namespace crypto {
 
 namespace {
 // Note(pseudorandom) Curve constants are defined in
-// third_party/boringssl/src/include/openssl/nid.h. NID_X9_62_prime256v1
+// third_party/boringssl/include/openssl/nid.h. NID_X9_62_prime256v1
 // refers to the NIST p256 curve (secp256r1 or P-256 defined in FIPS 186-4
 // here http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf)
 #define EC_CURVE_CONSTANT NID_X9_62_prime256v1

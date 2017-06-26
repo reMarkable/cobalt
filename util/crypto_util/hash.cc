@@ -14,7 +14,7 @@
 
 #include "util/crypto_util/hash.h"
 
-#include "third_party/boringssl/src/include/openssl/sha.h"
+#include "third_party/boringssl/include/openssl/sha.h"
 
 namespace cobalt {
 

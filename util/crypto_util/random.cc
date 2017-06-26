@@ -15,7 +15,7 @@
 #include <cmath>
 
 #include "util/crypto_util/random.h"
-#include "third_party/boringssl/src/include/openssl/rand.h"
+#include "third_party/boringssl/include/openssl/rand.h"
 
 namespace cobalt {
 namespace crypto {
