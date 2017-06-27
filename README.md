@@ -31,7 +31,7 @@ one-time setup.)
 
 ## Run the Tests
   * `cobaltb.py test` This runs the whole suite of tests finally running the
-  the end-to-end test
+  the end-to-end test.
   * It is possible to run subsets of the tests by passing the `--tests=`
   argument.
   * See `cobaltb.py test -h`
