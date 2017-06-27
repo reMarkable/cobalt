@@ -129,7 +129,7 @@ Analyzer
   * `encode 100 www.CCCC`
   * `send`
   * See that the Shuffler says it received another batch of Observations and
-  that it has now forwarded all of the Observations to the Analyzer
+  that it has now forwarded all of the Observations to the Analyzer.
   * See that the Analyzer says it has received the Observations
 
 * Use the observation_querier to inspect the state of the Observation store.
