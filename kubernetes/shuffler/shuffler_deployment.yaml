@@ -54,6 +54,7 @@ spec:
           # This path must match mountPath for shuffler-persistent-storage
           # below.
           - '/var/lib/cobalt/db'
+          - '-use_memstore=$$SHUFFLER_USE_MEMSTORE$$'
           - '-private_key_pem_file'
           # The directory path must match mountPath for shuffler-key-storage
           # below.
