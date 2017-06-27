@@ -71,7 +71,7 @@ class ClientSecret {
   // This method is not thread safe.
   std::string GetToken();
 
-  const byte* const data() const { return bytes_.data(); }
+  const byte* data() const { return bytes_.data(); }
 
   static const size_t kNumSecretBytes = 16;
 

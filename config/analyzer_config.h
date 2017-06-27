@@ -45,22 +45,21 @@ class AnalyzerConfig {
   // Returns the EncodingConfig with the given ID triple, or nullptr if there is
   // no such EncodingConfig. The caller does not take ownership of the returned
   // pointer.
-  const EncodingConfig* const EncodingConfig(uint32_t customer_id,
-                                             uint32_t project_id,
-                                             uint32_t encoding_config_id);
+  const EncodingConfig* EncodingConfig(uint32_t customer_id,
+                                       uint32_t project_id,
+                                       uint32_t encoding_config_id);
 
   // Returns the Metric with the given ID triple, or nullptr if there is
   // no such Metric. The caller does not take ownership of the returned
   // pointer.
-  const Metric* const Metric(uint32_t customer_id, uint32_t project_id,
-                             uint32_t metric_id);
+  const Metric* Metric(uint32_t customer_id, uint32_t project_id,
+                       uint32_t metric_id);
 
   // Returns the ReportConfig with the given ID triple, or nullptr if there is
   // no such ReportConfig. The caller does not take ownership of the returned
   // pointer.
-  const ReportConfig* const ReportConfig(uint32_t customer_id,
-                                         uint32_t project_id,
-                                         uint32_t report_config_id);
+  const ReportConfig* ReportConfig(uint32_t customer_id, uint32_t project_id,
+                                   uint32_t report_config_id);
 
  private:
   std::shared_ptr<config::EncodingRegistry> encoding_configs_;

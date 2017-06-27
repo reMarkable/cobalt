@@ -28,7 +28,7 @@ add_definitions(-DHAVE_GLOG=1)
 
 project(cobalt)
 
-SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wsign-compare -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
+SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wsign-compare -Wignored-qualifiers -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")
 
 enable_language(C)
 enable_language(CXX)
@@ -115,7 +115,7 @@ add_subdirectory(tools)
 add_subdirectory(util)
 
 # Turn off extra warnings on third_party code we don't control.
-add_compile_options(-Wno-sign-compare)
+add_compile_options(-Wno-sign-compare -Wno-ignored-qualifiers)
 add_subdirectory(third_party/boringssl)
 add_subdirectory(third_party/googletest)
 
