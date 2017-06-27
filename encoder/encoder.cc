@@ -14,11 +14,10 @@
 
 #include "encoder/encoder.h"
 
-#include <glog/logging.h>
-
 #include <ctime>
 #include <utility>
 
+#include "./logging.h"
 #include "algorithms/forculus/forculus_encrypter.h"
 #include "algorithms/rappor/rappor_encoder.h"
 #include "config/encodings.pb.h"

@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "./encrypted_message.pb.h"
-#include "glog/logging.h"
+#include "./logging.h"
 #include "google/protobuf/message_lite.h"
 #include "util/crypto_util/cipher.h"
 

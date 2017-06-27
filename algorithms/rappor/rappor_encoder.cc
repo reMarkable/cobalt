@@ -14,12 +14,11 @@
 
 #include "algorithms/rappor/rappor_encoder.h"
 
-#include <glog/logging.h>
-
 #include <cstring>
 #include <map>
 #include <vector>
 
+#include "./logging.h"
 #include "util/crypto_util/hash.h"
 #include "util/crypto_util/mac.h"
 #include "util/crypto_util/random.h"

@@ -22,6 +22,10 @@ cmake_minimum_required (VERSION 2.8.10)
 SET (CMAKE_C_COMPILER "clang")
 SET (CMAKE_CXX_COMPILER "clang++")
 
+# Tell the file logging.h that we want to use Google's GLog library for
+# logging.
+add_definitions(-DHAVE_GLOG=1)
+
 project(cobalt)
 
 SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wsign-compare -std=c++11 -stdlib=libstdc++ -fcolor-diagnostics")

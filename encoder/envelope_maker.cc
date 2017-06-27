@@ -14,9 +14,9 @@
 
 #include "encoder/envelope_maker.h"
 
-#include <glog/logging.h>
-
 #include <utility>
+
+#include "./logging.h"
 
 namespace cobalt {
 namespace encoder {

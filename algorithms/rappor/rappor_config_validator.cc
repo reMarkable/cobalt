@@ -14,11 +14,11 @@
 
 #include "algorithms/rappor/rappor_config_validator.h"
 
-#include <glog/logging.h>
 
 #include <string>
 #include <vector>
 
+#include "./logging.h"
 #include "./observation.pb.h"
 #include "util/crypto_util/hash.h"
 
