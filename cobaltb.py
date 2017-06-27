@@ -364,7 +364,8 @@ def _deploy_authenticate(args):
 
 def _deploy_build(args):
   container_util.build_all_docker_images(
-      shuffler_config_file=args.shuffler_config_file)
+      shuffler_config_file=args.shuffler_config_file,
+      cobalt_config_dir=args.cobalt_config_dir)
 
 def _deploy_push(args):
   if args.job == 'shuffler':
@@ -829,6 +830,10 @@ def main():
       help='Path to the Shuffler configuration file. '
            'Default=%s' % SHUFFLER_DEMO_CONFIG_FILE,
       default=SHUFFLER_DEMO_CONFIG_FILE)
+  sub_parser.add_argument('--cobalt_config_dir',
+      help='Path of directory containing Cobalt configuration files. '
+           'Default=%s' % DEMO_CONFIG_DIR,
+      default=DEMO_CONFIG_DIR)
 
   sub_parser = deploy_subparsers.add_parser('push',
       parents=[parent_parser], help='Push a Docker image to the Google'

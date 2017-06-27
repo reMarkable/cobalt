@@ -103,11 +103,11 @@ COBALT_COMMON_SO_FILES = [os.path.join(SYS_ROOT_DIR, 'lib', f) for f in
 
 ROOTS_PEM = os.path.join(SYS_ROOT_DIR, 'share', 'grpc', 'roots.pem')
 
-ANALYZER_CONFIG_FILES = [os.path.join(DEMO_CONFIG_DIR, f) for f in
-    ["registered_encodings.txt",
-     "registered_metrics.txt",
-     "registered_reports.txt"
-    ]]
+ANALYZER_CONFIG_FILE_NAMES = [
+    "registered_encodings.txt",
+    "registered_metrics.txt",
+    "registered_reports.txt"
+]
 
 ANALYZER_PRIVATE_KEY_SECRET_NAME = "analyzer-private-key"
 SHUFFLER_PRIVATE_KEY_SECRET_NAME = "shuffler-private-key"
@@ -128,6 +128,10 @@ def _set_contents_of_dir(dir_name, files_to_copy):
   for f in files_to_copy:
     shutil.copy(f, dir_name)
 
+def _build_analyzer_config_file_list(cobalt_config_dir):
+  return [os.path.join(cobalt_config_dir, f) for f in
+          ANALYZER_CONFIG_FILE_NAMES]
+
 def _build_cobalt_common_deploy_dir():
   files_to_copy = [COBALT_COMMON_DOCKER_FILE, ROOTS_PEM] +  \
                   COBALT_COMMON_SO_FILES
@@ -137,9 +141,9 @@ def _build_analyzer_service_deploy_dir():
   files_to_copy = [ANALYZER_SERVICE_DOCKER_FILE, ANALYZER_SERVICE_PATH]
   _set_contents_of_dir(ANALYZER_SERVICE_DOCKER_BUILD_DIR, files_to_copy)
 
-def _build_report_master_deploy_dir():
+def _build_report_master_deploy_dir(cobalt_config_dir):
   files_to_copy = [REPORT_MASTER_DOCKER_FILE, REPORT_MASTER_PATH] + \
-                   ANALYZER_CONFIG_FILES
+      _build_analyzer_config_file_list(cobalt_config_dir)
   _set_contents_of_dir(REPORT_MASTER_DOCKER_BUILD_DIR, files_to_copy)
 
 def _build_shuffler_deploy_dir(config_file):
@@ -153,7 +157,8 @@ def _build_docker_image(image_name, deploy_dir, extra_args=None):
   cmd = cmd + ["-t", image_name, deploy_dir]
   subprocess.check_call(cmd)
 
-def build_all_docker_images(shuffler_config_file=SHUFFLER_CONFIG_FILE):
+def build_all_docker_images(shuffler_config_file=SHUFFLER_CONFIG_FILE,
+      cobalt_config_dir=DEMO_CONFIG_DIR):
   _build_cobalt_common_deploy_dir()
   _build_docker_image(COBALT_COMMON_IMAGE_NAME,
                       COBALT_COMMON_DOCKER_BUILD_DIR)
@@ -162,7 +167,7 @@ def build_all_docker_images(shuffler_config_file=SHUFFLER_CONFIG_FILE):
   _build_docker_image(ANALYZER_SERVICE_IMAGE_NAME,
                       ANALYZER_SERVICE_DOCKER_BUILD_DIR)
 
-  _build_report_master_deploy_dir()
+  _build_report_master_deploy_dir(cobalt_config_dir)
   _build_docker_image(REPORT_MASTER_IMAGE_NAME,
                       REPORT_MASTER_DOCKER_BUILD_DIR)
 
