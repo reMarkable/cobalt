@@ -1,0 +1,27 @@
+# Copyright 2017 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+static_library("forculus_encoder") {
+  sources = [
+    "field_element.cc",
+    "field_element.h",
+    "forculus_encrypter.cc",
+    "forculus_encrypter.h",
+    "forculus_utils.cc",
+    "forculus_utils.h",
+    "polynomial_computations.cc",
+    "polynomial_computations.h"
+  ]
+  configs += [
+    "//cobalt:cobalt_config",
+  ]
+
+  public_deps = [
+    "//cobalt:cobalt_proto",
+    "//cobalt/config:cobalt_config_proto",
+    "//cobalt/encoder:client_secret",
+    "//cobalt/util:datetime_util",
+    "//cobalt/util/crypto_util"
+  ]
+}

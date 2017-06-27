@@ -1,0 +1,48 @@
+# Copyright 2017 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//third_party/protobuf/proto_library.gni")
+
+static_library("encoder") {
+  sources = [
+    "encoder.cc",
+    "encoder.h",
+    "envelope_maker.cc",
+    "envelope_maker.h",
+    "project_context.h",
+    "shuffler_client.cc",
+    "shuffler_client.h"
+  ]
+  public_configs = [
+    "//cobalt:cobalt_config",
+  ]
+
+  deps = [
+    "//cobalt/algorithms/forculus:forculus_encoder",
+    "//cobalt/algorithms/rappor:rappor_encoder",
+  ]
+
+  public_deps = [
+    ":client_secret",
+    "//cobalt:cobalt_proto",
+    "//cobalt/config:cobalt_config_proto",
+    "//cobalt/shuffler:shuffler_service",
+    "//cobalt/util:encrypted_message_util",
+    "//third_party/grpc:grpc++",
+  ]
+}
+
+static_library("client_secret") {
+  sources = [
+    "client_secret.cc",
+    "client_secret.h",
+  ]
+  configs += [
+    "//cobalt:cobalt_config",
+  ]
+
+  deps = [
+    "//cobalt/util/crypto_util"
+  ]
+}

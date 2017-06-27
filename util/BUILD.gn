@@ -1,0 +1,44 @@
+# Copyright 2017 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+static_library("encrypted_message_util") {
+  sources = [
+    "encrypted_message_util.cc",
+    "encrypted_message_util.h"
+  ]
+  configs += [
+    "//cobalt:cobalt_config",
+  ]
+
+  deps = [
+    "//cobalt:cobalt_proto",
+  ]
+}
+
+static_library("datetime_util") {
+  sources = [
+    "datetime_util.cc",
+    "datetime_util.h"
+  ]
+  configs += [
+    "//cobalt:cobalt_config",
+  ]
+  deps = [
+    "//cobalt/config:cobalt_config_proto"
+  ]
+}
+
+static_library("pem_util") {
+  sources = [
+    "pem_util.cc",
+    "pem_util.h"
+  ]
+  configs += [
+    "//cobalt:cobalt_config",
+  ]
+  deps = [
+    "//cobalt/util/crypto_util"
+  ]
+}
+

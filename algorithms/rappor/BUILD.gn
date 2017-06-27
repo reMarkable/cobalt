@@ -1,0 +1,21 @@
+# Copyright 2017 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+static_library("rappor_encoder") {
+  sources = [
+    "rappor_config_validator.cc",
+    "rappor_config_validator.h",
+    "rappor_encoder.cc",
+    "rappor_encoder.h"
+  ]
+  configs += [
+    "//cobalt:cobalt_config",
+  ]
+
+  public_deps = [
+    "//cobalt:cobalt_proto",
+    "//cobalt/encoder:client_secret",
+    "//cobalt/util/crypto_util"
+  ]
+}

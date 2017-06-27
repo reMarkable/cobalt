@@ -1,0 +1,29 @@
+# Copyright 2017 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//third_party/protobuf/proto_library.gni")
+
+proto_library("cobalt_config_proto") {
+  proto_in_dir = "//cobalt"
+  sources = [
+    "encodings.proto",
+    "metrics.proto",
+    "report_configs.proto",
+  ]
+  import_dirs = [ "//third_party/protobuf/src" ]
+  generate_python = false
+  # TODO(rudominer) Uncomment this line so that we can use Protobuf Lite
+  # in Fuchsia. In order to do this we need to replace the use of
+  # TextFormat with some other way of parsing a message from a human-readable
+  # string.
+  # cc_generator_options = "lite"
+
+  deps = [
+    "//cobalt:cobalt_proto",
+  ]
+
+  extra_configs = [
+     "//cobalt:cobalt_config",
+  ]
+}
