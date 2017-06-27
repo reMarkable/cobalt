@@ -17,6 +17,7 @@ package shuffler_config
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -39,15 +40,23 @@ func LoadConfig(configFileName string) (*shuffler.ShufflerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	config := &shuffler.ShufflerConfig{}
 	serializedBytes, err := ioutil.ReadFile(configFileName)
 	if err != nil {
 		return config, err
 	}
-
 	err = proto.UnmarshalText(string(serializedBytes), config)
+	if err == nil {
+		glog.Info("Successfully read the following configuration: ", toString(config))
+	}
 	return config, err
+}
+
+func toString(config *shuffler.ShufflerConfig) string {
+	return fmt.Sprintf("{FrequenceInHours:%d, Threshold:%d, DisposalAgeDays:%d}",
+		config.GlobalConfig.FrequencyInHours,
+		config.GlobalConfig.Threshold,
+		config.GlobalConfig.DisposalAgeDays)
 }
 
 // WriteConfig serializes the input Shuffler configuration params to a

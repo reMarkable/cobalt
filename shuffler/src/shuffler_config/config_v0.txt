@@ -15,7 +15,7 @@
 ###############################
 
 global_config: {
-  frequency_in_hours:24
-  threshold:500
+  frequency_in_hours:0
+  threshold:0
   disposal_age_days:4
 }
