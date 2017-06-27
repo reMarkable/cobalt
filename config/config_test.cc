@@ -205,27 +205,51 @@ TEST(ReportRegistryFromFile, ValidFile) {
   EXPECT_EQ(nullptr, registry->Get(1, 1, 3));
 }
 
-// This test runs EncodingRegistry::FromFile() on our official registration
+// This test runs EncodingRegistry::FromFile() on our demo
 // file, registered_encodings.txt. The purpose is to validate that file.
-TEST(EncodingRegistryFromFile, CheckRegisteredEncodings) {
+TEST(EncodingRegistryFromFile, CheckDemoEncodings) {
   auto result = EncodingRegistry::FromFile(
       "config/demo/registered_encodings.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
+// This test runs EncodingRegistry::FromFile() on our official registration
+// file, registered_encodings.txt. The purpose is to validate that file.
+TEST(EncodingRegistryFromFile, CheckProductionEncodings) {
+  auto result = EncodingRegistry::FromFile(
+      "config/production/registered_encodings.txt", nullptr);
+  EXPECT_EQ(kOK, result.second);
+}
+
+// This test runs MetricRegistry::FromFile() on our demo
+// file, registered_metrics.txt. The purpose is to validate that file.
+TEST(MetricRegistryFromFile, CheckDemoMetrics) {
+  auto result = MetricRegistry::FromFile(
+      "config/demo/registered_metrics.txt", nullptr);
+  EXPECT_EQ(kOK, result.second);
+}
+
 // This test runs MetricRegistry::FromFile() on our official registration
 // file, registered_metrics.txt. The purpose is to validate that file.
-TEST(MetricRegistryFromFile, CheckRegisteredMetrics) {
-  auto result =
-      MetricRegistry::FromFile("config/demo/registered_metrics.txt", nullptr);
+TEST(MetricRegistryFromFile, CheckProductionMetrics) {
+  auto result = MetricRegistry::FromFile(
+      "config/production/registered_metrics.txt", nullptr);
+  EXPECT_EQ(kOK, result.second);
+}
+
+// This test runs ReportRegistry::FromFile() on our demo
+// file, registered_reports.txt. The purpose is to validate that file.
+TEST(ReportRegistryFromFile, CheckDemodReports) {
+  auto result = ReportRegistry::FromFile(
+      "config/demo/registered_reports.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
 // This test runs ReportRegistry::FromFile() on our official registration
 // file, registered_reports.txt. The purpose is to validate that file.
-TEST(ReportRegistryFromFile, CheckRegisteredReports) {
-  auto result =
-      ReportRegistry::FromFile("config/demo/registered_reports.txt", nullptr);
+TEST(ReportRegistryFromFile, CheckProductionReports) {
+  auto result = ReportRegistry::FromFile(
+      "config/production/registered_reports.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 

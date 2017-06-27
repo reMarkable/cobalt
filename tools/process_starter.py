@@ -26,9 +26,8 @@ SYS_ROOT_DIR = os.path.join(SRC_ROOT_DIR, 'sysroot')
 
 DEMO_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
     'demo'))
-# Note(rudominer) Currently we don't have any real customers so our registered
-# config is our demo config
-REGISTERED_CONFIG_DIR = DEMO_CONFIG_DIR
+PRODUCTION_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
+    'production'))
 SHUFFLER_DEMO_CONFIG_FILE = os.path.abspath(os.path.join(SRC_ROOT_DIR,
     'shuffler', 'src', 'config', 'config_demo.txt'))
 SHUFFLER_DB_DIR = os.path.join("/tmp/cobalt_shuffler")

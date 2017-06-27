@@ -1,0 +1,41 @@
+
+###########################################################################
+# This file contains the source of truth for the set of EncodingConfigs
+# that are registered in version 0.1 of Cobalt.
+#
+# This file is maintained by hand. To add a new EncodingConfig or change
+# the definition of an EncodingConfig, manually edit this file and
+# commit the change to the Cobalt repo.
+#
+# The format of this file is the textual representation of the
+# RegisteredEncodings Protocol Buffer message, which is defined in
+# encodings.proto
+##########################################################################
+
+
+#########################
+# Customer 1 (Fuchsia)
+########################
+
+## Project 1: Ledger
+
+#####################################################################
+# EncodingConfig(1, 1, 1)
+# Name:  Basic RAPPOR for Daily Rare Event Counts
+# Description: A Configuration of Basic RAPPOR with no privacy, with string
+#              category names, and with one category for each rare event.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  basic_rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    string_categories: {
+      category: "Rare event 1"
+      category: "Rare event 2"
+      category: "Rare event 3"
+    }
+  }
+}

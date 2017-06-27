@@ -1,0 +1,42 @@
+
+###########################################################################
+# This file contains the source of truth for the set of ReportConfigs
+# that are registered in version 0.1 of Cobalt.
+#
+# This file is maintained by hand. To add a new ReportConfig or change
+# the definition of an ReportConfig, manually edit this file and
+# commit the change to the Cobalt repo.
+#
+# The format of this file is the textual representation of the
+# RegisteredReports Protocol Buffer message, which is defined in
+# report_configs.proto.
+##########################################################################
+
+
+#########################
+# Customer 1 (Fuchsia)
+########################
+
+## Project 1: Ledger
+
+#####################################################################
+# Report Config (1, 1, 1)
+# Name:  Daily rare event counts
+# Description: A Daily report of Rare Events metric.
+# Parts: This metric has one part name "Event name"
+# Notes: At least initially, we plan to use Basic RAPPOR with no privacy to
+#        collect this metric. Each category will be one of the rare events.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  name: "Fuchsia Ledger Daily Rare Events"
+  description: "A daily report of events that are expected to happen rarely."
+  metric_id: 1
+  variable {
+    metric_part: "Event name"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}

@@ -29,7 +29,7 @@ from process_starter import ANALYZER_SERVICE_PATH
 from process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from process_starter import DEFAULT_REPORT_MASTER_PORT
 from process_starter import DEFAULT_SHUFFLER_PORT
-from process_starter import REGISTERED_CONFIG_DIR
+from process_starter import DEMO_CONFIG_DIR
 from process_starter import REPORT_MASTER_PATH
 from process_starter import SHUFFLER_PRIVATE_KEY_PEM_NAME
 from process_starter import DEFAULT_SHUFFLER_PRIVATE_KEY_PEM
@@ -103,7 +103,7 @@ COBALT_COMMON_SO_FILES = [os.path.join(SYS_ROOT_DIR, 'lib', f) for f in
 
 ROOTS_PEM = os.path.join(SYS_ROOT_DIR, 'share', 'grpc', 'roots.pem')
 
-ANALYZER_CONFIG_FILES = [os.path.join(REGISTERED_CONFIG_DIR, f) for f in
+ANALYZER_CONFIG_FILES = [os.path.join(DEMO_CONFIG_DIR, f) for f in
     ["registered_encodings.txt",
      "registered_metrics.txt",
      "registered_reports.txt"
