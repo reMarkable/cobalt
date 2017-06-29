@@ -381,13 +381,16 @@ def _deploy_push(args):
     print('Unknown job "%s". I only know how to push "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
 
+def _parse_bool(bool_string):
+  return bool_string.lower() in ['true', 't', 'y', 'yes', '1']
+
 def _deploy_start(args):
   if args.job == 'shuffler':
     container_util.start_shuffler(
         args.cloud_project_prefix,
         args.cloud_project_name,
         args.gce_pd_name,
-        use_memstore=args.use_memstore,
+        use_memstore=parse_bool(args.shuffler_use_memstore),
         danger_danger_delete_all_data_at_startup=
             args.danger_danger_delete_all_data_at_startup)
   elif args.job == 'analyzer-service':
@@ -427,6 +430,21 @@ def _deploy_delete_secret_keys(args):
   container_util.delete_analyzer_private_key_secret()
   container_util.delete_shuffler_private_key_secret()
 
+def _default_shuffler_config_file(cluster_settings):
+  if cluster_settings['shuffler_config_file'] :
+    return  os.path.join(THIS_DIR, cluster_settings['shuffler_config_file'])
+  return SHUFFLER_DEMO_CONFIG_FILE
+
+def _default_cobalt_config_dir(cluster_settings):
+  if cluster_settings['cobalt_config_dir'] :
+    return os.path.join(THIS_DIR, cluster_settings['cobalt_config_dir'])
+  return DEMO_CONFIG_DIR
+
+def _default_shuffler_use_memstore(cluster_settings):
+  if cluster_settings['shuffler_use_memstore']:
+    return cluster_settings['shuffler_use_memstore']
+  return "false"
+
 def main():
   personal_cluster_settings = {
     'cloud_project_prefix': '',
@@ -435,6 +453,9 @@ def main():
     'cluster_zone': '',
     'gce_pd_name': '',
     'bigtable_instance_name': '',
+    'shuffler_config_file': '',
+    'cobalt_config_dir': '',
+    'shuffler_use_memstore' : '',
   }
   if os.path.exists(PERSONAL_CLUSTER_JSON_FILE):
     print ('Default deployment options will be taken from %s.' %
@@ -826,14 +847,18 @@ def main():
       parents=[parent_parser], help='Rebuild all Docker images. '
           'You must have the Docker daemon running.')
   sub_parser.set_defaults(func=_deploy_build)
+  default_shuffler_config_file = _default_shuffler_config_file(
+      personal_cluster_settings)
   sub_parser.add_argument('--shuffler_config_file',
       help='Path to the Shuffler configuration file. '
-           'Default=%s' % SHUFFLER_DEMO_CONFIG_FILE,
-      default=SHUFFLER_DEMO_CONFIG_FILE)
+           'Default=%s' % default_shuffler_config_file,
+      default=default_shuffler_config_file)
+  default_cobalt_config_dir = _default_cobalt_config_dir(
+      personal_cluster_settings)
   sub_parser.add_argument('--cobalt_config_dir',
       help='Path of directory containing Cobalt configuration files. '
-           'Default=%s' % DEMO_CONFIG_DIR,
-      default=DEMO_CONFIG_DIR)
+           'Default=%s' % default_cobalt_config_dir,
+      default=default_cobalt_config_dir)
 
   sub_parser = deploy_subparsers.add_parser('push',
       parents=[parent_parser], help='Push a Docker image to the Google'
@@ -889,10 +914,13 @@ def main():
            'Cloud project in which the Shuffler is being deployed. '
            'Default=%s' % personal_cluster_settings['gce_pd_name'],
       default=personal_cluster_settings['gce_pd_name'])
-  sub_parser.add_argument('-use-memstore',
-      help='When starting the Shuffler, should the Suffler use its in-memory '
-      'data store rather than a persistent datastore? Default=false.',
-      action='store_true')
+  default_shuffler_use_memstore = _default_shuffler_use_memstore(
+      personal_cluster_settings)
+  sub_parser.add_argument('--shuffler-use-memstore',
+      default=default_shuffler_use_memstore,
+      help=('When starting the Shuffler, should the Suffler use its in-memory '
+            'data store rather than a persistent datastore? Default=%s.' %
+            default_shuffler_use_memstore))
   sub_parser.add_argument('-danger_danger_delete_all_data_at_startup',
       help='When starting the Shuffler, should all of the Observations '
       'collected during previous runs of the Shuffler be permanently and '

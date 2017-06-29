@@ -395,6 +395,9 @@ Its contents should be exactly the following
   "cluster_zone": "<your-cluster-zone>",
   "gce_pd_name": "<your-persistent-disk-name>",
   "bigtable_instance_name": "<your-bigtable-instance-name>"
+  "shuffler_config_file" : "<optional-path-to-non-default-config-file>",
+  "cobalt_config_dir" : "<optional-path-to-non-default-config-dir>",
+  "suffler_use_memstore" : "<specify true or false. Default false.>"
 }
 ```
 
@@ -408,6 +411,9 @@ For example:
   "cluster_zone": "us-central1-a",
   "gce_pd_name": "rudominer-shuffler-1",
   "bigtable_instance_name": "rudominer-test-1"
+  "shuffler_config_file" : "shuffler/src/shuffler_config/config_demo.txt"
+  "cobalt_config_dir" : "config/demo"
+  "shuffler_use_memstore" : "false"
 }
 ```
 
@@ -433,6 +439,16 @@ project name without the prefix and the colon.
 * *cluster_zone*: The zone in which the GKE cluster was created
 * *gce_pd_name*: The name of the GCE persistent disk you created
 * *bigtable_instance_name*: The name of the Bigtable instance you created.
+* shuffler_config_file: If not specified uses the *demo* configuration file.
+  If specified it should be a *source-root-relative* path to a Shuffler config
+  file.
+* cobalt_config_dir: If not specified uses the *demo* Cobalt config dir. If
+  specified it should be a *source-root-relative* path to a directory containing
+  the cobalt config files `registered_encodings.txt`, `registered_metrics.txt`,
+  `registered_reports.txt`.
+* shuffler_use_memstore: If not specified defaults to false meaning that the
+  Shuffler will not use memstore but rather will use a persistent datastore.
+  If specified it should be the string `true` or `false`.
 
 ### Deploying Cobalt to GKE
 
