@@ -24,7 +24,6 @@ import sys
 
 import process_starter
 from process_starter import ANALYZER_PRIVATE_KEY_PEM_NAME
-from process_starter import DEFAULT_ANALYZER_PRIVATE_KEY_PEM
 from process_starter import ANALYZER_SERVICE_PATH
 from process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from process_starter import DEFAULT_REPORT_MASTER_PORT
@@ -32,7 +31,6 @@ from process_starter import DEFAULT_SHUFFLER_PORT
 from process_starter import DEMO_CONFIG_DIR
 from process_starter import REPORT_MASTER_PATH
 from process_starter import SHUFFLER_PRIVATE_KEY_PEM_NAME
-from process_starter import DEFAULT_SHUFFLER_PRIVATE_KEY_PEM
 from process_starter import SHUFFLER_CONFIG_FILE
 from process_starter import SHUFFLER_PATH
 
@@ -220,43 +218,61 @@ def compound_project_name(cloud_project_prefix, cloud_project_name):
     return cloud_project_name
   return "%s:%s"%(cloud_project_prefix, cloud_project_name)
 
+def _form_context_name(cloud_project_prefix, cloud_project_name, cluster_zone,
+                       cluster_name):
+  return "gke_%s_%s_%s" % (compound_project_name(cloud_project_prefix,
+      cloud_project_name), cluster_zone, cluster_name)
 
-def _create_secret_from_file(secret_name, data_key, file_path):
+def _create_secret_from_file(secret_name, data_key, file_path, context):
   subprocess.call(["kubectl", "create", "secret", "generic", secret_name,
-    "--from-file", "%s=%s"%(data_key, file_path)])
+    "--from-file", "%s=%s"%(data_key, file_path),
+    "--context", context])
 
-def _delete_secret(secret_name):
-  subprocess.call(["kubectl", "delete", "secret",  secret_name])
+def _delete_secret(secret_name, context):
+  subprocess.call(["kubectl", "delete", "secret",  secret_name,
+                   "--context", context])
 
-def create_analyzer_private_key_secret(
-    path_to_pem=DEFAULT_ANALYZER_PRIVATE_KEY_PEM):
+def create_analyzer_private_key_secret(cloud_project_prefix,
+    cloud_project_name, cluster_zone, cluster_name, path_to_pem):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
   _create_secret_from_file(ANALYZER_PRIVATE_KEY_SECRET_NAME,
                            ANALYZER_PRIVATE_KEY_PEM_NAME,
-                           path_to_pem)
+                           path_to_pem, context)
 
-def create_shuffler_private_key_secret(
-    path_to_pem=DEFAULT_SHUFFLER_PRIVATE_KEY_PEM):
+def create_shuffler_private_key_secret(cloud_project_prefix,
+    cloud_project_name, cluster_zone, cluster_name, path_to_pem):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
   _create_secret_from_file(SHUFFLER_PRIVATE_KEY_SECRET_NAME,
                            SHUFFLER_PRIVATE_KEY_PEM_NAME,
-                           path_to_pem)
+                           path_to_pem, context)
 
-def delete_analyzer_private_key_secret():
-  _delete_secret(ANALYZER_PRIVATE_KEY_SECRET_NAME)
+def delete_analyzer_private_key_secret(cloud_project_prefix,
+    cloud_project_name, cluster_zone, cluster_name):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  _delete_secret(ANALYZER_PRIVATE_KEY_SECRET_NAME, context)
 
-def delete_shuffler_private_key_secret():
-  _delete_secret(SHUFFLER_PRIVATE_KEY_SECRET_NAME)
+def delete_shuffler_private_key_secret(cloud_project_prefix,
+    cloud_project_name, cluster_zone, cluster_name):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  _delete_secret(SHUFFLER_PRIVATE_KEY_SECRET_NAME, context)
 
 def _start_gke_service(deployment_template_file, deployment_file,
-                       token_substitutions):
+                       token_substitutions, context):
   # Generate the kubernetes deployment file by performing token replacement.
   _replace_tokens_in_template(deployment_template_file, deployment_file,
                               token_substitutions)
 
   # Invoke "kubectl create" on the deployment file we just generated.
-  subprocess.check_call(["kubectl", "create", "-f", deployment_file])
+  subprocess.check_call(["kubectl", "create", "-f", deployment_file,
+                         "--context", context])
 
 def start_analyzer_service(cloud_project_prefix,
                            cloud_project_name,
+                           cluster_zone, cluster_name,
                            bigtable_instance_name):
   """ Starts the analyzer-service deployment and service.
   cloud_project_prefix {sring}: For example "google.com"
@@ -272,6 +288,9 @@ def start_analyzer_service(cloud_project_prefix,
   bigtable_project_name = compound_project_name(cloud_project_prefix,
                                                  cloud_project_name)
 
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+
   # These are the token replacements that must be made inside the deployment
   # template file.
   token_substitutions = {
@@ -282,10 +301,11 @@ def start_analyzer_service(cloud_project_prefix,
       '$$ANALYZER_PRIVATE_KEY_SECRET_NAME$$' : ANALYZER_PRIVATE_KEY_SECRET_NAME}
   _start_gke_service(ANALYZER_SERVICE_DEPLOYMENT_TEMPLATE_FILE,
                      ANALYZER_SERVICE_DEPLOYMENT_FILE,
-                     token_substitutions)
+                     token_substitutions, context)
 
 def start_report_master(cloud_project_prefix,
                         cloud_project_name,
+                        cluster_zone, cluster_name,
                         bigtable_instance_name):
   """ Starts the report-master deployment and service.
   cloud_project_prefix {sring}: For example "google.com"
@@ -301,6 +321,9 @@ def start_report_master(cloud_project_prefix,
   bigtable_project_name = compound_project_name(cloud_project_prefix,
                                                  cloud_project_name)
 
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+
   # These are the token replacements that must be made inside the deployment
   # template file.
   token_substitutions = {'$$REPORT_MASTER_IMAGE_URI$$' : image_uri,
@@ -308,10 +331,11 @@ def start_report_master(cloud_project_prefix,
                          '$$BIGTABLE_INSTANCE_NAME$$' :bigtable_instance_name}
   _start_gke_service(REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE,
                      REPORT_MASTER_DEPLOYMENT_FILE,
-                     token_substitutions)
+                     token_substitutions, context)
 
 def start_shuffler(cloud_project_prefix,
                    cloud_project_name,
+                   cluster_zone, cluster_name,
                    gce_pd_name,
                    use_memstore=False,
                    danger_danger_delete_all_data_at_startup=False):
@@ -333,6 +357,10 @@ def start_shuffler(cloud_project_prefix,
   delete_all_data = 'false'
   if danger_danger_delete_all_data_at_startup:
     delete_all_data = 'true'
+
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+
   token_substitutions = {'$$SHUFFLER_IMAGE_URI$$' : image_uri,
       '$$GCE_PERSISTENT_DISK_NAME$$' : gce_pd_name,
       '$$SHUFFLER_USE_MEMSTORE$$' : use_memstore_string,
@@ -341,19 +369,32 @@ def start_shuffler(cloud_project_prefix,
       '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data}
   _start_gke_service(SHUFFLER_DEPLOYMENT_TEMPLATE_FILE,
                      SHUFFLER_DEPLOYMENT_FILE,
-                     token_substitutions)
+                     token_substitutions, context)
 
-def _stop_gke_service(name):
-  subprocess.check_call(["kubectl", "delete", "service,deployment", name])
+def _stop_gke_service(name, context):
+  subprocess.check_call(["kubectl", "delete", "service,deployment", name,
+                         "--context", context])
 
-def stop_analyzer_service():
-  _stop_gke_service(ANALYZER_SERVICE_IMAGE_NAME)
+def stop_analyzer_service(cloud_project_prefix,
+                          cloud_project_name,
+                          cluster_zone, cluster_name):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  _stop_gke_service(ANALYZER_SERVICE_IMAGE_NAME, context)
 
-def stop_report_master():
-  _stop_gke_service(REPORT_MASTER_IMAGE_NAME)
+def stop_report_master(cloud_project_prefix,
+                       cloud_project_name,
+                       cluster_zone, cluster_name):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  _stop_gke_service(REPORT_MASTER_IMAGE_NAME, context)
 
-def stop_shuffler():
-  _stop_gke_service(SHUFFLER_IMAGE_NAME)
+def stop_shuffler(cloud_project_prefix,
+                  cloud_project_name,
+                  cluster_zone, cluster_name):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  _stop_gke_service(SHUFFLER_IMAGE_NAME, context)
 
 def authenticate(cluster_name,
                  cloud_project_prefix,
@@ -366,17 +407,28 @@ def authenticate(cluster_name,
       cmd.extend(["--zone", cluster_zone])
   subprocess.check_call(cmd)
 
-def display():
-   subprocess.check_call(["kubectl", "get", "services"])
+def display(cloud_project_prefix, cloud_project_name, cluster_zone,
+            cluster_name):
+   context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+   subprocess.check_call(["kubectl", "get", "services", "--context", context])
 
-def get_public_uris():
-  # Returns a dictionary of the public URIs of the deployed services.
-  #
-  # The returned dictionary will have keys "analyzer",
-  # "report_master", "shuffler". The value for each key will either
-  # be None or a string representing a URI.
-  #
-  output = subprocess.check_output(["kubectl", "get", "services"])
+def get_public_uris(cluster_name,
+                    cloud_project_prefix,
+                    cloud_project_name,
+                    cluster_zone):
+  """ Returns a dictionary of the public URIs of the deployed services.
+
+  The returned dictionary will have keys "analyzer",
+  "report_master", "shuffler". The value for each key will either
+  be None or a string representing a URI.
+
+  """
+
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  output = subprocess.check_output(["kubectl", "get", "services",
+                                    "--context", context])
   # This is an example of what the output of this command might look like.
   # We are going to parse it and extract the relevent data.
   #

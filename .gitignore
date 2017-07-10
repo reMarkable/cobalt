@@ -1,6 +1,9 @@
 *.pyc
 *.pem
+# We add the production public keys to source control.
+!production/fuchsia-cobalt-us-central1-b/analyzer_public.pem
+!production/fuchsia-cobalt-us-central1-b/shuffler_public.pem
 personal_cluster.json
-service_account_credentials.json
+*bt_admin_service_account.json
 /out/
 /sysroot/

@@ -32,7 +32,9 @@ import tools.test_runner as test_runner
 from tools.test_runner import E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
 from tools.test_runner import E2E_TEST_SHUFFLER_PUBLIC_KEY_PEM
 
+from tools.process_starter import DEFAULT_ANALYZER_PRIVATE_KEY_PEM
 from tools.process_starter import DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+from tools.process_starter import DEFAULT_SHUFFLER_PRIVATE_KEY_PEM
 from tools.process_starter import DEFAULT_SHUFFLER_PUBLIC_KEY_PEM
 from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from tools.process_starter import DEFAULT_SHUFFLER_PORT
@@ -43,8 +45,8 @@ from tools.process_starter import SHUFFLER_DEMO_CONFIG_FILE
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 OUT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'out'))
 SYSROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, 'sysroot'))
-SERVICE_ACCOUNT_CREDENTIALS_FILE = os.path.join(THIS_DIR,
-    'service_account_credentials.json')
+PERSONAL_BT_ADMIN_SERVICE_ACCOUNT_CREDENTIALS_FILE = os.path.join(THIS_DIR,
+    'personal_bt_admin_service_account.json')
 PERSONAL_CLUSTER_JSON_FILE = os.path.join(THIS_DIR, 'personal_cluster.json')
 BIGTABLE_TOOL_PATH = \
     os.path.join(OUT_DIR, 'tools', 'bigtable_tool', 'bigtable_tool')
@@ -154,9 +156,9 @@ def _test(args):
         and not args.cobalt_on_gke)
     test_args = None
     if (test_dir == 'gtests_cloud_bt'):
-      if not os.path.exists(SERVICE_ACCOUNT_CREDENTIALS_FILE):
+      if not os.path.exists(bt_admin_service_account_credentials_file):
         print ('You must first create the file %s.' %
-               SERVICE_ACCOUNT_CREDENTIALS_FILE)
+               bt_admin_service_account_credentials_file)
         print 'See the instructions in README.md.'
         return
       bigtable_project_name_from_args = _compound_project_name(args)
@@ -296,27 +298,45 @@ def _start_report_master(args):
 
 def _start_test_app(args):
   analyzer_uri = "localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT
-  report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
   shuffler_uri = "localhost:%d" % DEFAULT_SHUFFLER_PORT
-  if args.cobalt_on_gke:
-    public_uris = container_util.get_public_uris()
+  analyzer_public_key_pem = \
+    DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+  shuffler_public_key_pem = \
+    DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+  if args.production_dir:
+    pem_directory = os.path.abspath(args.production_dir)
+    analyzer_public_key_pem = os.path.join(pem_directory,
+        'analyzer_public.pem')
+    shuffler_public_key_pem = os.path.join(pem_directory,
+        'shuffler_public.pem')
+  if args.cobalt_on_gke or args.production_dir:
+    public_uris = container_util.get_public_uris(args.cluster_name,
+        args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone)
     analyzer_uri = public_uris["analyzer"]
     shuffler_uri = public_uris["shuffler"]
   process_starter.start_test_app(shuffler_uri=shuffler_uri,
-                                 analyzer_uri=analyzer_uri,
-                                 # Because it makes the demo more interesting
-                                 # we use verbose_count at least 3.
-                                 verbose_count=max(3, _verbose_count))
+      analyzer_uri=analyzer_uri,
+      analyzer_pk_pem_file=analyzer_public_key_pem,
+      shuffler_pk_pem_file=shuffler_public_key_pem,
+      cobalt_config_dir=args.cobalt_config_dir,
+      # Because it makes the demo more interesting
+      # we use verbose_count at least 3.
+      verbose_count=max(3, _verbose_count))
 
 def _start_report_client(args):
+  report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
+  if args.cobalt_on_gke or args.production_dir:
+    public_uris = container_util.get_public_uris(args.cluster_name,
+        args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone)
+    report_master_uri = public_uris["report_master"]
   process_starter.start_report_client(
-      report_master_uri=args.report_master_uri,
+      report_master_uri=report_master_uri,
       verbose_count=_verbose_count)
 
 def _start_observation_querier(args):
   bigtable_project_name = ''
   bigtable_instance_name = ''
-  if args.use_cloud_bt:
+  if args.use_cloud_bt or args.production_dir:
     bigtable_project_name = _compound_project_name(args)
     bigtable_instance_name = args.bigtable_instance_name
   process_starter.start_observation_querier(
@@ -329,9 +349,9 @@ def _generate_keys(args):
   subprocess.check_call([path])
 
 def _invoke_bigtable_tool(args, command):
-  if not os.path.exists(SERVICE_ACCOUNT_CREDENTIALS_FILE):
+  if not os.path.exists(bt_admin_service_account_credentials_file):
     print ('You must first create the file %s.' %
-           SERVICE_ACCOUNT_CREDENTIALS_FILE)
+           bt_admin_service_account_credentials_file)
     print 'See the instructions in README.md.'
     return
   bigtable_project_name_from_args = _compound_project_name(args)
@@ -356,7 +376,8 @@ def _delete_reports(args):
   _invoke_bigtable_tool(args, "delete_reports")
 
 def _deploy_show(args):
-  container_util.display()
+  container_util.display(args.cloud_project_prefix, args.cloud_project_name,
+      args.cluster_zone, args.cluster_name)
 
 def _deploy_authenticate(args):
   container_util.authenticate(args.cluster_name, args.cloud_project_prefix,
@@ -389,8 +410,9 @@ def _deploy_start(args):
     container_util.start_shuffler(
         args.cloud_project_prefix,
         args.cloud_project_name,
+        args.cluster_zone, args.cluster_name,
         args.gce_pd_name,
-        use_memstore=parse_bool(args.shuffler_use_memstore),
+        use_memstore=_parse_bool(args.shuffler_use_memstore),
         danger_danger_delete_all_data_at_startup=
             args.danger_danger_delete_all_data_at_startup)
   elif args.job == 'analyzer-service':
@@ -399,6 +421,7 @@ def _deploy_start(args):
         return
     container_util.start_analyzer_service(
         args.cloud_project_prefix, args.cloud_project_name,
+        args.cluster_zone, args.cluster_name,
         args.bigtable_instance_name)
   elif args.job == 'report-master':
     if args.bigtable_instance_name == '':
@@ -406,6 +429,7 @@ def _deploy_start(args):
         return
     container_util.start_report_master(
         args.cloud_project_prefix, args.cloud_project_name,
+        args.cluster_zone, args.cluster_name,
         args.bigtable_instance_name)
   else:
     print('Unknown job "%s". I only know how to start "shuffler", '
@@ -413,22 +437,31 @@ def _deploy_start(args):
 
 def _deploy_stop(args):
   if args.job == 'shuffler':
-    container_util.stop_shuffler()
+    container_util.stop_shuffler(args.cloud_project_prefix,
+        args.cloud_project_name, args.cluster_zone, args.cluster_name)
   elif args.job == 'analyzer-service':
-    container_util.stop_analyzer_service()
+    container_util.stop_analyzer_service(args.cloud_project_prefix,
+        args.cloud_project_name, args.cluster_zone, args.cluster_name)
   elif args.job == 'report-master':
-    container_util.stop_report_master()
+    container_util.stop_report_master(args.cloud_project_prefix,
+        args.cloud_project_name, args.cluster_zone, args.cluster_name)
   else:
     print('Unknown job "%s". I only know how to stop "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
 
 def _deploy_upload_secret_keys(args):
-  container_util.create_analyzer_private_key_secret()
-  container_util.create_shuffler_private_key_secret()
+  container_util.create_analyzer_private_key_secret(args.cloud_project_prefix,
+      args.cloud_project_name, args.cluster_zone, args.cluster_name,
+      args.analyzer_private_key_pem)
+  container_util.create_shuffler_private_key_secret(args.cloud_project_prefix,
+      args.cloud_project_name, args.cluster_zone, args.cluster_name,
+      args.shuffler_private_key_pem)
 
 def _deploy_delete_secret_keys(args):
-  container_util.delete_analyzer_private_key_secret()
-  container_util.delete_shuffler_private_key_secret()
+  container_util.delete_analyzer_private_key_secret(args.cloud_project_prefix,
+      args.cloud_project_name, args.cluster_zone, args.cluster_name)
+  container_util.delete_shuffler_private_key_secret(args.cloud_project_prefix,
+      args.cloud_project_name, args.cluster_zone, args.cluster_name)
 
 def _default_shuffler_config_file(cluster_settings):
   if cluster_settings['shuffler_config_file'] :
@@ -445,8 +478,71 @@ def _default_shuffler_use_memstore(cluster_settings):
     return cluster_settings['shuffler_use_memstore']
   return "false"
 
+def _cluster_settings_from_json(cluster_settings, json_file_path):
+  """ Reads cluster settings from a json file and adds them to a dictionary.
+
+  Args:
+    cluster_settings: A dictionary of cluster settings whose values will be
+    overwritten by any corresponding values in the json file. Any values in
+    the json file that do not correspond to a key in this dictionary will
+    be ignored.
+
+    json_file_path: The full path to a json file that must exist.
+  """
+  print ('Default deployment options will be taken from %s.' % json_file_path)
+  with open(json_file_path) as f:
+    read_cluster_settings = json.load(f)
+  for key in read_cluster_settings:
+    if key in cluster_settings:
+      cluster_settings[key] = read_cluster_settings[key]
+
+
+def _add_gke_deployment_args(parser, cluster_settings):
+  parser.add_argument('--cloud_project_prefix',
+      help='The prefix part of name of the Cloud project to which your are '
+           'deploying. This is usually an organization domain name if your '
+           'Cloud project is associated with one. Pass the empty string for no '
+           'prefix. '
+           'Default=%s.' %cluster_settings['cloud_project_prefix'],
+      default=cluster_settings['cloud_project_prefix'])
+  parser.add_argument('--cloud_project_name',
+      help='The main part of the name of the Cloud project to which you are '
+           'deploying. This is the full project name if --cloud_project_prefix '
+           'is empty. Otherwise the full project name is '
+           '<cloud_project_prefix>:<cloud_project_name>. '
+           'Default=%s' % cluster_settings['cloud_project_name'],
+      default=cluster_settings['cloud_project_name'])
+  parser.add_argument('--cluster_name',
+      help='The GKE "container cluster" within your Cloud project to which you '
+           'are deploying. '
+           'Default=%s' % cluster_settings['cluster_name'],
+      default=cluster_settings['cluster_name'])
+  parser.add_argument('--cluster_zone',
+      help='The zone in which your GKE "container cluster" is located. '
+           'Default=%s' % cluster_settings['cluster_zone'],
+      default=cluster_settings['cluster_zone'])
+
 def main():
-  personal_cluster_settings = {
+  # We parse the command line flags twice. The first time we are looking
+  # only for a particular flag, namely --production_dir. This first pass
+  # will not print any help and will ignore all other flags.
+  parser0 = argparse.ArgumentParser(add_help=False)
+  parser0.add_argument('--production_dir', default='')
+  args0, ignore = parser0.parse_known_args()
+  # If the flag --production_dir is passed then it must be the path to
+  # a directory containing a file named cluster.json. The contents of this
+  # json file is used to set default values for many of the other flags. That
+  # explains why we want to parse the flags twice.
+  production_cluster_json_file = ''
+  if args0.production_dir:
+    production_cluster_json_file = os.path.join(args0.production_dir,
+                                                'cluster.json')
+    if not  os.path.exists(production_cluster_json_file):
+       print ('File not found: %s.' % production_cluster_json_file)
+       return
+
+  # cluster_settings contains the default values for many of the flags.
+  cluster_settings = {
     'cloud_project_prefix': '',
     'cloud_project_name': '',
     'cluster_name': '',
@@ -457,14 +553,21 @@ def main():
     'cobalt_config_dir': '',
     'shuffler_use_memstore' : '',
   }
-  if os.path.exists(PERSONAL_CLUSTER_JSON_FILE):
-    print ('Default deployment options will be taken from %s.' %
-           PERSONAL_CLUSTER_JSON_FILE)
-    with open(PERSONAL_CLUSTER_JSON_FILE) as f:
-      read_personal_cluster_settings = json.load(f)
-    for key in read_personal_cluster_settings:
-      if key in personal_cluster_settings:
-        personal_cluster_settings[key] = read_personal_cluster_settings[key]
+  if production_cluster_json_file:
+    _cluster_settings_from_json(cluster_settings, production_cluster_json_file)
+  elif os.path.exists(PERSONAL_CLUSTER_JSON_FILE):
+    _cluster_settings_from_json(cluster_settings,
+        PERSONAL_CLUSTER_JSON_FILE)
+
+  # We also use the flag --production_dir to find the PEM files.
+  analyzer_private_key_pem = DEFAULT_ANALYZER_PRIVATE_KEY_PEM
+  shuffler_private_key_pem = DEFAULT_SHUFFLER_PRIVATE_KEY_PEM
+  if args0.production_dir:
+    pem_directory = os.path.abspath(args0.production_dir)
+    analyzer_private_key_pem = os.path.join(pem_directory,
+        'analyzer_private.pem')
+    shuffler_private_key_pem = os.path.join(pem_directory,
+        'shuffler_private.pem')
 
   parser = argparse.ArgumentParser(description='The Cobalt command-line '
       'interface.')
@@ -488,6 +591,24 @@ def main():
   #
   # we want to show the help for the --verbose option.
   parent_parser = argparse.ArgumentParser(add_help=False)
+
+  # Even though the flag --production_dir was already parsed by parser0
+  # above, we add the flag here too so that we can print help for it
+  # and also so that the call to parser.parse_args() below will not complain
+  # about --produciton_dir being unrecognized.
+  production_dir_help = ("The path to a "
+    "Cobalt production directory containing a 'cluster.json' file. If this "
+    "is specified then the contents of cluster.json will be used to set the "
+    "default values for many of the other flags pertaining to production "
+    "deployment. Additionally if there is a file named "
+    "'bt_admin_service_account.json' in that directory then the enviroment "
+    "variable GOOGLE_APPLICATION_CREDENTIALS will be set to the path to "
+    "this file. Also the files `analyzer_private.pem` and "
+    "`shuffler_private.pem` will be looked for in this directory. "
+    "See README.md for details.")
+  parser.add_argument('--production_dir', default='', help=production_dir_help)
+  parent_parser.add_argument('--production_dir', default='',
+      help=production_dir_help)
 
   parser.add_argument('--verbose',
     help='Be verbose (multiple times for more)',
@@ -533,8 +654,8 @@ def main():
            'tests when either -use_cloud_bt or -cobalt_on_gke are specified. '
            'This is usually an organization domain name if your Cloud project '
            'is associated with one. Pass the empty string for no prefix. '
-           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
+           'Default=%s.'%cluster_settings['cloud_project_prefix'],
+      default=cluster_settings['cloud_project_prefix'])
   sub_parser.add_argument('--cloud_project_name',
       help='The main part of the name of the Cloud project against which to '
            'run some of the tests. This is the full project name if '
@@ -542,15 +663,15 @@ def main():
            'is <cloud_project_prefix>:<cloud_project_name>. Only used for the '
            'cloud_bt tests and e2e tests when either -use_cloud_bt or '
            '-cobalt_on_gke are specified. '
-           'default=%s'%personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+           'default=%s'%cluster_settings['cloud_project_name'],
+      default=cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud'
       ' project against which to run some of the tests.'
       ' Only used for the cloud_bt tests and e2e tests when either '
       '-use_cloud_bt or -cobalt_on_gke are specified.'
-      ' default=%s'%personal_cluster_settings['bigtable_instance_name'],
-      default=personal_cluster_settings['bigtable_instance_name'])
+      ' default=%s'%cluster_settings['bigtable_instance_name'],
+      default=cluster_settings['bigtable_instance_name'])
 
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')
@@ -602,21 +723,21 @@ def main():
            'used if -use_cloud_bt is set. '
            'This is usually an organization domain name if your Cloud project '
            'is associated with one. Pass the empty string for no prefix. '
-           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
+           'Default=%s.'%cluster_settings['cloud_project_prefix'],
+      default=cluster_settings['cloud_project_prefix'])
   sub_parser.add_argument('--cloud_project_name',
       help='The main part of the name of the Cloud project containing the '
            'Bigtable instance to which the Analyzer service will connect. '
            'Only used if -use_cloud_bt is set. This is the full project '
            'name if --cloud_project_prefix is empty. Otherwise the full '
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
-           'default=%s'%personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+           'default=%s'%cluster_settings['cloud_project_name'],
+      default=cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
       'project against which to query. Only used if -use_cloud_bt is set. '
-      'default=%s'%personal_cluster_settings['bigtable_instance_name'],
-      default=personal_cluster_settings['bigtable_instance_name'])
+      'default=%s'%cluster_settings['bigtable_instance_name'],
+      default=cluster_settings['bigtable_instance_name'])
   sub_parser.add_argument('--port',
       help='The port on which the Analyzer service should listen. '
            'Default=%s.' % DEFAULT_ANALYZER_SERVICE_PORT,
@@ -638,21 +759,21 @@ def main():
            'used if -use_cloud_bt is set. '
            'This is usually an organization domain name if your Cloud project '
            'is associated with one. Pass the empty string for no prefix. '
-           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
+           'Default=%s.'%cluster_settings['cloud_project_prefix'],
+      default=cluster_settings['cloud_project_prefix'])
   sub_parser.add_argument('--cloud_project_name',
       help='The main part of the name of the Cloud project containing the '
            'Bigtable instance to which the Report Master will connect. '
            'Only used if -use_cloud_bt is set. This is the full project '
            'name if --cloud_project_prefix is empty. Otherwise the full '
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
-           'default=%s'%personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+           'default=%s'%cluster_settings['cloud_project_name'],
+      default=cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
       'project against which to query. Only used if -use_cloud_bt is set. '
-      'default=%s'%personal_cluster_settings['bigtable_instance_name'],
-      default=personal_cluster_settings['bigtable_instance_name'])
+      'default=%s'%cluster_settings['bigtable_instance_name'],
+      default=cluster_settings['bigtable_instance_name'])
   sub_parser.add_argument('--port',
       help='The port on which the ReportMaster should listen. '
            'Default=%s.' % DEFAULT_REPORT_MASTER_PORT,
@@ -665,18 +786,29 @@ def main():
   sub_parser = start_subparsers.add_parser('test_app',
       parents=[parent_parser], help='Start the Cobalt test client app.')
   sub_parser.set_defaults(func=_start_test_app)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
   sub_parser.add_argument('-cobalt_on_gke',
       help='Causes the test_app to run using an instance of Cobalt '
       'deployed in Google Container Engine. Otherwise local instances of the '
       'Cobalt processes are used.',
       action='store_true')
+  default_cobalt_config_dir = _default_cobalt_config_dir(cluster_settings)
+  sub_parser.add_argument('--cobalt_config_dir',
+      help='Path of directory containing Cobalt configuration files. '
+           'Default=%s' % default_cobalt_config_dir,
+      default=default_cobalt_config_dir)
 
   sub_parser = start_subparsers.add_parser('report_client',
       parents=[parent_parser], help='Start the Cobalt report client.')
   sub_parser.set_defaults(func=_start_report_client)
-  sub_parser.add_argument('--report_master_uri',
-      help='Default=localhost:%s' % DEFAULT_REPORT_MASTER_PORT,
-      default='localhost:%s' % DEFAULT_REPORT_MASTER_PORT)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('-cobalt_on_gke',
+      help='Causes the report_client to query the instance of ReportMaster '
+      'in your personal cluster rather than one running locally. If '
+      '--production_dir is also specified it takes precedence and causes '
+      'the report_client to query the instance of ReportMaster in the '
+      'specified production cluster.',
+      action='store_true')
 
   sub_parser = start_subparsers.add_parser('observation_querier',
       parents=[parent_parser], help='Start the Cobalt ObservationStore '
@@ -692,21 +824,21 @@ def main():
            'query. Only used if -use_cloud_bt is set. This is '
            'usually an organization domain name if your Cloud project is '
            'associated with one. Pass the empty string for no prefix. '
-           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
+           'Default=%s.'%cluster_settings['cloud_project_prefix'],
+      default=cluster_settings['cloud_project_prefix'])
   sub_parser.add_argument('--cloud_project_name',
       help='The main part of the name of the Cloud project containing the '
            'Bigtable instance against which to '
            'query. Only used if -use_cloud_bt is set. This is the full project '
            'name if --cloud_project_prefix is empty. Otherwise the full '
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
-           'default=%s'%personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+           'default=%s'%cluster_settings['cloud_project_name'],
+      default=cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
       'project against which to query. Only used if -use_cloud_bt is set. '
-      'default=%s'%personal_cluster_settings['bigtable_instance_name'],
-      default=personal_cluster_settings['bigtable_instance_name'])
+      'default=%s'%cluster_settings['bigtable_instance_name'],
+      default=cluster_settings['bigtable_instance_name'])
 
   sub_parser = start_subparsers.add_parser('bigtable_emulator',
     parents=[parent_parser],
@@ -733,20 +865,20 @@ def main():
            'Bigtable instance to be provisioned. This is '
            'usually an organization domain name if your Cloud project is '
            'associated with one. Pass the empty string for no prefix. '
-           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
+           'Default=%s.'%cluster_settings['cloud_project_prefix'],
+      default=cluster_settings['cloud_project_prefix'])
   sub_parser.add_argument('--cloud_project_name',
       help='The main part of the name of the Cloud project containing the '
            'Bigtable instance to be provisioned. This is the full project '
            'name if --cloud_project_prefix is empty. Otherwise the full '
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
-           'default=%s'%personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+           'default=%s'%cluster_settings['cloud_project_name'],
+      default=cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project that is to be provisioned. '
-    'default=%s'%personal_cluster_settings['bigtable_instance_name'],
-    default=personal_cluster_settings['bigtable_instance_name'])
+    'default=%s'%cluster_settings['bigtable_instance_name'],
+    default=cluster_settings['bigtable_instance_name'])
 
   sub_parser = bigtable_subparsers.add_parser('delete_observations',
     parents=[parent_parser],
@@ -759,21 +891,21 @@ def main():
            'permanently deleted. This is '
            'usually an organization domain name if your Cloud project is '
            'associated with one. Pass the empty string for no prefix. '
-           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
+           'Default=%s.'%cluster_settings['cloud_project_prefix'],
+      default=cluster_settings['cloud_project_prefix'])
   sub_parser.add_argument('--cloud_project_name',
       help='The main part of the name of the Cloud project containing the '
            'Bigtable instance from which all Observation data will be '
            'permanently deleted. This is the full project '
            'name if --cloud_project_prefix is empty. Otherwise the full '
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
-           'default=%s'%personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+           'default=%s'%cluster_settings['cloud_project_name'],
+      default=cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project from which all Observation data will be permanently deleted. '
-    'default=%s'%personal_cluster_settings['bigtable_instance_name'],
-    default=personal_cluster_settings['bigtable_instance_name'])
+    'default=%s'%cluster_settings['bigtable_instance_name'],
+    default=cluster_settings['bigtable_instance_name'])
 
   sub_parser = bigtable_subparsers.add_parser('delete_reports',
     parents=[parent_parser],
@@ -786,32 +918,34 @@ def main():
            'permanently deleted. This is '
            'usually an organization domain name if your Cloud project is '
            'associated with one. Pass the empty string for no prefix. '
-           'Default=%s.'%personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
+           'Default=%s.'%cluster_settings['cloud_project_prefix'],
+      default=cluster_settings['cloud_project_prefix'])
   sub_parser.add_argument('--cloud_project_name',
       help='The main part of the name of the Cloud project containing the '
            'Bigtable instance from which all Report data will be '
            'permanently deleted. This is the full project '
            'name if --cloud_project_prefix is empty. Otherwise the full '
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
-           'default=%s'%personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+           'default=%s'%cluster_settings['cloud_project_name'],
+      default=cluster_settings['cloud_project_name'])
   sub_parser.add_argument('--bigtable_instance_name',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project from which all Report data will be permanently deleted. '
-    'default=%s'%personal_cluster_settings['bigtable_instance_name'],
-    default=personal_cluster_settings['bigtable_instance_name'])
+    'default=%s'%cluster_settings['bigtable_instance_name'],
+    default=cluster_settings['bigtable_instance_name'])
 
   ########################################################
   # deploy command
   ########################################################
   deploy_parser = subparsers.add_parser('deploy',
+    parents=[parent_parser],
     help='Build Docker containers. Push to Container Regitry. Deploy to GKE.')
   deploy_subparsers = deploy_parser.add_subparsers()
 
   sub_parser = deploy_subparsers.add_parser('show',
       parents=[parent_parser], help='Display information about currently '
       'deployed jobs on GKE, including their public URIs.')
+  _add_gke_deployment_args(sub_parser, cluster_settings)
   sub_parser.set_defaults(func=_deploy_show)
 
   sub_parser = deploy_subparsers.add_parser('authenticate',
@@ -819,42 +953,19 @@ def main():
       'necessary. Also associates your local computer with a particular '
       'GKE cluster to which you will be deploying.')
   sub_parser.set_defaults(func=_deploy_authenticate)
-  sub_parser.add_argument('--cloud_project_prefix',
-      help='The prefix part of name of the Cloud project to which your are '
-           'deploying. This is usually an organization domain name if your '
-           'Cloud project is associated with one. Pass the empty string for no '
-           'prefix. '
-           'Default=%s.' %personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
-  sub_parser.add_argument('--cloud_project_name',
-      help='The main part of the name of the Cloud project to which you are '
-           'deploying. This is the full project name if --cloud_project_prefix '
-           'is empty. Otherwise the full project name is '
-           '<cloud_project_prefix>:<cloud_project_name>. '
-           'Default=%s' % personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
-  sub_parser.add_argument('--cluster_name',
-      help='The GKE "container cluster" within your Cloud project to which you '
-           'are deploying. '
-           'Default=%s' % personal_cluster_settings['cluster_name'],
-      default=personal_cluster_settings['cluster_name'])
-  sub_parser.add_argument('--cluster_zone',
-      help='The zone in which your GKE "container cluster" is located. '
-           'Default=%s' % personal_cluster_settings['cluster_zone'],
-      default=personal_cluster_settings['cluster_zone'])
+  _add_gke_deployment_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('build',
       parents=[parent_parser], help='Rebuild all Docker images. '
           'You must have the Docker daemon running.')
   sub_parser.set_defaults(func=_deploy_build)
   default_shuffler_config_file = _default_shuffler_config_file(
-      personal_cluster_settings)
+      cluster_settings)
   sub_parser.add_argument('--shuffler_config_file',
       help='Path to the Shuffler configuration file. '
            'Default=%s' % default_shuffler_config_file,
       default=default_shuffler_config_file)
-  default_cobalt_config_dir = _default_cobalt_config_dir(
-      personal_cluster_settings)
+  default_cobalt_config_dir = _default_cobalt_config_dir(cluster_settings)
   sub_parser.add_argument('--cobalt_config_dir',
       help='Path of directory containing Cobalt configuration files. '
            'Default=%s' % default_cobalt_config_dir,
@@ -867,24 +978,12 @@ def main():
   sub_parser.add_argument('--job',
       help='The job you wish to push. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
-  sub_parser.add_argument('--cloud_project_prefix',
-      help='The prefix part of name of the Cloud project to which your are '
-           'deploying. This is usually an organization domain name if your '
-           'Cloud project is associated with one. Pass the empty string for no '
-           'prefix. '
-           'Default=%s.' %personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
-  sub_parser.add_argument('--cloud_project_name',
-      help='The main part of the name of the Cloud project to which you are '
-           'deploying. This is the full project name if --cloud_project_prefix '
-           'is empty. Otherwise the full project name is '
-           '<cloud_project_prefix>:<cloud_project_name>. '
-           'Default=%s' % personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+  _add_gke_deployment_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('start',
       parents=[parent_parser], help='Start one of the jobs on GKE.')
   sub_parser.set_defaults(func=_deploy_start)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
   sub_parser.add_argument('--job',
       help='The job you wish to start. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
@@ -892,30 +991,16 @@ def main():
       help='Specify a Cloud Bigtable instance within the specified Cloud '
            'project that the Analyzer should connect to. This is required '
            'if and only if you are starting one of the two Analyzer jobs. '
-           'Default=%s' % personal_cluster_settings['bigtable_instance_name'],
-      default=personal_cluster_settings['bigtable_instance_name'])
-  sub_parser.add_argument('--cloud_project_prefix',
-      help='The prefix part of the name of the Cloud project to which your are '
-           'deploying. This is usually an organization domain name if your '
-           'Cloud project is associated with one. Pass the empty string for no '
-           'prefix. '
-           'Default=%s.' %personal_cluster_settings['cloud_project_prefix'],
-      default=personal_cluster_settings['cloud_project_prefix'])
-  sub_parser.add_argument('--cloud_project_name',
-      help='The main part of the name of the Cloud project to which you are '
-           'deploying. This is the full project name if --cloud_project_prefix '
-           'is empty. Otherwise the full project name is '
-           '<cloud_project_prefix>:<cloud_project_name>. '
-           'Default=%s' % personal_cluster_settings['cloud_project_name'],
-      default=personal_cluster_settings['cloud_project_name'])
+           'Default=%s' % cluster_settings['bigtable_instance_name'],
+      default=cluster_settings['bigtable_instance_name'])
   sub_parser.add_argument('--gce_pd_name',
       help='The name of a GCE persistent disk. This is used only when starting '
            'the Shuffler. The disk must already have been created in the same '
            'Cloud project in which the Shuffler is being deployed. '
-           'Default=%s' % personal_cluster_settings['gce_pd_name'],
-      default=personal_cluster_settings['gce_pd_name'])
+           'Default=%s' % cluster_settings['gce_pd_name'],
+      default=cluster_settings['gce_pd_name'])
   default_shuffler_use_memstore = _default_shuffler_use_memstore(
-      personal_cluster_settings)
+      cluster_settings)
   sub_parser.add_argument('--shuffler-use-memstore',
       default=default_shuffler_use_memstore,
       help=('When starting the Shuffler, should the Suffler use its in-memory '
@@ -930,6 +1015,7 @@ def main():
   sub_parser = deploy_subparsers.add_parser('stop',
       parents=[parent_parser], help='Stop one of the jobs on GKE.')
   sub_parser.set_defaults(func=_deploy_stop)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
   sub_parser.add_argument('--job',
       help='The job you wish to stop. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
@@ -943,13 +1029,18 @@ def main():
       'Shuffler. To replace the keys first delete the old ones using the '
       '"deploy delete_secret_keys" command.')
   sub_parser.set_defaults(func=_deploy_upload_secret_keys)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--analyzer_private_key_pem',
+      default=analyzer_private_key_pem)
+  sub_parser.add_argument('--shuffler_private_key_pem',
+      default=shuffler_private_key_pem)
 
   sub_parser = deploy_subparsers.add_parser('delete_secret_keys',
       parents=[parent_parser], help='Deletes the |secret| objects in the '
       'cluster that were created using the "deploy upload_secret_keys" '
       'command.')
   sub_parser.set_defaults(func=_deploy_delete_secret_keys)
-
+  _add_gke_deployment_args(sub_parser, cluster_settings)
 
   args = parser.parse_args()
   global _verbose_count
@@ -963,8 +1054,15 @@ def main():
       + os.pathsep + os.environ["PATH"]
   os.environ["LD_LIBRARY_PATH"] = "%s/lib" % SYSROOT_DIR
 
+  global bt_admin_service_account_credentials_file
+  bt_admin_service_account_credentials_file = \
+      PERSONAL_BT_ADMIN_SERVICE_ACCOUNT_CREDENTIALS_FILE
+  if args0.production_dir:
+    bt_admin_service_account_credentials_file = os.path.abspath(
+        os.path.join(args0.production_dir, 'bt_admin_service_account.json'))
+
   os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = \
-      SERVICE_ACCOUNT_CREDENTIALS_FILE
+      bt_admin_service_account_credentials_file
 
   os.environ["GRPC_DEFAULT_SSL_ROOTS_FILE_PATH"] = os.path.abspath(
       os.path.join(SYSROOT_DIR, 'share', 'grpc', 'roots.pem'))

@@ -201,12 +201,14 @@ TEST_APP_PATH = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'test_app',
 def start_test_app(shuffler_uri='', analyzer_uri='',
                    analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM,
                    shuffler_pk_pem_file=DEFAULT_SHUFFLER_PUBLIC_KEY_PEM,
+                   cobalt_config_dir=DEMO_CONFIG_DIR,
                    verbose_count=0, wait=True):
   cmd = [TEST_APP_PATH,
       "-shuffler_uri", shuffler_uri,
       "-analyzer_uri", analyzer_uri,
       "-analyzer_pk_pem_file", analyzer_pk_pem_file,
       "-shuffler_pk_pem_file", shuffler_pk_pem_file,
+      "-registry", cobalt_config_dir,
       "-logtostderr"]
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)

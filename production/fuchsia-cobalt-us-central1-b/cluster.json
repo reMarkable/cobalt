@@ -1,0 +1,11 @@
+{
+  "cloud_project_prefix": "google.com",
+  "cloud_project_name": "fuchsia-cobalt",
+  "cluster_name": "cobalt",
+  "cluster_zone": "us-central1-b",
+  "gce_pd_name": "cobalt",
+  "bigtable_instance_name": "cobalt",
+  "shuffler_config_file" : "shuffler/src/shuffler_config/config_v0.txt",
+  "cobalt_config_dir" : "config/production",
+  "shuffler_use_memstore" : "true"
+}
