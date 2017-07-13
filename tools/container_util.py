@@ -19,6 +19,7 @@ import fileinput
 import os
 import re
 import shutil
+import string
 import subprocess
 import sys
 
@@ -205,13 +206,32 @@ def push_shuffler_to_container_registry(cloud_project_prefix,
   _push_to_container_registry(cloud_project_prefix, cloud_project_name,
                               SHUFFLER_IMAGE_NAME)
 
+# A special value recognized by the function _replace_tokens_in_template. If
+# a line of a template file contains a token $$FOO$$ and if the provided
+# token_replacements dictionary contains a value for the token $$FOO$$ that
+# is equal to the DELETE_LINE_INDICATOR then _replace_tokens_in_template will
+# delete the line from the generated output.
+DELETE_LINE_INDICATOR = '$$$$DELETE_LINE$$$'
+
 def _replace_tokens_in_template(template_file, out_file, token_replacements):
   _ensure_dir(os.path.dirname(out_file))
+  used_tokens = set()
   with open(out_file, 'w+b') as f:
     for line in fileinput.input(template_file):
+      delete_this_line = False
       for token in token_replacements:
-        line = line.replace(token, token_replacements[token])
-      f.write(line)
+        if string.find(line, token) != -1:
+          used_tokens.add(token)
+          if token_replacements[token] == DELETE_LINE_INDICATOR:
+            delete_this_line = True
+            break
+          else:
+            line = line.replace(token, token_replacements[token])
+      if not delete_this_line:
+        f.write(line)
+  for token in token_replacements:
+    if not token in used_tokens:
+      raise Exception("The token %s was never used." % token)
 
 def compound_project_name(cloud_project_prefix, cloud_project_name):
   if not cloud_project_prefix:
@@ -273,7 +293,8 @@ def _start_gke_service(deployment_template_file, deployment_file,
 def start_analyzer_service(cloud_project_prefix,
                            cloud_project_name,
                            cluster_zone, cluster_name,
-                           bigtable_instance_name):
+                           bigtable_instance_name,
+                           static_ip_address):
   """ Starts the analyzer-service deployment and service.
   cloud_project_prefix {sring}: For example "google.com"
   cloud_project_name {sring}: For example "shuffler-test". The prefix and
@@ -281,6 +302,8 @@ def start_analyzer_service(cloud_project_prefix,
       also the bigtable project name.
   bigtable_instance_name {string}: The name of the instance of Cloud Bigtable
       within the specified project to be used by the Analyzer Service.
+  static_ip_address {string}: A static IP address that has already been
+     reserved on the GKE cluster.
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   ANALYZER_SERVICE_IMAGE_NAME)
@@ -291,6 +314,11 @@ def start_analyzer_service(cloud_project_prefix,
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
 
+  # If a static ip address is not proviced, then delete the static IP specifier
+  # from the descriptor.
+  if not static_ip_address:
+    static_ip_address = DELETE_LINE_INDICATOR
+
   # These are the token replacements that must be made inside the deployment
   # template file.
   token_substitutions = {
@@ -298,7 +326,8 @@ def start_analyzer_service(cloud_project_prefix,
       '$$BIGTABLE_PROJECT_NAME$$' : bigtable_project_name,
       '$$BIGTABLE_INSTANCE_NAME$$' :bigtable_instance_name,
       '$$ANALYZER_PRIVATE_PEM_NAME$$' : ANALYZER_PRIVATE_KEY_PEM_NAME,
-      '$$ANALYZER_PRIVATE_KEY_SECRET_NAME$$' : ANALYZER_PRIVATE_KEY_SECRET_NAME}
+      '$$ANALYZER_PRIVATE_KEY_SECRET_NAME$$' : ANALYZER_PRIVATE_KEY_SECRET_NAME,
+      '$$ANALYZER_STATIC_IP_ADDRESS$$' : static_ip_address}
   _start_gke_service(ANALYZER_SERVICE_DEPLOYMENT_TEMPLATE_FILE,
                      ANALYZER_SERVICE_DEPLOYMENT_FILE,
                      token_substitutions, context)
@@ -306,7 +335,8 @@ def start_analyzer_service(cloud_project_prefix,
 def start_report_master(cloud_project_prefix,
                         cloud_project_name,
                         cluster_zone, cluster_name,
-                        bigtable_instance_name):
+                        bigtable_instance_name,
+                        static_ip_address):
   """ Starts the report-master deployment and service.
   cloud_project_prefix {sring}: For example "google.com"
   cloud_project_name {sring}: For example "shuffler-test". The prefix and
@@ -314,6 +344,8 @@ def start_report_master(cloud_project_prefix,
       also the bigtable project name.
   bigtable_instance_name {string}: The name of the instance of Cloud Bigtable
       within the specified project to be used by the Report Master.
+  static_ip_address {string}: A static IP address that has already been
+      reserved on the GKE cluster.
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   REPORT_MASTER_IMAGE_NAME)
@@ -324,11 +356,18 @@ def start_report_master(cloud_project_prefix,
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
 
+  # If a static ip address is not proviced, then delete the static IP specifier
+  # from the descriptor.
+  if not static_ip_address:
+    static_ip_address = DELETE_LINE_INDICATOR
+
   # These are the token replacements that must be made inside the deployment
   # template file.
-  token_substitutions = {'$$REPORT_MASTER_IMAGE_URI$$' : image_uri,
-                         '$$BIGTABLE_PROJECT_NAME$$' : bigtable_project_name,
-                         '$$BIGTABLE_INSTANCE_NAME$$' :bigtable_instance_name}
+  token_substitutions = {
+      '$$REPORT_MASTER_IMAGE_URI$$' : image_uri,
+      '$$BIGTABLE_PROJECT_NAME$$' : bigtable_project_name,
+      '$$BIGTABLE_INSTANCE_NAME$$' :bigtable_instance_name,
+      '$$REPORT_MASTER_STATIC_IP_ADDRESS$$' : static_ip_address}
   _start_gke_service(REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE,
                      REPORT_MASTER_DEPLOYMENT_FILE,
                      token_substitutions, context)
@@ -337,6 +376,7 @@ def start_shuffler(cloud_project_prefix,
                    cloud_project_name,
                    cluster_zone, cluster_name,
                    gce_pd_name,
+                   static_ip_address,
                    use_memstore=False,
                    danger_danger_delete_all_data_at_startup=False):
   """ Starts the shuffler deployment and service.
@@ -346,6 +386,8 @@ def start_shuffler(cloud_project_prefix,
   gce_pd_name: {string} The name of a GCE persistent disk. This must have
       already been created. The shuffler will use this disk for it LevelDB
       storage so that the data persists between Shuffler updates.
+  static_ip_address {string}: A static IP address that has already been
+      reserved on the GKE cluster.
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   SHUFFLER_IMAGE_NAME)
@@ -361,10 +403,18 @@ def start_shuffler(cloud_project_prefix,
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
 
+  # If a static ip address is not proviced, then delete the static IP specifier
+  # from the descriptor.
+  if not static_ip_address:
+    static_ip_address = DELETE_LINE_INDICATOR
+
+  # These are the token replacements that must be made inside the deployment
+  # template file.
   token_substitutions = {'$$SHUFFLER_IMAGE_URI$$' : image_uri,
       '$$GCE_PERSISTENT_DISK_NAME$$' : gce_pd_name,
       '$$SHUFFLER_USE_MEMSTORE$$' : use_memstore_string,
       '$$SHUFFLER_PRIVATE_PEM_NAME$$' : SHUFFLER_PRIVATE_KEY_PEM_NAME,
+      '$$SHUFFLER_STATIC_IP_ADDRESS$$' : static_ip_address,
       '$$SHUFFLER_PRIVATE_KEY_SECRET_NAME$$' : SHUFFLER_PRIVATE_KEY_SECRET_NAME,
       '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data}
   _start_gke_service(SHUFFLER_DEPLOYMENT_TEMPLATE_FILE,
@@ -461,8 +511,6 @@ def get_public_uris(cluster_name,
     "shuffler" : values.get(SHUFFLER_IMAGE_NAME),
   }
   return uris
-
-
 
 def main():
   print get_public_uris()

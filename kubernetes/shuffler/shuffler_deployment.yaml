@@ -99,4 +99,5 @@ spec:
     # This must match the metadata.labels section of the Deployment above.
     name: shuffler
   type: LoadBalancer
+  loadBalancerIP: $$SHUFFLER_STATIC_IP_ADDRESS$$
 

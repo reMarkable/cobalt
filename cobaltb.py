@@ -412,6 +412,7 @@ def _deploy_start(args):
         args.cloud_project_name,
         args.cluster_zone, args.cluster_name,
         args.gce_pd_name,
+        args.shuffler_static_ip,
         use_memstore=_parse_bool(args.shuffler_use_memstore),
         danger_danger_delete_all_data_at_startup=
             args.danger_danger_delete_all_data_at_startup)
@@ -422,7 +423,8 @@ def _deploy_start(args):
     container_util.start_analyzer_service(
         args.cloud_project_prefix, args.cloud_project_name,
         args.cluster_zone, args.cluster_name,
-        args.bigtable_instance_name)
+        args.bigtable_instance_name,
+        args.analyzer_service_static_ip)
   elif args.job == 'report-master':
     if args.bigtable_instance_name == '':
         print '--bigtable_instance_name must be specified'
@@ -430,7 +432,8 @@ def _deploy_start(args):
     container_util.start_report_master(
         args.cloud_project_prefix, args.cloud_project_name,
         args.cluster_zone, args.cluster_name,
-        args.bigtable_instance_name)
+        args.bigtable_instance_name,
+        args.report_master_static_ip)
   else:
     print('Unknown job "%s". I only know how to start "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
@@ -521,6 +524,21 @@ def _add_gke_deployment_args(parser, cluster_settings):
       help='The zone in which your GKE "container cluster" is located. '
            'Default=%s' % cluster_settings['cluster_zone'],
       default=cluster_settings['cluster_zone'])
+  parser.add_argument('--shuffler_static_ip',
+      help='A static IP address that has been previously reserved on the GKE '
+           'cluster for the Shuffler. '
+           'Default=%s' % cluster_settings['shuffler_static_ip'],
+      default=cluster_settings['shuffler_static_ip'])
+  parser.add_argument('--report_master_static_ip',
+      help='A static IP address that has been previously reserved on the GKE '
+           'cluster for the Report Master. '
+           'Default=%s' % cluster_settings['report_master_static_ip'],
+      default=cluster_settings['report_master_static_ip'])
+  parser.add_argument('--analyzer_service_static_ip',
+      help='A static IP address that has been previously reserved on the GKE '
+           'cluster for the Analyzer Service. '
+           'Default=%s' % cluster_settings['analyzer_service_static_ip'],
+      default=cluster_settings['analyzer_service_static_ip'])
 
 def main():
   # We parse the command line flags twice. The first time we are looking
@@ -549,6 +567,9 @@ def main():
     'cluster_zone': '',
     'gce_pd_name': '',
     'bigtable_instance_name': '',
+    'shuffler_static_ip' : '',
+    'report_master_static_ip' : '',
+    'analyzer_service_static_ip' : '',
     'shuffler_config_file': '',
     'cobalt_config_dir': '',
     'shuffler_use_memstore' : '',
@@ -603,9 +624,8 @@ def main():
     "deployment. Additionally if there is a file named "
     "'bt_admin_service_account.json' in that directory then the enviroment "
     "variable GOOGLE_APPLICATION_CREDENTIALS will be set to the path to "
-    "this file. Also the files `analyzer_private.pem` and "
-    "`shuffler_private.pem` will be looked for in this directory. "
-    "See README.md for details.")
+    "this file. Also the public and private key PEM files will be looked for "
+    "in this directory. See README.md for details.")
   parser.add_argument('--production_dir', default='', help=production_dir_help)
   parent_parser.add_argument('--production_dir', default='',
       help=production_dir_help)

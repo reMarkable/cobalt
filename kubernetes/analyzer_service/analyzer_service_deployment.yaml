@@ -79,4 +79,5 @@ spec:
     # This must match the metadata.labels section of the Deployment above.
     name: analyzer-service
   type: LoadBalancer
+  loadBalancerIP: $$ANALYZER_STATIC_IP_ADDRESS$$
 

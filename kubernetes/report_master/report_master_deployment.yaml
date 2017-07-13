@@ -71,4 +71,5 @@ spec:
     # This must match the metadata.labels section of the Deployment above.
     name: report-master
   type: LoadBalancer
+  loadBalancerIP: $$REPORT_MASTER_STATIC_IP_ADDRESS$$
 

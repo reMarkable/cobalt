@@ -395,6 +395,9 @@ Its contents should be exactly the following
   "cluster_zone": "<your-cluster-zone>",
   "gce_pd_name": "<your-persistent-disk-name>",
   "bigtable_instance_name": "<your-bigtable-instance-name>"
+  "shuffler_static_ip" : "<optional-pre-allocated-static-ip>",
+  "report_master_static_ip" : "<optional-pre-allocated-static-ip>",
+  "analyzer_service_static_ip" : "<optional-pre-allocated-static-ip>"",
   "shuffler_config_file" : "<optional-path-to-non-default-config-file>",
   "cobalt_config_dir" : "<optional-path-to-non-default-config-dir>",
   "suffler_use_memstore" : "<specify true or false. Default false.>"
@@ -413,7 +416,6 @@ For example:
   "bigtable_instance_name": "rudominer-test-1"
   "shuffler_config_file" : "shuffler/src/shuffler_config/config_demo.txt"
   "cobalt_config_dir" : "config/demo"
-  "shuffler_use_memstore" : "false"
 }
 ```
 
@@ -439,6 +441,14 @@ project name without the prefix and the colon.
 * *cluster_zone*: The zone in which the GKE cluster was created
 * *gce_pd_name*: The name of the GCE persistent disk you created
 * *bigtable_instance_name*: The name of the Bigtable instance you created.
+* *shuffler_static_ip*: If you have allocated a static IP address in your
+  Google Cloud Project you can assign it to the shuffler by writing it here.
+  Otherwise the shuffler will use a new dynamic IP address every time it is
+  deployed. WARNING: Google Cloud Platform has a quota on static IP addresses.
+  If you manually create static IP addresses and the deployment of Cobalt fails
+  you may have hit this quota. It is possible to request a quota increase.
+* *report_master_static_ip*: Same as above for the Report Master
+* *analyzer_service_static_ip*: Same as above for the Analyzer Service.
 * shuffler_config_file: If not specified uses the *demo* configuration file.
   If specified it should be a *source-root-relative* path to a Shuffler config
   file.
@@ -553,6 +563,9 @@ following contents:
   "cluster_zone": "us-central1-b",
   "gce_pd_name": "cobalt",
   "bigtable_instance_name": "cobalt",
+  "shuffler_static_ip" : "130.211.218.95",
+  "report_master_static_ip" : "35.188.119.76",
+  "analyzer_service_static_ip" : "35.184.165.233",
   "shuffler_config_file" : "shuffler/src/shuffler_config/config_v0.txt",
   "cobalt_config_dir" : "config/production",
   "shuffler_use_memstore" : "true"
@@ -566,7 +579,7 @@ to set the default values for deployment-related flags if the flag
 Unlike a `personal_cluster.json` file the production `cluster.json` files are
 checked in to source control.
 
-## Generating PEM Files
+### Generating PEM Files
 The production Analyzer needs a file called `analyzer_private.pem` and the
 production Shuffler needs a file called `shuffler_public.pem`. The current
 procedure, which will likely change in the future, is for the developer that
