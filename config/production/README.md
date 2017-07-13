@@ -9,4 +9,6 @@ Below we enumerate the customers and projects by ID:
 
 CustomerID,  ProjecID,  Customer Name,  Project Name
 ----------- ---------   ------------    ------------
-1             1          Fuchsia         Ledger
+1             1          Fuchsia         End-to-End Test
+1             2          Fuchsia         Fuchsia Test App
+1             100        Fuchsia         Ledger

@@ -17,10 +17,10 @@
 # Customer 1 (Fuchsia)
 ########################
 
-## Project 1: Ledger
+## Project 100: Ledger
 
 #####################################################################
-# Report Config (1, 1, 1)
+# Report Config (1, 100, 1)
 # Name:  Daily rare event counts
 # Description: A Daily report of Rare Events metric.
 # Parts: This metric has one part name "Event name"
@@ -29,7 +29,67 @@
 ######################################################################
 element {
   customer_id: 1
+  project_id: 100
+  id: 1
+  name: "Fuchsia Ledger Daily Rare Events"
+  description: "A daily report of events that are expected to happen rarely."
+  metric_id: 1
+  variable {
+    metric_part: "Event name"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}
+
+#####################################################################
+#        ***  Below this line are testing projects. ***
+#####################################################################
+
+## Project 1: End-to-End test
+
+#### ReportConfig (1, 1, 1)
+element {
+  customer_id: 1
   project_id: 1
+  id: 1
+  name: "Fuchsia Popular URLs"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 1
+  variable {
+    metric_part: "url"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}
+
+#### ReportConfig (1, 1, 2)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  name: "Fuchsia Usage by Hour"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 2
+  variable {
+    metric_part: "hour"
+  }
+  aggregation_epoch_type: WEEK
+  report_delay_days: 5
+}
+
+## Project 2: Fuchsia Test App
+
+#####################################################################
+# Report Config (1, 2, 1)
+# Name:  Daily rare event counts
+# Description: A Daily report of Rare Events metric.
+# Parts: This metric has one part name "Event name"
+# Notes: At least initially, we plan to use Basic RAPPOR with no privacy to
+#        collect this metric. Each category will be one of the rare events.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 2
   id: 1
   name: "Fuchsia Ledger Daily Rare Events"
   description: "A daily report of events that are expected to happen rarely."

@@ -14,13 +14,13 @@
 
 
 #########################
-# Customer 1 (Fuchsia)
+# Customer 100 (Fuchsia)
 ########################
 
-## Project 1: Ledger
+## Project 100: Ledger
 
 #####################################################################
-# Metric (1, 1, 1)
+# Metric (1, 100, 1)
 # Name:  Daily rare event counts
 # Description: Daily counts of several events that are expected to occur
 #              rarely if ever.
@@ -30,7 +30,70 @@
 ######################################################################
 element {
   customer_id: 1
+  project_id: 100
+  id: 1
+  time_zone_policy: UTC
+  parts {
+    key: "Event name"
+    value {
+    }
+  }
+}
+
+#####################################################################
+#        ***  Below this line are testing projects. ***
+#####################################################################
+
+## Project 1: End-to-End test
+
+#### Metric (1, 1, 1)
+element {
+  customer_id: 1
   project_id: 1
+  id: 1
+  name: "Fuchsia Popular URLs"
+  description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
+  parts {
+    key: "url"
+    value {
+      description: "A URL."
+      data_type: STRING
+    }
+  }
+}
+
+#### Metric (1, 1, 2)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  name: "Fuschsia Usage by Hour"
+  description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
+  parts {
+    key: "hour"
+    value {
+      description: "An integer from 0 to 23 representing the hour of the day."
+      data_type: INT
+    }
+  }
+}
+
+## Project 2: Fuchsia Test App
+
+#####################################################################
+# Metric (1, 2, 1)
+# Name:  Daily rare event counts
+# Description: Daily counts of several events that are expected to occur
+#              rarely if ever.
+# Parts: This metric has one part name "Event name"
+# Notes: At least initially, we plan to use Basic RAPPOR with no privacy to
+#        collect this metric. Each category will be one of the rare events.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 2
   id: 1
   time_zone_policy: UTC
   parts {

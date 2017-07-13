@@ -17,17 +17,73 @@
 # Customer 1 (Fuchsia)
 ########################
 
-## Project 1: Ledger
+## Project 100: Ledger
 
 #####################################################################
-# EncodingConfig(1, 1, 1)
+# EncodingConfig(1, 100, 1)
 # Name:  Basic RAPPOR for Daily Rare Event Counts
 # Description: A Configuration of Basic RAPPOR with no privacy, with string
 #              category names, and with one category for each rare event.
 ######################################################################
 element {
   customer_id: 1
+  project_id: 100
+  id: 1
+  basic_rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    string_categories: {
+      category: "Rare-event-1"
+      category: "Rare-event-2"
+      category: "Rare-event-3"
+    }
+  }
+}
+
+
+#####################################################################
+#        ***  Below this line are testing projects. ***
+#####################################################################
+
+## Project 1: End-to-End test
+
+#### EncodingConfig(1, 1, 1)
+element {
+  customer_id: 1
   project_id: 1
+  id: 1
+  forculus {
+    threshold: 20
+    epoch_type: DAY
+  }
+}
+
+#### EncodingConfig(1, 1, 2)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  basic_rappor {
+    prob_0_becomes_1: 0.1
+    prob_1_stays_1: 0.9
+    int_range_categories: {
+      first: 0
+      last:  23
+    }
+  }
+}
+
+## Project 2: Fuchsia Test App
+
+#####################################################################
+# EncodingConfig(1, 2, 1)
+# Name:  Basic RAPPOR for Daily Rare Event Counts
+# Description: A Configuration of Basic RAPPOR with no privacy, with string
+#              category names, and with one category for each rare event.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 2
   id: 1
   basic_rappor {
     prob_0_becomes_1: 0.0
