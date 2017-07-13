@@ -120,6 +120,11 @@ class ObservationStore {
                                   size_t max_results,
                                   std::string pagination_token);
 
+  // Permanently deletes all observations in the observation store for the
+  // given metric.
+  Status DeleteAllForMetric(uint32_t customer_id, uint32_t project_id,
+                            uint32_t metric_id);
+
  private:
   // The underlying data store.
   const std::shared_ptr<DataStore> store_;

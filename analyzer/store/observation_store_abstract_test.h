@@ -160,6 +160,11 @@ class ObservationStoreAbstractTest : public ::testing::Test {
     }
   }
 
+  store::Status DeleteAllForMetric(uint32_t metric_id) {
+    return observation_store_->DeleteAllForMetric(kCustomerId, kProjectId,
+                                                  metric_id);
+  }
+
   // Generates a part name with the given index.
   std::string static PartName(int index) {
     std::string out(15, 100);
@@ -395,6 +400,34 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   full_results = this->QueryFullResults(metric_id, 0, UINT32_MAX,
                                         requested_num_parts, 100);
   EXPECT_EQ(0u, full_results.size());
+
+  /////////////////////////////////////////////////////////////////
+  // Test the method DeleteAllForMetric.
+  /////////////////////////////////////////////////////////////////
+  metric_id = 1;
+  EXPECT_EQ(kOK, this->DeleteAllForMetric(metric_id));
+  // For metric 1 expect to find 0 results.
+  full_results = this->QueryFullResults(metric_id, 0, UINT32_MAX,
+                                        requested_num_parts, 100);
+  EXPECT_EQ(0u, full_results.size());
+
+  // For metric 2 the results should be the same as above.
+  metric_id = 2;
+
+  // Query for observations for days in the range [50, 150].
+  full_results =
+      this->QueryFullResults(metric_id, 50, 150, requested_num_parts, 100);
+
+  // Expect to find 2000 results as 200 results per day for 10 days starting
+  // with day 101.
+  // Expect to find 1 part.
+  expected_num_results = 2000;
+  expected_num_results_per_day = 200;
+  expected_num_parts = 1;
+  expected_first_day_index = 101;
+  this->CheckFullResults(full_results, expected_num_results,
+                         expected_num_results_per_day, expected_num_parts,
+                         expected_first_day_index);
 }
 
 TYPED_TEST_P(ObservationStoreAbstractTest, QueryWithInvalidArguments) {

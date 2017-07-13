@@ -63,6 +63,19 @@ std::string RowKey(uint32_t customer_id, uint32_t project_id,
   return out;
 }
 
+// Returns the common prefix of all rows keys for the given metric.
+std::string RowKeyPrefix(uint32_t customer_id, uint32_t project_id,
+                         uint32_t metric_id) {
+  // TODO(rudominer) This length corresponds to our current, temporary,
+  // human-readable row-keys built in RowKey() above. This function needs
+  // to change when the implementation changes. The prefix we return
+  // includes three ten-digit numbers plus three colons.
+  static const size_t kPrefixLength = 33;
+  std::string row_key = RowKey(customer_id, project_id, metric_id, 0, 0, 0);
+  row_key.resize(kPrefixLength);
+  return row_key;
+}
+
 // Returns the day_index encoded by |row_key|.
 uint32_t DayIndexFromRowKey(const std::string& row_key) {
   uint32_t day_index = 0;
@@ -245,6 +258,14 @@ ObservationStore::QueryResponse ObservationStore::QueryObservations(
   }
 
   return query_response;
+}
+
+Status ObservationStore::DeleteAllForMetric(uint32_t customer_id,
+                                            uint32_t project_id,
+                                            uint32_t metric_id) {
+  return store_->DeleteRowsWithPrefix(
+      DataStore::kObservations,
+      internal::RowKeyPrefix(customer_id, project_id, metric_id));
 }
 
 }  // namespace store
