@@ -143,6 +143,11 @@ import (
 )
 
 const (
+	// IMPORTANT NOTE: This end-to-end test may be executed against the real production instance of Cobalt running on GKE.
+	// Doing this has the potential of destroying real customer data. Our mechanims for preventing this from happening
+	// is to partition our projectIds. Project IDs from 0 through 99 are test-only and must never be used for real projects.
+	// Conversely project IDs greater than or equal to 100 are for real projects and must never be used in tests.
+	// Consquently the projectId below MUST always be less than 100.
 	customerId = 1
 	projectId  = 1
 
@@ -190,7 +195,7 @@ func printWarningAndWait() {
 	// that may also be writing to the console. We sleep for 2 seconds here in
 	// order to minimize the chances of pixel collision.
 	time.Sleep(2 * time.Second)
-	// The control sequences \x1b[31;1m and \x1b[0m have the affect of displaying
+	// The control sequences \x1b[31;1m and \x1b[0m have the effect of displaying
 	// the enclosed text in red.
 	fmt.Println("\n********************************************************")
 	fmt.Println("              W A R N I N G\n")
@@ -204,7 +209,7 @@ func printWarningAndWait() {
 	fmt.Println()
 	fmt.Println("ctr-c now or forever hold your peace.")
 	fmt.Println("*********************************************************\n")
-	// Move the cursur back up 5 lines.
+	// Move the cursor back up 5 lines.
 	fmt.Printf("\033[5A")
 	// Print "10" in red.
 	fmt.Printf("\b\x1b[31;1m10\x1b[0m")
@@ -218,7 +223,7 @@ func printWarningAndWait() {
 		fmt.Printf("\b\x1b[31;1m%d\x1b[0m", i)
 		time.Sleep(time.Second)
 	}
-	// Move the cursur back down 5 lines.
+	// Move the cursor back down 5 lines.
 	fmt.Printf("\033[5B")
 }
 

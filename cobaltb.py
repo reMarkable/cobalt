@@ -151,9 +151,10 @@ def _test(args):
   bigtable_instance_name = ''
   for test_dir in test_dirs:
     start_bt_emulator = ((test_dir in NEEDS_BT_EMULATOR)
-        and not args.use_cloud_bt and not args.cobalt_on_gke)
+        and not args.use_cloud_bt and not args.cobalt_on_personal_cluster
+        and not args.production_dir)
     start_cobalt_processes = ((test_dir in NEEDS_COBALT_PROCESSES)
-        and not args.cobalt_on_gke)
+        and not args.cobalt_on_personal_cluster and not args.production_dir)
     test_args = None
     if (test_dir == 'gtests_cloud_bt'):
       if not os.path.exists(bt_admin_service_account_credentials_file):
@@ -182,21 +183,36 @@ def _test(args):
       report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
       shuffler_pk_pem_file=E2E_TEST_SHUFFLER_PUBLIC_KEY_PEM
       shuffler_uri = "localhost:%d" % DEFAULT_SHUFFLER_PORT
-      if args.cobalt_on_gke:
-        public_uris = container_util.get_public_uris()
-        analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+      if args.cobalt_on_personal_cluster or args.production_dir:
+        if args.cobalt_on_personal_cluster and args.production_dir:
+          print ("Do not specify both --production_dir and "
+                 "-cobalt_on_personal_cluster.")
+          success = False
+          break
+        public_uris = container_util.get_public_uris(args.cluster_name,
+            args.cloud_project_prefix, args.cloud_project_name,
+            args.cluster_zone)
         analyzer_uri = public_uris["analyzer"]
         report_master_uri = public_uris["report_master"]
-        shuffler_pk_pem_file=DEFAULT_SHUFFLER_PUBLIC_KEY_PEM
         shuffler_uri = public_uris["shuffler"]
         if args.use_cloud_bt:
           # use_cloud_bt means to use local instances of the Cobalt processes
-          # connected to a Cloud Bigtable. cobalt_on_gke means to use
-          # Cloud instances of the Cobalt processes. These two options
+          # connected to a Cloud Bigtable. cobalt_on_personal_cluster means to
+          # use Cloud instances of the Cobalt processes. These two options
           # are inconsistent.
-          print "Do not specify both --use_cloud_bt and --cobalt_on_gke."
+          print ("Do not specify both --use_cloud_bt and "
+                 "-cobalt_on_personal_cluster or --production_dir.")
           success = False
           break
+      if args.cobalt_on_personal_cluster:
+        analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+        shuffler_pk_pem_file=DEFAULT_SHUFFLER_PUBLIC_KEY_PEM
+      elif args.production_dir:
+        pem_directory = os.path.abspath(args.production_dir)
+        analyzer_pk_pem_file = os.path.join(pem_directory,
+            'analyzer_public.pem')
+        shuffler_pk_pem_file = os.path.join(pem_directory,
+            'shuffler_public.pem')
       test_args = [
           "-analyzer_uri=%s" % analyzer_uri,
           "-analyzer_pk_pem_file=%s" % analyzer_pk_pem_file,
@@ -208,7 +224,8 @@ def _test(args):
           "-test_app_path=%s" % process_starter.TEST_APP_PATH,
           "-sub_process_v=%d"%_verbose_count
       ]
-      if args.use_cloud_bt or args.cobalt_on_gke:
+      if (args.use_cloud_bt or args.cobalt_on_personal_cluster or
+          args.production_dir):
         bigtable_project_name_from_args = _compound_project_name(args)
         test_args = test_args + [
           "-bigtable_tool_path=%s" % BIGTABLE_TOOL_PATH,
@@ -309,7 +326,7 @@ def _start_test_app(args):
         'analyzer_public.pem')
     shuffler_public_key_pem = os.path.join(pem_directory,
         'shuffler_public.pem')
-  if args.cobalt_on_gke or args.production_dir:
+  if args.cobalt_on_personal_cluster or args.production_dir:
     public_uris = container_util.get_public_uris(args.cluster_name,
         args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone)
     analyzer_uri = public_uris["analyzer"]
@@ -325,7 +342,7 @@ def _start_test_app(args):
 
 def _start_report_client(args):
   report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
-  if args.cobalt_on_gke or args.production_dir:
+  if args.cobalt_on_personal_cluster or args.production_dir:
     public_uris = container_util.get_public_uris(args.cluster_name,
         args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone)
     report_master_uri = public_uris["report_master"]
@@ -519,7 +536,7 @@ def _cluster_settings_from_json(cluster_settings, json_file_path):
 
     json_file_path: The full path to a json file that must exist.
   """
-  print ('Default deployment options will be taken from %s.' % json_file_path)
+  print ('The GKE cluster settings file being used is: %s.' % json_file_path)
   with open(json_file_path) as f:
     read_cluster_settings = json.load(f)
   for key in read_cluster_settings:
@@ -527,30 +544,33 @@ def _cluster_settings_from_json(cluster_settings, json_file_path):
       cluster_settings[key] = read_cluster_settings[key]
 
 
-def _add_gke_deployment_args(parser, cluster_settings):
+def _add_cloud_access_args(parser, cluster_settings):
   parser.add_argument('--cloud_project_prefix',
-      help='The prefix part of name of the Cloud project to which your are '
-           'deploying. This is usually an organization domain name if your '
+      help='The prefix part of name of the Cloud project with which you wish '
+           'to work. This is usually an organization domain name if your '
            'Cloud project is associated with one. Pass the empty string for no '
            'prefix. '
            'Default=%s.' %cluster_settings['cloud_project_prefix'],
       default=cluster_settings['cloud_project_prefix'])
   parser.add_argument('--cloud_project_name',
-      help='The main part of the name of the Cloud project to which you are '
-           'deploying. This is the full project name if --cloud_project_prefix '
+      help='The main part of the name of the Cloud project with which you wish '
+           'to work. This is the full project name if --cloud_project_prefix '
            'is empty. Otherwise the full project name is '
            '<cloud_project_prefix>:<cloud_project_name>. '
            'Default=%s' % cluster_settings['cloud_project_name'],
       default=cluster_settings['cloud_project_name'])
   parser.add_argument('--cluster_name',
-      help='The GKE "container cluster" within your Cloud project to which you '
-           'are deploying. '
+      help='The GKE "container cluster" within your Cloud project with which '
+           'you wish to work. '
            'Default=%s' % cluster_settings['cluster_name'],
       default=cluster_settings['cluster_name'])
   parser.add_argument('--cluster_zone',
       help='The zone in which your GKE "container cluster" is located. '
            'Default=%s' % cluster_settings['cluster_zone'],
       default=cluster_settings['cluster_zone'])
+
+def _add_gke_deployment_args(parser, cluster_settings):
+  _add_cloud_access_args(parser, cluster_settings)
   parser.add_argument('--shuffler_static_ip',
       help='A static IP address that has been previously reserved on the GKE '
            'cluster for the Shuffler. '
@@ -645,11 +665,13 @@ def main():
   # and also so that the call to parser.parse_args() below will not complain
   # about --produciton_dir being unrecognized.
   production_dir_help = ("The path to a "
-    "Cobalt production directory containing a 'cluster.json' file. If this "
-    "is specified then the contents of cluster.json will be used to set the "
+    "Cobalt production directory containing a 'cluster.json' file. The use of "
+    "this flag in various commands implies that the command should be applied "
+    "against the production Cobalt cluster associated with the specified "
+    "directory. The contents of cluster.json will be used to set the "
     "default values for many of the other flags pertaining to production "
     "deployment. Additionally if there is a file named "
-    "'bt_admin_service_account.json' in that directory then the enviroment "
+    "'bt_admin_service_account.json' in that directory then the environment "
     "variable GOOGLE_APPLICATION_CREDENTIALS will be set to the path to "
     "this file. Also the public and private key PEM files will be looked for "
     "in this directory. See README.md for details.")
@@ -666,18 +688,30 @@ def main():
 
   subparsers = parser.add_subparsers()
 
+  ########################################################
+  # setup command
+  ########################################################
   sub_parser = subparsers.add_parser('setup', parents=[parent_parser],
     help='Sets up the build environment.')
   sub_parser.set_defaults(func=_setup)
 
+  ########################################################
+  # build command
+  ########################################################
   sub_parser = subparsers.add_parser('build', parents=[parent_parser],
     help='Builds Cobalt.')
   sub_parser.set_defaults(func=_build)
 
+  ########################################################
+  # lint command
+  ########################################################
   sub_parser = subparsers.add_parser('lint', parents=[parent_parser],
     help='Run language linters on all source files.')
   sub_parser.set_defaults(func=_lint)
 
+  ########################################################
+  # test command
+  ########################################################
   sub_parser = subparsers.add_parser('test', parents=[parent_parser],
     help='Runs Cobalt tests. You must build first.')
   sub_parser.set_defaults(func=_test)
@@ -689,37 +723,27 @@ def main():
       'Cobalt processes connected to an instance of Cloud Bigtable. Otherwise '
       'a local instance of the Bigtable Emulator will be used.',
       action='store_true')
-  sub_parser.add_argument('-cobalt_on_gke',
-      help='Causes the end-to-end tests to run using an instance of Cobalt '
-      'deployed in Google Container Engine. Otherwise local instances of the '
+  sub_parser.add_argument('-cobalt_on_personal_cluster',
+      help='Causes the end-to-end tests to run using the instance of Cobalt '
+      'deployed on your personal GKE cluster. Otherwise local instances of the '
       'Cobalt processes are used. This option and -use_cloud_bt are mutually '
-      'inconsistent. Do not use both at the same time.',
+      'inconsistent. Do not use both at the same time. Also this option and '
+      '--production_dir or mutually inconsistent because --production_dir '
+      'implies that the end-to-end tests should be run against the specified '
+      'production instance of Cobalt.',
       action='store_true')
-  sub_parser.add_argument('--cloud_project_prefix',
-      help='The prefix part of the name of the Cloud project against which to '
-           'run some of the tests. Only used for the cloud_bt tests and e2e '
-           'tests when either -use_cloud_bt or -cobalt_on_gke are specified. '
-           'This is usually an organization domain name if your Cloud project '
-           'is associated with one. Pass the empty string for no prefix. '
-           'Default=%s.'%cluster_settings['cloud_project_prefix'],
-      default=cluster_settings['cloud_project_prefix'])
-  sub_parser.add_argument('--cloud_project_name',
-      help='The main part of the name of the Cloud project against which to '
-           'run some of the tests. This is the full project name if '
-           '--cloud_project_prefix is empty. Otherwise the full project name '
-           'is <cloud_project_prefix>:<cloud_project_name>. Only used for the '
-           'cloud_bt tests and e2e tests when either -use_cloud_bt or '
-           '-cobalt_on_gke are specified. '
-           'default=%s'%cluster_settings['cloud_project_name'],
-      default=cluster_settings['cloud_project_name'])
+  _add_cloud_access_args(sub_parser, cluster_settings)
   sub_parser.add_argument('--bigtable_instance_name',
       help='Specify a Cloud Bigtable instance within the specified Cloud'
       ' project against which to run some of the tests.'
       ' Only used for the cloud_bt tests and e2e tests when either '
-      '-use_cloud_bt or -cobalt_on_gke are specified.'
+      '-use_cloud_bt or -cobalt_on_personal_cluster are specified.'
       ' default=%s'%cluster_settings['bigtable_instance_name'],
       default=cluster_settings['bigtable_instance_name'])
 
+  ########################################################
+  # clean command
+  ########################################################
   sub_parser = subparsers.add_parser('clean', parents=[parent_parser],
     help='Deletes some or all of the build products.')
   sub_parser.set_defaults(func=_clean)
@@ -833,8 +857,7 @@ def main():
   sub_parser = start_subparsers.add_parser('test_app',
       parents=[parent_parser], help='Start the Cobalt test client app.')
   sub_parser.set_defaults(func=_start_test_app)
-  _add_gke_deployment_args(sub_parser, cluster_settings)
-  sub_parser.add_argument('-cobalt_on_gke',
+  sub_parser.add_argument('-cobalt_on_personal_cluster',
       help='Causes the test_app to run using an instance of Cobalt '
       'deployed in Google Container Engine. Otherwise local instances of the '
       'Cobalt processes are used.',
@@ -844,12 +867,13 @@ def main():
       help='Path of directory containing Cobalt configuration files. '
            'Default=%s' % default_cobalt_config_dir,
       default=default_cobalt_config_dir)
+  _add_cloud_access_args(sub_parser, cluster_settings)
 
   sub_parser = start_subparsers.add_parser('report_client',
       parents=[parent_parser], help='Start the Cobalt report client.')
   sub_parser.set_defaults(func=_start_report_client)
-  _add_gke_deployment_args(sub_parser, cluster_settings)
-  sub_parser.add_argument('-cobalt_on_gke',
+  _add_cloud_access_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('-cobalt_on_personal_cluster',
       help='Causes the report_client to query the instance of ReportMaster '
       'in your personal cluster rather than one running locally. If '
       '--production_dir is also specified it takes precedence and causes '
@@ -1016,8 +1040,8 @@ def main():
   sub_parser = deploy_subparsers.add_parser('show',
       parents=[parent_parser], help='Display information about currently '
       'deployed jobs on GKE, including their public URIs.')
-  _add_gke_deployment_args(sub_parser, cluster_settings)
   sub_parser.set_defaults(func=_deploy_show)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('authenticate',
       parents=[parent_parser], help='Refresh your authentication token if '
