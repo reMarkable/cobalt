@@ -75,6 +75,7 @@ void PrintHelp(std::ostream* ostream) {
   *ostream << "ls                       \tList current values of "
               "parameters."
            << std::endl;
+  *ostream << "set project <id>         \tSet project id." << std::endl;
   *ostream << "set metric <id>          \tSet metric id." << std::endl;
   *ostream << "quit                     \tQuit." << std::endl;
   *ostream << std::endl;
@@ -312,12 +313,12 @@ void ObservationQuerier::ListParameters() {
   *ostream_ << std::endl;
   *ostream_ << "Settable values" << std::endl;
   *ostream_ << "---------------" << std::endl;
+  *ostream_ << "Project ID: " << project_ << std::endl;
   *ostream_ << "Metric ID: " << metric_ << std::endl;
   *ostream_ << std::endl;
   *ostream_ << "Values set by flag at startup." << std::endl;
   *ostream_ << "-----------------------------" << std::endl;
   *ostream_ << "Customer ID: " << customer_ << std::endl;
-  *ostream_ << "Project ID: " << project_ << std::endl;
   *ostream_ << std::endl;
 }
 
@@ -338,6 +339,16 @@ void ObservationQuerier::SetParameter(const std::vector<std::string>& command) {
       return;
     }
     metric_ = id;
+  } else if (command[1] == "project") {
+    int64_t id;
+    if (!ParseInt(command[2], &id)) {
+      return;
+    }
+    if (id <= 0) {
+      *ostream_ << "<id> must be a positive integer";
+      return;
+    }
+    project_ = id;
   } else {
     *ostream_ << command[1] << " is not a settable parameter." << std::endl;
   }
