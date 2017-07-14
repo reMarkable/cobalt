@@ -244,6 +244,11 @@ class ReportStore {
                                     size_t max_results,
                                     std::string pagination_token);
 
+  // Permanently deletes all data in the ReportStore corresponding to the given
+  // report config.
+  Status DeleteAllForReportConfig(uint32_t customer_id, uint32_t project_id,
+                                  uint32_t report_config_id);
+
   static std::string ToString(const ReportId& report_id);
 
   // Sets the clock used by the ReportStore for obtaining the current time.

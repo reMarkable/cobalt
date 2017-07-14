@@ -120,6 +120,26 @@ std::string MakeReportRowKey(const ReportId& report_id, uint32_t suffix) {
   return stream.str();
 }
 
+// Returns the common prefix for all row keys in both the ReportRows table
+// and the ReportMetadata table corresponding to the given report config.
+std::string RowKeyPrefix(uint32_t customer_id, uint32_t project_id,
+                         uint32_t report_config_id) {
+  // TODO(rudominer) This length corresponds to our current, temporary,
+  // human-readable row-keys. This function needs to change when the
+  // implementation changes. The prefix we return includes three ten-digit
+  // numbers plus three colons.
+  static const size_t kPrefixLength = 33;
+  ReportId report_id;
+  report_id.set_customer_id(customer_id);
+  report_id.set_project_id(project_id);
+  report_id.set_report_config_id(report_config_id);
+  report_id.set_creation_time_seconds(0);
+  report_id.set_instance_id(0);
+  std::string row_key = ReportStore::ToString(report_id);
+  row_key.resize(kPrefixLength);
+  return row_key;
+}
+
 // Checks that the type of Row contained in |report_row| matches the type of
 // report specified by the |report_type| field of |metadata|.
 bool CheckRowType(const ReportId& report_id, const ReportMetadataLite& metadata,
@@ -538,6 +558,20 @@ std::string ReportStore::ToString(const ReportId& report_id) {
   out.resize(69);
 
   return out;
+}
+
+Status ReportStore::DeleteAllForReportConfig(uint32_t customer_id,
+                                             uint32_t project_id,
+                                             uint32_t report_config_id) {
+  auto status = store_->DeleteRowsWithPrefix(
+      DataStore::kReportMetadata,
+      RowKeyPrefix(customer_id, project_id, report_config_id));
+  if (status != kOK) {
+    return status;
+  }
+  return store_->DeleteRowsWithPrefix(
+      DataStore::DataStore::kReportRows,
+      RowKeyPrefix(customer_id, project_id, report_config_id));
 }
 
 }  // namespace store

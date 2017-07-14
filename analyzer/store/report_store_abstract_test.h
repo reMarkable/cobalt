@@ -205,6 +205,11 @@ class ReportStoreAbstractTest : public ::testing::Test {
     }
   }
 
+  Status DeleteAllForReportConfig(uint32_t report_config_id) {
+    return report_store_->DeleteAllForReportConfig(kCustomerId, kProjectId,
+                                                   report_config_id);
+  }
+
   uint32_t first_day_index() const { return kFirstDayIndex; }
 
   uint32_t last_day_index() const { return kLastDayIndex; }
@@ -452,9 +457,82 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
   }
 }
 
+// Tests the function DeleteAllForReportConfi
+TYPED_TEST_P(ReportStoreAbstractTest, TestDeleteAllForReportConfig) {
+  // We start four reports: two using our standard report config ID..
+  auto report_id_1_a = this->StartNewHistogramReport();
+  auto report_id_1_b = this->StartNewHistogramReport();
+  // and two using a different report config id.
+  auto report_id_2_a = this->MakeReportId(0, 0);
+  report_id_2_a.set_report_config_id(this->kReportConfigId + 1);
+  EXPECT_EQ(kOK, this->StartNewHistogramReport(true, &report_id_2_a));
+  auto report_id_2_b = this->MakeReportId(0, 0);
+  report_id_2_b.set_report_config_id(this->kReportConfigId + 1);
+  EXPECT_EQ(kOK, this->StartNewHistogramReport(true, &report_id_2_b));
+
+  // Add rows to all four reports.
+  EXPECT_EQ(kOK, this->AddHistogramReportRows(report_id_1_a, 100));
+  EXPECT_EQ(kOK, this->AddHistogramReportRows(report_id_1_b, 200));
+  EXPECT_EQ(kOK, this->AddHistogramReportRows(report_id_2_a, 300));
+  EXPECT_EQ(kOK, this->AddHistogramReportRows(report_id_2_b, 400));
+
+  // Complete all four reports
+  this->report_store_->EndReport(report_id_1_a, true, "");
+  this->report_store_->EndReport(report_id_1_b, true, "");
+  this->report_store_->EndReport(report_id_2_a, true, "");
+  this->report_store_->EndReport(report_id_2_b, true, "");
+
+  // Now delete everything corresponding to the first report config ID.
+  EXPECT_EQ(kOK, this->DeleteAllForReportConfig(this->kReportConfigId));
+
+  // Attempt to get the ReportMetatdata for all four reports.
+  // The first two should be not found.
+  ReportMetadataLite report_metadata;
+  EXPECT_EQ(kNotFound,
+            this->report_store_->GetMetadata(report_id_1_a, &report_metadata));
+  EXPECT_EQ(kNotFound,
+            this->report_store_->GetMetadata(report_id_1_b, &report_metadata));
+  // The second two should be ok.
+  EXPECT_EQ(kOK,
+            this->report_store_->GetMetadata(report_id_2_a, &report_metadata));
+  EXPECT_EQ(kOK,
+            this->report_store_->GetMetadata(report_id_2_b, &report_metadata));
+
+  // Attempt to get the report rows for all four reports.
+  // The first two should be not found.
+  cobalt::analyzer::ReportRows rows;
+  EXPECT_EQ(kNotFound, this->report_store_->GetReport(report_id_1_a,
+                                                      &report_metadata, &rows));
+  EXPECT_EQ(kNotFound, this->report_store_->GetReport(report_id_1_b,
+                                                      &report_metadata, &rows));
+  // The second two should be ok.
+  this->GetReportAndCheck(report_id_2_a, 300);
+  this->GetReportAndCheck(report_id_2_b, 400);
+
+  // Query for all reports with the first report config id.
+  auto query_reports_response = this->report_store_->QueryReports(
+      this->customer_id(), this->project_id(), this->report_config_id(), 0,
+      INT64_MAX, INT_MAX, "");
+
+  // Check the results. We expect kOK and zero results.
+  ASSERT_EQ(kOK, query_reports_response.status);
+  EXPECT_TRUE(query_reports_response.pagination_token.empty());
+  ASSERT_EQ(0u, query_reports_response.results.size());
+
+  // Query for all reports with the second report config id.
+  auto query_reports_response2 = this->report_store_->QueryReports(
+      this->customer_id(), this->project_id(), this->report_config_id() + 1, 0,
+      INT64_MAX, INT_MAX, "");
+
+  // Check the results. We expect kOK and 2 results.
+  ASSERT_EQ(kOK, query_reports_response2.status);
+  EXPECT_TRUE(query_reports_response2.pagination_token.empty());
+  ASSERT_EQ(2u, query_reports_response2.results.size());
+}
+
 REGISTER_TYPED_TEST_CASE_P(ReportStoreAbstractTest, SetAndGetMetadata,
                            CreateAndStartDependentReport, ReportRows,
-                           QueryReports);
+                           QueryReports, TestDeleteAllForReportConfig);
 
 }  // namespace store
 }  // namespace analyzer
