@@ -14,7 +14,7 @@
 
 
 #########################
-# Customer 100 (Fuchsia)
+# Customer 1 (Fuchsia)
 ########################
 
 ## Project 100: Ledger
