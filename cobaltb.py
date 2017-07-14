@@ -361,10 +361,37 @@ def _invoke_bigtable_tool(args, command):
   if args.bigtable_instance_name == '':
     print '--bigtable_instance_name must be specified'
     return
-  subprocess.check_call([BIGTABLE_TOOL_PATH,
-      "--command", command,
-      "--bigtable_project_name", bigtable_project_name_from_args,
-      "--bigtable_instance_name", args.bigtable_instance_name])
+  cmd = [BIGTABLE_TOOL_PATH,
+         "-command", command,
+         "-bigtable_project_name", bigtable_project_name_from_args,
+         "-bigtable_instance_name", args.bigtable_instance_name]
+  if command == 'delete_observations':
+    if args.customer_id == 0:
+      print '--customer_id must be specified'
+      return
+    if args.project_id == 0:
+      print '--project_id must be specified'
+      return
+    if args.metric_id == 0:
+      print '--metric_id must be specified'
+      return
+    cmd = cmd + ["-customer", str(args.customer_id),
+                 "-project", str(args.project_id),
+                 "-metric", str(args.metric_id)]
+  elif command == 'delete_reports':
+    if args.customer_id == 0:
+      print '--customer_id must be specified'
+      return
+    if args.project_id == 0:
+      print '--project_id must be specified'
+      return
+    if args.report_config_id == 0:
+      print '--report_config_id must be specified'
+      return
+    cmd = cmd + ["-customer", str(args.customer_id),
+                 "-project", str(args.project_id),
+                 "-report_config", str(args.report_config_id)]
+  subprocess.check_call(cmd)
 
 def _provision_bigtable(args):
   _invoke_bigtable_tool(args, "create_tables")
@@ -902,7 +929,7 @@ def main():
 
   sub_parser = bigtable_subparsers.add_parser('delete_observations',
     parents=[parent_parser],
-    help='**WARNING: Permanently delete all data from Cobalt\'s Observation '
+    help='**WARNING: Permanently delete data from Cobalt\'s Observation '
     'store. **')
   sub_parser.set_defaults(func=_delete_observations)
   sub_parser.add_argument('--cloud_project_prefix',
@@ -926,10 +953,22 @@ def main():
     ' project from which all Observation data will be permanently deleted. '
     'default=%s'%cluster_settings['bigtable_instance_name'],
     default=cluster_settings['bigtable_instance_name'])
+  sub_parser.add_argument('--customer_id',
+    help='Specify the Cobalt customer ID from which you wish to delete '
+         'observations. Required.',
+    default=0)
+  sub_parser.add_argument('--project_id',
+    help='Specify the Cobalt project ID from which you wish to delete '
+         'observations. Required.',
+    default=0)
+  sub_parser.add_argument('--metric_id',
+    help='Specify the Cobalt metric ID from which you wish to delete '
+         'observations. Required.',
+    default=0)
 
   sub_parser = bigtable_subparsers.add_parser('delete_reports',
     parents=[parent_parser],
-    help='**WARNING: Permanently delete all data from Cobalt\'s Report '
+    help='**WARNING: Permanently delete data from Cobalt\'s Report '
     'store. **')
   sub_parser.set_defaults(func=_delete_reports)
   sub_parser.add_argument('--cloud_project_prefix',
@@ -953,6 +992,18 @@ def main():
     ' project from which all Report data will be permanently deleted. '
     'default=%s'%cluster_settings['bigtable_instance_name'],
     default=cluster_settings['bigtable_instance_name'])
+  sub_parser.add_argument('--customer_id',
+    help='Specify the Cobalt customer ID from which you wish to delete '
+         'reports. Required.',
+    default=0)
+  sub_parser.add_argument('--project_id',
+    help='Specify the Cobalt project ID from which you wish to delete '
+         'reports. Required.',
+    default=0)
+  sub_parser.add_argument('--report_config_id',
+    help='Specify the Cobalt report config ID for which you wish to delete '
+         'all report data. Required.',
+    default=0)
 
   ########################################################
   # deploy command

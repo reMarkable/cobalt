@@ -182,19 +182,69 @@ var (
 	reportClient *report_client.ReportClient
 )
 
+// Prints a big warning banner on the console and counts down 10 seconds
+// allowing the user to hit conrol-c and cancel. Uses ANSI control characters
+// in order to achieve color and animation.
+func printWarningAndWait() {
+	// There is a natural race condition because other processes have been started
+	// that may also be writing to the console. We sleep for 2 seconds here in
+	// order to minimize the chances of pixel collision.
+	time.Sleep(2 * time.Second)
+	// The control sequences \x1b[31;1m and \x1b[0m have the affect of displaying
+	// the enclosed text in red.
+	fmt.Println("\n********************************************************")
+	fmt.Println("              W A R N I N G\n")
+	fmt.Println("In 10 seconds I will permanently delete data from Bigtable.")
+	fmt.Println()
+	fmt.Printf("\x1b[31;1m%s  %s.\x1b[0m\n", *bigtableProjectName, *bigtableInstanceName)
+	fmt.Println()
+	fmt.Printf("\x1b[31;1mcustomer: %d,  project: %d\x1b[0m\n", customerId, projectId)
+	fmt.Println()
+	fmt.Println()
+	fmt.Println()
+	fmt.Println("ctr-c now or forever hold your peace.")
+	fmt.Println("*********************************************************\n")
+	// Move the cursur back up 5 lines.
+	fmt.Printf("\033[5A")
+	// Print "10" in red.
+	fmt.Printf("\b\x1b[31;1m10\x1b[0m")
+	// Sleep for 1 second.
+	time.Sleep(time.Second)
+	// Delete the "0" character. "\b" is the backspace character.
+	fmt.Printf("\b \b")
+	// Animate counting down 9, 8, 7, ... We use "\b" to overwrite the previous digit to
+	// achieve an animation effect.
+	for i := 9; i > 0; i-- {
+		fmt.Printf("\b\x1b[31;1m%d\x1b[0m", i)
+		time.Sleep(time.Second)
+	}
+	// Move the cursur back down 5 lines.
+	fmt.Printf("\033[5B")
+}
+
 func init() {
 	flag.Parse()
 
 	reportClient = report_client.NewReportClient(customerId, projectId, *reportMasterUri, false, "")
 
 	if *bigtableToolPath != "" {
-		fmt.Printf("*** Deleting all observations from the Observation Store at %s;%s.\n", *bigtableProjectName, *bigtableInstanceName)
-		if err := invokeBigtableTool("delete_observations"); err != nil {
-			panic(fmt.Sprintf("Error deleting observations [%v].", err))
+		// Since we are about to delete data from a real bigtable let's give a user a chance
+		// to cancel if something horrible has gone wrong.
+		printWarningAndWait()
+		fmt.Printf("*** Deleting all observations from the Observation Store at %s;%s for project (%d, %d), metrics %d and %d.\n",
+			*bigtableProjectName, *bigtableInstanceName, customerId, projectId, urlMetricId, hourMetricId)
+		if err := invokeBigtableTool("delete_observations", urlMetricId, 0); err != nil {
+			panic(fmt.Sprintf("Error deleting observations for url metric [%v].", err))
+		}
+		if err := invokeBigtableTool("delete_observations", hourMetricId, 0); err != nil {
+			panic(fmt.Sprintf("Error deleting observations for hour metric [%v].", err))
 		}
 		fmt.Printf("*** Deleting all reports from the Report Store at %s;%s.\n", *bigtableProjectName, *bigtableInstanceName)
-		if err := invokeBigtableTool("delete_reports"); err != nil {
-			panic(fmt.Sprintf("Error deleting reports [%v].", err))
+		if err := invokeBigtableTool("delete_reports", 0, forculusUrlReportConfigId); err != nil {
+			panic(fmt.Sprintf("Error deleting forculus URL reports [%v].", err))
+		}
+		if err := invokeBigtableTool("delete_reports", 0, basicRapporHourReportConfigId); err != nil {
+			panic(fmt.Sprintf("Error deleting basic RAPPOR hour reports [%v].", err))
 		}
 	}
 }
@@ -234,15 +284,23 @@ func flagString(values []ValuePart) string {
 	return buffer.String()
 }
 
-func invokeBigtableTool(command string) error {
+func invokeBigtableTool(command string, metricId, reportConfigId int) error {
 	arguments := []string{
 		"-logtostderr", fmt.Sprintf("-v=%d", *subProcessVerbosity),
 		"-command", command,
+		"-customer", strconv.Itoa(customerId),
+		"-project", strconv.Itoa(projectId),
+		"-metric", strconv.Itoa(metricId),
+		"-report_config", strconv.Itoa(reportConfigId),
 		"-bigtable_instance_name", *bigtableInstanceName,
 		"-bigtable_project_name", *bigtableProjectName,
 	}
 	cmd := exec.Command(*bigtableToolPath, arguments...)
-	_, err := cmd.Output()
+	stdoutStderr, err := cmd.CombinedOutput()
+	message := string(stdoutStderr)
+	if len(message) > 0 {
+		fmt.Printf("%s", stdoutStderr)
+	}
 	if err != nil {
 		stdErrMessage := ""
 		if exitError, ok := err.(*exec.ExitError); ok {

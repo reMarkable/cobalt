@@ -249,14 +249,18 @@ not able to use the service account credential located at
 `./cobaltb.py bigtable provision`
 This creates the Cobalt Bigtable tables in your Cloud Bigtable instance.
 
-#### Delete the data from the Tables
-`./cobaltb.py bigtable delete_observations`
-WARNING: This will permanently delete all data from the Observation Store in
-whichever Cloud Bigtable instance you point it at. Be careful.
+#### Delete data from the Tables
+`./cobaltb.py bigtable delete_observations --customer_id=<customer_id> --project_id=<project_id> --metric_id=<metric_id>`
 
-`./cobaltb.py bigtable delete_reports`
-WARNING: This will permanently delete all data from the Report Store in
-whichever Cloud Bigtable instance you point it at. Be careful.
+WARNING: This will permanently delete the Observations corresponding to the
+specified metric in whichever Cloud Bigtable instance you point it at.
+Be careful.
+
+`./cobaltb.py bigtable delete_reports --customer_id=<customer_id> --project_id=<project_id> --report_config_id=<report_config_id>`
+
+WARNING: This will permanently delete all report data corresponding to the
+specified report config from the Report Store in whichever Cloud Bigtable
+instance you point it at. Be careful.
 
 ### Cloud Bigtable tests
 These are a set of gunit tests that run locally but use Cloud Bigtable. These
@@ -676,12 +680,16 @@ To provision the Bigtable tables type
 This creates the Cobalt Bigtable tables in the **production** Cloud Bigtable
 if they have not already been created.
 
-#### Delete the data from the Tables
-`.cobaltb.py --production_dir=<production_dir> bigtable delete_observations`
-WARNING: This will permanently delete all data from the **production**
-Observation Store. Usually you should have no reason to do this.
+#### Delete data from the Tables
+`./cobaltb.py bigtable delete_observations  --production_dir=<production_dir> --customer_id=<customer_id> --project_id=<project_id> --metric_id=<metric_id>`
 
-`./cobaltb.py --production_dir=<production_dir> bigtable delete_reports`
-WARNING: This will permanently delete all data from the **production**
-Report Store. Usually you should have no reason to do this.
+WARNING: This will permanently delete the Observations corresponding to the
+specified metric in the **production** Observation Store.
+Be extremely careful.
+
+`./cobaltb.py bigtable delete_reports --production_dir=<production_dir> --customer_id=<customer_id> --project_id=<project_id> --report_config_id=<report_config_id>`
+
+WARNING: This will permanently delete all report data corresponding to the
+specified report config from the **production**  Report Store.
+Be extremely careful.
 
