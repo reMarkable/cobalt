@@ -223,6 +223,11 @@ std::shared_ptr<ProjectContext> LoadProjectContext(
   }
   std::shared_ptr<MetricRegistry> metric_registry(metrics.first.release());
 
+  CHECK(FLAGS_project < 100) << "-project=" << FLAGS_project
+                             << " not allowed. Project ID must be less than "
+                                "100 because this tool is not "
+                                "intended to mutate real customer projects.";
+
   return std::shared_ptr<ProjectContext>(new ProjectContext(
       FLAGS_customer, FLAGS_project, metric_registry, encoding_registry));
 }
@@ -859,8 +864,8 @@ void TestApp::Show(const std::vector<std::string>& command) {
   if (!metric) {
     *ostream_ << "There is no metric with id=" << metric_ << "." << std::endl;
   } else {
-    *ostream_ << "Metric" << std::endl;
-    *ostream_ << "------" << std::endl;
+    *ostream_ << "Metric " << metric->id() << std::endl;
+    *ostream_ << "-----------" << std::endl;
     ShowMetric(*metric);
     *ostream_ << std::endl;
   }
@@ -870,8 +875,8 @@ void TestApp::Show(const std::vector<std::string>& command) {
     *ostream_ << "There is no encoding config with id=" << encoding_config_id_
               << "." << std::endl;
   } else {
-    *ostream_ << "Encoding Config" << std::endl;
-    *ostream_ << "---------------" << std::endl;
+    *ostream_ << "Encoding Config " << encoding->id() << std::endl;
+    *ostream_ << "--------------------" << std::endl;
     ShowEncodingConfig(*encoding);
     *ostream_ << std::endl;
   }
@@ -879,6 +884,7 @@ void TestApp::Show(const std::vector<std::string>& command) {
 
 void TestApp::ShowMetric(const Metric& metric) {
   *ostream_ << metric.name() << std::endl;
+  *ostream_ << metric.description() << std::endl;
   for (const auto& pair : metric.parts()) {
     const std::string& name = pair.first;
     const MetricPart& part = pair.second;
@@ -940,6 +946,23 @@ void TestApp::ShowBasicRapporConfig(const BasicRapporConfig& config) {
   *ostream_ << "Basic Rappor " << std::endl;
   *ostream_ << "p=" << config.prob_0_becomes_1()
             << ", q=" << config.prob_1_stays_1() << std::endl;
+  *ostream_ << "Categories:" << std::endl;
+  switch (config.categories_case()) {
+    case BasicRapporConfig::kStringCategories: {
+      for (const std::string& s : config.string_categories().category()) {
+        *ostream_ << s << std::endl;
+      }
+      return;
+    }
+    case BasicRapporConfig::kIntRangeCategories: {
+      *ostream_ << config.int_range_categories().first() << " - "
+                << config.int_range_categories().last();
+      return;
+    }
+    case BasicRapporConfig::CATEGORIES_NOT_SET:
+      *ostream_ << "Invalid Encoding!";
+      return;
+  }
 }
 
 bool TestApp::ParseInt(const std::string& str, bool complain, int64_t* x) {

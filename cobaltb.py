@@ -336,6 +336,7 @@ def _start_test_app(args):
       analyzer_pk_pem_file=analyzer_public_key_pem,
       shuffler_pk_pem_file=shuffler_public_key_pem,
       cobalt_config_dir=args.cobalt_config_dir,
+      project_id=args.project_id,
       # Because it makes the demo more interesting
       # we use verbose_count at least 3.
       verbose_count=max(3, _verbose_count))
@@ -868,6 +869,10 @@ def main():
            'Default=%s' % default_cobalt_config_dir,
       default=default_cobalt_config_dir)
   _add_cloud_access_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--project_id',
+    help='Specify the Cobalt project ID with which you wish to work. '
+         'Must be in the range [1, 99]. Default = 1.',
+    default=1)
 
   sub_parser = start_subparsers.add_parser('report_client',
       parents=[parent_parser], help='Start the Cobalt report client.')

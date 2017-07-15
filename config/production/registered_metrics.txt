@@ -32,10 +32,13 @@ element {
   customer_id: 1
   project_id: 100
   id: 1
+  name: "Daily rare event counts"
+  description: "Daily counts of several events that are expected to occur rarely if ever."
   time_zone_policy: UTC
   parts {
     key: "Event name"
     value {
+      description: "Which rare event occured?"
     }
   }
 }
@@ -95,10 +98,13 @@ element {
   customer_id: 1
   project_id: 2
   id: 1
+  name: "Daily rare event counts"
+  description: "Daily counts of several events that are expected to occur rarely if ever."
   time_zone_policy: UTC
   parts {
     key: "Event name"
     value {
+      description: "Which rare event occured?"
     }
   }
 }
