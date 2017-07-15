@@ -36,6 +36,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -54,6 +55,10 @@ var (
 	customerID     = flag.Uint("customer_id", 1, "The Cobalt customer ID.")
 	projectID      = flag.Uint("project_id", 1, "The Cobalt project ID.")
 	reportConfigID = flag.Uint("report_config_id", 1, "The ReportConfig ID. Used in non-interactive mode only.")
+	firstDay       = flag.Int64("first_day", math.MaxInt64, "If -first_day and -last_day are specified they should be (usually negative) "+
+		"offsets relative to today specifying a range of days over which the report should be run. Otherwise the range is unbounded.")
+	lastDay = flag.Int64("last_day", math.MaxInt64, "If -first_day and -last_day are specified they should be (usually negative) "+
+		"offsets relative to today specifying a range of days over which the report should be run. Otherwise the range is unbounded.")
 
 	interactive = flag.Bool("interactive", true, "If false then exuecute the command specified by the flags and exit.  "+
 		"Don't enter a command loop.")
@@ -115,12 +120,24 @@ func (c *ReportClientCLI) PrintReportResults(includeStdErr bool) {
 	}
 }
 
-func (c *ReportClientCLI) RunReportAndPrint(reportConfigId uint32, printErrorColumn bool) {
+func (c *ReportClientCLI) startReport(complete bool,
+	firstDayOffset int, lastDayOffset int, reportConfigId uint32) (string, error) {
+	if complete {
+		fmt.Printf("Generating a new report for Report Configuration %d cover all days...\n", reportConfigId)
+		return c.reportClient.StartCompleteReport(reportConfigId)
+	} else {
+		fmt.Printf("Generating a new report for Report Configuration %d covering the relative day interval [%d, %d]...\n",
+			reportConfigId, firstDayOffset, lastDayOffset)
+		return c.reportClient.StartReportRelativeUtc(reportConfigId, firstDayOffset, lastDayOffset)
+	}
+}
+
+func (c *ReportClientCLI) RunReportAndPrint(complete bool,
+	firstDayOffset int, lastDayOffset int, reportConfigId uint32, printErrorColumn bool) {
 	// Start the report
-	fmt.Printf("Generating a new report for Report Configuration %d...\n", reportConfigId)
-	reportId, err := c.reportClient.StartCompleteReport(reportConfigId)
+	reportId, err := c.startReport(complete, firstDayOffset, lastDayOffset, reportConfigId)
 	if err != nil {
-		fmt.Printf("StartCompleteReport() returned an error: [%v]\n", err)
+		fmt.Printf("Error while generating report: [%v]\n", err)
 		return
 	}
 
@@ -128,7 +145,7 @@ func (c *ReportClientCLI) RunReportAndPrint(reportConfigId uint32, printErrorCol
 	report, err := c.reportClient.GetReport(reportId, time.Duration(*deadlineSeconds)*time.Second)
 
 	if err != nil {
-		fmt.Printf("GetReport() returned an error: [%v]\n", err)
+		fmt.Printf("Error while fetching report: [%v]\n", err)
 		return
 	}
 	c.report = report
@@ -140,30 +157,79 @@ func (c *ReportClientCLI) RunReportAndPrint(reportConfigId uint32, printErrorCol
 func (c *ReportClientCLI) PrintHelp() {
 	fmt.Println()
 	fmt.Println("Cobalt command-line report client")
+	fmt.Printf("Report Master URI: %s\n", *reportMasterURI)
+	fmt.Printf("Project ID: %d\n", *projectID)
 	fmt.Println("---------------------------------")
 	fmt.Printf("help                  \t Print this help message.\n")
 	fmt.Println()
-	fmt.Printf("run full <cID> [errs] \t Run a new report based on the ReportConfigId <cID> which is a postivie integer.\n")
+	fmt.Printf("run range <firstDay> <lastDay> <cID> [errs]\n")
+	fmt.Printf("                      \t Run a new report based on the ReportConfigId <cID> covering the specified interval of days.\n")
 	fmt.Printf("                      \t Wait for the report to complete and then print the results to the console in CSV format.\n")
-	fmt.Printf("                      \t The report will cover all Observations ever collected for the associated metrics.\n")
+	fmt.Printf("                      \t The values <firstDay> and <lastDay> are (usually negative) integers specifying the day relative to\n")
+	fmt.Printf("                      \t the current day in the UTC timezone. Thus for example to generate a report that covers the two day period\n")
+	fmt.Printf("                      \t consisting of two days ago and yesterday, use <firstDay> = -2 and <lastDay> = -1.\n")
+	fmt.Printf("                      \t If the token 'errs' is appended to the command the report will include a standard error column\n")
+	fmt.Println()
+	fmt.Printf("run full <cID> [errs] \t Run a new report based on the ReportConfigId <cID>.\n")
+	fmt.Printf("                      \t Wait for the report to complete and then print the results to the console in CSV format.\n")
+	fmt.Printf("                      \t The report will cover all Observations ever collected that are associated to the report.\n")
 	fmt.Printf("                      \t If the token 'errs' is appended to the command the report will include a standard error column\n")
 	fmt.Println()
 	fmt.Printf("quit                  \t Quit.\n")
 	fmt.Println()
 }
 
-func (c *ReportClientCLI) RunReport(commandTokens []string) {
-	if len(commandTokens) < 3 || len(commandTokens) > 4 {
-		fmt.Println("Malformed run command. Expected 2 or 3 arguments.")
+// processRunRangeCommand is invoked after we already know the following:
+// 3 <= len(commandTokens) <= 6
+// commandTokens[0] = "run"
+// commandTokens[1] = "range"
+func (c *ReportClientCLI) processRunRangeCommand(commandTokens []string) {
+	// Command should be of the form: run range <firstDayOffset> <lastDayOffset> <reportConfigId> [errs]
+	if len(commandTokens) < 5 {
+		fmt.Println("Malformed run range command. Expected at least three arguments after 'range'.")
 		return
 	}
-	if commandTokens[1] != "full" {
-		fmt.Printf("Unrecognized run command: %s.\n", commandTokens[1])
+	firstDayOffset, err := strconv.Atoi(commandTokens[2])
+	if err != nil {
+		fmt.Printf("Expected an integer instead of %s.\n", commandTokens[2])
+		return
+	}
+	lastDayOffset, err := strconv.Atoi(commandTokens[3])
+	if err != nil {
+		fmt.Printf("Expected an integer instead of %s.\n", commandTokens[3])
+		return
+	}
+	reportConfigId, err := strconv.Atoi(commandTokens[4])
+	if err != nil || reportConfigId <= 0 {
+		fmt.Printf("Expected a positive integer instead of %s.\n", commandTokens[4])
 		return
 	}
 
-	reportConfigID, err := strconv.Atoi(commandTokens[2])
-	if err != nil || reportConfigID <= 0 {
+	printErrorColumn := false
+	if len(commandTokens) == 6 {
+		if commandTokens[5] == "errs" {
+			printErrorColumn = true
+		} else {
+			fmt.Printf("Expected 'errs' instead of %s.\n", commandTokens[5])
+			return
+		}
+	}
+
+	c.RunReportAndPrint(false, firstDayOffset, lastDayOffset, uint32(reportConfigId), printErrorColumn)
+}
+
+// processRunFullCommand is invoked after we already know the following:
+// 3 <= len(commandTokens) <= 6
+// commandTokens[0] = "run"
+// commandTokens[1] = "full"
+func (c *ReportClientCLI) processRunFullCommand(commandTokens []string) {
+	// Command should be of the form: run full <reportConfigId> [errs]
+	if len(commandTokens) > 4 {
+		fmt.Println("Malformed run full command. Expected only 2 or three arguments after 'run full'.")
+		return
+	}
+	reportConfigId, err := strconv.Atoi(commandTokens[2])
+	if err != nil || reportConfigId <= 0 {
 		fmt.Printf("Expected a positive integer instead of %s.\n", commandTokens[2])
 		return
 	}
@@ -178,8 +244,25 @@ func (c *ReportClientCLI) RunReport(commandTokens []string) {
 		}
 	}
 
-	c.RunReportAndPrint(uint32(reportConfigID), printErrorColumn)
+	c.RunReportAndPrint(true, 0, 0, uint32(reportConfigId), printErrorColumn)
+}
 
+func (c *ReportClientCLI) RunReport(commandTokens []string) {
+	if len(commandTokens) < 3 || len(commandTokens) > 6 {
+		fmt.Println("Malformed run command. Expected between 2 and 5 arguments.")
+		return
+	}
+
+	if commandTokens[1] == "range" {
+		c.processRunRangeCommand(commandTokens)
+		return
+	} else if commandTokens[1] == "full" {
+		c.processRunFullCommand(commandTokens)
+		return
+	}
+
+	fmt.Printf("Unrecognized run command: %s.\n", commandTokens[1])
+	return
 }
 
 func (c *ReportClientCLI) ProcessCommand(commandTokens []string) bool {
@@ -226,7 +309,12 @@ func (c *ReportClientCLI) CommandLoop() {
 }
 
 func (c *ReportClientCLI) ExecuteCommand() {
-	command := []string{"run", "full", fmt.Sprintf("%d", *reportConfigID)}
+	var command []string
+	if *firstDay != math.MaxInt64 && *lastDay != math.MaxInt64 {
+		command = []string{"run", "range", fmt.Sprintf("%d", *firstDay), fmt.Sprintf("%d", *lastDay), fmt.Sprintf("%d", *reportConfigID)}
+	} else {
+		command = []string{"run", "full", fmt.Sprintf("%d", *reportConfigID)}
+	}
 	if *includeStdErrColumn {
 		command = append(command, "errs")
 	}

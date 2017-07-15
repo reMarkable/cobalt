@@ -210,16 +210,18 @@ def start_test_app(shuffler_uri='', analyzer_uri='',
       "-analyzer_pk_pem_file", analyzer_pk_pem_file,
       "-shuffler_pk_pem_file", shuffler_pk_pem_file,
       "-registry", cobalt_config_dir,
-      "-project", project_id,
+      "-project", str(project_id),
       "-logtostderr"]
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
 
-def start_report_client(report_master_uri='', verbose_count=0, wait=True):
+def start_report_client(report_master_uri='',  project_id=1,
+                        verbose_count=0, wait=True):
   path = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'report_client'))
   cmd = [path,
       "-report_master_uri", report_master_uri,
+      "-project_id", str(project_id),
       "-logtostderr"]
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)

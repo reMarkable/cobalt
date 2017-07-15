@@ -120,6 +120,28 @@ func (c *ReportClient) StartCompleteReport(reportConfigId uint32) (string, error
 	return c.StartReport(reportConfigId, 0, math.MaxUint32)
 }
 
+// StartReportRelativeLocal invokes StartReport using the interval of days specified by firstDayOffset and lastDayOffset.
+// The two offsets are added to the current day index in the local timezone in order to form the firstDayIndex and
+// lastDayIndex that are passed to StartReport. Thus for example to obtain a report that covers the two day period
+// consisting of two-days-ago and yesterday invoke this method with firstDayOffset = -2 and lastDayOffset = -1.
+// The values of firstDayOffset and lastDayOffset should ordinarily be non-positive numbers since usually one would
+// like to run a report that covers time periods in the past.
+func (c *ReportClient) StartReportRelativeLocal(reportConfigId uint32, firstDayOffset int, lastDayOffset int) (string, error) {
+	today := CurrentDayIndexLocal()
+	return c.StartReport(reportConfigId, uint32(int(today)+firstDayOffset), uint32(int(today)+lastDayOffset))
+}
+
+// StartReportRelativeUtc invokes StartReport using the interval of days specified by firstDayOffset and lastDayOffset.
+// The two offsets are added to the current day index in the Utc timezone in order to form the firstDayIndex and
+// lastDayIndex that are passed to StartReport. Thus for example to obtain a report that covers the two day period
+// consisting of two-days-ago and yesterday invoke this method with firstDayOffset = -2 and lastDayOffset = -1.
+// The values of firstDayOffset and lastDayOffset should ordinarily be non-positive numbers since usually one would
+// like to run a report that covers time periods in the past.
+func (c *ReportClient) StartReportRelativeUtc(reportConfigId uint32, firstDayOffset int, lastDayOffset int) (string, error) {
+	today := CurrentDayIndexUtc()
+	return c.StartReport(reportConfigId, uint32(int(today)+firstDayOffset), uint32(int(today)+lastDayOffset))
+}
+
 // StartReport starts a report that covers the specified interval of day indices.
 // A report for the given |reportConfigId| is started. The
 // returned string is the unique report ID, which may be passed to GetReport(),
@@ -391,4 +413,37 @@ func WriteCSVReportToString(report *report_master.Report, includeStdErr bool) (c
 	}
 	csv = buffer.String()
 	return
+}
+
+const unixSecondsPerDay = 60 * 60 * 24
+
+// See util/datetime_util.h for an explanation of Cobalt's notion of day index.
+
+// dayIndexUtc returns the day index for the given time interpretted in Utc.
+func dayIndexUtc(t time.Time) uint32 {
+	return uint32(t.Unix() / unixSecondsPerDay)
+}
+
+// dayIndexLocal reutrns the day index for the given time interpretted in
+// the local time zone.
+func dayIndexLocal(t time.Time) uint32 {
+	return dayIndexUtc(t.Add(time.Duration(localOffsetSeconds()) * time.Second))
+}
+
+// localOffsetSeconds returns the difference between the local time and
+// the UTC time in seconds. In the Pacific timezone it returns a negative
+// number.
+func localOffsetSeconds() int {
+	_, offset := time.Now().Zone()
+	return offset
+}
+
+// CurrentDayIndexUtc returns the current day index in the UTC timezone.
+func CurrentDayIndexUtc() uint32 {
+	return dayIndexUtc(time.Now())
+}
+
+// CurrentDayIndexLocal returns the current day index in the local timezone.
+func CurrentDayIndexLocal() uint32 {
+	return dayIndexLocal(time.Now())
 }

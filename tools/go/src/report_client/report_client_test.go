@@ -21,6 +21,7 @@ import (
 	"math"
 	"reflect"
 	"testing"
+	"time"
 
 	"analyzer/report_master"
 	"cobalt"
@@ -262,5 +263,30 @@ func TestReportErrorToStrings(t *testing.T) {
 	}
 	if !reflect.DeepEqual(expectedErrorStrings, errorStrings) {
 		t.Errorf("errorStrings=%v", errorStrings)
+	}
+}
+
+func TestDayIndex(t *testing.T) {
+	// This unix timestamp corresponds to Friday Dec 2, 2016 in UTC
+	// and Thursday Dec 1, 2016 in Pacific time.
+	const someTimestamp = 1480647356
+	someTime := time.Unix(someTimestamp, 0)
+
+	// This is the day index for Friday Dec 2, 2016
+	const utcDayIndex = 17137
+
+	// This is the day index for Thurs Dec 1, 2016
+	const pacificDayIndex = 17136
+
+	if dayIndexUtc(someTime) != utcDayIndex {
+		t.Errorf("oops")
+	}
+	name, _ := time.Now().Zone()
+	if name == "PDT" {
+		// Only execute this check when the test is being run in the Pacific timezone.
+		dayIndexLocal := dayIndexLocal(someTime)
+		if dayIndexLocal != pacificDayIndex {
+			t.Errorf("dayIndexLocal(someTime=%d", dayIndexLocal)
+		}
 	}
 }
