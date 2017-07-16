@@ -221,7 +221,16 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
     const ReportId& report_id, const ReportConfig& report_config,
     const Metric& metric, std::vector<Variable> variables,
     uint32_t start_day_index, uint32_t end_day_index) {
-  DCHECK(start_day_index <= end_day_index);
+  if (start_day_index > end_day_index) {
+    std::ostringstream stream;
+    stream << "Invalid arguments: start_day_index=" << start_day_index << ">"
+           << end_day_index << "=end_day_index. "
+           << ReportConfigIdString(report_id)
+           << " report_id=" << ReportStore::ToString(report_id);
+    std::string message = stream.str();
+    LOG(ERROR) << message;
+    return grpc::Status(grpc::INVALID_ARGUMENT, message);
+  }
   if (variables.size() != 1) {
     std::ostringstream stream;
     stream << "Invalid arguments: There are " << variables.size()
