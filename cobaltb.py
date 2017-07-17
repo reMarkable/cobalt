@@ -234,6 +234,14 @@ def _test(args):
         ]
         bigtable_project_name = bigtable_project_name_from_args
         bigtable_instance_name = args.bigtable_instance_name
+      if args.production_dir:
+        # When running the end-to-end test against the production instance of
+        # Cobalt, it may not be true that the Shuffler has been configured
+        # to use a threshold of 100 so skip the part of the test that
+        # verifies that.
+        test_args = test_args + [
+          "-do_shuffler_threshold_test=false",
+        ]
     print '********************************************************'
     success = (test_runner.run_all_tests(
         test_dir, start_bt_emulator=start_bt_emulator,

@@ -184,6 +184,11 @@ var (
 	bigtableInstanceName = flag.String("bigtable_instance_name", "", "If specified use this instance of Cloud Bigtable instead of a local "+
 		"Bigtable Emulator. -bigtable_project_name must also be specified.")
 
+	doShufflerThresholdTest = flag.Bool("do_shuffler_threshold_test", true, "By defalt this test assumes that the Shuffler is configured "+
+		"to use a threshold of 100 and it tests that if fewer than 100 Observations are sent to the Shuffler then the Shuffler does not forward "+
+		"the Observations on to the Analyzer. If the Shuffler has been configured to use a threshold other than 100 then set this flag to false "+
+		"and we will skip that part of the test.")
+
 	reportClient *report_client.ReportClient
 )
 
@@ -473,15 +478,17 @@ func TestForculusEncodingOfUrls(t *testing.T) {
 	sendForculusUrlObservations("www.CCCC.com", 20, t)
 	sendForculusUrlObservations("www.DDDD.com", 21, t)
 
-	// We have not yet sent 100 observations and the Shuffler's threshold is
-	// set to 100 so we except no observations to have been sent to the
-	// Analyzer yet.
-	numObservations, err := getNumObservations(1, 10)
-	if err != nil {
-		t.Fatalf("Error returned from getNumObservations[%v]", err)
-	}
-	if numObservations != 0 {
-		t.Fatalf("Expected no observations in the Observation store yet but got %d", numObservations)
+	if *doShufflerThresholdTest {
+		// We have not yet sent 100 observations and the Shuffler's threshold is
+		// set to 100 so we except no observations to have been sent to the
+		// Analyzer yet.
+		numObservations, err := getNumObservations(1, 10)
+		if err != nil {
+			t.Fatalf("Error returned from getNumObservations[%v]", err)
+		}
+		if numObservations != 0 {
+			t.Fatalf("Expected no observations in the Observation store yet but got %d", numObservations)
+		}
 	}
 
 	// We send additional observations to the Shuffler. This crosses the Shuffler's
