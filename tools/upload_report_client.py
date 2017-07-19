@@ -28,12 +28,17 @@ import tarfile
 THIS_DIR = os.path.dirname(__file__)
 SRC_ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.pardir))
 OUT_DIR = os.path.join(SRC_ROOT_DIR, 'out')
+OUT_TOOLS_DIR = os.path.join(OUT_DIR, 'tools')
+BINARY_NAME = 'report_client'
 TOOLS_GO_DIR = os.path.join(SRC_ROOT_DIR, 'tools', 'go')
 
-def _write_compressed_tarfile(source_files, tarfile_name):
-  with tarfile.open(tarfile_name, "w:gz") as tar:
-    for file in source_files:
-      tar.add(file)
+def _write_compressed_tarfile(tarfile_to_create):
+  saved_cwd = os.getcwd()
+  os.chdir(OUT_TOOLS_DIR)
+  with tarfile.open(tarfile_to_create, "w:gz") as tar:
+    tar.add(BINARY_NAME)
+  os.chdir(saved_cwd)
+
 
 def _platform_string():
   return '%s%s' % (platform.system().lower(), platform.architecture()[0][:2])
@@ -50,14 +55,17 @@ def main():
     print "You must build first."
     return 1
   platform_string = _platform_string()
-  temp_tgz_file = 'report_client.%s.tgz' % platform_string
+  tgz_file = 'report_client.%s.tgz' % platform_string
+  cwd = os.getcwd()
+  temp_tgz_file_path = os.path.join(cwd, tgz_file)
   print "Compressing %s to temporary file %s..." % (report_client_path,
-      temp_tgz_file)
-  _write_compressed_tarfile([report_client_path], temp_tgz_file)
-  _upload(temp_tgz_file, platform_string)
-  os.remove(temp_tgz_file)
-  temp_sha1_file = "%s.sha1" % temp_tgz_file
-  final_sha1_file = os.path.join(TOOLS_GO_DIR, temp_sha1_file)
+      temp_tgz_file_path)
+  _write_compressed_tarfile(temp_tgz_file_path)
+  _upload(temp_tgz_file_path, platform_string)
+  os.remove(temp_tgz_file_path)
+  temp_sha1_file = "%s.sha1" % temp_tgz_file_path
+  target_sha1_file_name = "%s.sha1" % tgz_file
+  final_sha1_file = os.path.join(TOOLS_GO_DIR, target_sha1_file_name)
   shutil.move(temp_sha1_file, final_sha1_file)
 
 if __name__ == '__main__':
