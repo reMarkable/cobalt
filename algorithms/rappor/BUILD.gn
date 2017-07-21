@@ -15,6 +15,7 @@ static_library("rappor_encoder") {
 
   public_deps = [
     "//cobalt:cobalt_proto",
+    "//cobalt/config:cobalt_config_proto",
     "//cobalt/encoder:client_secret",
     "//cobalt/util/crypto_util"
   ]
