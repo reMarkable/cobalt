@@ -30,6 +30,41 @@ message RapporCandidateList {
   repeated string candidates = 1;
 }
 
+// Data needed at report-generation time for a particular string RAPPOR
+// encoding.
+message RapporReportPerEncodingData {
+  RapporCandidateList candidate_list = 1;
+}
+
+// Data needed at report-generation time for a particular basic RAPPOR encoding.
+message BasicRapporReportPerEncodingData {
+  // This is used just in case the BasicRaporConfig specified
+  // indexed_categories. In that case each observation encodes not a value
+  // directly but rather a zero-based index into an enumerated set of values
+  // defined outside of the Cobalt configuration system.
+  // Here we specify human-readable lables corresponding to (some of) the
+  // category indexes. The keys to the map are the zero-based indices and
+  // the values are human-readable labels to be used in the report.
+  // Note that a missing label is NOT a fatal error. This is to allow
+  // configuration on the client and the server to be updated
+  // separately. If an index occurs in the data but there is no corresponding
+  // label specified here then the generated report will contain a string
+  // such as "<category 42 (undefined)>." If labels are specified here for
+  // indices greater than or equal to |num_categories| from the
+  // BasicRapporConfig then a warning will be logged.
+  map<uint32, string> category_labels = 1;
+}
+
+// Data needed at report-generation time that is specific to an encoding
+// configuration. Instances of ReportPerEncodingData are the values of the
+// |per_encoding_data| map within a |ReportVaraible|.
+message ReportPerEncodingData {
+  oneof encoding {
+    BasicRapporReportPerEncodingData basic_rappor = 1;
+    RapporReportPerEncodingData rappor = 2;
+  }
+}
+
 // A ReportVariable is used within a |ReportConfig|. It specifies that
 // a generated report should include a named part of a metric and it
 // gives additional information necessary to analyze that metric part.
@@ -37,9 +72,15 @@ message ReportVariable {
   // The named part of the metric to include in the report.
   string metric_part = 1;
 
-  // This field should be present if and only if the report is intended to
-  // include some String RAPPOR analysis of this variable.
-  RapporCandidateList rappor_candidates = 2;
+  // This field allows additional per-encoding data to be specified. This
+  // is for data that is necessary at report generation time that is
+  // sepcific to an encoding configuration. The keys to the map are
+  // encoding config IDs. An encoding_config_id should appear in this map if
+  // (a) The report is expected to encounter observations that have been
+  //     encoded using this encoding config, and
+  // (b) The associated encoding requires additional data at report-generation
+  //     time.
+  map<uint32, ReportPerEncodingData> per_encoding_data = 2;
 }
 
 // The different types of reports that Cobalt knows how to create. Each

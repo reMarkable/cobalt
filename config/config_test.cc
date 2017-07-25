@@ -135,7 +135,7 @@ TEST(EncodingRegistryFromFile, ValidFile) {
       "config/test_files/registered_encodings_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(5u, registry->size());
+  EXPECT_EQ(6u, registry->size());
 
   // (1, 1, 1) Should be Forculus 20
   auto* encoding_config = registry->Get(1, 1, 1);
@@ -152,8 +152,14 @@ TEST(EncodingRegistryFromFile, ValidFile) {
       encoding_config->basic_rappor().int_range_categories().first() + 1;
   EXPECT_EQ(3, num_categories);
 
-  // (1, 1, 4) Should be not present
-  EXPECT_EQ(nullptr, registry->Get(1, 1, 4));
+  // (1, 1, 4) Should be Basic RAPPOR with indexed categories
+  encoding_config = registry->Get(1, 1, 4);
+  num_categories =
+      encoding_config->basic_rappor().indexed_categories().num_categories();
+  EXPECT_EQ(100, num_categories);
+
+  // (1, 1, 5) Should be not present
+  EXPECT_EQ(nullptr, registry->Get(1, 1, 5));
 
   // (2, 1, 1) Should be Basic RAPPOR with string categories
   encoding_config = registry->Get(2, 1, 1);
@@ -167,7 +173,7 @@ TEST(MetricRegistryFromFile, ValidFile) {
       "config/test_files/registered_metrics_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(4u, registry->size());
+  EXPECT_EQ(5u, registry->size());
 
   // (1, 1, 1) Should have 2 parts
   auto* metric_config = registry->Get(1, 1, 1);
@@ -177,8 +183,14 @@ TEST(MetricRegistryFromFile, ValidFile) {
   metric_config = registry->Get(1, 1, 2);
   EXPECT_EQ("Fuschsia Usage by Hour", metric_config->name());
 
-  // (1, 1, 3) Should be not present
-  EXPECT_EQ(nullptr, registry->Get(1, 1, 3));
+  // (1, 1, 3) Should be "Fuschsia System Events"
+  metric_config = registry->Get(1, 1, 3);
+  EXPECT_EQ("Fuschsia System Events", metric_config->name());
+  // There should be one part named "event" of type INDEX.
+  EXPECT_EQ(MetricPart::INDEX, metric_config->parts().at("event").data_type());
+
+  // (1, 1, 4) Should be not present
+  EXPECT_EQ(nullptr, registry->Get(1, 1, 4));
 }
 
 // Tests ReportRegistry::FromFile() on a fully valid file.
@@ -187,22 +199,57 @@ TEST(ReportRegistryFromFile, ValidFile) {
       "config/test_files/registered_reports_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(4u, registry->size());
+  EXPECT_EQ(5u, registry->size());
 
   // (1, 1, 1) should have 2 variables
   auto* report_config = registry->Get(1, 1, 1);
   EXPECT_EQ(2, report_config->variable_size());
-  EXPECT_EQ(2,
-            report_config->variable(0).rappor_candidates().candidates_size());
-  EXPECT_EQ("San Francisco",
-            report_config->variable(0).rappor_candidates().candidates(0));
+
+  // Examine the first varaible of (1, 1, 1)
+  const auto& variable = report_config->variable(0);
+  EXPECT_EQ(1u, variable.per_encoding_data().size());
+  EXPECT_EQ(1u, variable.per_encoding_data().count(1));
+  EXPECT_EQ(ReportPerEncodingData::kRappor,
+            variable.per_encoding_data().at(1).encoding_case());
+  EXPECT_EQ(2, variable.per_encoding_data()
+                   .at(1)
+                   .rappor()
+                   .candidate_list()
+                   .candidates_size());
+  EXPECT_EQ(
+      "San Francisco",
+      variable.per_encoding_data().at(1).rappor().candidate_list().candidates(
+          0));
 
   // (1, 1, 2) Should be "Fuschsia Usage by Hour"
   report_config = registry->Get(1, 1, 2);
   EXPECT_EQ("Fuschsia Usage by Hour", report_config->name());
 
-  // (1, 1, 3) Should be not present
-  EXPECT_EQ(nullptr, registry->Get(1, 1, 3));
+  // (1, 1, 3) Should be "Fuschsia Daily System Event Counts"
+  report_config = registry->Get(1, 1, 3);
+  EXPECT_EQ("Fuschsia Daily System Event Counts", report_config->name());
+
+  // Examine the first varaible of (1, 1, 3)
+  const auto& variable0 = report_config->variable(0);
+  EXPECT_EQ(1u, variable0.per_encoding_data().size());
+  EXPECT_EQ(1u, variable0.per_encoding_data().count(1));
+  EXPECT_EQ(ReportPerEncodingData::kBasicRappor,
+            variable0.per_encoding_data().at(1).encoding_case());
+  EXPECT_EQ(
+      "Event A",
+      variable0.per_encoding_data().at(1).basic_rappor().category_labels().at(
+          0));
+  EXPECT_EQ(
+      "Event B",
+      variable0.per_encoding_data().at(1).basic_rappor().category_labels().at(
+          1));
+   EXPECT_EQ(
+      "Event Z",
+      variable0.per_encoding_data().at(1).basic_rappor().category_labels().at(
+          25));
+
+  // (1, 1, 4) Should be not present
+  EXPECT_EQ(nullptr, registry->Get(1, 1, 4));
 }
 
 // This test runs EncodingRegistry::FromFile() on our demo
@@ -224,8 +271,8 @@ TEST(EncodingRegistryFromFile, CheckProductionEncodings) {
 // This test runs MetricRegistry::FromFile() on our demo
 // file, registered_metrics.txt. The purpose is to validate that file.
 TEST(MetricRegistryFromFile, CheckDemoMetrics) {
-  auto result = MetricRegistry::FromFile(
-      "config/demo/registered_metrics.txt", nullptr);
+  auto result =
+      MetricRegistry::FromFile("config/demo/registered_metrics.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
@@ -240,8 +287,8 @@ TEST(MetricRegistryFromFile, CheckProductionMetrics) {
 // This test runs ReportRegistry::FromFile() on our demo
 // file, registered_reports.txt. The purpose is to validate that file.
 TEST(ReportRegistryFromFile, CheckDemodReports) {
-  auto result = ReportRegistry::FromFile(
-      "config/demo/registered_reports.txt", nullptr);
+  auto result =
+      ReportRegistry::FromFile("config/demo/registered_reports.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 

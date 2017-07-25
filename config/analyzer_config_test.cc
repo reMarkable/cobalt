@@ -38,7 +38,8 @@ TEST(AnalyzerConfigTest, ValidFiles) {
   config = AnalyzerConfig::CreateFromFlagsOrDie();
   // Sanity check the contents.
   EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 3));
-  EXPECT_EQ(nullptr, config->EncodingConfig(1, 1, 4));
+  EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 4));
+  EXPECT_EQ(nullptr, config->EncodingConfig(1, 1, 5));
   EXPECT_NE(nullptr, config->Metric(2, 1, 2));
   EXPECT_EQ(nullptr, config->Metric(2, 1, 3));
   EXPECT_NE(nullptr, config->ReportConfig(2, 1, 1));

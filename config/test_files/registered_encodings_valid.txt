@@ -50,6 +50,20 @@ element {
   }
 }
 
+#### Encoding (1, 1, 4)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  basic_rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    indexed_categories: {
+      num_categories: 100
+    }
+  }
+}
+
 #########################
 # Customer 2 (Acme)
 ########################

@@ -83,9 +83,17 @@ element {
   metric_id: 1
   variable {
     metric_part: "name"
-    rappor_candidates {
-      candidates: "Module A"
-      candidates: "Module B"
+    per_encoding_data {
+      # Encoding (2, 1, 1) Is String RAPPOR.
+      key: 1
+      value {
+        rappor {
+          candidate_list {
+             candidates: "Module A"
+             candidates: "Module B"
+          }
+        }
+      }
     }
   }
   aggregation_epoch_type: MONTH

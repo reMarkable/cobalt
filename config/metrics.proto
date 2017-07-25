@@ -36,6 +36,21 @@ message MetricPart {
     // will not try to interpret or display these values. A |ValuePart| encoded
     // for this MetricPart must have its |blob_value| set.
     BLOB = 2;
+
+    // Values for this MetricPart are non-negative integers that are
+    // interpreted as zero-based indices into some enumerated set that is
+    // specified outside of Cobalt's configuration. Human-readable labels may
+    // be associated with the indices in a Cobalt ReportConfig for the purpose
+    // of generating reports about this metric. During report generation, in
+    // case the ReportConfig does not specify a label for an index that occurs
+    // in the data, no error will occur but rather a temporary place-holder
+    // label such as "<index 42 (undefined)>" will be generated.
+    //
+    // Additionally, a maximum value for the indices may be specified by an
+    // EncodingConfig if the associated encoding mechanism requires it.
+    //
+    // A |ValuePart| for this MetricPart must have its |index_value| set.
+    INDEX = 3;
   }
 
   // A human-readable description of this MetricPart. This should include
@@ -52,7 +67,7 @@ message MetricPart {
 // Fuchsia system usage as a function of the hour of the day.
 // Each Observation from the Encoder is for a particular metric.
 // Each Observation for the metric "Fuchsia Usage Hour-of-the-day" would
-// report the hour of the day for a paticular usage of Fuchsia.
+// report the hour of the day for a particular usage of Fuchsia.
 // A Metric has one or more named parts and each Observation sent by the Encoder
 // must contain ObservationParts corresponding to these Metric parts.
 // For example the Metric described above might have only one part named

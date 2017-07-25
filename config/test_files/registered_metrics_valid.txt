@@ -57,6 +57,22 @@ element {
   }
 }
 
+#### Encoding (1, 1, 3)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  name: "Fuschsia System Events"
+  description: "This is a fictional metric used for the development of Cobalt."
+  parts {
+    key: "event"
+    value {
+      description: "The index of one of the system event types."
+      data_type: INDEX
+    }
+  }
+}
+
 #########################
 # Customer 2 (Acme)
 ########################

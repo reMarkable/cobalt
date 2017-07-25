@@ -111,6 +111,9 @@ std::string ToString(const ValuePart& value) {
     case ValuePart::kIntValue:
       stream << value.int_value();
       break;
+    case ValuePart::kIndexValue:
+      stream << value.index_value();
+      break;
     case ValuePart::kBlobValue:
       stream << "<blob of length " << value.blob_value().size() << ">";
       break;

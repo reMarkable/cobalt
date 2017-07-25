@@ -13,10 +13,6 @@ element {
   metric_id: 1
   variable {
     metric_part: "city"
-    rappor_candidates {
-      candidates: "San Francisco"
-      candidates: "Los Angeles"
-    }
   }
   variable {
     metric_part: "rating"

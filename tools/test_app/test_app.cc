@@ -959,6 +959,10 @@ void TestApp::ShowBasicRapporConfig(const BasicRapporConfig& config) {
                 << config.int_range_categories().last();
       return;
     }
+    case BasicRapporConfig::kIndexedCategories: {
+      *ostream_ << "num_categories: "
+                << config.indexed_categories().num_categories();
+    }
     case BasicRapporConfig::CATEGORIES_NOT_SET:
       *ostream_ << "Invalid Encoding!";
       return;

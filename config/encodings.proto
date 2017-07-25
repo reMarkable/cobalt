@@ -102,6 +102,13 @@ message IntRangeCategories {
   int64 last = 2;
 }
 
+// A specification of the number of categories to be used in Basic RAPPOR for a
+// metric part of type INDEX. k = |num_categories| must satisfy
+// 1 < k < 1024.
+message IndexedCategories {
+  uint32 num_categories = 1;
+}
+
 message BasicRapporConfig {
   // All probabilities below must be in the range [0.0, 1.0].
 
@@ -118,13 +125,15 @@ message BasicRapporConfig {
   // This value must not be set to a non-zero value.
   float prob_rr = 3;
 
-  // For basic RAPPOR the Encoder needs to know the list of categories.
-  // For encoding metric parts of type STRING |string_categories| should be used
-  // and for encoding metric parts of type INT |int_range_categories| should be
-  // used.
+  // For basic RAPPOR the Encoder needs to know something about the list of
+  // categories. For encoding metric parts of type STRING |string_categories|
+  // should be used, for encoding metric parts of type INT
+  // |int_range_categories| should be used and for encoding metric parts of
+  // type INDEX, |indexed_categories| should be used.
   oneof categories {
     StringCategories string_categories = 7;
     IntRangeCategories int_range_categories = 8;
+    IndexedCategories indexed_categories = 9;
   }
 }
 

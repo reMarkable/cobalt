@@ -38,6 +38,11 @@ message ValuePart {
 
     // An uninterpreted sequence of bytes.
     bytes blob_value = 3;
+
+    // A zero-based index into some enumerated set that is specified outside
+    // of Cobalt's configuration. See comments on the INDEX DataType in
+    // metrics.proto for more about this.
+    uint32 index_value = 4;
   }
 }
 

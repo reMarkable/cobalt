@@ -88,6 +88,8 @@ element {
   customer_id: 2
   project_id: 1
   id: 1
+  # Note that a candidate set for this RAPPOR encoding is specified
+  # in ReportConfig (2, 1, 1)
   rappor {
     num_bloom_bits: 64
     num_hashes: 2
