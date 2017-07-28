@@ -202,6 +202,13 @@ message HistogramReportRow {
   // The value for this row.
   ValuePart value = 1;
 
+  // An additional human-readable label used to identify this row.
+  // This may be empty if |value| contains all the information necessary to
+  // identify this row. One case in which this will be populated is if
+  // |value| contains an |index_value| and the ReportConfig used to generate
+  // this report contained a human-readable label for the index.
+  string label = 4;
+
   // This field is the primary output of Cobalt Analysis. It is an estimate
   // of the true count of the value in the user population.
   float count_estimate = 2;

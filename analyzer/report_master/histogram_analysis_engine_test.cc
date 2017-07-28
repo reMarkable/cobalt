@@ -31,6 +31,7 @@ namespace analyzer {
 using config::AnalyzerConfig;
 using config::EncodingRegistry;
 using config::MetricRegistry;
+using config::ReportRegistry;
 using encoder::ClientSecret;
 using encoder::Encoder;
 using encoder::ProjectContext;
@@ -39,9 +40,13 @@ namespace {
 
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
-const uint32_t kMetricId = 1;
+const uint32_t kStringMetricId = 1;
+const uint32_t kIndexMetricId = 2;
 const uint32_t kForculusEncodingConfigId = 1;
-const uint32_t kBasicRapporEncodingConfigId = 2;
+const uint32_t kBasicRapporStringEncodingConfigId = 2;
+const uint32_t kBasicRapporIndexEncodingConfigId = 3;
+const uint32_t kStringReportConfigId = 1;
+const uint32_t kIndexReportConfigId = 2;
 const char kPartName[] = "Part1";
 const size_t kForculusThreshold = 20;
 
@@ -64,6 +69,20 @@ element {
   }
 }
 
+# Metric 2 has one INDEX part.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  time_zone_policy: UTC
+  parts {
+    key: "Part1"
+    value {
+      data_type: INDEX
+    }
+  }
+}
+
 )";
 
 const char* kEncodingConfigText = R"(
@@ -77,7 +96,7 @@ element {
   }
 }
 
-# EncodingConfig 2 is Basic RAPPOR.
+# EncodingConfig 2 is Basic RAPPOR with string categories.
 element {
   customer_id: 1
   project_id: 1
@@ -93,13 +112,73 @@ element {
   }
 }
 
+# EncodingConfig 3 is Basic RAPPOR with indexed categories.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  basic_rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    indexed_categories: {
+      num_categories: 100
+    }
+  }
+}
+
+)";
+
+const char* kReportConfigText = R"(
+element {
+  customer_id: 1
+  project_id: 1
+  id: 1
+  metric_id: 1
+  variable {
+    metric_part: "Part1"
+  }
+}
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  metric_id: 2
+  variable {
+    metric_part: "Part1"
+    per_encoding_data {
+      key: 3
+      value {
+        basic_rappor {
+          category_labels {
+             key: 0
+             value: "Event A"
+          }
+          category_labels {
+             key: 1
+             value: "Event B"
+          }
+          category_labels {
+             key: 5
+             value: "Event F"
+          }
+          category_labels {
+             key: 25
+             value: "Event Z"
+          }
+        }
+      }
+    }
+  }
+}
+
 )";
 
 }  // namespace
 
 class HistogramAnalysisEngineTest : public ::testing::Test {
  protected:
-  void SetUp() {
+  void Init(uint32_t report_config_id) {
     report_id_.set_customer_id(kCustomerId);
     report_id_.set_project_id(kProjectId);
 
@@ -123,59 +202,102 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     std::shared_ptr<AnalyzerConfig> analyzer_config(
         new AnalyzerConfig(encoding_registry, metric_registry, nullptr));
 
-    analysis_engine_.reset(
-        new HistogramAnalysisEngine(report_id_, analyzer_config));
+    // Parse the report config string
+    auto report_parse_result =
+        ReportRegistry::FromString(kReportConfigText, nullptr);
+    EXPECT_EQ(config::kOK, report_parse_result.second);
+    report_registry_.reset((report_parse_result.first.release()));
+
+    // Extract the ReportVariable from the ReportConfig.
+    const auto* report_config =
+        report_registry_->Get(kCustomerId, kProjectId, report_config_id);
+    EXPECT_NE(nullptr, report_config);
+    const ReportVariable* report_variable = &(report_config->variable(0));
+    EXPECT_NE(nullptr, report_variable);
+
+    analysis_engine_.reset(new HistogramAnalysisEngine(
+        report_id_, report_variable, analyzer_config));
   }
 
   // Makes an Observation with one string part which has the given
   // |string_value|, using the encoding with the given encoding_config_id.
-  std::unique_ptr<Observation> MakeObservation(std::string string_value,
-                                               uint32_t encoding_config_id) {
+  std::unique_ptr<Observation> MakeStringObservation(
+      std::string string_value, uint32_t encoding_config_id) {
     // Construct a new Encoder with a new client secret.
     Encoder encoder(project_, ClientSecret::GenerateNewSecret());
     // Set a static current time so we know we have a static day_index.
     encoder.set_current_time(kSomeTimestamp);
 
     // Encode an observation.
-    Encoder::Result result = encoder.EncodeString(
-        kMetricId, encoding_config_id, string_value);
+    Encoder::Result result =
+        encoder.EncodeString(kStringMetricId, encoding_config_id, string_value);
     EXPECT_EQ(Encoder::kOK, result.status);
     EXPECT_TRUE(result.observation.get() != nullptr);
     EXPECT_EQ(1, result.observation->parts_size());
     return std::move(result.observation);
   }
 
-  // Makes an Observation with one string part which has the given |value|,
-  // using the encoding with the given encoding_config_id.
+  // Makes an Observation with one INDEX part which has the given
+  // |index| value, using the encoding with the given encoding_config_id.
+  std::unique_ptr<Observation> MakeIndexObservation(
+      uint32_t index, uint32_t encoding_config_id) {
+    // Construct a new Encoder with a new client secret.
+    Encoder encoder(project_, ClientSecret::GenerateNewSecret());
+    // Set a static current time so we know we have a static day_index.
+    encoder.set_current_time(kSomeTimestamp);
+
+    // Encode an observation.
+    Encoder::Result result =
+        encoder.EncodeIndex(kIndexMetricId, encoding_config_id, index);
+    EXPECT_EQ(Encoder::kOK, result.status);
+    EXPECT_TRUE(result.observation.get() != nullptr);
+    EXPECT_EQ(1, result.observation->parts_size());
+    return std::move(result.observation);
+  }
+
+  // Makes an Observation with one string part which has the given
+  // |string_value|, using the encoding with the given encoding_config_id.
   // Then passes the ObservationPart into
   // HistogramAnalysisEngine::ProcessObservationPart().
-  bool MakeAndProcessObservationPart(std::string value,
-                                     uint32_t encoding_config_id) {
+  bool MakeAndProcessStringObservationPart(std::string string_value,
+                                           uint32_t encoding_config_id) {
     std::unique_ptr<Observation> observation =
-        MakeObservation(value, encoding_config_id);
+        MakeStringObservation(string_value, encoding_config_id);
     return analysis_engine_->ProcessObservationPart(
         kDayIndex, observation->parts().at(kPartName));
   }
 
-  // Invokes MakeAndProcessObservationPart many times using the Forculus
+  // Makes an Observation with one INDEX part which has the given
+  // |index| value, using the encoding with the given encoding_config_id.
+  // Then passes the ObservationPart into
+  // HistogramAnalysisEngine::ProcessObservationPart().
+  bool MakeAndProcessIndexObservationPart(uint32_t index,
+                                          uint32_t encoding_config_id) {
+    std::unique_ptr<Observation> observation =
+        MakeIndexObservation(index, encoding_config_id);
+    return analysis_engine_->ProcessObservationPart(
+        kDayIndex, observation->parts().at(kPartName));
+  }
+
+  // Invokes MakeAndProcessStringObservationPart many times using the Forculus
   // encoding. Three strings are encoded: "hello" 20 times,
   // "goodbye" 19 times and "peace" 21 times. The first and third will be
   // decrypted by Forculus and the 2nd will not.
   void MakeAndProcessForculusObservations() {
     // Add the word "hello" 20 times.
     for (size_t i = 0; i < kForculusThreshold; i++) {
-      EXPECT_TRUE(
-          MakeAndProcessObservationPart("hello", kForculusEncodingConfigId));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "hello", kForculusEncodingConfigId));
     }
     // Add the word "goodbye" 19 times.
     for (size_t i = 0; i < kForculusThreshold - 1; i++) {
-      EXPECT_TRUE(
-          MakeAndProcessObservationPart("goodbye", kForculusEncodingConfigId));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "goodbye", kForculusEncodingConfigId));
     }
     // Add the word "peace" 21 times.
     for (size_t i = 0; i < kForculusThreshold + 1; i++) {
-      EXPECT_TRUE(
-          MakeAndProcessObservationPart("peace", kForculusEncodingConfigId));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "peace", kForculusEncodingConfigId));
     }
   }
 
@@ -183,6 +305,7 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
   // Observations, all of which were encoded using the same Forculus
   // EncodingCofig.
   void DoForculusTest() {
+    Init(kStringReportConfigId);
     MakeAndProcessForculusObservations();
 
     // Perform the analysis.
@@ -213,23 +336,26 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     }
   }
 
-  void MakeAndProcessBasicRapporObservations() {
+  // Invokes MakeAndProcessStringObservationPart many times using the
+  // BasicRappor encoding.
+  void MakeAndProcessBasicRapporStringObservations() {
     for (int i = 0; i < 100; i++) {
-      EXPECT_TRUE(
-          MakeAndProcessObservationPart("Apple", kBasicRapporEncodingConfigId));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Apple", kBasicRapporStringEncodingConfigId));
     }
     for (int i = 0; i < 200; i++) {
-      EXPECT_TRUE(MakeAndProcessObservationPart("Banana",
-                                                kBasicRapporEncodingConfigId));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Banana", kBasicRapporStringEncodingConfigId));
     }
     for (int i = 0; i < 300; i++) {
-      EXPECT_TRUE(MakeAndProcessObservationPart("Cantaloupe",
-                                                kBasicRapporEncodingConfigId));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Cantaloupe", kBasicRapporStringEncodingConfigId));
     }
   }
 
-  void DoBasicRapporTest() {
-    MakeAndProcessBasicRapporObservations();
+  void DoBasicRapporStringTest() {
+    Init(kStringReportConfigId);
+    MakeAndProcessBasicRapporStringObservations();
 
     // Perform the analysis.
     std::vector<ReportRow> report_rows;
@@ -251,9 +377,73 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     }
   }
 
+  // Invokes MakeAndProcessIndexObservationPart several times: Once for
+  // index 0, twice for index 1, ... 10 times for index 9.
+  void MakeAndProcessBasicRapporIndexObservations() {
+    for (int index = 0; index < 10; index++) {
+      for (int count = 1; count <= index + 1; count++)
+        EXPECT_TRUE(MakeAndProcessIndexObservationPart(
+            index, kBasicRapporIndexEncodingConfigId));
+    }
+  }
+
+  // Tests HistogramAnalysisEngine in the case where it performs a Basic RAPPROR
+  // report using Observations of type INDEX. We test that the correct
+  // human-readable labels from the ReportConfig are applied to the correct
+  // report rows.
+  void DoBasicRapporIndexTest() {
+    Init(kIndexReportConfigId);
+    MakeAndProcessBasicRapporIndexObservations();
+
+    // Perform the analysis.
+    std::vector<ReportRow> report_rows;
+    EXPECT_TRUE(analysis_engine_->PerformAnalysis(&report_rows).ok());
+
+    // Check the results.
+    EXPECT_EQ(100u, report_rows.size());
+    for (const auto& report_row : report_rows) {
+      EXPECT_EQ(0, report_row.histogram().std_error());
+      ValuePart recovered_value;
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
+      EXPECT_EQ(ValuePart::kIndexValue, recovered_value.data_case());
+      uint32_t index = recovered_value.index_value();
+      if (index > 9) {
+        // We did not add any Observations for indices > 9.
+        EXPECT_EQ(report_row.histogram().count_estimate(), 0);
+        if (index == 25) {
+          // Index 25 should be associated with the label 'Event Z'.
+          EXPECT_EQ("Event Z", report_row.histogram().label());
+        } else {
+          EXPECT_EQ("", report_row.histogram().label());
+        }
+      } else {
+        // For indices i=0..9 we added i+1 Observations.
+        EXPECT_EQ(report_row.histogram().count_estimate(), index + 1);
+        // We added labels for indices 0, 1 and 5 but not the others.
+        switch (index) {
+          case 0: {
+            EXPECT_EQ("Event A", report_row.histogram().label());
+            break;
+          }
+          case 1: {
+            EXPECT_EQ("Event B", report_row.histogram().label());
+            break;
+          }
+          case 5: {
+            EXPECT_EQ("Event F", report_row.histogram().label());
+            break;
+          }
+          default: { EXPECT_EQ("", report_row.histogram().label()); }
+        }
+      }
+    }
+  }
+
   void DoMixedEncodingTest() {
+    Init(kStringReportConfigId);
     MakeAndProcessForculusObservations();
-    MakeAndProcessBasicRapporObservations();
+    MakeAndProcessBasicRapporStringObservations();
 
     // Perform the analysis.
     std::vector<ReportRow> report_rows;
@@ -263,12 +453,19 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
 
   ReportId report_id_;
   std::shared_ptr<ProjectContext> project_;
+  std::shared_ptr<ReportRegistry> report_registry_;
   std::unique_ptr<HistogramAnalysisEngine> analysis_engine_;
 };
 
 TEST_F(HistogramAnalysisEngineTest, Forculus) { DoForculusTest(); }
 
-TEST_F(HistogramAnalysisEngineTest, BasicRappor) { DoBasicRapporTest(); }
+TEST_F(HistogramAnalysisEngineTest, BasicRapporString) {
+  DoBasicRapporStringTest();
+}
+
+TEST_F(HistogramAnalysisEngineTest, BasicRapporIndex) {
+  DoBasicRapporIndexTest();
+}
 
 TEST_F(HistogramAnalysisEngineTest, MixedEncoding) { DoMixedEncodingTest(); }
 

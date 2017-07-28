@@ -54,9 +54,15 @@ class HistogramAnalysisEngine {
   // Constructs a HistogramAnalysisEngine for the Histogram report with the
   // given |report_id|.
   //
+  // The |report_variable| is used to look up any per-encoding
+  // report configuration that may have been specified. Examples of this
+  // are the String RAPPOR candidate list, and the category labels for
+  // basic RAPPOR configured with indexed categories.
+  //
   // The |analyzer_config| is used to look up EncodingConfigs by their ID.
   HistogramAnalysisEngine(
       const ReportId& report_id,
+      const ReportVariable* report_variable,
       std::shared_ptr<config::AnalyzerConfig> analyzer_config);
 
   // Process the given (day_index, ObservationPart) pair. The |day_index|
@@ -89,6 +95,9 @@ class HistogramAnalysisEngine {
 
   // The ID of the Histogram report this HistogramAnalysisEngine is for.
   ReportId report_id_;
+
+  // The variable being analyzed.
+  const ReportVariable* report_variable_;
 
   // The keys to this map are encoding-config IDs and the values are the
   // DecoderAdapters adapting to the decoder/analyzer that knows how to

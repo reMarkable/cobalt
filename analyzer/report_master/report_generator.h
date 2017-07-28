@@ -32,22 +32,6 @@
 namespace cobalt {
 namespace analyzer {
 
-// Represents one of the variables to be analyzed from the list of variables
-// specified in a ReportConfig.
-struct Variable {
-  Variable(uint32_t index, std::string name)
-      : index(index), name(std::move(name)) {}
-
-  Variable(const Variable& other) : index(other.index), name(other.name) {}
-
-  // The index of the variable within the list of variables in a ReportConfig.
-  uint32_t index;
-
-  // The name of the variable as specified in a ReportConfig. This is also
-  // equal to the name of a MetricPart.
-  std::string name;
-};
-
 // In Cobalt V0.1 ReportGenerator is a singleton, single-threaded object
 // owned by the ReportMaster. In later versions of Cobalt, ReportGenerator
 // will be a separate service.
@@ -105,6 +89,30 @@ class ReportGenerator {
   grpc::Status GenerateReport(const ReportId& report_id);
 
  private:
+  // Represents one of the variables to be analyzed from the list of variables
+  // specified in a ReportConfig.
+  struct Variable {
+    Variable(uint32_t index, const ReportVariable* report_variable)
+        : index(index), report_variable(report_variable) {}
+
+    Variable(const Variable& other)
+        : index(other.index), report_variable(other.report_variable) {}
+
+    // The index of the variable within the list of variables in a ReportConfig.
+    uint32_t index;
+
+    // Not owned. A pointer to the ReportVariable from the ReportConfig.
+    const ReportVariable* report_variable;
+  };
+
+  // Builds the appropriate vector of Variables to analyze given the
+  // input data. Writes the result into |variables|.
+  // On error, does LOG(ERROR) and returns an appropriate status.
+  grpc::Status BuildVariableList(const ReportConfig& report_config,
+                                 const ReportId& report_id,
+                                 const ReportMetadataLite& metadata,
+                                 std::vector<Variable>* variables);
+
   // This is a helper function for GenerateReport().
   //
   // Generates the Histogram report with the given |report_id|,

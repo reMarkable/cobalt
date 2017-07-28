@@ -83,32 +83,6 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
   }
 }
 
-// Builds the appropriate vector of Variables to analyze given the
-// input data. Writes the result into |variables|.
-// On error, does LOG(ERROR) and returns an appropriate status.
-grpc::Status BuildVariableList(const ReportConfig& report_config,
-                               const ReportId& report_id,
-                               const ReportMetadataLite& metadata,
-                               std::vector<Variable>* variables) {
-  CHECK(variables);
-  variables->clear();
-  for (int index : metadata.variable_indices()) {
-    if (index > report_config.variable_size()) {
-      std::ostringstream stream;
-      stream << "Invalid arguments: metadata.variable_indices contains "
-             << "an out of range index: " << index << ". ReportConfig has only "
-             << report_config.variable_size() << " variables. "
-             << ReportConfigIdString(report_id)
-             << " report_id=" << ReportStore::ToString(report_id);
-      std::string message = stream.str();
-      LOG(ERROR) << message;
-      return grpc::Status(grpc::INVALID_ARGUMENT, message);
-    }
-    variables->emplace_back(index, report_config.variable(index).metric_part());
-  }
-  return grpc::Status::OK;
-}
-
 }  // namespace
 
 ReportGenerator::ReportGenerator(
@@ -180,9 +154,11 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
 
   // Check that each of the variable names are valid metric part names.
   for (auto& variable : variables) {
-    if (metric->parts().find(variable.name) == metric->parts().end()) {
+    if (metric->parts().find(variable.report_variable->metric_part()) ==
+        metric->parts().end()) {
       std::ostringstream stream;
-      stream << "Invalid ReportConfig: variable name '" << variable.name
+      stream << "Invalid ReportConfig: variable name '"
+             << variable.report_variable->metric_part()
              << "' is not the name of a part of the metric with "
              << MetricIdString(*report_config) << ". "
              << ReportConfigIdString(report_id);
@@ -244,13 +220,14 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
   }
 
   // Construct the HistogramAnalysisEngine.
-  HistogramAnalysisEngine analysis_engine(report_id, analyzer_config_);
+  HistogramAnalysisEngine analysis_engine(
+      report_id, variables[0].report_variable, analyzer_config_);
 
   // We query the ObservationStore for the relevant ObservationParts.
   store::ObservationStore::QueryResponse query_response;
   query_response.pagination_token = "";
   std::vector<std::string> parts(1);
-  parts[0] = variables[0].name;
+  parts[0] = variables[0].report_variable->metric_part();
   // We iteratively query in batches of size 1000.
   static const size_t kMaxResultsPerIteration = 1000;
   do {
@@ -321,6 +298,28 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
     }
   }
 
+  return grpc::Status::OK;
+}
+
+grpc::Status ReportGenerator::BuildVariableList(
+    const ReportConfig& report_config, const ReportId& report_id,
+    const ReportMetadataLite& metadata, std::vector<Variable>* variables) {
+  CHECK(variables);
+  variables->clear();
+  for (int index : metadata.variable_indices()) {
+    if (index > report_config.variable_size()) {
+      std::ostringstream stream;
+      stream << "Invalid arguments: metadata.variable_indices contains "
+             << "an out of range index: " << index << ". ReportConfig has only "
+             << report_config.variable_size() << " variables. "
+             << ReportConfigIdString(report_id)
+             << " report_id=" << ReportStore::ToString(report_id);
+      std::string message = stream.str();
+      LOG(ERROR) << message;
+      return grpc::Status(grpc::INVALID_ARGUMENT, message);
+    }
+    variables->emplace_back(index, &report_config.variable(index));
+  }
   return grpc::Status::OK;
 }
 
