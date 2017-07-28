@@ -114,6 +114,21 @@ element {
     }
   }
 }
+
+# Metric 6 has in INDEX part.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  time_zone_policy: UTC
+  parts {
+    key: "Part1"
+    value {
+      data_type: INDEX
+    }
+  }
+}
+
 )";
 
 const char* kEncodingConfigText = R"(
@@ -196,6 +211,20 @@ element {
   project_id: 1
   id: 7
   no_op_encoding {
+  }
+}
+
+# EncodingConfig 8 is Basic RAPPOR with 5 INDEXed categories.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 8
+  basic_rappor {
+    prob_0_becomes_1: 0.25
+    prob_1_stays_1: 0.75
+    indexed_categories: {
+      num_categories: 5,
+    }
   }
 }
 
@@ -340,6 +369,38 @@ Observation DoEncodeIntTest(
   return *result.observation;
 }
 
+// Tests the EncodeIndex() method using the given |index| and the given
+// metric and encoding. The metric is expected to have a single part named
+// "Part1".
+//
+// If expectOK is true then we verify that there are no errors and that the
+// produced Observation has the |expected_type| and is non-empty. Otherwise
+// we verify that kInvalidArguments is returned.
+void DoEncodeIndexTest(bool expectOK, uint32_t index, uint32_t metric_id,
+                       uint32_t encoding_config_id, bool expect_utc,
+                       const ObservationPart::ValueCase& expected_encoding) {
+  // Build the ProjectContext encapsulating our test config data.
+  std::shared_ptr<ProjectContext> project = GetTestProject();
+
+  // Construct the Encoder.
+  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  // Set a static current time so we can test the day_index computation.
+  encoder.set_current_time(kSomeTimestamp);
+
+  // Encode an observation for the given metric and encoding. The metric is
+  // expected to have a single part.
+  Encoder::Result result =
+      encoder.EncodeIndex(metric_id, encoding_config_id, index);
+
+  if (expectOK) {
+    CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
+                          expected_encoding);
+  } else {
+    EXPECT_EQ(Encoder::kInvalidArguments, result.status)
+        << "encoding_config_id=" << encoding_config_id;
+  }
+}
+
 // Tests the EncodeBlob() method using the given |value| and the given
 // metric and encoding. The metric is expected to have a single part named
 // "Part1". The encoding is expected to be for Forculus.
@@ -408,6 +469,77 @@ TEST(EncoderTest, EncodeIntBasicRappor) {
   // EncodingConfig 4 is Basic RAPPOR with int values. Here we need the value
   // to be one of the categories.
   DoEncodeIntTest(125, 2, 4, true, ObservationPart::kBasicRappor);
+}
+
+// Tests the EncodeIndex() method with both valid and invalid inputs.
+TEST(EncoderTest, EncodeIndex) {
+  // Metric 6 has a single part of type INDEX.
+  // EncodingConfig 8 is Basic RAPPOR with five INDEXed categories.
+  bool expect_ok = true;
+  uint32_t index = 0;
+  bool expect_utc = true;
+  DoEncodeIndexTest(expect_ok, index, 6, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+  index = 1;
+  DoEncodeIndexTest(expect_ok, index, 6, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+  index = 4;
+  DoEncodeIndexTest(expect_ok, index, 6, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Index 5 should yield kInalidArgs.
+  expect_ok = false;
+  index = 5;
+  DoEncodeIndexTest(expect_ok, index, 6, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Reset to index 0 just to confirm it still succeeds.
+  expect_ok = true;
+  index = 0;
+  DoEncodeIndexTest(expect_ok, index, 6, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Now we switch to metric 1 which has one string part. That should fail.
+  expect_ok = false;
+  DoEncodeIndexTest(expect_ok, index, 1, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Now we switch to metric 2 which has one int part. That should fail.
+  DoEncodeIndexTest(expect_ok, index, 2, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Now we switch to metric 3 which has one blob part. That should fail.
+  DoEncodeIndexTest(expect_ok, index, 3, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Reset to metric 6 just to confirm it still succeeds.
+  expect_ok = true;
+  DoEncodeIndexTest(expect_ok, index, 6, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Now we switch to encoding 1 which is Forculus. That should fail.
+  expect_ok = false;
+  DoEncodeIndexTest(expect_ok, index, 6, 1, expect_utc,
+                    ObservationPart::kForculus);
+
+  // Now we switch to encoding 2 which is String RAPPOR. That should fail.
+  DoEncodeIndexTest(expect_ok, index, 6, 2, expect_utc,
+                    ObservationPart::kRappor);
+
+  // Now we switch to encoding 3 which is Basic RAPPOR with string categories.
+  // That should fail.
+  DoEncodeIndexTest(expect_ok, index, 6, 3, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Now we switch to encoding 4 which is Basic RAPPOR with int categories.
+  // That should fail.
+  DoEncodeIndexTest(expect_ok, index, 6, 4, expect_utc,
+                    ObservationPart::kBasicRappor);
+
+  // Now we switch to encoding 7 which is NoOpEncoding. That should be OK.
+  expect_ok = true;
+  DoEncodeIndexTest(expect_ok, index, 6, 7, expect_utc,
+                    ObservationPart::kUnencoded);
 }
 
 // Tests EncodeInt() with NoOp encoding as the specified encoding.

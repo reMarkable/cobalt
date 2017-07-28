@@ -43,6 +43,11 @@ std::string DebugString(const ValuePart& value) {
     case ValuePart::kIntValue:
       stream << value.int_value();
       break;
+    case ValuePart::kIndexValue:
+      stream << "index-" << value.index_value();
+      break;
+    case ValuePart::kBlobValue:
+      stream << "[blob value]";
     default:
       stream << "unexpected value type";
   }

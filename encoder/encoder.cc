@@ -50,6 +50,11 @@ Encoder::Status Encoder::EncodeForculus(
               << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
+    case MetricPart::INDEX: {
+      VLOG(3) << "Forculus doesn't support INDEXes: (" << customer_id_ << ", "
+              << project_id_ << ", " << encoding_config_id << ")";
+      return kInvalidArguments;
+    }
     default:
       break;
   }
@@ -84,6 +89,11 @@ Encoder::Status Encoder::EncodeRappor(uint32_t metric_id,
   switch (data_type) {
     case MetricPart::INT: {
       VLOG(3) << "RAPPOR doesn't support INTs: (" << customer_id_ << ", "
+              << project_id_ << ", " << encoding_config_id << ")";
+      return kInvalidArguments;
+    }
+    case MetricPart::INDEX: {
+      VLOG(3) << "RAPPOR doesn't support INDEXes: (" << customer_id_ << ", "
               << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
@@ -145,6 +155,17 @@ Encoder::Status Encoder::EncodeBasicRappor(
   }
 }
 
+Encoder::Status Encoder::EncodeNoOp(uint32_t metric_id, const ValuePart& value,
+                                    const std::string& part_name,
+                                    ObservationPart* observation_part) {
+  // TODO(rudominer) Notice we are copying the value here. If we pass
+  // the parameter |value| by pointer instead of by const ref then we could
+  // Swap() here instead.
+  observation_part->mutable_unencoded()->set_allocated_unencoded_value(
+      new ValuePart(value));
+  return kOK;
+}
+
 Encoder::Result Encoder::EncodeString(uint32_t metric_id,
                                       uint32_t encoding_config_id,
                                       const std::string& string_value) {
@@ -159,8 +180,19 @@ Encoder::Result Encoder::EncodeInt(uint32_t metric_id,
                                    uint32_t encoding_config_id,
                                    int64_t int_value) {
   Value value;
-  // An empty part name means the metric has only a single part.
+  // An empty part name is a signal to the function Encoder::Encode() that the
+  // metric has only a single part.
   value.AddIntPart(encoding_config_id, "", int_value);
+  return Encode(metric_id, value);
+}
+
+Encoder::Result Encoder::EncodeIndex(uint32_t metric_id,
+                                     uint32_t encoding_config_id,
+                                     uint32_t index) {
+  Value value;
+  // An empty part name is a signal to the function Encoder::Encode() that the
+  // metric has only a single part.
+  value.AddIndexPart(encoding_config_id, "", index);
   return Encode(metric_id, value);
 }
 
@@ -168,7 +200,8 @@ Encoder::Result Encoder::EncodeBlob(uint32_t metric_id,
                                     uint32_t encoding_config_id,
                                     const void* data, size_t num_bytes) {
   Value value;
-  // An empty part name means the metric has only a single part.
+  // An empty part name is a signal to the function Encoder::Encode() that the
+  // metric has only a single part.
   value.AddBlobPart(encoding_config_id, "", data, num_bytes);
   return Encode(metric_id, value);
 }
@@ -302,14 +335,8 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
       }
 
       case EncodingConfig::kNoOpEncoding: {
-        VLOG(4) << "WARNING: Using the NoOpEncoding. No privacy-protection is "
-                   "being applied.";
-        // TODO(rudominer) Notice we are copying the value here. If we pass
-        // the parameter |value| to this method by pointer instead of by
-        // const ref then we could Swap() here instead.
-        observation_part.mutable_unencoded()->set_allocated_unencoded_value(
-            new ValuePart(value_part_data.value_part));
-        status = kOK;
+        status = EncodeNoOp(metric_id, value_part_data.value_part, part_name,
+                            &observation_part);
         break;
       }
 
@@ -345,6 +372,13 @@ void Encoder::Value::AddStringPart(uint32_t encoding_config_id,
 void Encoder::Value::AddIntPart(uint32_t encoding_config_id,
                                 const std::string& part_name, int64_t value) {
   AddPart(encoding_config_id, part_name, MetricPart::INT).set_int_value(value);
+}
+
+void Encoder::Value::AddIndexPart(uint32_t encoding_config_id,
+                                  const std::string& part_name,
+                                  uint32_t index) {
+  AddPart(encoding_config_id, part_name, MetricPart::INDEX)
+      .set_index_value(index);
 }
 
 void Encoder::Value::AddBlobPart(uint32_t encoding_config_id,

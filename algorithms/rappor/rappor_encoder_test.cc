@@ -586,6 +586,43 @@ TEST(BasicRapporEncoderTest, BadCategory) {
   EXPECT_EQ(kInvalidInput, encoder.Encode(value, &obs));
 }
 
+// Tests that BasicRapporEncoder::Encode() correctly handles values of type
+// INDEX
+TEST(BasicRapporEncoderTest, EncodeIndex) {
+  // Configure Basic RAPPOR with 5 indexed categories.
+  // We use no randomness so we can check that the correct bit is being set.
+  BasicRapporConfig config;
+  config.set_prob_0_becomes_1(0.0);
+  config.set_prob_1_stays_1(1.0);
+  config.mutable_indexed_categories()->set_num_categories(5);
+
+  // Construct a BasicRapporEncoder.
+  static const std::string kClientSecretToken =
+      ClientSecret::GenerateNewSecret().GetToken();
+  BasicRapporEncoder encoder(config,
+                             ClientSecret::FromToken(kClientSecretToken));
+
+  BasicRapporObservation obs;
+  // Validate that category indices 0, 1 and 4 yield the correct data.
+  ValuePart value;
+  value.set_index_value(0);
+  EXPECT_EQ(kOK, encoder.Encode(value, &obs));
+  EXPECT_EQ("00000001", DataToBinaryString(obs.data()));
+  obs.Clear();
+  value.set_index_value(1);
+  EXPECT_EQ(kOK, encoder.Encode(value, &obs));
+  EXPECT_EQ("00000010", DataToBinaryString(obs.data()));
+  obs.Clear();
+  value.set_index_value(4);
+  EXPECT_EQ(kOK, encoder.Encode(value, &obs));
+  EXPECT_EQ("00010000", DataToBinaryString(obs.data()));
+  obs.Clear();
+
+  // Validate that category index 5 yields kInvalidInput.
+  value.set_index_value(5);
+  EXPECT_EQ(kInvalidInput, encoder.Encode(value, &obs));
+}
+
 class StringRapporEncoderTest : public ::testing::Test {
  protected:
   uint32_t AttemptDeriveCohortFromSecret(size_t attempt_number) {

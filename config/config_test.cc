@@ -243,7 +243,7 @@ TEST(ReportRegistryFromFile, ValidFile) {
       "Event B",
       variable0.per_encoding_data().at(1).basic_rappor().category_labels().at(
           1));
-   EXPECT_EQ(
+  EXPECT_EQ(
       "Event Z",
       variable0.per_encoding_data().at(1).basic_rappor().category_labels().at(
           25));

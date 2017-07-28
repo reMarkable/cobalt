@@ -40,22 +40,32 @@ namespace encoder {
 // metrics that have multiple parts.
 //
 // The raw values that are inputs to an encoding are typed. We currently handle
-// three different types:
+// four different types:
 // (a) UTF8, human-readable strings
 // (b) Signed 64-bit integers
-// (c) Uninterpretted blobs of bytes
+// (c) Non-negative integers that are considered to be *indexes* into an
+//     enumerated set that is specified outside of Cobalt's configuration.
+// (d) Uninterpretted blobs of bytes
 //
 // Each call to any of the Encode*() methods specifies a metric and (implicitly
 // or explicitly) a metric part name. Each metric part has a type and the type
 // of the value passed to Encode*() must correspond to the type of the metric
 // part.
 //
-// Each call to any of the Encode*() methods also specifies an encoding config.
+// Each call to any of the Encode*() methods also specifies an encoding config
+// and thus specifies one of Cobalt's encodings. As of this writing Cobalt
+// includes 4 encodings:
+// (i)   RAPPOR (a.k.a string RAPPOR)
+// (ii)  Basic RAPPOR (a.k.a category RAPPOR)
+// (iii) Forculus
+// (iv)  NoOp (a do-nothing encoding that transimits unencoded values)
+//
 // Not every data type is compatible with every encoding type. Currently the
 // following combinatations are supported:
 // (a) UTF8, human-readable strings are compatible with all encoding types.
-// (b) Integers are compatible with Basic RAPPOR only.
-// (c) Blobs are compatible with Forculus only.
+// (b) Integers are compatible with Basic RAPPOR and NoOp only.
+// (c) Indexes are compatible with Basic RAPPOR and NoOp only.
+// (d) Blobs are compatible with Forculus and NoOp only.
 class Encoder {
  public:
   // Constructs an Encoder for the given project.
@@ -108,22 +118,32 @@ class Encoder {
   ////////////////////////////////////////////////////////////////////////////
 
   // Encodes the utf8, human-readable string |value| using the specified
-  // encoding for the specified metric. On success the result contains kOK
-  // and an Observation with its metadata. Otherwise the result contains
-  // an error status.
+  // encoding for the specified metric. Use this method if the type of the
+  // metric's sole part is STRING. On success the result contains kOK and an
+  // Observation with its metadata. Otherwise the result contains an error
+  // status.
   Result EncodeString(uint32_t metric_id, uint32_t encoding_config_id,
                       const std::string& value);
 
   // Encodes the integer |value| using the specified encoding for the specified
-  // metric. On success the result contains kOK and an Observation with its
-  // metadata. Otherwise the result contains an error status.
+  // metric. Use this method if the type of the metric's sole part is INT. On
+  // success the result contains kOK and an Observation with its metadata.
+  // Otherwise the result contains an error status.
   Result EncodeInt(uint32_t metric_id, uint32_t encoding_config_id,
                    int64_t value);
 
+  // Encodes the given |index| using the specified encoding for the specified
+  // metric. Use this method if the type of the metric's sole part is INDEX.
+  // On success the result contains kOK and an Observation with its metadata.
+  // Otherwise the result contains an error status.
+  Result EncodeIndex(uint32_t metric_id, uint32_t encoding_config_id,
+                     uint32_t index);
+
   // Encodes |num_bytes| of uninterpreted data from |data| using the specified
-  // encoding for the specified metric. On success the result contains kOK
-  // and an Observation with its metadata. Otherwise the result contains
-  // an error status.
+  // encoding for the specified metric. Use this method if the type of the
+  // metric's sole part is BLOB. On success the result contains kOK and an
+  // Observation with its metadata. Otherwise the result contains an error
+  // status.
   Result EncodeBlob(uint32_t metric_id, uint32_t encoding_config_id,
                     const void* data, size_t num_bytes);
 
@@ -145,18 +165,28 @@ class Encoder {
     // Adds the utf8, human-readable string |value| to this multi-part Value,
     // associates it with the metric part named |part_name| and requests that it
     // be encoded using the configuration specified by |encoding_config_id|.
+    // Use this method if the type of the MetricPart is STRING.
     void AddStringPart(uint32_t encoding_config_id,
                        const std::string& part_name, const std::string& value);
 
     // Adds the integer |value| to this multi-part Value, associates
     // it with the metric part named |part_name| and requests that it be
     // encoded using the configuration specified by |encoding_config_id|.
+    // Use this method if the type of the MetricPart is INT.
     void AddIntPart(uint32_t encoding_config_id, const std::string& part_name,
                     int64_t value);
+
+    // Adds the given |index| value to this multi-part Value, associates
+    // it with the metric part named |part_name| and requests that it be
+    // encoded using the configuration specified by |encoding_config_id|.
+    // Use this method if the type of the MetricPart is INDEX.
+    void AddIndexPart(uint32_t encoding_config_id, const std::string& part_name,
+                      uint32_t index);
 
     // Adds |num_bytes| of uninterpreted data from |data| to this Value,
     // associates it with the metric part named |part_name| and requests that
     // it be encoded using the configuration specified by |encoding_config_id|.
+    // Use this method if the type of the MetricPart is BLOB.
     void AddBlobPart(uint32_t encoding_config_id, const std::string& part_name,
                      const void* data, size_t num_bytes);
 
@@ -194,9 +224,7 @@ class Encoder {
   // the current time. But this function may be invoked to override that
   // behavior. This is useful for example in tests. Invoke this function with
   // zero or a negative number to restore the default behavior.
-  void set_current_time(time_t time) {
-    current_time_ = time;
-  }
+  void set_current_time(time_t time) { current_time_ = time; }
 
  private:
   // Helper function that performs Forculus encoding on |value| using the
@@ -215,7 +243,7 @@ class Encoder {
                       const std::string& part_name,
                       ObservationPart* observation_part);
 
-  // Helper function that performs Basic Forculus encoding on |value| using the
+  // Helper function that performs Basic RAPPOR encoding on |value| using the
   // given metadata and writes the result into |observation_part|.
   Status EncodeBasicRappor(uint32_t metric_id, uint32_t encoding_config_id,
                            MetricPart::DataType data_type,
@@ -223,6 +251,12 @@ class Encoder {
                            const EncodingConfig* encoding_config,
                            const std::string& part_name,
                            ObservationPart* observation_part);
+
+  // Helper function that performs the NoOp encoding on |value|
+  // and writes the result into |observation_part|.
+  Status EncodeNoOp(uint32_t metric_id, const ValuePart& value,
+                    const std::string& part_name,
+                    ObservationPart* observation_part);
 
   uint32_t customer_id_, project_id_;
   std::shared_ptr<ProjectContext> project_;

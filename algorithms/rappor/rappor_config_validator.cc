@@ -14,7 +14,6 @@
 
 #include "algorithms/rappor/rappor_config_validator.h"
 
-
 #include <string>
 #include <vector>
 
@@ -81,6 +80,17 @@ bool ExtractCategories(const BasicRapporConfig& config,
       for (int64_t category = first; category <= last; category++) {
         ValuePart value_part;
         value_part.set_int_value(category);
+        categories->push_back(value_part);
+      }
+    } break;
+    case BasicRapporConfig::kIndexedCategories: {
+      uint32_t num_categories = config.indexed_categories().num_categories();
+      if (num_categories >= 1024) {
+        return false;
+      }
+      for (uint32_t i = 0; i < num_categories; i++) {
+        ValuePart value_part;
+        value_part.set_index_value(i);
         categories->push_back(value_part);
       }
     } break;
