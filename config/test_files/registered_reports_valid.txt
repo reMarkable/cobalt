@@ -76,7 +76,7 @@ element {
     metric_part: "event"
     per_encoding_data {
       # Encoding (1, 1, 4) Is Basic RAPPOR with indexed categories.
-      key: 1
+      key: 4
       value {
         basic_rappor {
           category_labels {

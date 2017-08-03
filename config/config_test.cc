@@ -231,21 +231,22 @@ TEST(ReportRegistryFromFile, ValidFile) {
 
   // Examine the first varaible of (1, 1, 3)
   const auto& variable0 = report_config->variable(0);
-  EXPECT_EQ(1u, variable0.per_encoding_data().size());
-  EXPECT_EQ(1u, variable0.per_encoding_data().count(1));
+  // It should have per_encoding_data for report_config 4.
+  ASSERT_EQ(1u, variable0.per_encoding_data().size());
+  ASSERT_EQ(1u, variable0.per_encoding_data().count(4));
   EXPECT_EQ(ReportPerEncodingData::kBasicRappor,
-            variable0.per_encoding_data().at(1).encoding_case());
+            variable0.per_encoding_data().at(4).encoding_case());
   EXPECT_EQ(
       "Event A",
-      variable0.per_encoding_data().at(1).basic_rappor().category_labels().at(
+      variable0.per_encoding_data().at(4).basic_rappor().category_labels().at(
           0));
   EXPECT_EQ(
       "Event B",
-      variable0.per_encoding_data().at(1).basic_rappor().category_labels().at(
+      variable0.per_encoding_data().at(4).basic_rappor().category_labels().at(
           1));
   EXPECT_EQ(
       "Event Z",
-      variable0.per_encoding_data().at(1).basic_rappor().category_labels().at(
+      variable0.per_encoding_data().at(4).basic_rappor().category_labels().at(
           25));
 
   // (1, 1, 4) Should be not present

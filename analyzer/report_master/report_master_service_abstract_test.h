@@ -51,11 +51,14 @@ static const uint32_t kCustomerId = 1;
 static const uint32_t kProjectId = 1;
 static const uint32_t kMetricId1 = 1;
 static const uint32_t kMetricId2 = 2;
+static const uint32_t kMetricId3 = 3;
 static const uint32_t kReportConfigId1 = 1;
 static const uint32_t kReportConfigId2 = 2;
+static const uint32_t kReportConfigId3 = 3;
 static const uint32_t kForculusEncodingConfigId = 1;
 static const uint32_t kBasicRapporStringEncodingConfigId = 2;
 static const uint32_t kBasicRapporIntEncodingConfigId = 3;
+static const uint32_t kBasicRapporIndexEncodingConfigId = 4;
 static const char kPartName1[] = "Part1";
 static const char kPartName2[] = "Part2";
 static const size_t kForculusThreshold = 20;
@@ -107,6 +110,20 @@ element {
   }
 }
 
+# Metric 3 has one INDEX part.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  time_zone_policy: UTC
+  parts {
+    key: "Part1"
+    value {
+      data_type: INDEX
+    }
+  }
+}
+
 )";
 
 static const char* kEncodingConfigText = R"(
@@ -151,6 +168,20 @@ element {
   }
 }
 
+# EncodingConfig 4 is Basic RAPPOR with INDEX categories (non-stochastic).
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  basic_rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    indexed_categories: {
+      num_categories: 100
+    }
+  }
+}
+
 )";
 
 static const char* kReportConfigText = R"(
@@ -177,6 +208,37 @@ element {
   }
   variable {
     metric_part: "Part2"
+  }
+}
+
+# ReportConfig 3 is for metric 3 and gives labels for encoding config 4.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  metric_id: 3
+  variable {
+    metric_part: "Part1"
+    per_encoding_data {
+      # Encoding (1, 1, 4) Is Basic RAPPOR with 100 indexed categories.
+      key: 4
+      value {
+        basic_rappor {
+          category_labels {
+             key: 0
+             value: "Event A"
+          }
+          category_labels {
+             key: 1
+             value: "Event B"
+          }
+          category_labels {
+             key: 25
+             value: "Event Z"
+          }
+        }
+      }
+    }
   }
 }
 
@@ -287,6 +349,26 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     return std::move(result.observation);
   }
 
+  // Makes an Observation with one INDEX value for the given metric and
+  // encoding.
+  std::unique_ptr<Observation> MakeIndexObservation(
+      uint32_t index, uint32_t metric_id, uint32_t encoding_config_id) {
+    // Construct a new Encoder with a new client secret.
+    encoder::Encoder encoder(project_,
+                             encoder::ClientSecret::GenerateNewSecret());
+    // Set a static current time so we know we have a static day_index.
+    encoder.set_current_time(kSomeTimestamp);
+
+    auto result = encoder.EncodeIndex(metric_id, encoding_config_id, index);
+
+    EXPECT_EQ(encoder::Encoder::kOK, result.status);
+    CHECK_EQ(encoder::Encoder::kOK, result.status);
+    EXPECT_TRUE(result.observation.get() != nullptr);
+    CHECK(result.observation.get() != nullptr);
+    EXPECT_EQ(1, result.observation->parts_size());
+    return std::move(result.observation);
+  }
+
   // Adds to the ObservationStore |num_clients| two-part observations that each
   // encode the given two values using the given metric and the
   // given two encodings. Each Observation is generated as if from a different
@@ -299,6 +381,25 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
       observations.emplace_back(*MakeObservation(part1_value, part2_value,
                                                  metric_id, encoding_config_id1,
                                                  encoding_config_id2));
+    }
+    ObservationMetadata metadata;
+    metadata.set_customer_id(kCustomerId);
+    metadata.set_project_id(kProjectId);
+    metadata.set_metric_id(metric_id);
+    metadata.set_day_index(kDayIndex);
+    EXPECT_EQ(store::kOK,
+              observation_store_->AddObservationBatch(metadata, observations));
+  }
+
+  // Adds to the ObservationStore |num_clients| Observations with one INDEX
+  // value using the given metric and encoding. Each Observation is generated
+  // as if from a different client.
+  void AddIndexObservations(uint32_t index, uint32_t metric_id,
+                            uint32_t encoding_config_id1, int num_clients) {
+    std::vector<Observation> observations;
+    for (int i = 0; i < num_clients; i++) {
+      observations.emplace_back(
+          *MakeIndexObservation(index, metric_id, encoding_config_id1));
     }
     ObservationMetadata metadata;
     metadata.set_customer_id(kCustomerId);
@@ -686,6 +787,73 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
   EXPECT_EQ(20, second_marginal_results[10]);
 }
 
+// Tests Cobalt analyzer end-to-end using a (metric, encoding, report) trio
+// in which Observations use the INDEX data type and the report config
+// specifies human-readable labels for some of the indices.
+TYPED_TEST_P(ReportMasterServiceAbstractTest, E2EWithIndexLabels) {
+  for (int index = 0; index < 50; index++) {
+    // Add |index| + 1 observations of |index|.
+    this->AddIndexObservations(index, kMetricId3,
+                               kBasicRapporIndexEncodingConfigId, index + 1);
+  }
+
+  // Start the report.
+  StartReportRequest start_request;
+  start_request.set_customer_id(kCustomerId);
+  start_request.set_project_id(kProjectId);
+  start_request.set_report_config_id(kReportConfigId3);
+  start_request.set_first_day_index(kDayIndex);
+  start_request.set_last_day_index(kDayIndex);
+  StartReportResponse start_response;
+  auto status = this->report_master_service_->StartReport(
+      nullptr, &start_request, &start_response);
+  EXPECT_TRUE(status.ok()) << "error_code=" << status.error_code()
+                           << " error_message=" << status.error_message();
+  // Capture the report ID.
+  std::string report_id = start_response.report_id();
+  EXPECT_FALSE(report_id.empty());
+
+  // Wait until the report generation completes.
+  this->WaitUntilIdle();
+
+  Report report;
+  {
+    // Fetch the report and check the metadata.
+    SCOPED_TRACE("");
+    bool check_completed = true;
+    bool expect_part1 = true;
+    bool expect_part2 = false;
+    this->GetReportAndCheck(report_id, kReportConfigId3, expect_part1,
+                            expect_part2, check_completed, &report);
+  }
+  // Check the rows of the report including the labels.
+  ASSERT_EQ(100, report.rows().rows_size());
+  for (size_t i = 0; i < 100; i++) {
+    auto index = report.rows().rows(i).histogram().value().index_value();
+    auto count = report.rows().rows(i).histogram().count_estimate();
+    auto label = report.rows().rows(i).histogram().label();
+    auto expected_count = (index < 50 ? index + 1 : 0);
+    EXPECT_EQ(expected_count, count) << "i=" << i << ", index=" << index
+                                     << ", count=" << count;
+    switch (index) {
+      case 0:
+        EXPECT_EQ("Event A", label);
+        break;
+
+      case 1:
+        EXPECT_EQ("Event B", label);
+        break;
+
+      case 25:
+        EXPECT_EQ("Event Z", label);
+        break;
+
+      default:
+        EXPECT_EQ("", label);
+    }
+  }
+}
+
 // Tests the method ReportMaster::QueryReports. We write into the ReportStore
 // many instance of ReportConfig 1 and then invoke QueryReports() and check the
 // results.
@@ -740,7 +908,7 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, QueryReportsTest) {
 }
 
 REGISTER_TYPED_TEST_CASE_P(ReportMasterServiceAbstractTest, StartAndGetReports,
-                           QueryReportsTest);
+                           E2EWithIndexLabels, QueryReportsTest);
 
 }  // namespace analyzer
 }  // namespace cobalt
