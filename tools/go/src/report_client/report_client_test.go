@@ -57,6 +57,18 @@ var intValuePart2 = cobalt.ValuePart{
 	},
 }
 
+var indexValuePart1 = cobalt.ValuePart{
+	Data: &cobalt.ValuePart_IndexValue{
+		IndexValue: 1,
+	},
+}
+
+var indexValuePart2 = cobalt.ValuePart{
+	Data: &cobalt.ValuePart_IndexValue{
+		IndexValue: 2,
+	},
+}
+
 var successfulReport = report_master.Report{
 	Metadata: &report_master.ReportMetadata{
 		State: report_master.ReportState_COMPLETED_SUCCESSFULLY,
@@ -68,6 +80,16 @@ var successfulReport = report_master.Report{
 					Histogram: &report_master.HistogramReportRow{
 						Value:         &intValuePart1,
 						CountEstimate: 101.1,
+						StdError:      3.14,
+					},
+				},
+			},
+			&report_master.ReportRow{
+				RowType: &report_master.ReportRow_Histogram{
+					Histogram: &report_master.HistogramReportRow{
+						Value:         &indexValuePart2,
+						Label:         "Label-for-index-2",
+						CountEstimate: 101.2,
 						StdError:      3.14,
 					},
 				},
@@ -93,6 +115,15 @@ var successfulReport = report_master.Report{
 			&report_master.ReportRow{
 				RowType: &report_master.ReportRow_Histogram{
 					Histogram: &report_master.HistogramReportRow{
+						Value:         &indexValuePart1,
+						CountEstimate: 103.4,
+						StdError:      3.14,
+					},
+				},
+			},
+			&report_master.ReportRow{
+				RowType: &report_master.ReportRow_Histogram{
+					Histogram: &report_master.HistogramReportRow{
 						Value:         &intValuePart2,
 						CountEstimate: 104.4,
 						StdError:      3.14,
@@ -109,6 +140,8 @@ const expectedCSVReportString = `String Value 11,103.300,3.140
 String Value 2,102.200,3.140
 42,101.100,3.140
 43,104.400,3.140
+<index 1>,103.400,3.140
+Label-for-index-2<index 2>,101.200,3.140
 `
 
 var failedReportPrimary = report_master.Report{

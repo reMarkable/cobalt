@@ -233,6 +233,9 @@ func valuePartToString(val *cobalt.ValuePart) string {
 	if x, ok := val.GetData().(*cobalt.ValuePart_IntValue); ok {
 		return fmt.Sprintf("%v", x.IntValue)
 	}
+	if x, ok := val.GetData().(*cobalt.ValuePart_IndexValue); ok {
+		return fmt.Sprintf("<index %v>", x.IndexValue)
+	}
 	// We won't try to display the contents of a BLOB.
 	return "[blob]"
 }
@@ -254,9 +257,20 @@ func ReportRowToStrings(row *report_master.ReportRow, includeStdErr bool) []stri
 // |StdError|.
 func HistogramReportRowToStrings(row *report_master.HistogramReportRow, includeStdErr bool) []string {
 	result := []string{}
+	valueString := ""
 	if row.GetValue() != nil {
-		result = append(result, valuePartToString(row.Value))
+		valueString = valuePartToString(row.Value)
 	}
+	// If the row has a |label| then use that as that as the primary identifier
+	// for the row rather than the serialized value.
+	if row.Label != "" {
+		if valueString == "" {
+			valueString = row.Label
+		} else {
+			valueString = fmt.Sprintf("%s%s", row.Label, valueString)
+		}
+	}
+	result = append(result, valueString)
 
 	result = append(result, fmt.Sprintf("%.3f", math.Max(0, float64(row.CountEstimate))))
 	if includeStdErr {
@@ -269,11 +283,17 @@ func HistogramReportRowToStrings(row *report_master.HistogramReportRow, includeS
 // Returns -1, 0 or 1 as v1 is respectively less than, equivalent to,
 // or greater than v2.
 //
-// Compares number and strings in natural order. For other comparisons
+// Compares numbers and strings in natural order. For other comparisons
 // we make the following arbitrary choices for the sake of concreteness:
 // (a) A nil is less than a non-nil, two nils are equivalent
-// (b) A string is less than an integer is less than a blob
+// (b) A string is less than an integer is less than an index is less than a blob
 // (c) Two blobs are  equivalent
+//
+// This method is used in order to sort the rows of a report by their
+// their value fields. The sort order is only intended to be intuitive
+// to a human looking at the report. That is why we group like kinds together,
+// sort numbers and strings naturally, sort numbers and strings above
+// blobs, and don't care about the other arbitrary choices.
 func CompareValueParts(v1, v2 *cobalt.ValuePart) int {
 	// If both values are missing they are equal.
 	if (v1 == nil) && (v2 == nil) {
@@ -321,12 +341,27 @@ func CompareValueParts(v1, v2 *cobalt.ValuePart) int {
 		return 0
 	}
 
-	// An int is less than a blob
+	// An int is less than a non-int
 	if ok1 {
 		return -1
 	}
 	if ok2 {
 		return 1
+	}
+
+	// See if the two values are indices
+	index1, ok1 := v1.GetData().(*cobalt.ValuePart_IndexValue)
+	index2, ok2 := v2.GetData().(*cobalt.ValuePart_IndexValue)
+
+	// Compare two integer indices naturally.
+	if ok1 && ok2 {
+		if index1.IndexValue > index2.IndexValue {
+			return 1
+		}
+		if index1.IndexValue < index2.IndexValue {
+			return -1
+		}
+		return 0
 	}
 
 	// Two blobs are equal.
