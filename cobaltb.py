@@ -327,7 +327,7 @@ def _start_test_app(args):
   analyzer_public_key_pem = \
     DEFAULT_ANALYZER_PUBLIC_KEY_PEM
   shuffler_public_key_pem = \
-    DEFAULT_ANALYZER_PUBLIC_KEY_PEM
+    DEFAULT_SHUFFLER_PUBLIC_KEY_PEM
   if args.production_dir:
     pem_directory = os.path.abspath(args.production_dir)
     analyzer_public_key_pem = os.path.join(pem_directory,

@@ -60,7 +60,7 @@ element {
   customer_id: 1
   project_id: 1
   id: 2
-  name: "Fuschsia Usage by Hour"
+  name: "Fuchsia Usage by Hour"
   description: "This is a fictional metric used for the development of Cobalt."
   time_zone_policy: LOCAL
   parts {
@@ -77,7 +77,7 @@ element {
   customer_id: 1
   project_id: 1
   id: 3
-  name: "Fuschsia Fruit Consumption and Rating"
+  name: "Fuchsia Fruit Consumption and Rating"
   description: "This is a fictional metric used for the development of Cobalt."
   time_zone_policy: LOCAL
   parts {
@@ -91,6 +91,23 @@ element {
     value {
       description: "An integer from 0 to 10"
       data_type: INT
+    }
+  }
+}
+
+# Metric 4 has one INDEX part named event.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  name: "Fuchsia Rare Events"
+  description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
+  parts {
+    key: "event"
+    value {
+      description: "The index of the event type."
+      data_type: INDEX
     }
   }
 }
@@ -151,6 +168,20 @@ element {
     int_range_categories: {
       first: 0
       last:  10
+    }
+  }
+}
+
+# EncodingConfig 5 is Basic RAPPOR with 100 indexed categories
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  basic_rappor {
+    prob_0_becomes_1: 0.2
+    prob_1_stays_1: 0.8
+    indexed_categories: {
+      num_categories: 100
     }
   }
 }
@@ -257,7 +288,7 @@ TEST_F(TestAppTest, ProcessCommandLineHelp) {
   EXPECT_TRUE(OutputContains("Print this help message."));
   EXPECT_TRUE(
       OutputContains("Encode <num> independent copies of the string "
-                     "or integer value <val>."));
+                     "or integer value <val>, or index <n> if"));
 }
 
 // Tests processing a bad set command line.
@@ -355,7 +386,7 @@ TEST_F(TestAppTest, ProcessCommandLineSetAndShowConfig) {
   EXPECT_TRUE(NoOutput());
 
   EXPECT_TRUE(test_app_.ProcessCommandLine("show config"));
-  EXPECT_TRUE(OutputContains("Fuschsia Usage by Hour"));
+  EXPECT_TRUE(OutputContains("Fuchsia Usage by Hour"));
   EXPECT_TRUE(
       OutputContains("One int part named \"hour\": An integer from 0 to 23 "
                      "representing the hour of the day."));
@@ -366,7 +397,7 @@ TEST_F(TestAppTest, ProcessCommandLineSetAndShowConfig) {
   EXPECT_TRUE(NoOutput());
 
   EXPECT_TRUE(test_app_.ProcessCommandLine("show config"));
-  EXPECT_TRUE(OutputContains("Fuschsia Usage by Hour"));
+  EXPECT_TRUE(OutputContains("Fuchsia Usage by Hour"));
   EXPECT_TRUE(
       OutputContains("One int part named \"hour\": An integer from 0 to 23 "
                      "representing the hour of the day."));
@@ -379,7 +410,7 @@ TEST_F(TestAppTest, ProcessCommandLineSetAndShowConfig) {
   EXPECT_TRUE(NoOutput());
 
   EXPECT_TRUE(test_app_.ProcessCommandLine("show config"));
-  EXPECT_TRUE(OutputContains("Fuschsia Fruit Consumption and Rating"));
+  EXPECT_TRUE(OutputContains("Fuchsia Fruit Consumption and Rating"));
   EXPECT_TRUE(
       OutputContains("One int part named \"rating\": An integer from 0 to 10"));
   EXPECT_TRUE(
@@ -394,8 +425,22 @@ TEST_F(TestAppTest, ProcessCommandLineSetAndShowConfig) {
   EXPECT_TRUE(NoOutput());
 
   EXPECT_TRUE(test_app_.ProcessCommandLine("show config"));
-  EXPECT_TRUE(OutputContains("There is no metric with id=4."));
-  EXPECT_TRUE(OutputContains("There is no encoding config with id=5."));
+  EXPECT_TRUE(OutputContains("Fuchsia Rare Events")) << output_stream_.str();
+  EXPECT_TRUE(OutputContains(
+      "One indexed part named \"event\": The index of the event type"));
+  EXPECT_TRUE(OutputContains("Basic Rappor"));
+  EXPECT_TRUE(OutputContains("p=0.2, q=0.8"));
+  EXPECT_TRUE(OutputContains("Categories:"));
+  EXPECT_TRUE(OutputContains("num_categories: 100")) << output_stream_.str();
+  ClearOutput();
+
+  EXPECT_TRUE(test_app_.ProcessCommandLine("set metric 5"));
+  EXPECT_TRUE(test_app_.ProcessCommandLine("set encoding 6"));
+  EXPECT_TRUE(NoOutput());
+
+  EXPECT_TRUE(test_app_.ProcessCommandLine("show config"));
+  EXPECT_TRUE(OutputContains("There is no metric with id=5."));
+  EXPECT_TRUE(OutputContains("There is no encoding config with id=6."));
   ClearOutput();
 }
 
@@ -482,6 +527,37 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSend) {
     EXPECT_EQ(1, observation.parts_size());
     auto part = observation.parts().at("hour");
     EXPECT_EQ(2u, part.encoding_config_id());
+  }
+
+  // Switch to metric 4 encoding 5 which is Basic RAPPOR with
+  // events encoded as indices
+  EXPECT_TRUE(test_app_.ProcessCommandLine("set encoding 5"));
+  EXPECT_TRUE(test_app_.ProcessCommandLine("set metric 4"));
+
+  // Set skip_shuffler true.
+  EXPECT_TRUE(test_app_.ProcessCommandLine("set skip_shuffler true"));
+  EXPECT_TRUE(NoOutput());
+
+  EXPECT_TRUE(test_app_.ProcessCommandLine("encode 100 index=0"));
+  EXPECT_TRUE(test_app_.ProcessCommandLine("encode 200 index=1"));
+  EXPECT_TRUE(test_app_.ProcessCommandLine("send"));
+  EXPECT_TRUE(NoOutput());
+  EXPECT_TRUE(fake_sender_->skip_shuffler);
+  // The received envelope should contain 1 batch.
+  envelope = fake_sender_->envelope;
+  ASSERT_EQ(1, envelope.batch_size());
+  // That batch should contain 300 messages.
+  const ObservationBatch& batch3 = envelope.batch(0);
+  EXPECT_EQ(300, batch3.encrypted_observation_size());
+  // The metric ID should be 4.
+  EXPECT_EQ(4u, batch3.meta_data().metric_id());
+  // All of the Observations should have a single part named "event" that has an
+  // encoding config ID of 5
+  for (const auto& encrypted_message : batch3.encrypted_observation()) {
+    auto observation = ParseUnencryptedObservation(encrypted_message);
+    EXPECT_EQ(1, observation.parts_size());
+    auto part = observation.parts().at("event");
+    EXPECT_EQ(5u, part.encoding_config_id());
   }
 }
 

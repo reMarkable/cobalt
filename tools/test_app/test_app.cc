@@ -119,7 +119,8 @@ void PrintHelp(std::ostream* ostream) {
   *ostream << "help                     \tPrint this help message."
            << std::endl;
   *ostream << "encode <num> <val>       \tEncode <num> independent copies "
-              "of the string or integer value <val>."
+              "of the string or integer value <val>, or index <n> if "
+              "<val>='index=<n>'"
            << std::endl;
   *ostream << std::endl;
   *ostream << "encode <num> <part>:<val>:<encoding> "
@@ -129,7 +130,10 @@ void PrintHelp(std::ostream* ostream) {
               "a multi-part value. Each <part> is a part name."
            << std::endl;
   *ostream << "                         \tEach <val> is an int or string "
-              "value. Each <encoding> is an EncodingConfig id."
+              "value or an index <n> if <val>='index=<n>'."
+           << std::endl;
+  *ostream << "                         \tEach <encoding> is an EncodingConfig "
+              "id."
            << std::endl;
   *ostream << std::endl;
   *ostream << "ls                       \tList current values of "
@@ -590,8 +594,11 @@ bool TestApp::EncodeAsNewClient(const std::vector<uint32_t> encoding_config_ids,
   Encoder::Value value;
   for (size_t i = 0; i < num_parts; i++) {
     int64_t int_val;
+    uint32_t index;
     if (ParseInt(values[i], false, &int_val)) {
       value.AddIntPart(encoding_config_ids[i], metric_parts[i], int_val);
+    } else if (ParseIndex(values[i], &index)) {
+      value.AddIndexPart(encoding_config_ids[i], metric_parts[i], index);
     } else {
       value.AddStringPart(encoding_config_ids[i], metric_parts[i], values[i]);
     }
@@ -680,6 +687,30 @@ bool TestApp::EncodeIntAsNewClient(int64_t value) {
   return true;
 }
 
+void TestApp::EncodeIndex(uint32_t index) {
+  for (size_t i = 0; i < FLAGS_num_clients; i++) {
+    if (!EncodeIndexAsNewClient(index)) {
+      break;
+    }
+  }
+}
+
+bool TestApp::EncodeIndexAsNewClient(uint32_t index) {
+  std::unique_ptr<Encoder> encoder(
+      new Encoder(project_context_, ClientSecret::GenerateNewSecret()));
+  auto result = encoder->EncodeIndex(metric_, encoding_config_id_, index);
+  if (result.status != Encoder::kOK) {
+    LOG(ERROR) << "EncodeIndex() failed with status " << result.status
+               << ". metric_id=" << metric_
+               << ". encoding_config_id=" << encoding_config_id_
+               << ". index=" << index;
+    return false;
+  }
+  envelope_maker_->AddObservation(*result.observation,
+                                  std::move(result.metadata));
+  return true;
+}
+
 bool TestApp::ProcessCommandLine(const std::string command_line) {
   return ProcessCommand(Tokenize(command_line));
 }
@@ -752,8 +783,11 @@ void TestApp::Encode(const std::vector<std::string>& command) {
   FLAGS_num_clients = num_clients;
 
   int64_t int_val;
+  uint32_t index;
   if (ParseInt(command[2], false, &int_val)) {
     EncodeInt(int_val);
+  } else if (ParseIndex(command[2], &index)) {
+    EncodeIndex(index);
   } else {
     EncodeString(command[2]);
   }
@@ -898,12 +932,17 @@ void TestApp::ShowMetric(const Metric& metric) {
         data_type = "int";
         break;
 
+      case MetricPart::INDEX:
+        data_type = "indexed";
+        break;
+
       case MetricPart::BLOB:
         data_type = "blob";
         break;
 
       default:
-        data_type = "";
+        data_type = "<missing case>";
+        break;
     }
     *ostream_ << "One " << data_type << " part named \"" << name
               << "\": " << part.description() << std::endl;
@@ -962,6 +1001,7 @@ void TestApp::ShowBasicRapporConfig(const BasicRapporConfig& config) {
     case BasicRapporConfig::kIndexedCategories: {
       *ostream_ << "num_categories: "
                 << config.indexed_categories().num_categories();
+      return;
     }
     case BasicRapporConfig::CATEGORIES_NOT_SET:
       *ostream_ << "Invalid Encoding!";
@@ -986,6 +1026,34 @@ bool TestApp::ParseInt(const std::string& str, bool complain, int64_t* x) {
     }
     return false;
   }
+  return true;
+}
+
+bool TestApp::ParseIndex(const std::string& str, uint32_t* index) {
+  CHECK(index);
+  if (str.size() < 7) {
+    return false;
+  }
+  if (str.substr(0, 6) != "index=") {
+    return false;
+  }
+  auto index_string = str.substr(6);
+  std::istringstream iss(index_string);
+  int64_t possible_index;
+  iss >> possible_index;
+  char c;
+  if (iss.fail() || iss.get(c) || possible_index < 0 ||
+      possible_index > UINT32_MAX) {
+    if (mode_ == kInteractive) {
+      *ostream_ << "Expected small non-negative integer instead of "
+                << index_string << "." << std::endl;
+    } else {
+      LOG(ERROR) << "Expected small non-negative integer instead of  "
+                 << index_string;
+    }
+    return false;
+  }
+  *index = possible_index;
   return true;
 }
 

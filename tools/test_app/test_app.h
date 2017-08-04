@@ -140,6 +140,15 @@ class TestApp {
   // argument, and adds the resulting Observation to the EnvelopeMaker.
   bool EncodeIntAsNewClient(int64_t value);
 
+  // Generates FLAGS_num_clients independent Observations by encoding the
+  // given |index| and adds the Observations to the EnvelopeMaker.
+  void EncodeIndex(uint32_t index);
+
+  // Generates a new ClientSecret, constructs a new Encoder using that secret,
+  // uses this Encoder to encode the given |index|, and adds the resulting
+  // Observation to the EnvelopeMaker.
+  bool EncodeIndexAsNewClient(uint32_t index);
+
   void SendToAnalyzer();
 
   void SendToShuffler();
@@ -169,6 +178,8 @@ class TestApp {
   void ShowBasicRapporConfig(const BasicRapporConfig& config);
 
   bool ParseInt(const std::string& str, bool complain, int64_t* x);
+
+  bool ParseIndex(const std::string& str, uint32_t* index);
 
   // Parses a string of the form <part>:<value>:<encoding> and writes <part>
   // into |part_name| and <value> into |value| and <encoding> into
