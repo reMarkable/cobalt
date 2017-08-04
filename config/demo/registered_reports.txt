@@ -67,6 +67,39 @@ element {
   report_delay_days: 1
 }
 
+#### ReportConfig (1, 1, 4)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  name: "Fuschsia Daily System Event Counts"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 4
+  variable {
+    metric_part: "event"
+    per_encoding_data {
+      # Encoding (1, 1, 5) Is Basic RAPPOR with indexed categories.
+      key: 5
+      value {
+        basic_rappor {
+          category_labels {
+             key: 0
+             value: "Event A"
+          }
+          category_labels {
+             key: 1
+             value: "Event B"
+          }
+          category_labels {
+             key: 25
+             value: "Event Z"
+          }
+        }
+      }
+    }
+  }
+}
+
 #########################
 # Customer 2 (Acme)
 ########################

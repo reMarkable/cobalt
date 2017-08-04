@@ -68,6 +68,23 @@ element {
   }
 }
 
+#### Metric (1, 1, 4)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  name: "Rare Events"
+  description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
+  parts {
+    key: "event"
+    value {
+      description: "The index of a rare event. See report config (1,1,4) for the labels corresponding to each index."
+      data_type: INDEX
+    }
+  }
+}
+
 #### Encoding (1, 1, 1)
 element {
   customer_id: 1
@@ -90,6 +107,20 @@ element {
     int_range_categories: {
       first: 0
       last:  23
+    }
+  }
+}
+
+#### Encoding (1, 1, 5)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  basic_rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    indexed_categories: {
+      num_categories: 100
     }
   }
 }
@@ -124,6 +155,39 @@ element {
   report_delay_days: 5
 }
 
+#### ReportConfig (1, 1, 4)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  name: "Fuschsia Daily System Event Counts"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 4
+  variable {
+    metric_part: "event"
+    per_encoding_data {
+      # Encoding (1, 1, 5) Is Basic RAPPOR with indexed categories.
+      key: 5
+      value {
+        basic_rappor {
+          category_labels {
+             key: 0
+             value: "Event A"
+          }
+          category_labels {
+             key: 1
+             value: "Event B"
+          }
+          category_labels {
+             key: 25
+             value: "Event Z"
+          }
+        }
+      }
+    }
+  }
+}
+
 */
 
 package main
@@ -151,17 +215,21 @@ const (
 	customerId = 1
 	projectId  = 1
 
-	urlMetricId  = 1
-	hourMetricId = 2
+	urlMetricId   = 1
+	hourMetricId  = 2
+	eventMetricId = 4
 
-	forculusEncodingConfigId    = 1
-	basicRapporEncodingConfigId = 2
+	forculusEncodingConfigId           = 1
+	basicRapporStringsEncodingConfigId = 2
+	basicRapporIndexEncodingConfigId   = 5
 
-	forculusUrlReportConfigId     = 1
-	basicRapporHourReportConfigId = 2
+	forculusUrlReportConfigId      = 1
+	basicRapporHourReportConfigId  = 2
+	basicRapporEventReportConfigId = 4
 
-	hourMetricPartName = "hour"
-	urlMetricPartName  = "url"
+	hourMetricPartName  = "hour"
+	urlMetricPartName   = "url"
+	eventMetricPartName = "event"
 )
 
 var (
@@ -241,26 +309,34 @@ func init() {
 		// Since we are about to delete data from a real bigtable let's give a user a chance
 		// to cancel if something horrible has gone wrong.
 		printWarningAndWait()
-		fmt.Printf("*** Deleting all observations from the Observation Store at %s;%s for project (%d, %d), metrics %d and %d.\n",
-			*bigtableProjectName, *bigtableInstanceName, customerId, projectId, urlMetricId, hourMetricId)
+		fmt.Printf("*** Deleting observations from the Observation Store at %s;%s for project (%d, %d), metrics %d, %d and %d.\n",
+			*bigtableProjectName, *bigtableInstanceName, customerId, projectId, urlMetricId, hourMetricId, eventMetricId)
 		if err := invokeBigtableTool("delete_observations", urlMetricId, 0); err != nil {
 			panic(fmt.Sprintf("Error deleting observations for url metric [%v].", err))
 		}
 		if err := invokeBigtableTool("delete_observations", hourMetricId, 0); err != nil {
 			panic(fmt.Sprintf("Error deleting observations for hour metric [%v].", err))
 		}
-		fmt.Printf("*** Deleting all reports from the Report Store at %s;%s.\n", *bigtableProjectName, *bigtableInstanceName)
+		if err := invokeBigtableTool("delete_observations", eventMetricId, 0); err != nil {
+			panic(fmt.Sprintf("Error deleting observations for event metric [%v].", err))
+		}
+		fmt.Printf("*** Deleting reports from the Report Store at %s;%s for project (%d, %d), report configs %d, %d and %d.\n",
+			*bigtableProjectName, *bigtableInstanceName, customerId, projectId,
+			forculusUrlReportConfigId, basicRapporHourReportConfigId, basicRapporEventReportConfigId)
 		if err := invokeBigtableTool("delete_reports", 0, forculusUrlReportConfigId); err != nil {
 			panic(fmt.Sprintf("Error deleting forculus URL reports [%v].", err))
 		}
 		if err := invokeBigtableTool("delete_reports", 0, basicRapporHourReportConfigId); err != nil {
 			panic(fmt.Sprintf("Error deleting basic RAPPOR hour reports [%v].", err))
 		}
+		if err := invokeBigtableTool("delete_reports", 0, basicRapporEventReportConfigId); err != nil {
+			panic(fmt.Sprintf("Error deleting basic RAPPOR hour reports [%v].", err))
+		}
 	}
 }
 
 // A ValuePart represents part of an input to the Cobalt encoder. It specifies
-// that the given integer or string should be encoded using the given
+// that the given integer, string or index should be encoded using the given
 // EncodingConfig and associated with the given metric part name.
 type ValuePart struct {
 	// The name of the metric part this value is for.
@@ -430,11 +506,28 @@ func sendBasicRapporHourObservations(hour int, numClients uint, t *testing.T) {
 		ValuePart{
 			hourMetricPartName,
 			strconv.Itoa(hour),
-			basicRapporEncodingConfigId,
+			basicRapporStringsEncodingConfigId,
 		},
 	}
 	if err := sendObservations(hourMetricId, values, skipShuffler, numClients); err != nil {
 		t.Fatalf("hour=%d, numClient=%d, err=%v", hour, numClients, err)
+	}
+}
+
+// sendBasicRapporEventObservations sends Observations containing a Basic RAPPOR encoding of the
+// given |index| to the Shuffler. |numClients| different, independent observations
+// will be sent.
+func sendBasicRapporEventObservations(index int, numClients uint, t *testing.T) {
+	const skipShuffler = false
+	values := []ValuePart{
+		ValuePart{
+			eventMetricPartName,
+			fmt.Sprintf("index=%d", index),
+			basicRapporIndexEncodingConfigId,
+		},
+	}
+	if err := sendObservations(eventMetricId, values, skipShuffler, numClients); err != nil {
+		t.Fatalf("index=%d, numClient=%d, err=%v", index, numClients, err)
 	}
 }
 
@@ -498,7 +591,7 @@ func TestForculusEncodingOfUrls(t *testing.T) {
 
 	// There should now be 123 Observations sent to the Analyzer for metric 1.
 	// We wait for them.
-	if err := waitForObservations(1, 123); err != nil {
+	if err := waitForObservations(urlMetricId, 123); err != nil {
 		t.Fatalf("%s", err)
 	}
 
@@ -529,7 +622,7 @@ func TestBasicRapporEncodingOfHours(t *testing.T) {
 
 	// There should now be 4021 Observations sent to the Analyzer for metric 2.
 	// We wait for them.
-	if err := waitForObservations(2, 4021); err != nil {
+	if err := waitForObservations(hourMetricId, 4021); err != nil {
 		t.Fatalf("%s", err)
 	}
 
@@ -583,5 +676,75 @@ func TestBasicRapporEncodingOfHours(t *testing.T) {
 		if rows[hour][2] != "23.779" {
 			t.Errorf("rows[hour][2]=%s", rows[hour][2])
 		}
+	}
+}
+
+// We run the full Cobalt pipeline using Metric 4, Encoding Config 5 and
+// Report Config 4. This uses Basic RAPPOR with 100 indexed categories, in
+// which some of the indices have been associated with labels in the
+// report config.
+func TestBasicRapporEncodingOfEvents(t *testing.T) {
+	// Send observations for indices 0 through 29.
+	for index := 0; index < 30; index++ {
+		numClients := index + 1
+		sendBasicRapporEventObservations(index, uint(numClients), t)
+	}
+
+	// There should 30*31/2 = 465 Observations sent to the Analyzer for metric 4.
+	// We wait for them.
+	if err := waitForObservations(eventMetricId, 465); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	report := getReport(basicRapporEventReportConfigId, true, t)
+	if report.Metadata.State != report_master.ReportState_COMPLETED_SUCCESSFULLY {
+		t.Fatalf("report.Metadata.State=%v", report.Metadata.State)
+	}
+	rows := report_client.ReportToStrings(report, true)
+	if rows == nil {
+		t.Fatalf("rows is nil")
+	}
+	if len(rows) != 100 {
+		t.Fatalf("len(rows)=%d", len(rows))
+	}
+
+	for index := 0; index < 100; index++ {
+		if len(rows[index]) != 3 {
+			t.Fatalf("len(rows[index])=%d", len(rows[index]))
+		}
+		var expectedRowKey string
+		switch index {
+		case 0:
+			expectedRowKey = "Event A<index 0>"
+			break
+		case 1:
+			expectedRowKey = "Event B<index 1>"
+			break
+		case 25:
+			expectedRowKey = "Event Z<index 25>"
+			break
+		default:
+			expectedRowKey = fmt.Sprintf("<index %d>", index)
+		}
+		if rows[index][0] != expectedRowKey {
+			t.Errorf("Expected %s, got %s", expectedRowKey, rows[index][0])
+			continue
+		}
+
+		val, err := strconv.ParseFloat(rows[index][1], 32)
+		if err != nil {
+			t.Errorf("Error parsing %s as float: %v", rows[index][1], err)
+			continue
+		}
+
+		expectedCount := index + 1
+		if index >= 30 {
+			expectedCount = 0
+		}
+		if int(val) != expectedCount {
+			t.Errorf("Expected %d, got %d", expectedCount, int(val))
+			continue
+		}
+
 	}
 }
