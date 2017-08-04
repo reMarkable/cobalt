@@ -144,7 +144,7 @@ element {
   id: 2
   name: "Fuchsia Module Daily Launch Counts"
   description: "A daily report of the daily counts of module launches by URL."
-  metric_id: 1
+  metric_id: 2
   variable {
     metric_part: "url"
   }
