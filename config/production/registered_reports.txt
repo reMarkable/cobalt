@@ -17,22 +17,19 @@
 # Customer 1 (Fuchsia)
 ########################
 
-## Project 100: Ledger
+########################### Project 100: Ledger ###############################
 
 #####################################################################
 # Report Config (1, 100, 1)
 # Name:  Daily rare event counts
-# Description: A Daily report of Rare Events metric.
-# Parts: This metric has one part name "Event name"
-# Notes: At least initially, we plan to use Basic RAPPOR with no privacy to
-#        collect this metric. Each category will be one of the rare events.
+# Description: A daily report of the daily counts of rare events.
 ######################################################################
 element {
   customer_id: 1
   project_id: 100
   id: 1
-  name: "Fuchsia Ledger Daily Rare Events"
-  description: "A daily report of events that are expected to happen rarely."
+  name: "Fuchsia Ledger Daily Rare Event Counts"
+  description: "A daily report of the daily counts of rare events."
   metric_id: 1
   variable {
     metric_part: "Event name"
@@ -41,9 +38,39 @@ element {
   report_delay_days: 1
 }
 
+##################### Project 101: Module Usage Tracking ######################
+
 #####################################################################
-#        ***  Below this line are testing projects. ***
-#####################################################################
+# Report Config (1, 101, 1)
+# Name:  Daily module launch counts.
+# Description: A daily report of the daily counts of module launches.
+#              Note that because we use Forculus to collect the Observations
+#              for this report, a given URL will not appear in the report
+#              unless it was used by at least two different devices in
+#              the same calendar month. (At this time each reboot of Fuchsia
+#              counts as a different device for this purpose.)
+######################################################################
+element {
+  customer_id: 1
+  project_id: 101
+  id: 1
+  name: "Fuchsia Module Daily Launch Counts"
+  description: "A daily report of the daily counts of module launches by URL."
+  metric_id: 1
+  variable {
+    metric_part: "url"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}
+
+
+
+################################################################################
+#      ***  NOTICE: Below this line are testing-only projects. ***
+#
+#           These project must all use project IDs less than 100.
+################################################################################
 
 ## Project 1: End-to-End test
 
@@ -96,6 +123,30 @@ element {
   metric_id: 1
   variable {
     metric_part: "Event name"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}
+
+#####################################################################
+# Report Config (1, 2, 2)
+# Name:  Daily module view counts.
+# Description: A daily report of the daily counts of module views.
+#              Note that because we use Forculus to collect the Observations
+#              for this report, a given URL will not appear in the report
+#              unless it was used by at least two different devices in
+#              the same calendar month. (At this time each reboot of Fuchsia
+#              counts as a different device for this purpose.)
+######################################################################
+element {
+  customer_id: 1
+  project_id: 2
+  id: 2
+  name: "Fuchsia Module Daily Launch Counts"
+  description: "A daily report of the daily counts of module launches by URL."
+  metric_id: 1
+  variable {
+    metric_part: "url"
   }
   aggregation_epoch_type: DAY
   report_delay_days: 1
