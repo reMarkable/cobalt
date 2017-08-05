@@ -207,19 +207,8 @@ TEST(ReportRegistryFromFile, ValidFile) {
 
   // Examine the first varaible of (1, 1, 1)
   const auto& variable = report_config->variable(0);
-  EXPECT_EQ(1u, variable.per_encoding_data().size());
-  EXPECT_EQ(1u, variable.per_encoding_data().count(1));
-  EXPECT_EQ(ReportPerEncodingData::kRappor,
-            variable.per_encoding_data().at(1).encoding_case());
-  EXPECT_EQ(2, variable.per_encoding_data()
-                   .at(1)
-                   .rappor()
-                   .candidate_list()
-                   .candidates_size());
-  EXPECT_EQ(
-      "San Francisco",
-      variable.per_encoding_data().at(1).rappor().candidate_list().candidates(
-          0));
+  EXPECT_EQ(2, variable.rappor_candidates().candidates_size());
+  EXPECT_EQ("San Francisco", variable.rappor_candidates().candidates(0));
 
   // (1, 1, 2) Should be "Fuschsia Usage by Hour"
   report_config = registry->Get(1, 1, 2);
@@ -231,23 +220,11 @@ TEST(ReportRegistryFromFile, ValidFile) {
 
   // Examine the first varaible of (1, 1, 3)
   const auto& variable0 = report_config->variable(0);
-  // It should have per_encoding_data for report_config 4.
-  ASSERT_EQ(1u, variable0.per_encoding_data().size());
-  ASSERT_EQ(1u, variable0.per_encoding_data().count(4));
-  EXPECT_EQ(ReportPerEncodingData::kBasicRappor,
-            variable0.per_encoding_data().at(4).encoding_case());
-  EXPECT_EQ(
-      "Event A",
-      variable0.per_encoding_data().at(4).basic_rappor().category_labels().at(
-          0));
-  EXPECT_EQ(
-      "Event B",
-      variable0.per_encoding_data().at(4).basic_rappor().category_labels().at(
-          1));
-  EXPECT_EQ(
-      "Event Z",
-      variable0.per_encoding_data().at(4).basic_rappor().category_labels().at(
-          25));
+  ASSERT_TRUE(variable0.has_index_labels());
+  ASSERT_EQ(3, variable0.index_labels().labels_size());
+  EXPECT_EQ("Event A", variable0.index_labels().labels().at(0));
+  EXPECT_EQ("Event B", variable0.index_labels().labels().at(1));
+  EXPECT_EQ("Event Z", variable0.index_labels().labels().at(25));
 
   // (1, 1, 4) Should be not present
   EXPECT_EQ(nullptr, registry->Get(1, 1, 4));

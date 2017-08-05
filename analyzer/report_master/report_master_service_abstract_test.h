@@ -219,24 +219,18 @@ element {
   metric_id: 3
   variable {
     metric_part: "Part1"
-    per_encoding_data {
-      # Encoding (1, 1, 4) Is Basic RAPPOR with 100 indexed categories.
-      key: 4
-      value {
-        basic_rappor {
-          category_labels {
-             key: 0
-             value: "Event A"
-          }
-          category_labels {
-             key: 1
-             value: "Event B"
-          }
-          category_labels {
-             key: 25
-             value: "Event Z"
-          }
-        }
+    index_labels {
+      labels {
+         key: 0
+         value: "Event A"
+      }
+      labels {
+         key: 1
+         value: "Event B"
+      }
+      labels {
+         key: 25
+         value: "Event Z"
       }
     }
   }

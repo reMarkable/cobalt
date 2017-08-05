@@ -141,10 +141,10 @@ class BasicRapporAdapter : public DecoderAdapter {
  public:
   BasicRapporAdapter(const ReportId& report_id,
                      const cobalt::BasicRapporConfig& config,
-                     const BasicRapporReportPerEncodingData* data)
+                     const IndexLabels* index_labels)
       : report_id_(report_id),
         analyzer_(new BasicRapporAnalyzer(config)),
-        data(data) {}
+        index_labels(index_labels) {}
 
   bool ProcessObservationPart(uint32_t day_index,
                               const ObservationPart& obs) override {
@@ -162,10 +162,10 @@ class BasicRapporAdapter : public DecoderAdapter {
       // then check whether the BasicRapporReporPerEncodingData from the
       // ReportConfig contains a human-readable label for this index.
       // If so attach the label to the report row.
-      if (data != nullptr &&
+      if (index_labels != nullptr &&
           row->value().data_case() == ValuePart::kIndexValue) {
-        auto iter = data->category_labels().find(row->value().index_value());
-        if (iter != data->category_labels().end()) {
+        auto iter = index_labels->labels().find(row->value().index_value());
+        if (iter != index_labels->labels().end()) {
           row->set_label(iter->second);
         }
       }
@@ -181,7 +181,7 @@ class BasicRapporAdapter : public DecoderAdapter {
  private:
   ReportId report_id_;
   std::unique_ptr<BasicRapporAnalyzer> analyzer_;
-  const BasicRapporReportPerEncodingData* data;  // not owned.
+  const IndexLabels* index_labels;  // not owned.
 };
 
 ////////////////////////////////////////////////////////////////////////////
@@ -279,26 +279,12 @@ std::unique_ptr<DecoderAdapter> HistogramAnalysisEngine::NewDecoder(
     case EncodingConfig::kRappor:
       return std::unique_ptr<DecoderAdapter>(new RapporAdapter);
     case EncodingConfig::kBasicRappor: {
-      // Retrieve the BasicRapporReportPerEncodingData if it exists.
-      auto encoding_config_id = encoding_config->id();
-      const BasicRapporReportPerEncodingData* data = nullptr;
-      auto iter =
-          report_variable_->per_encoding_data().find(encoding_config_id);
-      if (iter != report_variable_->per_encoding_data().end()) {
-        if (iter->second.encoding_case() ==
-            ReportPerEncodingData::kBasicRappor) {
-          data = &iter->second.basic_rappor();
-        } else {
-          LOG(ERROR) << "Invalid ReportConfig: For report_id="
-                     << ReportStore::ToString(report_id_)
-                     << ", for variable=" << report_variable_->metric_part()
-                     << ", the per_encoding_data for encoding_config_id="
-                     << encoding_config_id
-                     << " should be of type basic_rappor.";
-        }
+      const IndexLabels* index_labels = nullptr;
+      if (report_variable_->has_index_labels()) {
+        index_labels = &(report_variable_->index_labels());
       }
       return std::unique_ptr<DecoderAdapter>(new BasicRapporAdapter(
-          report_id_, encoding_config->basic_rappor(), data));
+          report_id_, encoding_config->basic_rappor(), index_labels));
     }
     default:
       LOG(FATAL) << "Unexpected EncodingConfig type "

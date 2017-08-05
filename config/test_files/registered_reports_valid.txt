@@ -29,17 +29,9 @@ element {
   metric_id: 1
   variable {
     metric_part: "city"
-    per_encoding_data {
-      # Encoding (2, 1, 1) Is String RAPPOR.
-      key: 1
-      value {
-        rappor {
-          candidate_list {
-             candidates: "San Francisco"
-             candidates: "Los Angeles"
-          }
-        }
-      }
+    rappor_candidates {
+      candidates: "San Francisco"
+      candidates: "Los Angeles"
     }
   }
   variable {
@@ -74,24 +66,18 @@ element {
   metric_id: 3
   variable {
     metric_part: "event"
-    per_encoding_data {
-      # Encoding (1, 1, 4) Is Basic RAPPOR with indexed categories.
-      key: 4
-      value {
-        basic_rappor {
-          category_labels {
-             key: 0
-             value: "Event A"
-          }
-          category_labels {
-             key: 1
-             value: "Event B"
-          }
-          category_labels {
-             key: 25
-             value: "Event Z"
-          }
-        }
+    index_labels {
+      labels {
+         key: 0
+         value: "Event A"
+      }
+      labels {
+         key: 1
+         value: "Event B"
+      }
+      labels {
+         key: 25
+         value: "Event Z"
       }
     }
   }
@@ -113,17 +99,9 @@ element {
   metric_id: 1
   variable {
     metric_part: "name"
-    per_encoding_data {
-      # Encoding (2, 1, 1) Is String RAPPOR.
-      key: 1
-      value {
-        rappor {
-          candidate_list {
-             candidates: "Module A"
-             candidates: "Module B"
-          }
-        }
-      }
+    rappor_candidates {
+      candidates: "Module A"
+      candidates: "Module B"
     }
   }
   aggregation_epoch_type: MONTH

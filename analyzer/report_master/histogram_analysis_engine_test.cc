@@ -146,27 +146,22 @@ element {
   metric_id: 2
   variable {
     metric_part: "Part1"
-    per_encoding_data {
-      key: 3
-      value {
-        basic_rappor {
-          category_labels {
-             key: 0
-             value: "Event A"
-          }
-          category_labels {
-             key: 1
-             value: "Event B"
-          }
-          category_labels {
-             key: 5
-             value: "Event F"
-          }
-          category_labels {
-             key: 25
-             value: "Event Z"
-          }
-        }
+    index_labels {
+      labels {
+         key: 0
+         value: "Event A"
+      }
+      labels {
+         key: 1
+         value: "Event B"
+      }
+      labels {
+         key: 5
+         value: "Event F"
+      }
+      labels {
+         key: 25
+         value: "Event Z"
       }
     }
   }
