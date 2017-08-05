@@ -314,6 +314,9 @@ Status ReportStore::EndReport(const ReportId& report_id, bool success,
 
 Status ReportStore::AddReportRows(const ReportId& report_id,
                                   const std::vector<ReportRow>& report_rows) {
+  if (report_rows.empty()) {
+    return kOK;
+  }
   if (report_id.creation_time_seconds() == 0 || report_id.instance_id() == 0) {
     LOG(ERROR) << "Attempt to AddReportRow for incomplete report_id: "
                << ToString(report_id);
