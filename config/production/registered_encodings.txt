@@ -21,6 +21,9 @@
 
 #####################################################################
 # EncodingConfig(1, 100, 1)
+#
+# DEPRECATED: Please use EncodingConfig (1, 100, 2) instead.
+#
 # Name:  Basic RAPPOR for Rare Event Occurrences
 # Description: A Configuration of Basic RAPPOR with no privacy, with string
 #              category names, and with one category for each rare event.
@@ -38,6 +41,25 @@ element {
       category: "Commits-merged"
       category: "Merged-commits-merged"
       category: "Commits-received-out-of-order-not-recovered"
+    }
+  }
+}
+
+#####################################################################
+# EncodingConfig(1, 100, 2)
+# Name:  Basic RAPPOR for Rare Event Occurrences
+# Description: A Configuration of Basic RAPPOR with no privacy, with 128
+#              indexed categories.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 100
+  id: 2
+  basic_rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    indexed_categories: {
+      num_categories: 128
     }
   }
 }
@@ -144,5 +166,24 @@ element {
   forculus {
     threshold: 2
     epoch_type: MONTH
+  }
+}
+
+#####################################################################
+# EncodingConfig(1, 2, 3)
+# Name:  Basic RAPPOR for Rare Event Occurrences
+# Description: A Configuration of Basic RAPPOR with no privacy, with 128
+#              indexed categories.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 2
+  id: 3
+  basic_rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    indexed_categories: {
+      num_categories: 128
+    }
   }
 }

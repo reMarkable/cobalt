@@ -21,6 +21,9 @@
 
 #####################################################################
 # Report Config (1, 100, 1)
+#
+# DEPRECATED: Please use Report Config (1, 100, 2) instead.
+#
 # Name:  Daily rare event counts
 # Description: A daily report of the daily counts of rare events.
 ######################################################################
@@ -28,11 +31,52 @@ element {
   customer_id: 1
   project_id: 100
   id: 1
-  name: "Fuchsia Ledger Daily Rare Event Counts"
+  name: "Deprecated: Fuchsia Ledger Daily Rare Event Counts"
   description: "A daily report of the daily counts of rare events."
   metric_id: 1
   variable {
     metric_part: "Event name"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}
+
+#####################################################################
+# Report Config (1, 100, 2)
+# Name:  Daily rare event counts
+# Description: A daily report of the daily counts of rare events.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 100
+  id: 2
+  name: "Fuchsia Ledger Daily Rare Event Counts"
+  description: "A daily report of the daily counts of rare events."
+  metric_id: 2
+  variable {
+    metric_part: "event-index"
+    index_labels {
+      labels {
+         key: 0
+         value: "ledger startup"
+      }
+      labels {
+         key: 1
+         value: "commits received out-of-order"
+      }
+      labels {
+         key: 2
+         value: "commits merged"
+      }
+      labels {
+         key: 3
+         value: "merged-commits merged"
+      }
+      labels {
+         key: 4;
+         value: "commits received out-of-order: not-recovered"
+      }
+    }
   }
   aggregation_epoch_type: DAY
   report_delay_days: 1
@@ -147,6 +191,47 @@ element {
   metric_id: 2
   variable {
     metric_part: "url"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}
+
+#####################################################################
+# Report Config (1, 2, 3)
+# Name:  Daily rare event counts
+# Description: A daily report of the daily counts of rare events.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 2
+  id: 3
+  name: "Fuchsia Ledger Daily Rare Event Counts"
+  description: "A daily report of the daily counts of rare events."
+  metric_id: 3
+  variable {
+    metric_part: "event-index"
+    index_labels {
+      labels {
+        key: 0
+        value: "ledger startup"
+      }
+      labels {
+        key: 1
+        value: "commits received out-of-order"
+      }
+      labels {
+        key: 2
+        value: "commits merged"
+      }
+      labels {
+        key: 3
+        value: "merged-commits merged"
+      }
+      labels {
+        key: 4;
+        value: "commits received out-of-order: not-recovered"
+      }
+    }
   }
   aggregation_epoch_type: DAY
   report_delay_days: 1

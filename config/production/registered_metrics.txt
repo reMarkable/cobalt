@@ -21,6 +21,9 @@
 
 #####################################################################
 # Metric (1, 100, 1)
+#
+# DEPRECATED: Please use Metric (1, 100, 2) instead.
+#
 # Name:  Rare event occurrences.
 # Description: Occurrences of several events that are expected to occur
 #              rarely if ever.
@@ -32,13 +35,40 @@ element {
   customer_id: 1
   project_id: 100
   id: 1
-  name: "Rare event occurrences"
+  name: "Deprecated: Rare event occurrences"
   description: "Occurrences of several events that are expected to occur rarely if ever."
   time_zone_policy: UTC
   parts {
     key: "Event name"
     value {
       description: "Which rare event occurred?"
+    }
+  }
+}
+
+#####################################################################
+# Metric (1, 100, 2)
+# Name:  Rare event occurrences.
+# Description: Occurrences of several events that are expected to occur
+#              rarely if ever.
+# Parts: This metric has one part named "event-index"
+# Notes: At least initially, we plan to use Basic RAPPOR with no privacy to
+#        collect this metric. The events are specified by a zero-based index.
+#        The meaning of each index is not specified here. See the definition
+#        of report config (1, 100, 2).
+######################################################################
+element {
+  customer_id: 1
+  project_id: 100
+  id: 2
+  name: "Rare event occurrences"
+  description: "Occurrences of several events that are expected to occur rarely if ever."
+  time_zone_policy: UTC
+  parts {
+    key: "event-index"
+    value {
+      description: "The index of the rare event that occurred."
+       data_type: INDEX
     }
   }
 }
@@ -157,6 +187,31 @@ element {
     key: "url"
     value {
       description: "The URL of the module being launched."
+    }
+  }
+}
+
+#####################################################################
+# Metric (1, 2, 3)
+# Name:  Rare event occurrences using indexes.
+# Description: Occurrences of several events that are expected to occur
+#              rarely if ever.
+# Parts: This metric has one part named "event-index"
+# Notes: At least initially, we plan to use Basic RAPPOR with no privacy to
+#        collect this metric. Each category will be one of the rare events.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 2
+  id: 3
+  name: "Rare event occurrences"
+  description: "Occurrences of several events that are expected to occur rarely if ever."
+  time_zone_policy: UTC
+  parts {
+    key: "event-index"
+    value {
+      description: "The index of the rare event that occurred."
+       data_type: INDEX
     }
   }
 }
