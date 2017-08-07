@@ -16,6 +16,16 @@ using the sha1 of the .tgz file as the filename.
 
 Some typical values of <platform> are linux64 and darwin64.
 
+Instructions:
+(1) Build a new version of report_client locally via
+./cobaltb.py build.
+(2) Run this script
+(3) In addition to uploading a new report_client this script will also
+update the file tools/go/report_client.<platform>.tgz.sha1. Submit
+this change in a new CL.
+(4) In the Fuchsia repo update the file
+//apps/cobalt_client/download_report_client.py with the new sha1.
+
 """
 
 import os
