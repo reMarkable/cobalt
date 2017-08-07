@@ -240,43 +240,57 @@ func valuePartToString(val *cobalt.ValuePart) string {
 	return "[blob]"
 }
 
-// ReportRowToStrings returns a list of human-readable strings that represent the given |row|.
-// The format of the row depends on the type of report row it is.
-func ReportRowToStrings(row *report_master.ReportRow, includeStdErr bool) []string {
-	if histogramRow := row.GetHistogram(); histogramRow != nil {
-		return HistogramReportRowToStrings(histogramRow, includeStdErr)
-	}
-	glog.Fatalf("Unknown report row type %t", row)
-	return nil
+// A ReportRowStrings struct contains human-readable strings that are derived
+/// from a ReportRow. It may be used to print a ReportRow.
+type ReportRowStrings struct {
+	// The primary key for the row.
+	rowKey string
+
+	// The estimated count for the row.
+	countEstimate string
+
+	// The estimated std error for the row.
+	stdError string
+
+	// An indication of whether the row may be considered "empty." This
+	// means that the row probably does not contain any information that
+	// is useful to a user and we might want to omit it in a printed
+	// report. This is determined by heuristic.
+	isEmpty bool
 }
 
-// HistogramReportRowToStrings returns a list of human-readable strings that represent the given |row|.
-// The first element of the returned list will be the row's |Value|.
-// The next element of the list will be the row's |CountEstimate|.
-// If |includeStdErr| is true the final element of the list will be the row's
-// |StdError|.
-func HistogramReportRowToStrings(row *report_master.HistogramReportRow, includeStdErr bool) []string {
-	result := []string{}
-	valueString := ""
-	if row.GetValue() != nil {
-		valueString = valuePartToString(row.Value)
+// Returns a ReportRowStrings for the given ReportRow.
+func ReportRowToStrings(row *report_master.ReportRow) ReportRowStrings {
+	if histogramRow := row.GetHistogram(); histogramRow != nil {
+		return HistogramReportRowToStrings(histogramRow)
 	}
-	// If the row has a |label| then use that as that as the primary identifier
-	// for the row rather than the serialized value.
-	if row.Label != "" {
-		if valueString == "" {
-			valueString = row.Label
-		} else {
-			valueString = fmt.Sprintf("%s%s", row.Label, valueString)
-		}
-	}
-	result = append(result, valueString)
+	glog.Fatalf("Unknown report row type %t", row)
+	return ReportRowStrings{}
+}
 
-	result = append(result, fmt.Sprintf("%.3f", math.Max(0, float64(row.CountEstimate))))
-	if includeStdErr {
-		result = append(result, fmt.Sprintf("%.3f", row.StdError))
+// Returns a ReportRowStrings for the given HistogramReportRow.
+func HistogramReportRowToStrings(row *report_master.HistogramReportRow) ReportRowStrings {
+	rowStrings := ReportRowStrings{}
+	if row.Label != "" {
+		rowStrings.rowKey = row.Label
+	} else if row.GetValue() != nil {
+		rowStrings.rowKey = valuePartToString(row.Value)
+	} else {
+		rowStrings.rowKey = "<missing value>"
 	}
-	return result
+
+	rowStrings.countEstimate = fmt.Sprintf("%.3f", math.Max(0, float64(row.CountEstimate)))
+	rowStrings.stdError = fmt.Sprintf("%.3f", row.StdError)
+
+	_, rowUsesIndex := row.Value.GetData().(*cobalt.ValuePart_IndexValue)
+
+	// We use the following heuristic: If the rows is identified only by an index without
+	// an associated label and its count is zero then probably printing the row would
+	// give the user little useful information and so it may be better to not print
+	// the row. To indicate this we mark the row as "empty."
+	rowStrings.isEmpty = rowUsesIndex && row.Label == "" && rowStrings.countEstimate == "0.000"
+
+	return rowStrings
 }
 
 // CompareValueParts compares two |ValuePart|s for the purpose of sorting.
@@ -410,12 +424,23 @@ func ReportRowsSortedByValues(report *report_master.Report, includeStdErr bool) 
 // Each element of the returned list represents  a row of the report.
 // The rows of are sorted in increasing order of their values.
 // Each row is itself a list of strings as specified by ReportRowToStrings.
-func ReportToStrings(report *report_master.Report, includeStdErr bool) [][]string {
+func ReportToStrings(report *report_master.Report, includeStdErr bool, supressEmptyRows bool) [][]string {
 	result := [][]string{}
 	rows := ReportRowsSortedByValues(report, includeStdErr)
 	if rows != nil {
 		for _, row := range rows {
-			result = append(result, ReportRowToStrings(row, includeStdErr))
+			rowStrings := ReportRowToStrings(row)
+			if supressEmptyRows && rowStrings.isEmpty {
+				continue
+			}
+			currentRow := []string{}
+			currentRow = append(currentRow, rowStrings.rowKey)
+			currentRow = append(currentRow, rowStrings.countEstimate)
+			if includeStdErr {
+				currentRow = append(currentRow, rowStrings.stdError)
+			}
+			result = append(result, currentRow)
+
 		}
 	}
 	return result
@@ -430,7 +455,8 @@ func ReportToStrings(report *report_master.Report, includeStdErr bool) [][]strin
 // the final field will be the row's StdErr.
 func WriteCSVReport(w io.Writer, report *report_master.Report, includeStdErr bool) error {
 	csvWriter := csv.NewWriter(w)
-	err := csvWriter.WriteAll(ReportToStrings(report, includeStdErr))
+	supressEmptyRows := true
+	err := csvWriter.WriteAll(ReportToStrings(report, includeStdErr, supressEmptyRows))
 	if err != nil {
 		return err
 	}

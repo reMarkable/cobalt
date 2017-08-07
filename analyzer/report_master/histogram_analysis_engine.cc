@@ -159,9 +159,8 @@ class BasicRapporAdapter : public DecoderAdapter {
       row->mutable_value()->Swap(&category_result.category);
       // If the value is of type INDEX, meaning that it represents an index
       // into some enumerated set defined outside of the Cobalt configuration,
-      // then check whether the BasicRapporReporPerEncodingData from the
-      // ReportConfig contains a human-readable label for this index.
-      // If so attach the label to the report row.
+      // then check whether we were given an index label for this index and
+      // if so attach the label to the report row.
       if (index_labels != nullptr &&
           row->value().data_case() == ValuePart::kIndexValue) {
         auto iter = index_labels->labels().find(row->value().index_value());

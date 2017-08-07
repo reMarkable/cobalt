@@ -648,7 +648,9 @@ func TestBasicRapporEncodingOfHours(t *testing.T) {
 	if report.Metadata.State != report_master.ReportState_COMPLETED_SUCCESSFULLY {
 		t.Fatalf("report.Metadata.State=%v", report.Metadata.State)
 	}
-	rows := report_client.ReportToStrings(report, true)
+	includeStdErr := true
+	supressEmptyRows := false
+	rows := report_client.ReportToStrings(report, includeStdErr, supressEmptyRows)
 	if rows == nil {
 		t.Fatalf("rows is nil")
 	}
@@ -718,7 +720,9 @@ func TestBasicRapporEncodingOfEvents(t *testing.T) {
 	if report.Metadata.State != report_master.ReportState_COMPLETED_SUCCESSFULLY {
 		t.Fatalf("report.Metadata.State=%v", report.Metadata.State)
 	}
-	rows := report_client.ReportToStrings(report, true)
+	includeStdErr := true
+	supressEmptyRows := false
+	rows := report_client.ReportToStrings(report, includeStdErr, supressEmptyRows)
 	if rows == nil {
 		t.Fatalf("rows is nil")
 	}
@@ -733,13 +737,13 @@ func TestBasicRapporEncodingOfEvents(t *testing.T) {
 		var expectedRowKey string
 		switch index {
 		case 0:
-			expectedRowKey = "Event A<index 0>"
+			expectedRowKey = "Event A"
 			break
 		case 1:
-			expectedRowKey = "Event B<index 1>"
+			expectedRowKey = "Event B"
 			break
 		case 25:
-			expectedRowKey = "Event Z<index 25>"
+			expectedRowKey = "Event Z"
 			break
 		default:
 			expectedRowKey = fmt.Sprintf("<index %d>", index)

@@ -141,7 +141,7 @@ String Value 2,102.200,3.140
 42,101.100,3.140
 43,104.400,3.140
 <index 1>,103.400,3.140
-Label-for-index-2<index 2>,101.200,3.140
+Label-for-index-2,101.200,3.140
 `
 
 var failedReportPrimary = report_master.Report{
