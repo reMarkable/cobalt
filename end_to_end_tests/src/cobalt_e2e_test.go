@@ -20,6 +20,23 @@ invoked via the command "cobaltb.py test --tests=e2e" which invokes
 "tools/test_runner.py" which uses "tools/process_starter.py" to start the
 Cobalt processes prior to invoking this test.
 
+We support several diferent configurations of running this test. When invoked
+as described above, the Cobalt Analyzer Service, Shuffler and Report Master
+are started locally using a local Bigtable Emulator. These processes are
+started via the script "tools/process_starter.py". If the invocation of
+this test from cobaltb.py includes the flag "-use_cloud_bt" then a local
+instance of Analyzer Service, Shuffler and Report Master are started, but
+rather than using a local instance of the Bigtable Emulator, we use a
+real instance of Cloud Bigtable in the current user's devel cluster
+(if configured.) If the invocation of this test from cobaltb.py instead includes
+the flag "-cobalt_on_personal_cluster" then the local services are not started
+and instead this test uses the Cobalt server processes from the current user's
+devel cluster (if configured.) Finally if the invocation of this test from
+cobaltb.py instead includes the flag "--production_dir=<dir>" then
+this test is run against the production instance of Cobalt using a special
+test-only project ID. See the README.md file for more details about all
+of this.
+
 The test uses the |cobalt_test_app| program in order to encode values into
 observations and send those observations to the Shuffler. It then uses
 the |query_observations| tool to query the Observation Store and it waits
@@ -28,11 +45,16 @@ then uses the report_client to contact the ReportMaster and request
 that a report be generated and wait for the report to be generated. It then
 validates the report.
 
-The test assumes particular contents of the Cobalt registration system.
-By default "tools/process_starter.py" will cause the Cobalt processes to
-use the configuration files located in <source root>/config/demo. Thus
-this test must be kept in sync with the contents of those files. Here
-we include a copy of the relevant parts of  those files for reference:
+The test assumes a particular contents of the Cobalt registration system.
+The relevent registration files are located in the config/demo directory
+for all test configurations other than the one that runs against production
+Cobalt--in that case the relevent registration files are located in the
+config/production directory. We reserve (customerID=1, projectID=1) for the
+end-to-end test. Therefore it is important that the configuration of
+(customerID=1, projectID=1) in the config/demo and config/production directories
+be kept in sync with this test.
+
+Below we copy the config registration for projectID=1 from those files.
 
 #### Metric (1, 1, 1)
 element {
@@ -230,6 +252,7 @@ var (
 	observationQuerierPath = flag.String("observation_querier_path", "", "The full path to the Observation querier binary")
 	testAppPath            = flag.String("test_app_path", "", "The full path to the Cobalt test app binary")
 	bigtableToolPath       = flag.String("bigtable_tool_path", "", "The full path to the Cobalt bigtable_tool binary")
+	configRegDirPath       = flag.String("config_reg_dir_path", "", "The full path to the cobalt config registration directory")
 
 	analyzerUri     = flag.String("analyzer_uri", "", "The URI of the Analyzer Service")
 	reportMasterUri = flag.String("report_master_uri", "", "The URI of the Report Master")
@@ -457,6 +480,7 @@ func waitForObservations(metricId uint32, expectedNum uint32) error {
 func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, numClients uint) error {
 	cmd := exec.Command(*testAppPath,
 		"-mode", "send-once",
+		"-registry", *configRegDirPath,
 		"-analyzer_uri", *analyzerUri,
 		"-analyzer_pk_pem_file", *analyzerPkPemFile,
 		"-shuffler_uri", *shufflerUri,

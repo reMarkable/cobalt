@@ -40,6 +40,7 @@ from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from tools.process_starter import DEFAULT_SHUFFLER_PORT
 from tools.process_starter import DEFAULT_REPORT_MASTER_PORT
 from tools.process_starter import DEMO_CONFIG_DIR
+from tools.process_starter import PRODUCTION_CONFIG_DIR
 from tools.process_starter import SHUFFLER_DEMO_CONFIG_FILE
 
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -183,6 +184,7 @@ def _test(args):
       report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
       shuffler_pk_pem_file=E2E_TEST_SHUFFLER_PUBLIC_KEY_PEM
       shuffler_uri = "localhost:%d" % DEFAULT_SHUFFLER_PORT
+      config_dir_path=DEMO_CONFIG_DIR
       if args.cobalt_on_personal_cluster or args.production_dir:
         if args.cobalt_on_personal_cluster and args.production_dir:
           print ("Do not specify both --production_dir and "
@@ -213,6 +215,7 @@ def _test(args):
             'analyzer_public.pem')
         shuffler_pk_pem_file = os.path.join(pem_directory,
             'shuffler_public.pem')
+        config_dir_path=PRODUCTION_CONFIG_DIR
       test_args = [
           "-analyzer_uri=%s" % analyzer_uri,
           "-analyzer_pk_pem_file=%s" % analyzer_pk_pem_file,
@@ -222,6 +225,7 @@ def _test(args):
           ("-observation_querier_path=%s" %
               process_starter.OBSERVATION_QUERIER_PATH),
           "-test_app_path=%s" % process_starter.TEST_APP_PATH,
+          "-config_reg_dir_path=%s" % config_dir_path,
           "-sub_process_v=%d"%_verbose_count
       ]
       if (args.use_cloud_bt or args.cobalt_on_personal_cluster or
