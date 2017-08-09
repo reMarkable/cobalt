@@ -6,6 +6,7 @@ An extensible, privacy-preserving, user-data analysis pipeline.
   1. We only develop on Ubuntu Linux. You may or may not have success on other
   systems.
   2. Python 2.7
+  3. libstdc++
 
 ## One-time setup
 * Fetch the code, for example via
