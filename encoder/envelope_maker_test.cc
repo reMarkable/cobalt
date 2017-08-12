@@ -69,6 +69,19 @@ element {
     }
   }
 }
+
+# Metric 3 has one string part.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  time_zone_policy: UTC
+  parts {
+    key: "Part1"
+    value {
+    }
+  }
+}
 )";
 
 const char* kEncodingConfigText = R"(
@@ -95,6 +108,15 @@ element {
       category: "Banana"
       category: "Cantaloupe"
     }
+  }
+}
+
+# EncodingConfig 3 is NoOp.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  no_op_encoding {
   }
 }
 
@@ -126,12 +148,22 @@ std::shared_ptr<ProjectContext> GetTestProject() {
 class EnvelopeMakerTest : public ::testing::Test {
  public:
   EnvelopeMakerTest()
-      : envelope_maker_(kAnalyzerPublicKey, EncryptedMessage::NONE,
-                        kShufflerPublicKey, EncryptedMessage::NONE),
+      : envelope_maker_(
+            new EnvelopeMaker(kAnalyzerPublicKey, EncryptedMessage::NONE,
+                              kShufflerPublicKey, EncryptedMessage::NONE)),
         project_(GetTestProject()),
         encoder_(project_, ClientSecret::GenerateNewSecret()) {
     // Set a static current time so we can test the day_index computation.
     encoder_.set_current_time(kSomeTimestamp);
+  }
+
+  // Returns the current value of envelope_maker_ and resets envelope_maker_.
+  std::unique_ptr<EnvelopeMaker> ResetEnvelopeMaker() {
+    std::unique_ptr<EnvelopeMaker> return_val = std::move(envelope_maker_);
+    envelope_maker_.reset(
+        new EnvelopeMaker(kAnalyzerPublicKey, EncryptedMessage::NONE,
+                          kShufflerPublicKey, EncryptedMessage::NONE));
+    return return_val;
   }
 
   // The metric is expected to have a single string part named "Part1" and
@@ -149,23 +181,25 @@ class EnvelopeMakerTest : public ::testing::Test {
     ASSERT_NE(nullptr, result.metadata);
 
     // Add the Observation to the EnvelopeMaker
-    envelope_maker_.AddObservation(*result.observation,
-                                   std::move(result.metadata));
+    envelope_maker_->AddObservation(*result.observation,
+                                    std::move(result.metadata));
 
     // Check the number of batches currently in the envelope.
-    ASSERT_EQ(expected_num_batches, envelope_maker_.envelope().batch_size());
-
-    // Check the size of the expected batch.
-    const auto& batch =
-        envelope_maker_.envelope().batch(expected_this_batch_index);
-    ASSERT_EQ(expected_this_batch_size, batch.encrypted_observation_size());
+    ASSERT_EQ(expected_num_batches, envelope_maker_->envelope().batch_size());
 
     // Check the ObservationMetadata of the expected batch.
+    const auto& batch =
+        envelope_maker_->envelope().batch(expected_this_batch_index);
     const auto& metadata = batch.meta_data();
     EXPECT_EQ(kCustomerId, metadata.customer_id());
     EXPECT_EQ(kProjectId, metadata.project_id());
     EXPECT_EQ(metric_id, metadata.metric_id());
     EXPECT_EQ(kUtcDayIndex, metadata.day_index());
+
+    // Check the size of the expected batch.
+    ASSERT_EQ(expected_this_batch_size, batch.encrypted_observation_size())
+        << "batch_index=" << expected_this_batch_index
+        << "; metric_id=" << metric_id;
 
     // Deserialize the most recently added observation from the
     // expected batch.
@@ -182,6 +216,30 @@ class EnvelopeMakerTest : public ::testing::Test {
     ASSERT_TRUE(iter != recovered_observation.parts().cend());
     const auto& part = iter->second;
     ASSERT_EQ(encoding_config_id, part.encoding_config_id());
+  }
+
+  // Adds multiple string observations to the EnvelopeMaker for the given
+  // metric_id and for encoding_config_id=3, the NoOp encoding. The string
+  // values will be "value<i>" for i in [first, limit).
+  // expected_num_batches: How many batches do we expecte the EnvelopeMaker to
+  // contain after the first add.
+  // expected_this_batch_index: Which batch index do we expect this add to
+  // have gone into.
+  // expected_this_batch_size: What is the expected size of the current batch
+  // *before* the first add.
+  void AddManyStringsNoOp(int first, int limit, uint32_t metric_id,
+                          int expected_num_batches,
+                          size_t expected_this_batch_index,
+                          int expected_this_batch_size) {
+    static const uint32_t kEncodingConfigId = 3;
+    for (int i = first; i < limit; i++) {
+      std::ostringstream stream;
+      stream << "value " << i;
+      expected_this_batch_size++;
+      AddStringObservation(stream.str(), metric_id, kEncodingConfigId,
+                           expected_num_batches, expected_this_batch_index,
+                           expected_this_batch_size);
+    }
   }
 
   // Adds multiple encoded Observations to two different metrics. Test that
@@ -227,7 +285,7 @@ class EnvelopeMakerTest : public ::testing::Test {
 
     // Make the encrypted Envelope.
     EncryptedMessage encrypted_message;
-    EXPECT_TRUE(envelope_maker_.MakeEncryptedEnvelope(&encrypted_message));
+    EXPECT_TRUE(envelope_maker_->MakeEncryptedEnvelope(&encrypted_message));
 
     // Decrypt encrypted_message. (No actual decryption is involved since
     // we used the NONE encryption scheme.)
@@ -245,7 +303,7 @@ class EnvelopeMakerTest : public ::testing::Test {
   }
 
  protected:
-  EnvelopeMaker envelope_maker_;
+  std::unique_ptr<EnvelopeMaker> envelope_maker_;
   std::shared_ptr<ProjectContext> project_;
   Encoder encoder_;
 };
@@ -255,7 +313,117 @@ class EnvelopeMakerTest : public ::testing::Test {
 TEST_F(EnvelopeMakerTest, TestAll) {
   for (int i = 0; i < 3; i++) {
     DoTest();
-    envelope_maker_.Clear();
+    envelope_maker_->Clear();
+  }
+}
+
+// Tests the MergeOutOf() method.
+TEST_F(EnvelopeMakerTest, MergeOutOf) {
+  // Add metric 1 batch to EnvelopeMaker 1 with strings 0..9
+  uint32_t metric_id = 1;
+  int expected_num_batches = 1;
+  size_t expected_this_batch_index = 0;
+  int expected_this_batch_size = 0;
+  AddManyStringsNoOp(0, 10, metric_id, expected_num_batches,
+                     expected_this_batch_index, expected_this_batch_size);
+
+  // Add metric 2 batch to EnvelopeMaker 1 with strings 0..9
+  metric_id = 2;
+  expected_num_batches = 2;
+  expected_this_batch_index = 1;
+  AddManyStringsNoOp(0, 10, metric_id, expected_num_batches,
+                     expected_this_batch_index, expected_this_batch_size);
+
+  // Take EnvelopeMaker 1 and create EnvelopeMaker 2.
+  auto envelope_maker1 = ResetEnvelopeMaker();
+
+  // Add metric 2 batch to EnvelopeMaker 2 with strings 10..19
+  metric_id = 2;
+  expected_num_batches = 1;
+  expected_this_batch_index = 0;
+  AddManyStringsNoOp(10, 20, metric_id, expected_num_batches,
+                     expected_this_batch_index, expected_this_batch_size);
+
+  // Add metric 3 to EnvelopeMaker 2 with strings 0..9
+  metric_id = 3;
+  expected_num_batches = 2;
+  expected_this_batch_index = 1;
+  AddManyStringsNoOp(0, 10, metric_id, expected_num_batches,
+                     expected_this_batch_index, expected_this_batch_size);
+
+  // Take EnvelopeMaker 2,
+  auto envelope_maker2 = ResetEnvelopeMaker();
+
+  // Now invoke MergeOutOf to merge EnvelopeMaker 2 into EnvelopeMaker 1.
+  envelope_maker1->MergeOutOf(envelope_maker2.get());
+
+  // EnvelopeMaker 2 should be empty.
+  EXPECT_TRUE(envelope_maker2->Empty());
+
+  // EnvelopeMaker 1 should have three batches for Metrics 1, 2, 3
+  EXPECT_FALSE(envelope_maker1->Empty());
+  ASSERT_EQ(3, envelope_maker1->envelope().batch_size());
+
+  // Iterate through each of the batches and check it.
+  for (uint index = 0; index < 3; index++) {
+    // Batch 0 and 2 should have 10 encrypted observations and batch
+    // 1 should have 20 because batch 1 from EnvelopeMaker 2 was merged
+    // into batch 1 of EnvelopeMaker 1.
+    auto& batch = envelope_maker1->envelope().batch(index);
+    EXPECT_EQ(index + 1, batch.meta_data().metric_id());
+    auto expected_num_observations = (index == 1 ? 20 : 10);
+    ASSERT_EQ(expected_num_observations, batch.encrypted_observation_size());
+
+    // Check each one of the observations.
+    for (int i = 0; i < expected_num_observations; i++) {
+      // Extract the serialized observation.
+      auto& encrypted_message = batch.encrypted_observation(i);
+      EXPECT_EQ(EncryptedMessage::NONE, encrypted_message.scheme());
+      std::string serialized_observation = encrypted_message.ciphertext();
+      Observation recovered_observation;
+      ASSERT_TRUE(
+          recovered_observation.ParseFromString(serialized_observation));
+
+      // Check that it looks right.
+      ASSERT_EQ(1u, recovered_observation.parts().size());
+      auto iter = recovered_observation.parts().find("Part1");
+      ASSERT_TRUE(iter != recovered_observation.parts().cend());
+      const auto& part = iter->second;
+      ASSERT_EQ(3u, part.encoding_config_id());
+      ASSERT_TRUE(part.has_unencoded());
+
+      // Check the string values. Batches 0 and 2 are straightforward. The
+      // values should be {"value 0", "value 1", .. "value 9"}. But
+      // batch 1 is more complicated. Because of the way merge is implemented
+      // we expect to see:
+      // {"value 0", "value 1", .. "value 9", "value 19",
+      //                                           "value 18", ... "value 10"}
+      // This is because when we merged batch 1 of Envelope 2 into batch
+      // 1 of Envelope 1 we reversed the order of the observations in
+      // Ennvelope 2.
+      std::ostringstream stream;
+      int expected_value_index = i;
+      if (index == 1 && i >= 10) {
+        expected_value_index = 29 - i;
+      }
+      stream << "value " << expected_value_index;
+      auto expected_string_value = stream.str();
+      EXPECT_EQ(expected_string_value,
+                part.unencoded().unencoded_value().string_value());
+    }
+  }
+
+  // Now we want to test that after the MergeOutOf() operation the EnvelopeMaker
+  // is still usable. Put EnvelopeMaker 1 back as the test EnvelopeMaker.
+  envelope_maker_ = std::move(envelope_maker1);
+
+  // Add string observations 10..19 to metric ID 1 batches 1, 2 and 3.
+  for (int metric_id = 1; metric_id <= 3; metric_id++) {
+    expected_num_batches = 3;
+    expected_this_batch_index = metric_id - 1;
+    expected_this_batch_size = (metric_id == 2 ? 20 : 10);
+    AddManyStringsNoOp(10, 20, metric_id, expected_num_batches,
+                       expected_this_batch_index, expected_this_batch_size);
   }
 }
 

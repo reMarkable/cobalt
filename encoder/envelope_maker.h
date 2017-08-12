@@ -80,10 +80,16 @@ class EnvelopeMaker {
   // Gives direct read-only access to the internal instance of Envelope.
   const Envelope& envelope() const { return envelope_; }
 
+  bool Empty() const {return envelope_.batch_size() == 0;}
+
   void Clear() {
     envelope_ = Envelope();
     batch_map_.clear();
   }
+
+  // Moves the contents out of |*other| and merges it into |*this|.
+  // Leaves |*other| empty.
+  void MergeOutOf(EnvelopeMaker* other);
 
  private:
   friend class EnvelopeMakerTest;

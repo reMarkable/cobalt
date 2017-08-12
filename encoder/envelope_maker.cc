@@ -72,5 +72,32 @@ bool EnvelopeMaker::MakeEncryptedEnvelope(
   return true;
 }
 
+void EnvelopeMaker::MergeOutOf(EnvelopeMaker* other) {
+  CHECK(other);
+  // Iterate through the other's batch_map_. For each pair...
+  for (auto& other_pair : other->batch_map_) {
+    // see if we have a pair with the same key.
+    auto iter = batch_map_.find(other_pair.first);
+    if (iter != batch_map_.end()) {
+      // We do have a pair with the same key. Move the EncryptedMessages
+      // from the other's batch into our batch. Note that this process
+      // reverses the order of the messages in other but the order of
+      // the messages in a batch has no meaning so this doesn't matter.
+      auto* other_messages = other_pair.second->mutable_encrypted_observation();
+      auto* this_messages = iter->second->mutable_encrypted_observation();
+      while (!other_messages->empty()) {
+        this_messages->AddAllocated(other_messages->ReleaseLast());
+      }
+    } else {
+      // We do not have a pair with the same key. Make one and swap the
+      // contents of the others batch into it.
+      ObservationBatch* observation_batch = envelope_.add_batch();
+      observation_batch->Swap(other_pair.second);
+      batch_map_[other_pair.first] = observation_batch;
+    }
+  }
+  other->Clear();
+}
+
 }  // namespace encoder
 }  // namespace cobalt
