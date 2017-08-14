@@ -24,9 +24,23 @@
 namespace cobalt {
 namespace encoder {
 
+class ShufflerClientInterface {
+ public:
+  // Send the given |encrypted_message| to the Shuffler. It should be an
+  // encryped Envelope as given by the output of
+  // EnvelopeMaker::MakeEncryptedEnvelope().
+  //
+  // context. An optional grpc::Client context may be passed in allowing the
+  // caller more control over the gRPC call. The context may be used for example
+  // to set the deadline or to cancel the call.
+  virtual grpc::Status SendToShuffler(
+      const EncryptedMessage& encrypted_message,
+      grpc::ClientContext* context = nullptr) = 0;
+};
+
 // This class provides a thin wrapper around the gRPC client to the Shuffler,
 // allowing an Encoder client to optionally not deal with the details of gRPC.
-class ShufflerClient {
+class ShufflerClient : public ShufflerClientInterface {
  public:
   // Constructor.
   //
@@ -52,7 +66,7 @@ class ShufflerClient {
   // caller more control over the gRPC call. The context may be used for example
   // to set the deadline or to cancel the call.
   grpc::Status SendToShuffler(const EncryptedMessage& encrypted_message,
-    grpc::ClientContext* context = nullptr);
+                              grpc::ClientContext* context = nullptr) override;
 
  private:
   std::unique_ptr<shuffler::Shuffler::Stub> shuffler_stub_;

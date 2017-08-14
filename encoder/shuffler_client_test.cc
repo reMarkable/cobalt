@@ -26,8 +26,6 @@
 namespace cobalt {
 namespace encoder {
 
-namespace {}  // namespace
-
 class ShufflerClientTest : public ::testing::Test {
  public:
   ShufflerClientTest() {}
