@@ -24,23 +24,46 @@ namespace encoder {
 EnvelopeMaker::EnvelopeMaker(const std::string& analyzer_public_key_pem,
                              EncryptedMessage::EncryptionScheme analyzer_scheme,
                              const std::string& shuffler_public_key_pem,
-                             EncryptedMessage::EncryptionScheme shuffler_scheme)
+                             EncryptedMessage::EncryptionScheme shuffler_scheme,
+                             size_t max_bytes_each_observation,
+                             size_t max_num_bytes)
     : encrypt_to_analyzer_(analyzer_public_key_pem, analyzer_scheme),
-      encrypt_to_shuffler_(shuffler_public_key_pem, shuffler_scheme) {}
+      encrypt_to_shuffler_(shuffler_public_key_pem, shuffler_scheme),
+      max_bytes_each_observation_(max_bytes_each_observation),
+      max_num_bytes_(max_num_bytes) {}
 
-void EnvelopeMaker::AddObservation(
+EnvelopeMaker::AddStatus EnvelopeMaker::AddObservation(
     const Observation& observation,
     std::unique_ptr<ObservationMetadata> metadata) {
   EncryptedMessage encrypted_message;
   if (encrypt_to_analyzer_.Encrypt(observation, &encrypted_message)) {
+    // "+1" below is for the |scheme| field of EncryptedMessage.
+    size_t obs_size = encrypted_message.ciphertext().size() +
+                      encrypted_message.public_key_fingerprint().size() + 1;
+    if (obs_size > max_bytes_each_observation_) {
+      VLOG(1) << "WARNING: An Observation was rejected by "
+                 "EnvelopeMaker::AddObservation() because it was too big: "
+              << obs_size;
+      return kObservationTooBig;
+    }
+
+    size_t new_num_bytes = num_bytes_ + obs_size;
+    if (new_num_bytes > max_num_bytes_) {
+      VLOG(4) << "Envelope full.";
+      return kEnvelopeFull;
+    }
+
+    num_bytes_ = new_num_bytes;
     // Put the encrypted observation into the appropriate ObservationBatch.
     GetBatch(std::move(metadata))
         ->add_encrypted_observation()
         ->Swap(&encrypted_message);
+    return kOk;
   } else {
     VLOG(1)
         << "ERROR: Encryption of Observations failed! Observation not added "
            "to batch.";
+    return kEncryptionFailed;
   }
 }
 
@@ -96,6 +119,7 @@ void EnvelopeMaker::MergeOutOf(EnvelopeMaker* other) {
       batch_map_[other_pair.first] = observation_batch;
     }
   }
+  num_bytes_ += other->num_bytes_;
   other->Clear();
 }
 

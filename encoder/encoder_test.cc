@@ -695,9 +695,9 @@ TEST(EncoderTest, AdvancedApiWithErrors) {
 }  // namespace cobalt
 
 int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
-  ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
