@@ -29,6 +29,7 @@
 #include "encoder/encoder.h"
 #include "encoder/envelope_maker.h"
 #include "encoder/project_context.h"
+#include "encoder/send_retryer.h"
 #include "encoder/shuffler_client.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -44,6 +45,7 @@ using encoder::ClientSecret;
 using encoder::Encoder;
 using encoder::EnvelopeMaker;
 using encoder::ProjectContext;
+using encoder::SendRetryer;
 using encoder::ShufflerClient;
 using grpc::Channel;
 using grpc::ClientContext;
@@ -295,6 +297,7 @@ class EnvelopeSender : public EnvelopeSenderInterface {
                  TestApp::Mode mode)
       : analyzer_client_(std::move(analyzer_client)),
         shuffler_client_(std::move(shuffler_client)),
+        send_retryer_(new SendRetryer(shuffler_client_.get())),
         mode_(mode) {}
 
   void Send(const EnvelopeMaker& envelope_maker, bool skip_shuffler) override {
@@ -398,37 +401,36 @@ class EnvelopeSender : public EnvelopeSenderInterface {
       return;
     }
 
-    for (int attempt = 0; attempt < 3; attempt++) {
-      std::unique_ptr<grpc::ClientContext> context(new grpc::ClientContext());
-      context->set_deadline(std::chrono::system_clock::now() +
-                            std::chrono::seconds(FLAGS_deadline_seconds));
-      auto status =
-          shuffler_client_->SendToShuffler(encrypted_envelope, context.get());
-      if (status.ok()) {
-        if (mode_ == TestApp::kInteractive) {
-          std::cout << "Sent to Shuffler." << std::endl;
-        } else {
-          VLOG(1) << "Sent to Shuffler";
-        }
+    // Try to send to the Shuffler. Try multiple times with an initial
+    // RPC deadline of FLAGS_deadline_seconds and an overall deadline of
+    // FLAGS_deadline_seconds * 6.
+    auto status = send_retryer_->SendToShuffler(
+        std::chrono::seconds(FLAGS_deadline_seconds),
+        std::chrono::seconds(FLAGS_deadline_seconds * 6), nullptr,
+        encrypted_envelope);
+    if (status.ok()) {
+      if (mode_ == TestApp::kInteractive) {
+        std::cout << "Sent to Shuffler." << std::endl;
+      } else {
+        VLOG(1) << "Sent to Shuffler";
+      }
+      return;
+    } else {
+      if (mode_ == TestApp::kInteractive) {
+        std::cout << "Send to shuffler failed with status="
+                  << status.error_code() << " " << status.error_message()
+                  << std::endl;
         return;
       } else {
-        if (mode_ == TestApp::kInteractive) {
-          std::cout << "Send to shuffler failed with status="
-                    << status.error_code() << " " << status.error_message()
-                    << std::endl;
-          return;
-        } else {
-          LOG(ERROR) << "Send to shuffler failed with status="
-                     << status.error_code() << " " << status.error_message()
-                     << ". Will try three times.";
-          std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
+        LOG(ERROR) << "Send to shuffler failed with status="
+                   << status.error_code() << " " << status.error_message();
       }
     }
   }
 
   std::unique_ptr<analyzer::Analyzer::Stub> analyzer_client_;
   std::unique_ptr<encoder::ShufflerClient> shuffler_client_;
+  std::unique_ptr<encoder::SendRetryer> send_retryer_;
   TestApp::Mode mode_;
 };
 
