@@ -419,7 +419,7 @@ Its contents should be exactly the following
   "analyzer_service_static_ip" : "<optional-pre-allocated-static-ip>"",
   "shuffler_config_file" : "<optional-path-to-non-default-config-file>",
   "cobalt_config_dir" : "<optional-path-to-non-default-config-dir>",
-  "suffler_use_memstore" : "<specify true or false. Default false.>"
+  "shuffler_use_memstore" : "<specify true or false. Default false.>"
 }
 ```
 
@@ -480,6 +480,10 @@ project name without the prefix and the colon.
 
 ### Deploying Cobalt to GKE
 
+`./cobaltb.py deploy login`
+Run this one time to login with the copy of gcloud included in the cobalt
+sysroot.
+
 `./cobaltb.py deploy authenticate`
 Run this one time in order to register your personal cluster within the
 Kubernets configuration file on your computer.
@@ -491,6 +495,11 @@ and Shuffler's private keys. These are the files *analyzer_private.pem* and
 **Generating PEM Files** above. To upload different private keys,
 first delete any previously upload secret keys by running
 `./cobaltb.py deploy delete_secret_keys`
+
+`./cobaltb.py deploy endpoint --job=report-master`
+Run this one time to configure the Cloud Endpoint. If you run this multiple
+times, it will upload multiple copies of the Cloud Endpoint configuration but
+will otherwise have no effect. (The latest uploaded config will be used.)
 
 `./cobaltb.py deploy build`
 Run this to build Docker containers for the Shuffler, Analyzer Service and

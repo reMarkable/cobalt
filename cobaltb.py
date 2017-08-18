@@ -437,6 +437,9 @@ def _deploy_show(args):
   container_util.display(args.cloud_project_prefix, args.cloud_project_name,
       args.cluster_zone, args.cluster_name)
 
+def _deploy_login(args):
+  container_util.login()
+
 def _deploy_authenticate(args):
   container_util.authenticate(args.cluster_name, args.cloud_project_prefix,
       args.cloud_project_name, args.cluster_zone)
@@ -524,6 +527,18 @@ def _deploy_delete_secret_keys(args):
   container_util.delete_shuffler_private_key_secret(args.cloud_project_prefix,
       args.cloud_project_name, args.cluster_zone, args.cluster_name)
 
+def _deploy_endpoint(args):
+  if args.cloud_project_prefix and args.cloud_project_prefix != 'google.com':
+    print('Endpoints cannot be configured by this script for projects with '
+          'the prefix: ' % args.cloud_project_prefix)
+    return
+  if args.job == 'report-master':
+    container_util.configure_report_master_endpoint(
+        args.cloud_project_prefix, args.cloud_project_name)
+  else:
+    print('Unknown job "%s". I only know how to configure endpoints for the '
+          '"report-master".' % args.job)
+
 def _default_shuffler_config_file(cluster_settings):
   if cluster_settings['shuffler_config_file'] :
     return  os.path.join(THIS_DIR, cluster_settings['shuffler_config_file'])
@@ -552,13 +567,15 @@ def _cluster_settings_from_json(cluster_settings, json_file_path):
   """
   print ('The GKE cluster settings file being used is: %s.' % json_file_path)
   with open(json_file_path) as f:
-    read_cluster_settings = json.load(f)
+    try:
+      read_cluster_settings = json.load(f)
+    except ValueError:
+      print('%s could not be parsed.' % json_file_path)
   for key in read_cluster_settings:
     if key in cluster_settings:
       cluster_settings[key] = read_cluster_settings[key]
 
-
-def _add_cloud_access_args(parser, cluster_settings):
+def _add_cloud_project_args(parser, cluster_settings):
   parser.add_argument('--cloud_project_prefix',
       help='The prefix part of name of the Cloud project with which you wish '
            'to work. This is usually an organization domain name if your '
@@ -573,6 +590,9 @@ def _add_cloud_access_args(parser, cluster_settings):
            '<cloud_project_prefix>:<cloud_project_name>. '
            'Default=%s' % cluster_settings['cloud_project_name'],
       default=cluster_settings['cloud_project_name'])
+
+def _add_cloud_access_args(parser, cluster_settings):
+  _add_cloud_project_args(parser, cluster_settings)
   parser.add_argument('--cluster_name',
       help='The GKE "container cluster" within your Cloud project with which '
            'you wish to work. '
@@ -1065,6 +1085,11 @@ def main():
   sub_parser.set_defaults(func=_deploy_show)
   _add_gke_deployment_args(sub_parser, cluster_settings)
 
+  sub_parser = deploy_subparsers.add_parser('login', parents=[parent_parser],
+      help='Login to gcloud. Invoke if any command fails and asks you to login '
+      'to gcloud.')
+  sub_parser.set_defaults(func=_deploy_login)
+
   sub_parser = deploy_subparsers.add_parser('authenticate',
       parents=[parent_parser], help='Refresh your authentication token if '
       'necessary. Also associates your local computer with a particular '
@@ -1158,6 +1183,14 @@ def main():
       'command.')
   sub_parser.set_defaults(func=_deploy_delete_secret_keys)
   _add_gke_deployment_args(sub_parser, cluster_settings)
+
+  sub_parser = deploy_subparsers.add_parser('endpoint', parents=[parent_parser],
+      help='Create or configure the Cloud Endpoint for one of Cobalt\'s job.')
+  sub_parser.set_defaults(func=_deploy_endpoint)
+  _add_cloud_project_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--job',
+      help='The job whose Cloud Endpoint you wish to configure. Valid choices: '
+           '"report-master". Required.')
 
   args = parser.parse_args()
   global _verbose_count

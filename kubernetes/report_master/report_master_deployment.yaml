@@ -37,12 +37,20 @@ spec:
         name: report-master
     spec:
       containers:
+      - name: endpoint
+        image: gcr.io/endpoints-release/endpoints-runtime:1
+        args: [
+          '-P', '8000',
+          '-s', '$$ENDPOINT_NAME$$',
+          '-v', '$$ENDPOINT_CONFIG_ID$$',
+          '-a', 'grpc://127.0.0.1:7000'
+          ]
       - name: report-master
         # The URI of a Docker image in a Docker repository.
         image: $$REPORT_MASTER_IMAGE_URI$$
         args:
           - '-port'
-          - '7001'
+          - '7000'
           - '-bigtable_project_name'
           - $$BIGTABLE_PROJECT_NAME$$
           - '-bigtable_instance_name'
@@ -55,7 +63,7 @@ spec:
           - '-logtostderr'
           - '-v=3'
         ports:
-          - containerPort: 7001
+          - containerPort: 7000
 ---
 # The defintion of the Service
 apiVersion: v1
@@ -64,9 +72,27 @@ metadata:
   name: report-master
 spec:
   ports:
-    # The port that this service should serve on. This should match the port
-    # used several times above and the one specified in Dockerfile.
+    # Requests to this port are forwarded directly to the ReportMaster
+    # implementation on port 7000. This will be deleted after all clients have
+    # been moved over to accessing the ReportMaster through Cloud Endpoints.
   - port: 7001
+    # The port which the ReportMaster implementation exposes within the cluster.
+    # This must match the value passed to the implementation in the "-port" flag
+    # above and the value passed to the Endpoints process in the the "-a" flag
+    # above and the value used in ReportMaster's Dockerfile.
+    targetPort: 7000
+    protocol: TCP
+    name: report-master-http2
+    # Requests to this port are forwarded to the Endpoints
+    # implementation on port 8000. All clients should access ReportMaster via
+    # this port.
+  - port: 8001
+    # The port which the Endpoints implementation exposes within
+    # the cluster. This must match the value passed to the Endpoints process in
+    # the '-P' flag above.
+    targetPort: 8000
+    protocol: TCP
+    name: endpoint-http2
   selector:
     # This must match the metadata.labels section of the Deployment above.
     name: report-master

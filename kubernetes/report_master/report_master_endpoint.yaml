@@ -1,0 +1,20 @@
+# The configuration schema is defined by service.proto file
+# https://github.com/googleapis/googleapis/blob/master/google/api/service.proto
+type: google.api.Service
+config_version: 3
+
+# Name of the service configuration.
+name: $$ENDPOINT_NAME$$
+
+# API title to appear in the user interface (Google Cloud Console).
+title: Cobalt Report Master gRPC API
+apis:
+- name: cobalt.analyzer.ReportMaster
+
+# API usage restrictions.
+usage:
+  rules:
+  # All methods can be called without an API Key.
+  # TODO(azani): Restrict access.
+  - selector: "*"
+    allow_unregistered_calls: true

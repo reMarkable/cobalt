@@ -16,6 +16,7 @@
 """A library with functions to help work with Docker, Kubernetes and GKE."""
 
 import fileinput
+import json
 import os
 import re
 import shutil
@@ -75,6 +76,15 @@ ANALYZER_SERVICE_DEPLOYMENT_FILE = os.path.join(KUBE_OUT_DIR,
 REPORT_MASTER_DEPLOYMENT_FILE = os.path.join(KUBE_OUT_DIR,
     REPORT_MASTER_DEPLOYMENT_YAML)
 SHUFFLER_DEPLOYMENT_FILE = os.path.join(KUBE_OUT_DIR, SHUFFLER_DEPLOYMENT_YAML)
+
+# Yaml file configuring the report master endpoint.
+REPORT_MASTER_ENDPOINT_CONFIG_YAML = 'report_master_endpoint.yaml'
+REPORT_MASTER_ENDPOINT_CONFIG_TEMPLATE_FILE = os.path.join(KUBE_SRC_DIR,
+    'report_master', REPORT_MASTER_ENDPOINT_CONFIG_YAML)
+REPORT_MASTER_ENDPOINT_CONFIG_FILE = os.path.join(KUBE_OUT_DIR,
+    REPORT_MASTER_ENDPOINT_CONFIG_YAML)
+REPORT_MASTER_PROTO_DESCRIPTOR = os.path.join(OUT_DIR, 'analyzer',
+    'report_master', 'report_master.descriptor')
 
 # Docker image deployment directories
 COBALT_COMMON_DOCKER_BUILD_DIR = os.path.join(KUBE_OUT_DIR,
@@ -290,6 +300,39 @@ def _start_gke_service(deployment_template_file, deployment_file,
   subprocess.check_call(["kubectl", "create", "-f", deployment_file,
                          "--context", context])
 
+def _build_report_master_endpoint_name(cloud_project_prefix, cloud_project_name):
+  if cloud_project_prefix == 'google.com':
+    return 'reportmaster-%s.googleapis.com' % cloud_project_name
+  elif not cloud_project_prefix:
+    return 'reportmaster.endpoints.%s.cloud.goog' % cloud_project_name
+  raise ValueError('Project has a unsupported prefix.')
+
+def _get_endpoint_config_id(cloud_project_prefix, cloud_project_name,
+                            endpoint_name):
+  """Get the id of the latest endpoint configuration for the specified endpoint.
+
+  There is a many-to-many relationship between endpoint names and endpoint
+  configurations. When a new configuration is uploaded for an endpoint, that
+  configuration is added to the list of configuration and given an id. This
+  function retreives the configuration id for the most recently uploaded config
+  and returns it.
+
+  Args:
+    cloud_project_prefix {string}: For example "google.com"
+    cloud_project_name {string}: For example "shuffler-test". The prefix and
+        name are used when forming the URI to the image in the registry and
+        also the bigtable project name.
+    endpoint_name {string}: For example "cobalt.googleapi.com".
+
+  Returns
+    {string}: The configuration id. For example "2017-08-21r2"
+  """
+  config_json = subprocess.check_output(["gcloud", "service-management",
+    "describe", "--format", "json", endpoint_name, "--project",
+    compound_project_name(cloud_project_prefix, cloud_project_name)])
+  config = json.loads(config_json)
+  return config["serviceConfig"]["id"]
+
 def start_analyzer_service(cloud_project_prefix,
                            cloud_project_name,
                            cluster_zone, cluster_name,
@@ -356,6 +399,11 @@ def start_report_master(cloud_project_prefix,
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
 
+  endpoint_name = _build_report_master_endpoint_name(
+      cloud_project_prefix, cloud_project_name)
+  endpoint_config_id = _get_endpoint_config_id(cloud_project_prefix,
+      cloud_project_name, endpoint_name)
+
   # If a static ip address is not proviced, then delete the static IP specifier
   # from the descriptor.
   if not static_ip_address:
@@ -367,7 +415,9 @@ def start_report_master(cloud_project_prefix,
       '$$REPORT_MASTER_IMAGE_URI$$' : image_uri,
       '$$BIGTABLE_PROJECT_NAME$$' : bigtable_project_name,
       '$$BIGTABLE_INSTANCE_NAME$$' :bigtable_instance_name,
-      '$$REPORT_MASTER_STATIC_IP_ADDRESS$$' : static_ip_address}
+      '$$REPORT_MASTER_STATIC_IP_ADDRESS$$' : static_ip_address,
+      '$$ENDPOINT_NAME$$': endpoint_name,
+      '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id}
   _start_gke_service(REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE,
                      REPORT_MASTER_DEPLOYMENT_FILE,
                      token_substitutions, context)
@@ -446,6 +496,10 @@ def stop_shuffler(cloud_project_prefix,
       cluster_zone, cluster_name)
   _stop_gke_service(SHUFFLER_IMAGE_NAME, context)
 
+def login():
+  subprocess.check_call(["gcloud", "auth", "login", "--project",
+    compound_project_name(cloud_project_prefix, cloud_project_name)])
+
 def authenticate(cluster_name,
                  cloud_project_prefix,
                  cloud_project_name,
@@ -462,6 +516,9 @@ def display(cloud_project_prefix, cloud_project_name, cluster_zone,
    context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
    subprocess.check_call(["kubectl", "get", "services", "--context", context])
+   subprocess.check_call(["gcloud", "service-management", "list", "--produced",
+     "--project",
+     compound_project_name(cloud_project_prefix, cloud_project_name)])
 
 def get_public_uris(cluster_name,
                     cloud_project_prefix,
@@ -511,6 +568,18 @@ def get_public_uris(cluster_name,
     "shuffler" : values.get(SHUFFLER_IMAGE_NAME),
   }
   return uris
+
+def configure_report_master_endpoint(cloud_project_prefix, cloud_project_name):
+  endpoint_name = _build_report_master_endpoint_name(
+      cloud_project_prefix, cloud_project_name)
+  token_substitutions = { '$$ENDPOINT_NAME$$': endpoint_name }
+  _replace_tokens_in_template(REPORT_MASTER_ENDPOINT_CONFIG_TEMPLATE_FILE,
+      REPORT_MASTER_ENDPOINT_CONFIG_FILE, token_substitutions)
+  subprocess.check_call(["gcloud", "service-management", "deploy",
+    REPORT_MASTER_PROTO_DESCRIPTOR, REPORT_MASTER_ENDPOINT_CONFIG_FILE,
+    '--project',
+    compound_project_name(cloud_project_prefix, cloud_project_name)])
+
 
 def main():
   print get_public_uris()

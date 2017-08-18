@@ -23,4 +23,4 @@ COPY registered_metrics.txt /etc/cobalt/
 COPY registered_reports.txt /etc/cobalt/
 
 ENTRYPOINT ["analyzer_report_master"]
-EXPOSE 7001
+EXPOSE 7000

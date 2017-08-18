@@ -39,7 +39,17 @@ add_custom_command(OUTPUT ${PROTO_GRPC}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
 )
 
-set(REPORT_PROTO_SRCS ${REPORT_PROTO_SRCS} ${PROTO_GRPC})
+# generate the descriptor set to configure cloud endpoints.
+set(PROTO_DESCRIPTOR "${CMAKE_CURRENT_BINARY_DIR}/report_master.descriptor")
+add_custom_command(OUTPUT ${PROTO_DESCRIPTOR}
+    COMMAND protoc -I ${CMAKE_SOURCE_DIR}
+                --include_imports
+                --include_source_info ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
+                --descriptor_set_out ${PROTO_DESCRIPTOR}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
+)
+
+set(REPORT_PROTO_SRCS ${REPORT_PROTO_SRCS} ${PROTO_GRPC} ${PROTO_DESCRIPTOR})
 
 add_custom_target(build_report_protos
                   DEPENDS ${REPORT_PROTO_SRCS})
