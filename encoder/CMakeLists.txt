@@ -24,6 +24,7 @@ add_library(encoder
             encoder.cc
             envelope_maker.cc
             send_retryer.cc
+            shipping_manager.cc
             shuffler_client.cc
             ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
 target_link_libraries(encoder
@@ -36,7 +37,8 @@ target_link_libraries(encoder
 
 add_executable(encoder_tests
                client_secret_test.cc encoder_test.cc envelope_maker_test.cc
-               send_retryer_test.cc shuffler_client_test)
+               send_retryer_test.cc shipping_manager_test.cc
+               shuffler_client_test.cc)
 target_link_libraries(encoder_tests
                       gtest gtest_main client_secret encoder
                       ${PROTOBUF_LIBRARY})
