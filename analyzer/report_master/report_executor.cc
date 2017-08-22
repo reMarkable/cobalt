@@ -89,8 +89,8 @@ ReportExecutor::~ReportExecutor() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     shut_down_ = true;
+    worker_notifier_.notify_all();
   }
-  worker_notifier_.notify_all();
   worker_thread_.join();
 }
 
