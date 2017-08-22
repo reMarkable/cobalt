@@ -16,6 +16,7 @@
 
 namespace cobalt {
 namespace encoder {
+namespace send_retryer {
 
 namespace {
 
@@ -40,10 +41,9 @@ bool ShouldRetry(const grpc::Status& status) {
 
 }  // namespace
 
-SendRetryer::CancelHandle::CancelHandle()
-    : context_(new grpc::ClientContext()) {}
+CancelHandle::CancelHandle() : context_(new grpc::ClientContext()) {}
 
-void SendRetryer::CancelHandle::TryCancel() {
+void CancelHandle::TryCancel() {
   std::lock_guard<std::mutex> lock(mutex_);
   cancelled_ = true;
   cancel_notifier_.notify_all();
@@ -193,5 +193,6 @@ grpc::Status SendRetryer::SendToShuffler(
   }
 }
 
+}  // namespace send_retryer
 }  // namespace encoder
 }  // namespace cobalt

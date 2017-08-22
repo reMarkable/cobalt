@@ -45,7 +45,7 @@ using encoder::ClientSecret;
 using encoder::Encoder;
 using encoder::EnvelopeMaker;
 using encoder::ProjectContext;
-using encoder::SendRetryer;
+using encoder::send_retryer::SendRetryer;
 using encoder::ShufflerClient;
 using grpc::Channel;
 using grpc::ClientContext;
@@ -430,7 +430,7 @@ class EnvelopeSender : public EnvelopeSenderInterface {
 
   std::unique_ptr<analyzer::Analyzer::Stub> analyzer_client_;
   std::unique_ptr<encoder::ShufflerClient> shuffler_client_;
-  std::unique_ptr<encoder::SendRetryer> send_retryer_;
+  std::unique_ptr<SendRetryer> send_retryer_;
   TestApp::Mode mode_;
 };
 

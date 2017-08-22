@@ -13,15 +13,28 @@
 namespace cobalt {
 namespace encoder {
 
+namespace send_retryer {
+
+// An object that provides a way to cancel an invocation of SendToShuffler().
+class CancelHandle;
+
+// An abstract interface implemented by SendRetryer (below).
+// This is abstracted so that it may be mocked in tests.
+class SendRetryerInterface {
+ public:
+  virtual grpc::Status SendToShuffler(
+      std::chrono::seconds initial_rpc_deadline,
+      std::chrono::seconds overerall_deadline,
+      send_retryer::CancelHandle* cancel_handle,
+      const EncryptedMessage& encrypted_message) = 0;
+};
+
 // This class wraps a ShufflerClient with retry logic. We categorize
 // gRPC error statuses as either retryable or not. If an error is retryable
 // then we retry with exponential backoff, otherwise we give up. If the
 // returned error is DEADLINE_EXEEDED then we increase the deadline.
-class SendRetryer {
+class SendRetryer : public SendRetryerInterface {
  public:
-  // An object that provides a way to cancel an invocation of SendToShuffler().
-  class CancelHandle;
-
   // Does not take ownership of |shuffler_client|.
   explicit SendRetryer(ShufflerClientInterface* shuffler_client);
 
@@ -63,36 +76,11 @@ class SendRetryer {
   //   |cancel_handle|. May return CANCELLED in this case if the call
   //   was successfully canceled. Other responses including OK are possible
   //   after a TryCancel() because the cancellation is not guaranteed.
-  grpc::Status SendToShuffler(std::chrono::seconds initial_rpc_deadline,
-                              std::chrono::seconds overerall_deadline,
-                              CancelHandle* cancel_handle,
-                              const EncryptedMessage& encrypted_message);
-
-  class CancelHandle {
-   public:
-    CancelHandle();
-
-    // Attempt to cancel the call. This may or may not succeed depending on
-    // the current state of the call. If the Retryer is currently blocked
-    // waiting for a retry then this will succeed. If a gRPC call is in-flight
-    // an attempt will be made to cancel it but this may not succeed.
-    void TryCancel();
-
-   private:
-    friend class SendRetryer;
-    friend class SendRetryerTest;
-
-    std::mutex mutex_;
-    bool cancelled_ = false;
-    std::condition_variable cancel_notifier_;
-    std::unique_ptr<grpc::ClientContext> context_;
-
-    // If this is not NULL then it will be invoked with the value
-    // |sleep_millis| just prior to a sleep of |sleep_millis| milliseconds
-    // commencing. This is only used for tests so far but may prove useful
-    // for other purposes in the future.
-    std::function<void(int)> sleep_notification_function_;
-  };
+  grpc::Status SendToShuffler(
+      std::chrono::seconds initial_rpc_deadline,
+      std::chrono::seconds overerall_deadline,
+      send_retryer::CancelHandle* cancel_handle,
+      const EncryptedMessage& encrypted_message) override;
 
  private:
   friend class SendRetryerTest;
@@ -107,6 +95,34 @@ class SendRetryer {
   std::unique_ptr<ClockInterface> clock_;
 };
 
+// An object that provides a way to cancel an invocation of SendToShuffler().
+class CancelHandle {
+ public:
+  CancelHandle();
+
+  // Attempt to cancel the call. This may or may not succeed depending on
+  // the current state of the call. If the Retryer is currently blocked
+  // waiting for a retry then this will succeed. If a gRPC call is in-flight
+  // an attempt will be made to cancel it but this may not succeed.
+  void TryCancel();
+
+ private:
+  friend class SendRetryer;
+  friend class SendRetryerTest;
+
+  std::mutex mutex_;
+  bool cancelled_ = false;
+  std::condition_variable cancel_notifier_;
+  std::unique_ptr<grpc::ClientContext> context_;
+
+  // If this is not NULL then it will be invoked with the value
+  // |sleep_millis| just prior to a sleep of |sleep_millis| milliseconds
+  // commencing. This is only used for tests so far but may prove useful
+  // for other purposes in the future.
+  std::function<void(int)> sleep_notification_function_;
+};
+
+}  // namespace send_retryer
 }  // namespace encoder
 }  // namespace cobalt
 

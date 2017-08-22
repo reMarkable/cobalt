@@ -19,6 +19,7 @@
 
 namespace cobalt {
 namespace encoder {
+namespace send_retryer {
 
 namespace {
 
@@ -30,7 +31,7 @@ namespace {
 class FakeShufflerClient : public ShufflerClientInterface {
  public:
   FakeShufflerClient(IncrementingClock* incrementing_clock,
-                     SendRetryer::CancelHandle* cancel_handle)
+                     CancelHandle* cancel_handle)
       : incrementing_clock(incrementing_clock), cancel_handle(cancel_handle) {}
 
   grpc::Status SendToShuffler(const EncryptedMessage& encrypted_message,
@@ -61,7 +62,7 @@ class FakeShufflerClient : public ShufflerClientInterface {
   size_t call_count = 0;
   std::vector<int64_t> deadlines;
   size_t cancel_on_this_call_count = -1;
-  SendRetryer::CancelHandle* cancel_handle;
+  CancelHandle* cancel_handle;
 };
 
 }  // namespace
@@ -71,7 +72,7 @@ class SendRetryerTest : public ::testing::Test {
   SendRetryerTest() {
     std::unique_ptr<IncrementingClock> clock(new IncrementingClock());
     incrementing_clock_ = clock.get();
-    cancel_handle_.reset(new SendRetryer::CancelHandle());
+    cancel_handle_.reset(new CancelHandle());
     cancel_handle_->sleep_notification_function_ = [this](int sleep_millis) {
       sleep_millis_used_.push_back(sleep_millis);
     };
@@ -124,7 +125,7 @@ class SendRetryerTest : public ::testing::Test {
   std::unique_ptr<SendRetryer> retryer_;
   EncryptedMessage encrypted_message_;
   IncrementingClock* incrementing_clock_;  // not owned.
-  std::unique_ptr<SendRetryer::CancelHandle> cancel_handle_;
+  std::unique_ptr<CancelHandle> cancel_handle_;
   std::vector<int> sleep_millis_used_;
 };
 
@@ -275,5 +276,6 @@ TEST_F(SendRetryerTest, TestCancel) {
   CheckResults(status, grpc::CANCELLED, 2u, {10u, 15u});
 }
 
+}  // namespace send_retryer
 }  // namespace encoder
 }  // namespace cobalt
