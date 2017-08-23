@@ -17,6 +17,7 @@ static_library("rappor_encoder") {
     "//cobalt:cobalt_proto",
     "//cobalt/config:cobalt_config_proto",
     "//cobalt/encoder:client_secret",
-    "//cobalt/util/crypto_util"
+    "//cobalt/util/crypto_util",
+    "//lib/ftl",
   ]
 }

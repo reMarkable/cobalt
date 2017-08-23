@@ -29,6 +29,7 @@ static_library("encoder") {
     "//cobalt/config:cobalt_config_proto",
     "//cobalt/shuffler:shuffler_service",
     "//cobalt/util:encrypted_message_util",
+    "//lib/ftl",
     "//third_party/grpc:grpc++",
   ]
 }
