@@ -6,11 +6,16 @@ import("//third_party/protobuf/proto_library.gni")
 
 static_library("encoder") {
   sources = [
+    "clock.h",
     "encoder.cc",
     "encoder.h",
     "envelope_maker.cc",
     "envelope_maker.h",
     "project_context.h",
+    "send_retryer.cc",
+    "send_retryer.h",
+    "shipping_manager.cc",
+    "shipping_manager.h",
     "shuffler_client.cc",
     "shuffler_client.h"
   ]
