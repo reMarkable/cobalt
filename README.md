@@ -183,7 +183,7 @@ Bigtable and also in which to create an instance of Google Container Engine if
 you wish to do that later. Create a new one or use an existing one. You will
 need to enable billing. If you are a member of the core Cobalt team you can
 request access to our
-[shared project](https://console.cloud.google.com/home/dashboard?project=google.com:shuffler-test).
+[shared project](https://console.cloud.google.com/home/dashboard?project=fuchsia-cobalt-testing).
 
 #### Enable the Bigtable APIs for your project
 You must enable Cloud Bigtable API and Cloud Bigtable Admin API.
@@ -199,11 +199,14 @@ You must enable Cloud Bigtable API and Cloud Bigtable Admin API.
 #### Create an instance of Cloud Bigtable
 Navigate to the Bigtable section of the Cloud console for your project.
 Here is the link for the core Cobalt team's
-[shared project](https://console.cloud.google.com/bigtable/instances?project=google.com:shuffler-test)
+[shared project](https://console.cloud.google.com/bigtable/instances?project=fuchsia-cobalt-testing)
 * Select **CREATE INSTANCE**
 * Name your instance whatever you would like
 * If this feature is available to you, select **Development** and
 not *Production*. This is one-third the cost.
+* Under *Zone* select a zone, for example *us-central1-c*. (It is best if you
+use the same zone for all the different Google Cloud components you create for
+a Cobalt cluster.)
 * If you don't plan to use your instance for a few days you may delete it and
 then recreate another one later in order to save money.
 
@@ -218,7 +221,7 @@ Cobalt code running on your computer to be able to access Cloud Bigtable.
 
 * Go to the
 [Credentials page](https://cloud.google.com/storage/docs/authentication#generating-a-private-key)
-of your Cloud project. Here is [the link](https://console.cloud.google.com/apis/credentials?debugUI=DEVELOPERS&project=google.com:shuffler-test) for the core
+of your Cloud project. Here is [the link](https://console.cloud.google.com/apis/credentials?debugUI=DEVELOPERS&project=fuchsia-cobalt-testing) for the core
 Cobalt team's shared project.
 * Click `Create Credentials`
 * Select `Service Account Key` as the type of key
@@ -275,6 +278,9 @@ WARNING: This will modify the contents of the tables in whichever
 Cloud Bigtable instance you point it at. Be careful.
 
 ### Cloud Project Name Prefix
+**NOTE:** The project name prefix described in this sub-section is now
+deprecated by Google Cloud. If you make a new Google Cloud project as of
+this writing the project name will not have a prefix.
 
 If your Cloud project name has a domain prefix (for example your Cloud project
 name is `google.com:myproject`) then you must specify the prefix separately
@@ -318,7 +324,7 @@ about creating a *personal_cluster.json* file.
 
 ## Google Container Engine (GKE)
 You can deploy the Shuffler, Analyzer Service and Report Master on Google
-Container Engine and then run the the demo or the end-to-end test using your
+Container Engine and then run the demo or the end-to-end test using your
 cloud instance.
 
 
@@ -349,11 +355,17 @@ through *cobatlb.py*.
 * `gcloud init`
 * `gcloud components install kubectl`
 
+#### Enable the Container Engine API in your Project
+* Navigate to the [API Manager Library](https://console.cloud.google.com/apis/library).
+* Search for "Container".
+* Select "Google Container Engine API"
+* Click the "Enable" button.
+
 #### Create a GKE Cluster
 Navigate to the Container Clusters section of the Cloud console for your project.
 Here is the link for the core Cobalt team's
-[shared project](https://console.cloud.google.com/kubernetes/list?project=google.com:shuffler-test)
-* Click **Create Cluster**
+[shared project](https://console.cloud.google.com/kubernetes/list?project=fuchsia-cobalt-testing)
+* Click **Create a container cluster**
 * Name your cluster whatever you would like
 * Put your cluster in the same zone as your Bigtable instance. If this is not
 possible put it into a different zone in the same region.
@@ -377,7 +389,7 @@ database between deployments. The database will still persist between
 
 Navigate to the Compute Engine / Disks section of the Cloud console for your
 project. Here is the link for the core Cobalt team's
-[shared project](https://console.cloud.google.com/compute/disks?project=google.com:shuffler-test)
+[shared project](https://console.cloud.google.com/compute/disks?project=fuchsia-cobalt-testing)
 * Click **CREATE DISK**
 * Name your disk whatever you would like
 * Put your disk in the same zone as your GKE cluster. If this is not possible
@@ -394,7 +406,7 @@ Its contents should be exactly the following
 
 ```
 {
-  "cloud_project_prefix": "<your-project-prefix>",
+  "cloud_project_prefix": "<your-project-prefix (now deprecated)>",
   "cloud_project_name": "<your-project-name>",
   "cluster_name": "<your-cluster-name>",
   "cluster_zone": "<your-cluster-zone>",
@@ -413,8 +425,7 @@ For example:
 
 ```
 {
-  "cloud_project_prefix": "google.com",
-  "cloud_project_name": "shuffler-test",
+  "cloud_project_name": "fuchsia-cobalt-testing",
   "cluster_name": "rudominer-test-1",
   "cluster_zone": "us-central1-a",
   "gce_pd_name": "rudominer-shuffler-1",
@@ -428,17 +439,17 @@ The script *cobaltb.py* looks for this file and uses it to set defaults for
 flags. It is ok for some of the values to be the empty string or missing.
 For example if you have not yet created a GKE cluster but you have already
 created a Bigtable instance you can omit all fields other than
-`cloud_project_prefix`, `cloud_project_name` and `bigtable_instance_name` and
+`cloud_project_name` and `bigtable_instance_name` and
 then when performing the steps described above in the section
 **Using Cloud Bigtable** you will not have to type the flags
 `--cloud_project_prefix`, `--cloud_project_name` or `--bigtable_instance_name`.
 
 Here is an explanation of each of the entries.
-* *cloud_project_prefix*: This should be the empty string unless you created
+* *cloud_project_prefix*: (This is now deprecated. New Google Cloud projects
+will not have a prefix.) This should be the empty string unless you created
 your Google cloud project in such a way that it is part of a custom domain in
-which case this should
-be the custom domain. The fully qualified name of your project will then be
-`<your-project-prefix>:<your-project-name>`
+which case this should be the custom domain. The fully qualified name of your
+project will then be `<your-project-prefix>:<your-project-name>`
 * *cloud_project_name*: This should be the full name of your project if you
 used the empty string for *cloud_project_prefix* otherwise it should be the
 project name without the prefix and the colon.
@@ -520,7 +531,7 @@ Run this in order to see the list of running jobs and their
 externally facing IP addresses and ports.
 
 ### Running the End-to-End test on GKE
-`./cobaltb.py test --tests=e2e -cobalt_on_gke`
+`./cobaltb.py test --tests=e2e -cobalt_on_personal_cluster`
 
 If your GKE cluster has been set up correctly and your *personal_cluster.json*
 file is set up correclty, this will run the end-to-end test using your
@@ -533,9 +544,9 @@ you do not need to start the Shuffler, Analyzer Service, Report Master or
 Bigtable as these are all running in the cloud. You still need to start
 the test app, the observation querier and the report client.
 
-*  ` ./cobaltb.py start test_app -cobalt_on_gke`
+*  ` ./cobaltb.py start test_app -cobalt_on_personal_cluster`
 *  `./cobaltb.py start observation_querier -use_cloud_bt`
-*  `./tools/demo/demo_reporter.py -cobalt_on_gke`
+*  `./tools/demo/demo_reporter.py -cobalt_on_personal_cluster`
 
 ## Managing Production Clusters
 In addition to developers' personal clusters Cobalt also has production
