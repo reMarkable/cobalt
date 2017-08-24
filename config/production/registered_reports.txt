@@ -76,6 +76,10 @@ element {
          key: 4;
          value: "commits received out-of-order: not-recovered"
       }
+      labels {
+         key: 5;
+         value: "ledger leveldb state corrupted"
+      }
     }
   }
   aggregation_epoch_type: DAY
