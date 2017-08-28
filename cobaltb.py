@@ -533,8 +533,11 @@ def _deploy_endpoint(args):
           'the prefix: ' % args.cloud_project_prefix)
     return
   if args.job == 'report-master':
-    container_util.configure_report_master_endpoint(
-        args.cloud_project_prefix, args.cloud_project_name)
+    container_util.configure_report_master_endpoint(args.cloud_project_prefix,
+        args.cloud_project_name, args.report_master_static_ip)
+  elif args.job == 'shuffler':
+    container_util.configure_shuffler_endpoint(args.cloud_project_prefix,
+        args.cloud_project_name, args.shuffler_static_ip)
   else:
     print('Unknown job "%s". I only know how to configure endpoints for the '
           '"report-master".' % args.job)
@@ -603,8 +606,7 @@ def _add_cloud_access_args(parser, cluster_settings):
            'Default=%s' % cluster_settings['cluster_zone'],
       default=cluster_settings['cluster_zone'])
 
-def _add_gke_deployment_args(parser, cluster_settings):
-  _add_cloud_access_args(parser, cluster_settings)
+def _add_static_ip_args(parser, cluster_settings):
   parser.add_argument('--shuffler_static_ip',
       help='A static IP address that has been previously reserved on the GKE '
            'cluster for the Shuffler. '
@@ -620,6 +622,10 @@ def _add_gke_deployment_args(parser, cluster_settings):
            'cluster for the Analyzer Service. '
            'Default=%s' % cluster_settings['analyzer_service_static_ip'],
       default=cluster_settings['analyzer_service_static_ip'])
+
+def _add_gke_deployment_args(parser, cluster_settings):
+  _add_cloud_access_args(parser, cluster_settings)
+  _add_static_ip_args(parser, cluster_settings)
 
 def main():
   # We parse the command line flags twice. The first time we are looking
@@ -1188,9 +1194,10 @@ def main():
       help='Create or configure the Cloud Endpoint for one of Cobalt\'s job.')
   sub_parser.set_defaults(func=_deploy_endpoint)
   _add_cloud_project_args(sub_parser, cluster_settings)
+  _add_static_ip_args(sub_parser, cluster_settings)
   sub_parser.add_argument('--job',
       help='The job whose Cloud Endpoint you wish to configure. Valid choices: '
-           '"report-master". Required.')
+           '"report-master", "shuffler". Required.')
 
   args = parser.parse_args()
   global _verbose_count

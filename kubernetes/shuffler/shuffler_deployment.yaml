@@ -37,12 +37,22 @@ spec:
         name: shuffler
     spec:
       containers:
+      - name: endpoint
+        image: gcr.io/endpoints-release/endpoints-runtime:1
+        args: [
+          '-P', '8000',
+          '-s', '$$ENDPOINT_NAME$$',
+          '-v', '$$ENDPOINT_CONFIG_ID$$',
+          '-a', 'grpc://127.0.0.1:5000'
+          ]
+        ports:
+          - containerPort: 8000
       - name: shuffler
         # The URI of a Docker image in a Docker repository.
         image: $$SHUFFLER_IMAGE_URI$$
         args:
           - '-port'
-          - '5001'
+          - '5000'
           - '-analyzer_uri'
           # This must match the defintion of the "analyzer-service" Service
           # in analyzer_service_deployment.yaml
@@ -64,7 +74,7 @@ spec:
           - '-logtostderr'
           - '-v=3'
         ports:
-          - containerPort: 5001
+          - containerPort: 5000
         volumeMounts:
             # This name must match the volumes.name for
             # shuffler-persistent-storage below.
@@ -92,9 +102,27 @@ metadata:
   name: shuffler
 spec:
   ports:
-    # The port that this service should serve on. This should match the
-    # port used several times above and the port specified in the Dockerfile.
+    # Requests to this port are forwarded directly to the Shuffler
+    # implementation on port 5000. This will be deleted after all clients have
+    # been moved over to accessing the Shuffler through Cloud Endpoints.
   - port: 5001
+    # The port which the Shuffler implementation exposes within the cluster.
+    # This must match the value passed to the implementation in the "-port" flag
+    # above and the value passed to the Endpoints process in the the "-a" flag
+    # above and the value used in Shuffler's Dockerfile.
+    targetPort: 5000
+    protocol: TCP
+    name: shuffler-http2
+    # Requests to this port are forwarded to the Endpoints
+    # implementation on port 8000. All clients should access Shuffler via
+    # this port.
+  - port: 8001
+    # The port which the Endpoint implementation exposes within the cluster.
+    # This must match the value passed to the Endpoints process in the '-P' flag
+    # above.
+    targetPort: 8000
+    protocol: TCP
+    name: endpoint-http2
   selector:
     # This must match the metadata.labels section of the Deployment above.
     name: shuffler

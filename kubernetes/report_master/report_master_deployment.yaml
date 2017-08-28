@@ -45,6 +45,8 @@ spec:
           '-v', '$$ENDPOINT_CONFIG_ID$$',
           '-a', 'grpc://127.0.0.1:7000'
           ]
+        ports:
+          - containerPort: 8000
       - name: report-master
         # The URI of a Docker image in a Docker repository.
         image: $$REPORT_MASTER_IMAGE_URI$$

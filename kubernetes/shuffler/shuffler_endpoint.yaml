@@ -5,15 +5,14 @@ config_version: 3
 
 # Name of the service configuration.
 name: $$ENDPOINT_NAME$$
-
 endpoints:
   - name: $$ENDPOINT_NAME$$
     target: "$$STATIC_IP_ADDRESS$$"
 
 # API title to appear in the user interface (Google Cloud Console).
-title: Cobalt Report Master gRPC API
+title: Cobalt Shuffler gRPC API
 apis:
-- name: cobalt.analyzer.ReportMaster
+- name: cobalt.shuffler.Shuffler
 
 # API usage restrictions.
 usage:

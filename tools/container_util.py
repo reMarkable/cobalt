@@ -86,6 +86,15 @@ REPORT_MASTER_ENDPOINT_CONFIG_FILE = os.path.join(KUBE_OUT_DIR,
 REPORT_MASTER_PROTO_DESCRIPTOR = os.path.join(OUT_DIR, 'analyzer',
     'report_master', 'report_master.descriptor')
 
+# Yaml file configuring the shuffler endpoint.
+SHUFFLER_ENDPOINT_CONFIG_YAML = 'shuffler_endpoint.yaml'
+SHUFFLER_ENDPOINT_CONFIG_TEMPLATE_FILE = os.path.join(KUBE_SRC_DIR,
+    'shuffler', SHUFFLER_ENDPOINT_CONFIG_YAML)
+SHUFFLER_ENDPOINT_CONFIG_FILE = os.path.join(KUBE_OUT_DIR,
+    SHUFFLER_ENDPOINT_CONFIG_YAML)
+SHUFFLER_PROTO_DESCRIPTOR = os.path.join(OUT_DIR, 'shuffler',
+    'shuffler.descriptor')
+
 # Docker image deployment directories
 COBALT_COMMON_DOCKER_BUILD_DIR = os.path.join(KUBE_OUT_DIR,
     'cobalt_common')
@@ -300,11 +309,23 @@ def _start_gke_service(deployment_template_file, deployment_file,
   subprocess.check_call(["kubectl", "create", "-f", deployment_file,
                          "--context", context])
 
-def _build_report_master_endpoint_name(cloud_project_prefix, cloud_project_name):
+def _build_report_master_endpoint_name(cloud_project_prefix,
+                                       cloud_project_name):
+  return _build_endpoint_name('reportmaster', cloud_project_prefix,
+                              cloud_project_name)
+
+def _build_shuffler_endpoint_name(cloud_project_prefix,
+                                       cloud_project_name):
+  return _build_endpoint_name('shuffler', cloud_project_prefix,
+                              cloud_project_name)
+
+def _build_endpoint_name(endpoint_name_prefix,
+                         cloud_project_prefix, cloud_project_name):
   if cloud_project_prefix == 'google.com':
-    return 'reportmaster-%s.googleapis.com' % cloud_project_name
+    return '%s-%s.googleapis.com' % (endpoint_name_prefix, cloud_project_name)
   elif not cloud_project_prefix:
-    return 'reportmaster.endpoints.%s.cloud.goog' % cloud_project_name
+    return '%s.endpoints.%s.cloud.goog' % (endpoint_name_prefix,
+                                           cloud_project_name)
   raise ValueError('Project has a unsupported prefix.')
 
 def _get_endpoint_config_id(cloud_project_prefix, cloud_project_name,
@@ -452,6 +473,10 @@ def start_shuffler(cloud_project_prefix,
 
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
+  endpoint_name = _build_shuffler_endpoint_name(
+      cloud_project_prefix, cloud_project_name)
+  endpoint_config_id = _get_endpoint_config_id(cloud_project_prefix,
+      cloud_project_name, endpoint_name)
 
   # If a static ip address is not proviced, then delete the static IP specifier
   # from the descriptor.
@@ -466,7 +491,9 @@ def start_shuffler(cloud_project_prefix,
       '$$SHUFFLER_PRIVATE_PEM_NAME$$' : SHUFFLER_PRIVATE_KEY_PEM_NAME,
       '$$SHUFFLER_STATIC_IP_ADDRESS$$' : static_ip_address,
       '$$SHUFFLER_PRIVATE_KEY_SECRET_NAME$$' : SHUFFLER_PRIVATE_KEY_SECRET_NAME,
-      '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data}
+      '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data,
+      '$$ENDPOINT_NAME$$': endpoint_name,
+      '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id}
   _start_gke_service(SHUFFLER_DEPLOYMENT_TEMPLATE_FILE,
                      SHUFFLER_DEPLOYMENT_FILE,
                      token_substitutions, context)
@@ -573,16 +600,40 @@ def get_public_uris(cluster_name,
   }
   return uris
 
-def configure_report_master_endpoint(cloud_project_prefix, cloud_project_name):
+def _configure_endpoint(cloud_project_prefix, cloud_project_name,
+                        endpoint_name,
+                        static_ip_address,
+                        config_template_file,
+                        config_file,
+                        proto_descriptor):
+  # If a static ip address is not proviced, then delete the static IP specifier
+  # from the descriptor.
+  if not static_ip_address:
+    static_ip_address = DELETE_LINE_INDICATOR
+  token_substitutions = {
+      '$$ENDPOINT_NAME$$': endpoint_name,
+      '$$STATIC_IP_ADDRESS$$': static_ip_address}
+  _replace_tokens_in_template(
+      config_template_file, config_file, token_substitutions)
+  subprocess.check_call(["gcloud", "service-management", "deploy",
+    proto_descriptor, config_file, '--project',
+    compound_project_name(cloud_project_prefix, cloud_project_name)])
+
+def configure_report_master_endpoint(cloud_project_prefix, cloud_project_name,
+                                     static_ip_address):
   endpoint_name = _build_report_master_endpoint_name(
       cloud_project_prefix, cloud_project_name)
-  token_substitutions = { '$$ENDPOINT_NAME$$': endpoint_name }
-  _replace_tokens_in_template(REPORT_MASTER_ENDPOINT_CONFIG_TEMPLATE_FILE,
-      REPORT_MASTER_ENDPOINT_CONFIG_FILE, token_substitutions)
-  subprocess.check_call(["gcloud", "service-management", "deploy",
-    REPORT_MASTER_PROTO_DESCRIPTOR, REPORT_MASTER_ENDPOINT_CONFIG_FILE,
-    '--project',
-    compound_project_name(cloud_project_prefix, cloud_project_name)])
+  _configure_endpoint(cloud_project_prefix, cloud_project_name, endpoint_name,
+      static_ip_address, REPORT_MASTER_ENDPOINT_CONFIG_TEMPLATE_FILE,
+      REPORT_MASTER_ENDPOINT_CONFIG_FILE, REPORT_MASTER_PROTO_DESCRIPTOR)
+
+def configure_shuffler_endpoint(cloud_project_prefix, cloud_project_name,
+                                static_ip_address):
+  endpoint_name = _build_shuffler_endpoint_name(
+      cloud_project_prefix, cloud_project_name)
+  _configure_endpoint(cloud_project_prefix, cloud_project_name, endpoint_name,
+      static_ip_address, SHUFFLER_ENDPOINT_CONFIG_TEMPLATE_FILE,
+      SHUFFLER_ENDPOINT_CONFIG_FILE, SHUFFLER_PROTO_DESCRIPTOR)
 
 
 def main():

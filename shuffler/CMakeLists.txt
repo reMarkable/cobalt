@@ -42,6 +42,16 @@ add_custom_command(OUTPUT ${SHUFFLER_PB_GO}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+# generate the descriptor set to configure cloud endpoints.
+set(SHUFFLER_PROTO_DESCRIPTOR "${CMAKE_CURRENT_BINARY_DIR}/shuffler.descriptor")
+add_custom_command(OUTPUT ${SHUFFLER_PROTO_DESCRIPTOR}
+    COMMAND protoc -I ${CMAKE_SOURCE_DIR}
+                --include_imports
+                --include_source_info ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
+                --descriptor_set_out ${SHUFFLER_PROTO_DESCRIPTOR}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
+)
+
 # Build shuffler executables
 set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
 set(DISPATCHER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher.go")
@@ -172,6 +182,7 @@ add_custom_target(shuffler_all ALL
             ${ENCRYPTED_MESSAGE_UTIL_TEST_BIN}
             ${CONFIG_TEST_BIN}
             ${STORAGE_TEST_BIN}
+            ${SHUFFLER_PROTO_DESCRIPTOR}
 )
 
 # Generate protobuf files prior to compiling anything.  This is needed for

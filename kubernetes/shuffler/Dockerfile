@@ -22,4 +22,4 @@ COPY ${config_file} /etc/cobalt/shuffler_config.txt
 
 ENTRYPOINT ["shuffler"]
 # This port number must match the one used in shuffler_deployment.yaml
-EXPOSE 5001
+EXPOSE 5000
