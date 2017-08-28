@@ -2,6 +2,8 @@
 An extensible, privacy-preserving, user-data analysis pipeline.
 [go/cobalt-for-privacy](https://goto.google.com/cobalt-for-privacy)
 
+[TOC]
+
 ## Requirements
   1. We only develop on Ubuntu Linux. You may or may not have success on other
   systems.
