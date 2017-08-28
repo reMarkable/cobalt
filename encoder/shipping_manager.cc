@@ -11,6 +11,19 @@
 namespace cobalt {
 namespace encoder {
 
+namespace {
+std::string ToString(const std::chrono::system_clock::time_point& t) {
+  std::time_t time_struct = std::chrono::system_clock::to_time_t(t);
+  return std::ctime(&time_struct);
+}
+}  // namespace
+
+// Definition of the static constant declared in shipping_manager.h.
+// This must be less than 2^31. There appears to be a bug in
+// std::condition_variable::wait_for() in which setting the wait time to
+// std::chrono::seconds::max() effectively sets the wait time to zero.
+const std::chrono::seconds ShippingManager::kMaxSeconds(999999999);
+
 ShippingManager::ShippingManager(
     const SizeParams& size_params, const ScheduleParams& schedule_params,
     const EnvelopeMakerParams& envelope_maker_params,
@@ -23,7 +36,9 @@ ShippingManager::ShippingManager(
       schedule_params_(schedule_params),
       envelope_maker_params_(envelope_maker_params),
       send_retryer_params_(send_retryer_params),
-      send_retryer_(send_retryer) {
+      send_retryer_(send_retryer),
+      next_scheduled_send_time_(std::chrono::system_clock::now() +
+                                schedule_params_.schedule_interval_) {
   CHECK(send_retryer);
   _mutex_protected_fields_do_not_access_directly_.active_envelope_maker.reset(
       new EnvelopeMaker(envelope_maker_params.analyzer_public_key_pem_,
@@ -192,6 +207,8 @@ void ShippingManager::Run() {
       locked->fields->idle = false;
     } else {
       auto now = std::chrono::system_clock::now();
+      VLOG(4) << "now: " << ToString(now) << " next_scheduled_send_time_: "
+              << ToString(next_scheduled_send_time_);
       if (next_scheduled_send_time_ <= now ||
           locked->fields->expedited_send_requested) {
         VLOG(4) << "ShippingManager worker: time to send now.";

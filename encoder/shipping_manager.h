@@ -101,11 +101,17 @@ class ShippingManager {
     size_t min_envelope_send_size_;
   };
 
+  // Use this constant instead of std::chrono::seconds::max() in
+  // ScheduleParams below in order to effectively set the wait time to
+  // infinity.
+  static const std::chrono::seconds kMaxSeconds;
+
   // Parameters passed to the ShippingManager constructor that control its
   // behavior with respect to scheduling.
   //
   // schedule_interval: How frequently should ShippingManager perform regular
-  // periodic sends to the Shuffler?
+  // periodic sends to the Shuffler? Set to kMaxSeconds to effectively
+  // disable periodic sends.
   //
   // min_interval: Because of expedited sends, ShippingManager may sometimes
   // send to the Shuffler more frequently than |schedule_interval|. This
@@ -113,13 +119,15 @@ class ShippingManager {
   // sends within a single period of |min_interval| seconds.
   //
   // REQUIRED:
-  // min_interval <= schedule_interval
+  // 0 <= min_interval <= schedule_interval <= kMaxSeconds
   class ScheduleParams {
    public:
     ScheduleParams(std::chrono::seconds schedule_interval,
                    std::chrono::seconds min_interval)
         : schedule_interval_(schedule_interval), min_interval_(min_interval) {
+      CHECK_GE(min_interval.count(), 0);
       CHECK_LE(min_interval_.count(), schedule_interval_.count());
+      CHECK_LE(schedule_interval.count(), kMaxSeconds.count());
     }
 
    private:
@@ -295,9 +303,7 @@ class ShippingManager {
 
   // Variables accessed only by the worker thread. These are not
   // protected by a mutex.
-  std::chrono::system_clock::time_point next_scheduled_send_time_ =
-      std::chrono::system_clock::time_point(
-          std::chrono::system_clock::duration(0));
+  std::chrono::system_clock::time_point next_scheduled_send_time_;
 
   std::deque<std::unique_ptr<EnvelopeMaker>> envelopes_to_send_;
   send_retryer::CancelHandle cancel_handle_;

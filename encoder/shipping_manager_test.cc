@@ -42,10 +42,7 @@ const size_t kMaxBytesTotal = 1000;
 const size_t kMinEnvelopeSendSize = 170;
 const std::chrono::seconds kInitialRpcDeadline(10);
 const std::chrono::seconds kDeadlinePerSendAttempt(60);
-// Note(rudominer) std::condition_variable::wait_for() does not work
-// with the duration std::chrono::seconds::max(). I expected that to
-// cause it to wait forever but instead the wait is over immediately.
-const std::chrono::seconds kVeryLongTime(999999999);
+const std::chrono::seconds kMaxSeconds = ShippingManager::kMaxSeconds;
 
 const char* kMetricConfigText = R"(
 # Metric 1 has one string part.
@@ -175,7 +172,7 @@ class ShippingManagerTest : public ::testing::Test {
 // This tests that the destructor requests that the worker thread terminate
 // and then waits for it to terminate.
 TEST_F(ShippingManagerTest, ConstructAndDestruct) {
-  Init(kVeryLongTime, kVeryLongTime);
+  Init(kMaxSeconds, kMaxSeconds);
 }
 
 // We construct a ShippingManager and add one small Observation to it.
@@ -183,59 +180,56 @@ TEST_F(ShippingManagerTest, ConstructAndDestruct) {
 // destruct it. We test that the Add() returns OK and the destructor
 // succeeds.
 TEST_F(ShippingManagerTest, AddOneObservationAndDestruct) {
-  Init(kVeryLongTime, kVeryLongTime);
+  Init(kMaxSeconds, kMaxSeconds);
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
 }
 
-// After the first Observation is added to a new ShippingManager it will
-// send it soon since it has no record of any previous sends. We Add one
-// Observation and wait for it to be sent and confirm that the call count
-// and observation count are 1.
-TEST_F(ShippingManagerTest, AddFirstObservation) {
+// We add one Observation, confirm that it is not immediately sent,
+// invoke RequestSendSoon, wait for the Observation to be sent, confirm
+// that it was sent.
+TEST_F(ShippingManagerTest, SendOne) {
   // Init with a very long time for the regular schedule interval but
   // zero for the minimum interval so the test doesn't have to wait.
-  Init(kVeryLongTime, std::chrono::seconds::zero());
+  Init(kMaxSeconds, std::chrono::seconds::zero());
   // Add one Observation().
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-  // Wait for it to be sent.
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
 
+  // Confirm it has not been sent yet.
+  CheckCallCount(0, 0);
+
+  // Invoke RequestSendSoon.
+  shipping_manager_->RequestSendSoon();
+
+  // Wait for it to be sent.
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
+
+  // Confirm it has been sent.
   CheckCallCount(1, 1);
 }
 
-// After the first Observation is sent the second Observation will not be
-// sent soon unless RequestSendSoon() is invoked. We Add one Observation,
-// wait for it to be sent, confirm that the call count is one. Then we add
-// a second Observation, confirm that the call count is still one, invoke
-// RequestSendSoon(), wait for the second Observation to be sent and check
-// that the call count and observation count are 2.
-TEST_F(ShippingManagerTest, RequestSendSoon) {
+// We add two Observations, confirm that they are not immediately sent,
+// invoke RequestSendSoon, wait for the Observations to be sent, confirm
+// that they were sent together in a single Envelope.
+TEST_F(ShippingManagerTest, SendTwo) {
   // Init with a very long time for the regular schedule interval but
   // zero for the minimum interval so the test doesn't have to wait.
-  Init(kVeryLongTime, std::chrono::seconds::zero());
+  Init(kMaxSeconds, std::chrono::seconds::zero());
 
-  // Add one observation.
+  // Add two observations.
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
 
-  // Wait for it to be sent.
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
-
-  CheckCallCount(1, 1);
-
-  // Add another Observation.
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-
-  // Confirm that the call count hasn't changed. (Because the second
-  // Observation hasn't been sent yet.)
-  CheckCallCount(1, 1);
+  // Confirm they have not been sent.
+  CheckCallCount(0, 0);
 
   // Request send soon.
   shipping_manager_->RequestSendSoon();
 
-  // Wait for the second Observation to be sent.
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
+  // Wait for both Observations to be sent.
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
-  CheckCallCount(2, 2);
+  // Confirm the two Observations were sent together in a single Envelope.
+  CheckCallCount(1, 2);
 }
 
 // Trys to add an Observation that is too big. Tests that kObservationTooBig
@@ -243,7 +237,7 @@ TEST_F(ShippingManagerTest, RequestSendSoon) {
 TEST_F(ShippingManagerTest, ObservationTooBig) {
   // Init with a very long time for the regular schedule interval but
   // zero for the minimum interval so the test doesn't have to wait.
-  Init(kVeryLongTime, std::chrono::seconds::zero());
+  Init(kMaxSeconds, std::chrono::seconds::zero());
 
   // Add one observation that is too big.
   EXPECT_EQ(ShippingManager::kObservationTooBig, AddObservation(60));
@@ -252,37 +246,31 @@ TEST_F(ShippingManagerTest, ObservationTooBig) {
 // The value of |envelope_send_threshold_size_| is 60% * max_bytes_per_envelope
 // = 60% * 200 = 120 bytes.
 //
-// We prime the pump by sending and waitng for the first observation.
-// Then we add two 40 byte observations and expect them not be be sent.
+// We add two 40 byte observations and expect them not be be sent.
 // Then we add the third 40 byte observation pushing the byte count
 // over the threshold. This triggers RequestSendSoon(). All three
 // 40 byte observations should be sent in one envelope.
 TEST_F(ShippingManagerTest, EnvelopeSendThresholdSize) {
   // Init with a very long time for the regular schedule interval but
   // zero for the minimum interval so the test doesn't have to wait.
-  Init(kVeryLongTime, std::chrono::seconds::zero());
+  Init(kMaxSeconds, std::chrono::seconds::zero());
 
-  // Add one observation.
+  // Add one Observation.
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-
-  // Wait for it to be sent and check the call count.
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
-  CheckCallCount(1, 1);
+  CheckCallCount(0, 0);
 
   // Add another Observation.
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-  CheckCallCount(1, 1);
+  CheckCallCount(0, 0);
 
-  // Add another Observation.
+  // Add another Observation. This pushes us over the threshold.
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-  CheckCallCount(1, 1);
 
-  // Add another Observation.
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
   // Now all Observations should be sent. Wait for them.
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
-  // There should be two sends with a total of 4 Observations.
-  CheckCallCount(2, 4);
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
+
+  // All three Observations should have been sent in a single Envelope.
+  CheckCallCount(1, 3);
 }
 
 // Add multiple Observations and allow them to be sent on the regular
@@ -292,26 +280,19 @@ TEST_F(ShippingManagerTest, ScheduledSend) {
   // does not have to wait.
   Init(std::chrono::seconds::zero(), std::chrono::seconds::zero());
 
-  // Prime the pump by Adding and waiting for the first Observation. The
-  // first Observation is always sent after min_interval.
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
-  CheckCallCount(1, 1);
-
-  // Add two more Observatoins but do not invoke RequestSendSoon() and do
+  // Add two Observations but do not invoke RequestSendSoon() and do
   // not add enough Observations to exceed envelope_send_threshold_size_.
-  // We have to wait 1 second for the next scheduled send time.
   for (int i = 0; i < 2; i++) {
     EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
   }
-  // Wait for the send
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
+  // Wait for the scheduled send
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
-  // We do not check the number of SendRequests() because that depends on the
+  // We do not check the number of sends because that depends on the
   // timing interaction of the test thread and the worker thread and so it
   // would be flaky. Just check that all 3 Observations were sent.
   std::unique_lock<std::mutex> lock(send_retryer_->mutex);
-  EXPECT_EQ(3, send_retryer_->observation_count);
+  EXPECT_EQ(2, send_retryer_->observation_count);
 }
 
 // Tests that if we manage to exceed max_bytes_per_envelope then
@@ -319,7 +300,7 @@ TEST_F(ShippingManagerTest, ScheduledSend) {
 TEST_F(ShippingManagerTest, ExceedMaxBytesPerEnvelope) {
   // We configure the worker thread to not be able to do any work
   // so no sending will occur.
-  Init(kVeryLongTime, kVeryLongTime);
+  Init(kMaxSeconds, kMaxSeconds);
   // Configure the FakeSendRetryer to fail every time.
   {
     std::unique_lock<std::mutex> lock(send_retryer_->mutex);
@@ -340,7 +321,7 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesPerEnvelope) {
 TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
   // Init with a very long time for the regular schedule interval but
   // zero for the minimum interval so the test doesn't have to wait.
-  Init(kVeryLongTime, std::chrono::seconds::zero());
+  Init(kMaxSeconds, std::chrono::seconds::zero());
 
   // Configure the FakeSendRetryer to fail every time.
   {
@@ -357,16 +338,11 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
   // exceed max_bytes_per_envelope_.  Each time we will invoke RequestSendSoon()
   // and then WaitUntilWorkerWaiting() so that we know that between
   // invocations of AddObservtion() the worker thread will complete one
-  // execution of SendAllEnvelopes(). (Note we don't want to call
-  // RequestSendSoon() after the very first invocation of AddObservation()
-  // because the ShippingManager is initially in send-request-soon state
-  // anyway.)
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-  shipping_manager_->WaitUntilWorkerWaiting(kVeryLongTime);
-  for (int i = 0; i < 25; i++) {
+  // execution of SendAllEnvelopes().
+  for (int i = 0; i < 26; i++) {
     EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
     shipping_manager_->RequestSendSoon();
-    shipping_manager_->WaitUntilWorkerWaiting(kVeryLongTime);
+    shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
   }
 
   // We expect there to have been 81 calls to SendRetryer::SendToShuffler()
@@ -410,7 +386,7 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
 
   // Send all of the accumulated Observations.
   shipping_manager_->RequestSendSoon();
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
   // All 26 successfully-added Observations should have been sent in six
   // envelopes
@@ -419,7 +395,7 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
   // Now we can add a 27th Observation and send it.
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
   shipping_manager_->RequestSendSoon();
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
   CheckCallCount(7, 27);
 }
 
@@ -428,7 +404,7 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
 TEST_F(ShippingManagerTest, TotalBytesSendThreshold) {
   // Init with a very long time for the regular schedule interval but
   // zero for the minimum interval so the test doesn't have to wait.
-  Init(kVeryLongTime, std::chrono::seconds::zero());
+  Init(kMaxSeconds, std::chrono::seconds::zero());
 
   // Configure the FakeSendRetryer to fail every time so that we can accumulate
   // Observation data in memory.
@@ -446,16 +422,11 @@ TEST_F(ShippingManagerTest, TotalBytesSendThreshold) {
   // exceed max_bytes_per_envelope_.  Each time we will invoke RequestSendSoon()
   // and then WaitUntilWorkerWaiting() so that we know that between
   // invocations of AddObservtion() the worker thread will complete one
-  // execution of SendAllEnvelopes(). (Note we don't want to call
-  // RequestSendSoon() after the very first invocation of AddObservation()
-  // because the ShippingManager is initially in send-request-soon state
-  // anyway.)
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-  shipping_manager_->WaitUntilWorkerWaiting(kVeryLongTime);
-  for (int i = 0; i < 14; i++) {
+  // execution of SendAllEnvelopes().
+  for (int i = 0; i < 15; i++) {
     EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
     shipping_manager_->RequestSendSoon();
-    shipping_manager_->WaitUntilWorkerWaiting(kVeryLongTime);
+    shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
   }
 
   // We expect there to have been 30 calls to SendRetryer::SendToShuffler()
@@ -495,7 +466,7 @@ TEST_F(ShippingManagerTest, TotalBytesSendThreshold) {
   // now is because we are exceeding total_bytes_send_threshold_.
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
 
-  shipping_manager_->WaitUntilIdle(kVeryLongTime);
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
   // All 16 Observations should have been sent in 4 envelopes as {5, 5, 5, 1}.
   CheckCallCount(4, 16);
