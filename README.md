@@ -553,12 +553,12 @@ the test app, the observation querier and the report client.
 ## Managing Production Clusters
 In addition to developers' personal clusters Cobalt also has production
 clusters. As of this writing there is exactly one production cluster called
-`fuchsia-cobalt-us-central1-b` because it is used to run Cobalt for Fuchsia
-and it is located in the us-central1-b zone.
+`fuchsia-cobalt-us-central1-c` because it is used to run Cobalt for Fuchsia
+and it is located in the us-central1-c zone.
 
 In the `production` directory there are sub-directories corresponding to
 each of the production clusters. For example as of this writing there is
-a directory called `production/fuchsia-cobalt-us-central1-b`.
+a directory called `production/fuchsia-cobalt-us-central1-c`.
 
 Several of the operations described above pertaining to a developer's personal
 cluster are also applicable to a Cobalt production cluster. To manage
@@ -570,20 +570,17 @@ production cluster you wish to manage.
 Similar to the `personal_cluster.json` for personal clusters described
 above, there is a file called `cluster.json` located in each of the
 production directories. For example, as of this writing, there is a file
-called `production/fuchsia-cobalt-us-central1-b/cluster.json` with the
+called `production/fuchsia-cobalt-us-central1-c/cluster.json` with the
 following contents:
 
 ```
 {
-  "cloud_project_prefix": "google.com",
   "cloud_project_name": "fuchsia-cobalt",
   "cluster_name": "cobalt",
-  "cluster_zone": "us-central1-b",
+  "cluster_zone": "us-central1-c",
   "gce_pd_name": "cobalt",
   "bigtable_instance_name": "cobalt",
-  "shuffler_static_ip" : "130.211.218.95",
-  "report_master_static_ip" : "35.188.119.76",
-  "analyzer_service_static_ip" : "35.184.165.233",
+  "shuffler_static_ip" : 130.211.188.46,
   "shuffler_config_file" : "shuffler/src/shuffler_config/config_v0.txt",
   "cobalt_config_dir" : "config/production",
   "shuffler_use_memstore" : "true"
@@ -614,6 +611,15 @@ deployed with clients that will access the production cluster.
 `./cobaltb.py --production_dir=<production_dir> deploy authenticate`
 Run this one time in order to register the production cluster within the
 Kubernets configuration file on your computer.
+
+`./cobaltb.py --production_dir=<production_dir> deploy upload_secret_keys`
+The current procedure, which will likely change in the future, is for the
+developer who first creates the production cluster to upload the PEM files
+containing the Analyzer's and Shuffler's private keys. These are the files
+*analyzer_private.pem* and *shuffler_private.pem* that were created in the
+section **Generating PEM Files** above. To upload different private keys,
+first delete any previously upload secret keys by running
+`./cobaltb.py --production_dir=<production_dir> deploy delete_secret_keys`
 
 `./cobaltb.py --production_dir=<production_dir> deploy build`
 Run this to build Docker containers for the Shuffler, Analyzer Service and
@@ -652,15 +658,6 @@ Kubernetes entities that were started by the corresponding *start* command.
 Run this in order to see the list of running jobs and their
 externally facing IP addresses and ports.
 
-`./cobaltb.py --production_dir=<production_dir> deploy upload_secret_keys`
-The current procedure, which will likely change in the future, is for the
-developer who first creates the production cluster to upload the PEM files
-containing the Analyzer's and Shuffler's private keys. These are the files
-*analyzer_private.pem* and *shuffler_private.pem* that were created in the
-section **Generating PEM Files** above. To upload different private keys,
-first delete any previously upload secret keys by running
-`./cobaltb.py --production_dir=<production_dir> deploy delete_secret_keys`
-
 ### Managing Production Bigtable
 
 This section describes how to manage Cobalt's production Bigtable instances.
@@ -676,9 +673,9 @@ have permission to access the production project.)
 * Instead of creating a file in the root directory called
 `personal_bt_admin_service_account.json`, create a file in the appropriate
 production directory called `bt_admin_service_account.json`. For example for
-the Cobalt instance `fuchsia-cobalt-us-central1-b` described above you would
+the Cobalt instance `fuchsia-cobalt-us-central1-c` described above you would
 create the file
-`production/fuchsia-cobalt-us-central1-b/bt_admin_service_account.json`.
+`production/fuchsia-cobalt-us-central1-c/bt_admin_service_account.json`.
 
 The script `cobaltb.py` sets the environment variable
 `GOOGLE_APPLICATION_CREDENTIALS` equal to the path to
