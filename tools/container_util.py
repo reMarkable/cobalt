@@ -515,7 +515,11 @@ def display(cloud_project_prefix, cloud_project_name, cluster_zone,
             cluster_name):
    context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
+   print "Kubernetes Services"
+   print "-------------------"
    subprocess.check_call(["kubectl", "get", "services", "--context", context])
+   print "Google Cloud Endpoints"
+   print "----------------------"
    subprocess.check_call(["gcloud", "service-management", "list", "--produced",
      "--project",
      compound_project_name(cloud_project_prefix, cloud_project_name)])
