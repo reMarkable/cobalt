@@ -41,13 +41,13 @@ bool ShouldRetry(const grpc::Status& status) {
 
 }  // namespace
 
-CancelHandle::CancelHandle() : context_(new grpc::ClientContext()) {}
-
 void CancelHandle::TryCancel() {
   std::lock_guard<std::mutex> lock(mutex_);
   cancelled_ = true;
   cancel_notifier_.notify_all();
-  context_->TryCancel();
+  if (context_) {
+    context_->TryCancel();
+  }
 }
 
 SendRetryer::SendRetryer(ShufflerClientInterface* shuffler_client)
@@ -88,19 +88,25 @@ grpc::Status SendRetryer::SendToShuffler(
   std::chrono::milliseconds sleep_between_attempts = initial_sleep_;
 
   // The retry loop.
+  grpc::ClientContext* client_context;
   while (true) {
     {
-      // Quit now if we were cancelled.
       std::lock_guard<std::mutex> lock(cancel_handle->mutex_);
+
+      // Quit now if we were cancelled.
       if (cancel_handle->cancelled_) {
         return grpc::Status(grpc::CANCELLED, "Cancelled from CancelHandle.");
       }
+
+      // We need a new ClientContext for every request.
+      cancel_handle->context_.reset(new grpc::ClientContext());
+      client_context = cancel_handle->context_.get();
     }
 
     // Attempt the RPC.
-    cancel_handle->context_->set_deadline(clock_->now() + rpc_deadline);
-    auto status = shuffler_client_->SendToShuffler(
-        encrypted_message, cancel_handle->context_.get());
+    client_context->set_deadline(clock_->now() + rpc_deadline);
+    auto status =
+        shuffler_client_->SendToShuffler(encrypted_message, client_context);
 
     // If the RPC succeeded or failed with a non-retryable error then we
     // are done.
@@ -187,9 +193,6 @@ grpc::Status SendRetryer::SendToShuffler(
 
     // Exponential backoff.
     sleep_between_attempts *= 2;
-
-    // We are going to retry. Make a new grpc::ClientContext.
-    cancel_handle->context_.reset(new grpc::ClientContext());
   }
 }
 

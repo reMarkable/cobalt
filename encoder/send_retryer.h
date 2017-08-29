@@ -98,8 +98,6 @@ class SendRetryer : public SendRetryerInterface {
 // An object that provides a way to cancel an invocation of SendToShuffler().
 class CancelHandle {
  public:
-  CancelHandle();
-
   // Attempt to cancel the call. This may or may not succeed depending on
   // the current state of the call. If the Retryer is currently blocked
   // waiting for a retry then this will succeed. If a gRPC call is in-flight
