@@ -496,6 +496,9 @@ and Shuffler's private keys. These are the files *analyzer_private.pem* and
 first delete any previously upload secret keys by running
 `./cobaltb.py deploy delete_secret_keys`
 
+`./cobaltb.py deploy addresses`
+Run this one time to provision static IPs for the Cobalt jobs.
+
 `./cobaltb.py deploy endpoint --job=report-master`
 Run this one time to configure the Cloud Endpoint. If you run this multiple
 times, it will upload multiple copies of the Cloud Endpoint configuration but

@@ -542,6 +542,10 @@ def _deploy_endpoint(args):
     print('Unknown job "%s". I only know how to configure endpoints for the '
           '"report-master".' % args.job)
 
+def _deploy_addresses(args):
+  container_util.reserve_static_ip_addresses(args.cloud_project_prefix,
+      args.cloud_project_name, args.cluster_zone)
+
 def _default_shuffler_config_file(cluster_settings):
   if cluster_settings['shuffler_config_file'] :
     return  os.path.join(THIS_DIR, cluster_settings['shuffler_config_file'])
@@ -1198,6 +1202,12 @@ def main():
   sub_parser.add_argument('--job',
       help='The job whose Cloud Endpoint you wish to configure. Valid choices: '
            '"report-master", "shuffler". Required.')
+
+  sub_parser = deploy_subparsers.add_parser('addresses',
+      parents=[parent_parser],
+      help='Reserves static ip addresses for all the Cobalt jobs.')
+  _add_cloud_access_args(sub_parser, cluster_settings)
+  sub_parser.set_defaults(func=_deploy_addresses)
 
   args = parser.parse_args()
   global _verbose_count

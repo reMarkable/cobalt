@@ -95,6 +95,12 @@ SHUFFLER_ENDPOINT_CONFIG_FILE = os.path.join(KUBE_OUT_DIR,
 SHUFFLER_PROTO_DESCRIPTOR = os.path.join(OUT_DIR, 'shuffler',
     'shuffler.descriptor')
 
+# Static IP Names.
+REPORT_MASTER_STATIC_IP_NAME = 'report-master'
+SHUFFLER_STATIC_IP_NAME = 'shuffler-service'
+ANALYZER_STATIC_IP_NAME = 'analyzer-service'
+
+
 # Docker image deployment directories
 COBALT_COMMON_DOCKER_BUILD_DIR = os.path.join(KUBE_OUT_DIR,
     'cobalt_common')
@@ -378,6 +384,9 @@ def start_analyzer_service(cloud_project_prefix,
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
 
+  if not static_ip_address:
+    static_ip_address = _get_analyzer_static_ip(
+        cloud_project_prefix, cloud_project_name)
   # If a static ip address is not proviced, then delete the static IP specifier
   # from the descriptor.
   if not static_ip_address:
@@ -425,6 +434,9 @@ def start_report_master(cloud_project_prefix,
   endpoint_config_id = _get_endpoint_config_id(cloud_project_prefix,
       cloud_project_name, endpoint_name)
 
+  if not static_ip_address:
+    static_ip_address = _get_report_master_static_ip(
+        cloud_project_prefix, cloud_project_name)
   # If a static ip address is not proviced, then delete the static IP specifier
   # from the descriptor.
   if not static_ip_address:
@@ -478,6 +490,9 @@ def start_shuffler(cloud_project_prefix,
   endpoint_config_id = _get_endpoint_config_id(cloud_project_prefix,
       cloud_project_name, endpoint_name)
 
+  if not static_ip_address:
+    static_ip_address = _get_shuffler_static_ip(
+        cloud_project_prefix, cloud_project_name)
   # If a static ip address is not proviced, then delete the static IP specifier
   # from the descriptor.
   if not static_ip_address:
@@ -621,6 +636,9 @@ def _configure_endpoint(cloud_project_prefix, cloud_project_name,
 
 def configure_report_master_endpoint(cloud_project_prefix, cloud_project_name,
                                      static_ip_address):
+  if not static_ip_address:
+    static_ip_address = _get_report_master_static_ip(cloud_project_prefix,
+        cloud_project_name)
   endpoint_name = _build_report_master_endpoint_name(
       cloud_project_prefix, cloud_project_name)
   _configure_endpoint(cloud_project_prefix, cloud_project_name, endpoint_name,
@@ -629,11 +647,46 @@ def configure_report_master_endpoint(cloud_project_prefix, cloud_project_name,
 
 def configure_shuffler_endpoint(cloud_project_prefix, cloud_project_name,
                                 static_ip_address):
+  if not static_ip_address:
+    static_ip_address = _get_shuffler_static_ip(cloud_project_prefix,
+        cloud_project_name)
   endpoint_name = _build_shuffler_endpoint_name(
       cloud_project_prefix, cloud_project_name)
   _configure_endpoint(cloud_project_prefix, cloud_project_name, endpoint_name,
       static_ip_address, SHUFFLER_ENDPOINT_CONFIG_TEMPLATE_FILE,
       SHUFFLER_ENDPOINT_CONFIG_FILE, SHUFFLER_PROTO_DESCRIPTOR)
+
+def reserve_static_ip_addresses(cloud_project_prefix, cloud_project_name,
+                                cluster_zone):
+  project_name = compound_project_name(cloud_project_prefix, cloud_project_name)
+  # The format for a zone name is: '<region>-<zone>'. For instance:
+  # zone: us-central1-a
+  # region: us-central1
+  # We extract the region since the IPs should be located in the same region as
+  # the cluster.
+  region = '-'.join(cluster_zone.split('-')[:-1])
+  subprocess.check_call(["gcloud", "compute", "addresses", "create",
+    REPORT_MASTER_STATIC_IP_NAME, SHUFFLER_STATIC_IP_NAME, "--project",
+    project_name, "--region", region])
+
+def _get_static_ips(cloud_project_prefix, cloud_project_name):
+  project_name = compound_project_name(cloud_project_prefix, cloud_project_name)
+  ip_list_json = subprocess.check_output(["gcloud", "compute", "addresses",
+    "list", "--project", project_name, "--format", "json"])
+  ip_list = json.loads(ip_list_json)
+  return { ip['name']: ip['address'] for ip in ip_list }
+
+def _get_report_master_static_ip(cloud_project_prefix, cloud_project_name):
+  ips = _get_static_ips(cloud_project_prefix, cloud_project_name)
+  return ips.get(REPORT_MASTER_STATIC_IP_NAME)
+
+def _get_shuffler_static_ip(cloud_project_prefix, cloud_project_name):
+  ips = _get_static_ips(cloud_project_prefix, cloud_project_name)
+  return ips.get(SHUFFLER_STATIC_IP_NAME)
+
+def _get_analyzer_static_ip(cloud_project_prefix, cloud_project_name):
+  ips = _get_static_ips(cloud_project_prefix, cloud_project_name)
+  return ips.get(ANALYZER_STATIC_IP_NAME)
 
 
 def main():
