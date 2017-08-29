@@ -168,6 +168,26 @@ void ShippingManager::ShutDown() {
   VLOG(4) << "ShippingManager: shut-down requested.";
 }
 
+std::unique_ptr<EnvelopeMaker> ShippingManager::TakeActiveEnvelopeMaker() {
+  auto locked = lock();
+  return TakeActiveEnvelopeMakerLockHeld(locked->fields);
+}
+
+size_t ShippingManager::num_send_attempts() {
+  auto locked = lock();
+  return locked->fields->num_send_attempts;
+}
+
+size_t ShippingManager::num_failed_attempts() {
+  auto locked = lock();
+  return locked->fields->num_failed_attempts;
+}
+
+grpc::Status ShippingManager::last_send_status() {
+  auto locked = lock();
+  return locked->fields->last_send_status;
+}
+
 void ShippingManager::Run() {
   while (true) {
     auto locked = lock();
@@ -238,8 +258,8 @@ void ShippingManager::Run() {
 }
 
 // A lock on mutex_ should be held by the caller.
-void ShippingManager::PrepareForSendLockHeld(MutexProtectedFields* fields) {
-  fields->expedited_send_requested = false;
+std::unique_ptr<EnvelopeMaker> ShippingManager::TakeActiveEnvelopeMakerLockHeld(
+    MutexProtectedFields* fields) {
   std::unique_ptr<EnvelopeMaker> latest_envelope_maker(
       new EnvelopeMaker(envelope_maker_params_.analyzer_public_key_pem_,
                         envelope_maker_params_.analyzer_scheme_,
@@ -248,6 +268,13 @@ void ShippingManager::PrepareForSendLockHeld(MutexProtectedFields* fields) {
                         size_params_.max_bytes_per_observation_,
                         size_params_.max_bytes_per_envelope_));
   fields->active_envelope_maker.swap(latest_envelope_maker);
+  return latest_envelope_maker;
+}
+
+// A lock on mutex_ should be held by the caller.
+void ShippingManager::PrepareForSendLockHeld(MutexProtectedFields* fields) {
+  fields->expedited_send_requested = false;
+  auto latest_envelope_maker = TakeActiveEnvelopeMakerLockHeld(fields);
   fields->envelopes_to_send_total_bytes += latest_envelope_maker->size();
   envelopes_to_send_.emplace_front(std::move(latest_envelope_maker));
 }
@@ -307,13 +334,22 @@ void ShippingManager::SendOneEnvelope(
       send_retryer_params_.initial_rpc_deadline_,
       send_retryer_params_.deadline_per_send_attempt_, &cancel_handle_,
       encrypted_envelope);
+  {
+    auto locked = lock();
+    locked->fields->num_send_attempts++;
+    if (!status.ok()) {
+      locked->fields->num_failed_attempts++;
+    }
+    locked->fields->last_send_status = status;
+  }
   if (status.ok()) {
     VLOG(4) << "ShippingManager::SendOneEnvelope: OK";
     return;
   }
 
-  VLOG(4) << "ShippingManager::SendOneEnvelope failed: (" << status.error_code()
-          << ") " << status.error_message();
+  VLOG(1) << "Cobalt send to Shuffler failed: (" << status.error_code() << ") "
+          << status.error_message()
+          << ". Observations have been re-enqueued for later.";
   envelopes_that_failed->emplace_back(std::move(envelope_to_send));
 }
 

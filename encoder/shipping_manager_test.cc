@@ -204,6 +204,9 @@ TEST_F(ShippingManagerTest, SendOne) {
   shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
   // Confirm it has been sent.
+  EXPECT_EQ(1u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(0u, shipping_manager_->num_failed_attempts());
+  EXPECT_EQ(grpc::OK, shipping_manager_->last_send_status().error_code());
   CheckCallCount(1, 1);
 }
 
@@ -229,6 +232,9 @@ TEST_F(ShippingManagerTest, SendTwo) {
   shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
   // Confirm the two Observations were sent together in a single Envelope.
+  EXPECT_EQ(1u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(0u, shipping_manager_->num_failed_attempts());
+  EXPECT_EQ(grpc::OK, shipping_manager_->last_send_status().error_code());
   CheckCallCount(1, 2);
 }
 
@@ -270,6 +276,9 @@ TEST_F(ShippingManagerTest, EnvelopeSendThresholdSize) {
   shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
   // All three Observations should have been sent in a single Envelope.
+  EXPECT_EQ(1u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(0u, shipping_manager_->num_failed_attempts());
+  EXPECT_EQ(grpc::OK, shipping_manager_->last_send_status().error_code());
   CheckCallCount(1, 3);
 }
 
@@ -293,6 +302,7 @@ TEST_F(ShippingManagerTest, ScheduledSend) {
   // would be flaky. Just check that all 3 Observations were sent.
   std::unique_lock<std::mutex> lock(send_retryer_->mutex);
   EXPECT_EQ(2, send_retryer_->observation_count);
+  EXPECT_EQ(grpc::OK, shipping_manager_->last_send_status().error_code());
 }
 
 // Tests that if we manage to exceed max_bytes_per_envelope then
@@ -301,11 +311,6 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesPerEnvelope) {
   // We configure the worker thread to not be able to do any work
   // so no sending will occur.
   Init(kMaxSeconds, kMaxSeconds);
-  // Configure the FakeSendRetryer to fail every time.
-  {
-    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
-    send_retryer_->status_to_return = grpc::Status::CANCELLED;
-  }
   // We can add 5 40-byte Observations.
   for (int i = 0; i < 5; i++) {
     EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
@@ -343,6 +348,11 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
     EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
     shipping_manager_->RequestSendSoon();
     shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
+    EXPECT_TRUE(shipping_manager_->num_send_attempts() > (size_t)i);
+    EXPECT_EQ(shipping_manager_->num_send_attempts(),
+              shipping_manager_->num_failed_attempts());
+    EXPECT_EQ(grpc::CANCELLED,
+              shipping_manager_->last_send_status().error_code());
   }
 
   // We expect there to have been 81 calls to SendRetryer::SendToShuffler()
@@ -370,6 +380,8 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
   // {5, 5, 5, 5, 1} ... {5, 5, 5, 5, 5}
   // {5, 5, 5, 5, 5, 1}
   CheckCallCount(81, 351);
+  EXPECT_EQ(81u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(81u, shipping_manager_->num_failed_attempts());
 
   // Now attempt to add a 27th Observation and expected to get kFull because
   // we have exceeded max_bytes_total.
@@ -391,12 +403,18 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
   // All 26 successfully-added Observations should have been sent in six
   // envelopes
   CheckCallCount(6, 26);
+  EXPECT_EQ(grpc::OK, shipping_manager_->last_send_status().error_code());
+  EXPECT_EQ(87u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(81u, shipping_manager_->num_failed_attempts());
 
   // Now we can add a 27th Observation and send it.
   EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
   shipping_manager_->RequestSendSoon();
   shipping_manager_->WaitUntilIdle(kMaxSeconds);
   CheckCallCount(7, 27);
+  EXPECT_EQ(grpc::OK, shipping_manager_->last_send_status().error_code());
+  EXPECT_EQ(88u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(81u, shipping_manager_->num_failed_attempts());
 }
 
 // Tests that when the total amount of accumulated Observation data exceeds

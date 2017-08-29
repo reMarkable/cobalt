@@ -260,6 +260,16 @@ class ShippingManager {
   // that state to never be entered.
   void WaitUntilWorkerWaiting(std::chrono::seconds max_wait);
 
+  // Returns the active EnvelopeMaker via move leaving the active EnvelopeMaker
+  // empty. This method is most likely only useful in a test.
+  std::unique_ptr<EnvelopeMaker> TakeActiveEnvelopeMaker();
+
+  // These diagnostic stats are mostly useful in a testing environment but
+  // may possibly prove useful in production also.
+  size_t num_send_attempts();
+  size_t num_failed_attempts();
+  grpc::Status last_send_status();
+
  private:
   // Has the ShippingManager been shut down?
   bool shut_down();
@@ -344,6 +354,12 @@ class ShippingManager {
     bool idle = true;
     bool waiting_for_schedule = true;
 
+    // These diagnostic stats are mostly useful in a testing environment but
+    // may possibly prove useful in production also.
+    size_t num_send_attempts = 0;
+    size_t num_failed_attempts = 0;
+    grpc::Status last_send_status;
+
     std::condition_variable add_observation_notifier;
     std::condition_variable expedited_send_notifier;
     std::condition_variable shutdown_notifier;
@@ -377,6 +393,11 @@ class ShippingManager {
     return std::unique_ptr<LockedFields>(
         new LockedFields(&_mutex_protected_fields_do_not_access_directly_));
   }
+
+  // Does the work of TakeActiveEnvelopeMaker() and assumes that the
+  // fields->mutex lock is held.
+  std::unique_ptr<EnvelopeMaker> TakeActiveEnvelopeMakerLockHeld(
+      MutexProtectedFields* fields);
 
   // Does the work of RequestSendSoon() and assumes that the fields->mutex lock
   // is held.
