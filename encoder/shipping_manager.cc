@@ -318,7 +318,8 @@ void ShippingManager::SendOneEnvelope(
     }
     envelope_to_send_size = envelope_to_send->size();
   }
-  if (!envelope_to_send) {
+  if (!envelope_to_send || envelope_to_send_size == 0) {
+    VLOG(3) << "ShippingManager worker: There are no Observations to send.";
     return;
   }
   EncryptedMessage encrypted_envelope;

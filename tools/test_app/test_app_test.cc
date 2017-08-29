@@ -32,6 +32,7 @@ using config::EncodingRegistry;
 using config::MetricRegistry;
 using encoder::EnvelopeMaker;
 using encoder::ProjectContext;
+using encoder::ShufflerClientInterface;
 
 namespace {
 const uint32_t kCustomerId = 1;
@@ -209,18 +210,32 @@ std::shared_ptr<ProjectContext> GetTestProject() {
       kCustomerId, kProjectId, metric_registry, encoding_registry));
 }
 
-// An implementation of EnvelopeSenderInterface that just stores the
-// arguments for inspection by a test.
-class FakeEnvelopeSender : public EnvelopeSenderInterface {
+// An implementation of AnalyzerClientInterface that just stores the
+// Envelope for inspection by a test.
+class FakeAnalyzerClient : public AnalyzerClientInterface {
  public:
-  void Send(const EnvelopeMaker& envelope_maker, bool skip_shuffler) override {
+  void SendToAnalyzer(const Envelope& e) override {
     // Copy the EnvelopeMaker's Envelope.
-    envelope = Envelope(envelope_maker.envelope());
-    this->skip_shuffler = skip_shuffler;
+    envelope = e;
   }
-
-  bool skip_shuffler;
   Envelope envelope;
+};
+
+// An implementation of ShufflerClientInterface that just stores the
+// Envelope for inspection by a test.
+class FakeShufflerClient : public ShufflerClientInterface {
+ public:
+  FakeShufflerClient() : decrypter_("") {}
+
+  grpc::Status SendToShuffler(const EncryptedMessage& encrypted_message,
+                              grpc::ClientContext* context = nullptr) override {
+    EXPECT_TRUE(decrypter_.DecryptMessage(encrypted_message, &envelope));
+    return grpc::Status::OK;
+  }
+  Envelope envelope;
+
+ private:
+  cobalt::util::MessageDecrypter decrypter_;
 };
 
 // Parses the |ciphertext| field of the given EncryptedMessage assuming
@@ -238,9 +253,11 @@ Observation ParseUnencryptedObservation(const EncryptedMessage& em) {
 class TestAppTest : public ::testing::Test {
  public:
   TestAppTest()
-      : fake_sender_(new FakeEnvelopeSender()),
-        test_app_(GetTestProject(), fake_sender_, "", EncryptedMessage::NONE,
-                  "", EncryptedMessage::NONE, &output_stream_) {}
+      : fake_analyzer_client_(new FakeAnalyzerClient()),
+        fake_shuffler_client_(new FakeShufflerClient()),
+        test_app_(GetTestProject(), fake_analyzer_client_,
+                  fake_shuffler_client_, "", EncryptedMessage::NONE, "",
+                  EncryptedMessage::NONE, &output_stream_) {}
 
  protected:
   // Clears the contents of the TestApp's output stream and returns the
@@ -260,8 +277,8 @@ class TestAppTest : public ::testing::Test {
   // Is the TestApp's output stream curently empty?
   bool NoOutput() { return output_stream_.str().empty(); }
 
-  // The FakeEnvelpeSender that the TestApp has been given.
-  std::shared_ptr<FakeEnvelopeSender> fake_sender_;
+  std::shared_ptr<FakeAnalyzerClient> fake_analyzer_client_;
+  std::shared_ptr<FakeShufflerClient> fake_shuffler_client_;
 
   // The output stream that the TestApp has been given.
   std::ostringstream output_stream_;
@@ -480,9 +497,8 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSend) {
   EXPECT_TRUE(test_app_.ProcessCommandLine("encode 20 www.BBBB"));
   EXPECT_TRUE(test_app_.ProcessCommandLine("send"));
   EXPECT_TRUE(NoOutput());
-  EXPECT_FALSE(fake_sender_->skip_shuffler);
   // The received envelope should contain 1 batch.
-  Envelope& envelope = fake_sender_->envelope;
+  Envelope& envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(1, envelope.batch_size());
   // That batch should contain 39 messages.
   const ObservationBatch& batch = envelope.batch(0);
@@ -511,9 +527,8 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSend) {
   EXPECT_TRUE(test_app_.ProcessCommandLine("encode 200 9"));
   EXPECT_TRUE(test_app_.ProcessCommandLine("send"));
   EXPECT_TRUE(NoOutput());
-  EXPECT_TRUE(fake_sender_->skip_shuffler);
   // The received envelope should contain 1 batch.
-  envelope = fake_sender_->envelope;
+  envelope = fake_analyzer_client_->envelope;
   ASSERT_EQ(1, envelope.batch_size());
   // That batch should contain 300 messages.
   const ObservationBatch& batch2 = envelope.batch(0);
@@ -542,9 +557,8 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSend) {
   EXPECT_TRUE(test_app_.ProcessCommandLine("encode 200 index=1"));
   EXPECT_TRUE(test_app_.ProcessCommandLine("send"));
   EXPECT_TRUE(NoOutput());
-  EXPECT_TRUE(fake_sender_->skip_shuffler);
   // The received envelope should contain 1 batch.
-  envelope = fake_sender_->envelope;
+  envelope = fake_analyzer_client_->envelope;
   ASSERT_EQ(1, envelope.batch_size());
   // That batch should contain 300 messages.
   const ObservationBatch& batch3 = envelope.batch(0);
@@ -568,9 +582,8 @@ TEST_F(TestAppTest, ProcessCommandLineMultiEncodeAndSend) {
   EXPECT_TRUE(test_app_.ProcessCommandLine("encode 20 url:www.BBBB:1"));
   EXPECT_TRUE(test_app_.ProcessCommandLine("send"));
   EXPECT_TRUE(NoOutput());
-  EXPECT_FALSE(fake_sender_->skip_shuffler);
   // The received envelope should contain 1 batch.
-  Envelope& envelope = fake_sender_->envelope;
+  Envelope& envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(1, envelope.batch_size());
   // That batch should contain 39 messages.
   const ObservationBatch& batch = envelope.batch(0);
@@ -600,9 +613,7 @@ TEST_F(TestAppTest, ProcessCommandLineMultiEncodeAndSend) {
   // Send
   EXPECT_TRUE(test_app_.ProcessCommandLine("send"));
   EXPECT_TRUE(NoOutput());
-  EXPECT_FALSE(fake_sender_->skip_shuffler);
-
-  envelope = fake_sender_->envelope;
+  envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(1, envelope.batch_size());
   // That batch should contain 300 messages.
   const ObservationBatch& batch2 = envelope.batch(0);
@@ -643,9 +654,8 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSendMulti) {
   EXPECT_TRUE(test_app_.ProcessCommandLine("send"));
   EXPECT_TRUE(NoOutput());
 
-  EXPECT_FALSE(fake_sender_->skip_shuffler);
   // The received envelope should contain 2 batches.
-  Envelope& envelope = fake_sender_->envelope;
+  Envelope& envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(2, envelope.batch_size());
 
   // The first batch should contain 39 messages.
@@ -695,10 +705,9 @@ TEST_F(TestAppTest, RunSendAndQuit) {
   FLAGS_values = "fruit:apple:3,rating:10:4";
   test_app_.Run();
   EXPECT_TRUE(NoOutput());
-  EXPECT_FALSE(fake_sender_->skip_shuffler);
 
   // The envelope should contain a single batch.
-  Envelope& envelope = fake_sender_->envelope;
+  Envelope& envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(1, envelope.batch_size());
 
   // That batch should contain 31 messages.
@@ -726,42 +735,42 @@ TEST_F(TestAppTest, RunSendAndQuitBad) {
   FLAGS_values = "fruits:apple:3,rating:10:4";
   test_app_.Run();
   // The envelope should be empty.
-  Envelope& envelope = fake_sender_->envelope;
+  Envelope& envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(0, envelope.batch_size());
 
   // Misspell "apple"
   FLAGS_values = "fruit:apples:3,rating:10:4";
   test_app_.Run();
   // The envelope should be empty.
-  envelope = fake_sender_->envelope;
+  envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(0, envelope.batch_size());
 
   // Write "x" in place of "3"
   FLAGS_values = "fruit:apple:x,rating:10:4";
   test_app_.Run();
   // The envelope should be empty.
-  envelope = fake_sender_->envelope;
+  envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(0, envelope.batch_size());
 
   // Write "-3" in place of "3"
   FLAGS_values = "fruit:apple:-3,rating:10:4";
   test_app_.Run();
   // The envelope should be empty.
-  envelope = fake_sender_->envelope;
+  envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(0, envelope.batch_size());
 
   // Miss the comma.
   FLAGS_values = "fruit:apple:3 rating:10:4";
   test_app_.Run();
   // The envelope should be empty.
-  envelope = fake_sender_->envelope;
+  envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(0, envelope.batch_size());
 
   // Miss the third part of the second triple
   FLAGS_values = "fruit:apple:3,rating:10:";
   test_app_.Run();
   // The envelope should be empty.
-  envelope = fake_sender_->envelope;
+  envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(0, envelope.batch_size());
 }
 

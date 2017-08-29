@@ -46,7 +46,9 @@ using encoder::Encoder;
 using encoder::EnvelopeMaker;
 using encoder::ProjectContext;
 using encoder::send_retryer::SendRetryer;
+using encoder::ShippingManager;
 using encoder::ShufflerClient;
+using encoder::ShufflerClientInterface;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -112,6 +114,13 @@ DEFINE_string(
     " encode and the encodings to use.");
 
 namespace {
+
+const size_t kMaxBytesPerObservation = 100 * 1024;
+const size_t kMaxBytesPerEnvelope = 1024 * 1024;
+const size_t kMaxBytesTotal = 10 * 1024 * 1024;
+const size_t kMinEnvelopeSendSize = 1024;
+const std::chrono::seconds kInitialRpcDeadline(FLAGS_deadline_seconds);
+const std::chrono::seconds kDeadlinePerSendAttempt(60);
 
 // Prints help for the interactive mode.
 void PrintHelp(std::ostream* ostream) {
@@ -287,30 +296,18 @@ std::shared_ptr<grpc::ChannelCredentials> CreateChannelCredentials(
 
 }  // namespace
 
-// An implementation of EnvelopeSenderInterface that actually sends Envelopes.
-class EnvelopeSender : public EnvelopeSenderInterface {
+// An implementation of AnalyzerClientInterface that actually sends Envelopes.
+class AnalyzerClient : public AnalyzerClientInterface {
  public:
   // The mode is used only to determine whether to print error messages to
   // the logs or the the console.
-  EnvelopeSender(std::unique_ptr<analyzer::Analyzer::Stub> analyzer_client,
-                 std::unique_ptr<encoder::ShufflerClient> shuffler_client,
+  AnalyzerClient(std::unique_ptr<analyzer::Analyzer::Stub> analyzer_stub,
                  TestApp::Mode mode)
-      : analyzer_client_(std::move(analyzer_client)),
-        shuffler_client_(std::move(shuffler_client)),
-        send_retryer_(new SendRetryer(shuffler_client_.get())),
-        mode_(mode) {}
-
-  void Send(const EnvelopeMaker& envelope_maker, bool skip_shuffler) override {
-    if (skip_shuffler) {
-      SendToAnalyzer(envelope_maker);
-    } else {
-      SendToShuffler(envelope_maker);
-    }
-  }
+      : analyzer_stub_(std::move(analyzer_stub)), mode_(mode) {}
 
  private:
-  void SendToAnalyzer(const EnvelopeMaker& envelope_maker) {
-    if (!analyzer_client_) {
+  void SendToAnalyzer(const Envelope& envelope) {
+    if (!analyzer_stub_) {
       if (mode_ == TestApp::kInteractive) {
         std::cout
             << "The flag -analyzer_uri was not specified so you cannot "
@@ -322,7 +319,7 @@ class EnvelopeSender : public EnvelopeSenderInterface {
       return;
     }
 
-    if (envelope_maker.envelope().batch_size() == 0) {
+    if (envelope.batch_size() == 0) {
       if (mode_ == TestApp::kInteractive) {
         std::cout << "There are no Observations to send yet." << std::endl;
       } else {
@@ -334,7 +331,7 @@ class EnvelopeSender : public EnvelopeSenderInterface {
 
     Empty resp;
 
-    for (const ObservationBatch& batch : envelope_maker.envelope().batch()) {
+    for (const ObservationBatch& batch : envelope.batch()) {
       if (mode_ == TestApp::kInteractive) {
       } else {
         VLOG(1) << "Sending to analyzer with deadline = "
@@ -345,7 +342,7 @@ class EnvelopeSender : public EnvelopeSenderInterface {
                             std::chrono::seconds(FLAGS_deadline_seconds));
 
       auto status =
-          analyzer_client_->AddObservations(context.get(), batch, &resp);
+          analyzer_stub_->AddObservations(context.get(), batch, &resp);
       if (status.ok()) {
         if (mode_ == TestApp::kInteractive) {
           std::cout << "Sent to Analyzer" << std::endl;
@@ -366,73 +363,47 @@ class EnvelopeSender : public EnvelopeSenderInterface {
     }
   }
 
-  void SendToShuffler(const EnvelopeMaker& envelope_maker) {
-    if (!shuffler_client_) {
-      if (mode_ == TestApp::kInteractive) {
-        std::cout << "The flag -shuffler_uri was not specified so you cannot "
-                     "send to the shuffler. Try 'set skip_shuffler true'."
-                  << std::endl;
-      } else {
-        LOG(ERROR) << "-shuffler_uri was not specified.";
-      }
-      return;
-    }
-
-    if (envelope_maker.envelope().batch_size() == 0) {
-      if (mode_ == TestApp::kInteractive) {
-        std::cout << "There are no Observations to send yet." << std::endl;
-      } else {
-        LOG(ERROR) << "Not sending to Shuffler. No observations were "
-                      "successfully encoded.";
-      }
-      return;
-    }
-
-    if (mode_ == TestApp::kInteractive) {
-    } else {
-      VLOG(1) << "Sending to shuffler with deadline = "
-              << FLAGS_deadline_seconds << " seconds...";
-    }
-
-    // Encrypt the envelope.
-    EncryptedMessage encrypted_envelope;
-    if (!envelope_maker.MakeEncryptedEnvelope(&encrypted_envelope)) {
-      LOG(ERROR) << "Encryption of Envelope failed.";
-      return;
-    }
-
-    // Try to send to the Shuffler. Try multiple times with an initial
-    // RPC deadline of FLAGS_deadline_seconds and an overall deadline of
-    // FLAGS_deadline_seconds * 6.
-    auto status = send_retryer_->SendToShuffler(
-        std::chrono::seconds(FLAGS_deadline_seconds),
-        std::chrono::seconds(FLAGS_deadline_seconds * 6), nullptr,
-        encrypted_envelope);
-    if (status.ok()) {
-      if (mode_ == TestApp::kInteractive) {
-        std::cout << "Sent to Shuffler." << std::endl;
-      } else {
-        VLOG(1) << "Sent to Shuffler";
-      }
-      return;
-    } else {
-      if (mode_ == TestApp::kInteractive) {
-        std::cout << "Send to shuffler failed with status="
-                  << status.error_code() << " " << status.error_message()
-                  << std::endl;
-        return;
-      } else {
-        LOG(ERROR) << "Send to shuffler failed with status="
-                   << status.error_code() << " " << status.error_message();
-      }
-    }
-  }
-
-  std::unique_ptr<analyzer::Analyzer::Stub> analyzer_client_;
-  std::unique_ptr<encoder::ShufflerClient> shuffler_client_;
-  std::unique_ptr<SendRetryer> send_retryer_;
+  std::unique_ptr<analyzer::Analyzer::Stub> analyzer_stub_;
   TestApp::Mode mode_;
 };
+
+void TestApp::SendToShuffler() {
+  if (!shuffler_client_) {
+    if (mode_ == TestApp::kInteractive) {
+      std::cout << "The flag -shuffler_uri was not specified so you cannot "
+                   "send to the shuffler. Try 'set skip_shuffler true'."
+                << std::endl;
+    } else {
+      LOG(ERROR) << "-shuffler_uri was not specified.";
+    }
+    return;
+  }
+
+  if (mode_ != TestApp::kInteractive) {
+    VLOG(1) << "Sending to shuffler with deadline = " << FLAGS_deadline_seconds
+            << " seconds...";
+  }
+  shipping_manager_->RequestSendSoon();
+  shipping_manager_->WaitUntilIdle(kDeadlinePerSendAttempt);
+  auto status = shipping_manager_->last_send_status();
+  if (status.ok()) {
+    if (mode_ == TestApp::kInteractive) {
+      std::cout << "Sent to Shuffler." << std::endl;
+    } else {
+      VLOG(1) << "Sent to Shuffler";
+    }
+    return;
+  } else {
+    if (mode_ == TestApp::kInteractive) {
+      std::cout << "Send to shuffler failed with status=" << status.error_code()
+                << " " << status.error_message() << std::endl;
+      return;
+    } else {
+      LOG(ERROR) << "Send to shuffler failed with status="
+                 << status.error_code() << " " << status.error_message();
+    }
+  }
+}
 
 std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
   std::string registry_path = FLAGS_registry;
@@ -447,22 +418,22 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
   CHECK(!FLAGS_analyzer_uri.empty() || !FLAGS_shuffler_uri.empty())
       << "You must specify either -shuffler_uri or -analyzer_uri";
 
-  std::unique_ptr<analyzer::Analyzer::Stub> analyzer;
+  std::unique_ptr<analyzer::Analyzer::Stub> analyzer_stub;
   if (!FLAGS_analyzer_uri.empty()) {
-    analyzer = Analyzer::NewStub(grpc::CreateChannel(
+    analyzer_stub = Analyzer::NewStub(grpc::CreateChannel(
         FLAGS_analyzer_uri, CreateChannelCredentials(FLAGS_use_tls)));
   }
 
-  std::unique_ptr<encoder::ShufflerClient> shuffler_client;
+  auto mode = ParseMode();
+  std::shared_ptr<AnalyzerClientInterface> analyzer_client(
+      new AnalyzerClient(std::move(analyzer_stub), mode));
+
+  std::shared_ptr<encoder::ShufflerClient> shuffler_client;
   if (!FLAGS_shuffler_uri.empty()) {
     VLOG(1) << "Connecting to Shuffler at " << FLAGS_shuffler_uri;
     shuffler_client.reset(
         new ShufflerClient(FLAGS_shuffler_uri, FLAGS_use_tls));
   }
-
-  auto mode = ParseMode();
-  std::shared_ptr<EnvelopeSender> envelope_sender(new EnvelopeSender(
-      std::move(analyzer), std::move(shuffler_client), mode));
 
   auto analyzer_encryption_scheme = EncryptedMessage::NONE;
   std::string analyzer_public_key_pem = "";
@@ -483,31 +454,47 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
     shuffler_encryption_scheme = EncryptedMessage::HYBRID_ECDH_V1;
   }
 
-  auto test_app = std::unique_ptr<TestApp>(
-      new TestApp(project_context, envelope_sender, analyzer_public_key_pem,
-                  analyzer_encryption_scheme, shuffler_public_key_pem,
-                  shuffler_encryption_scheme, &std::cout));
+  auto test_app = std::unique_ptr<TestApp>(new TestApp(
+      project_context, analyzer_client, shuffler_client,
+      analyzer_public_key_pem, analyzer_encryption_scheme,
+      shuffler_public_key_pem, shuffler_encryption_scheme, &std::cout));
   test_app->set_metric(FLAGS_metric);
   test_app->set_skip_shuffler(FLAGS_skip_shuffler);
   test_app->set_mode(mode);
   return test_app;
 }
 
-TestApp::TestApp(std::shared_ptr<ProjectContext> project_context,
-                 std::shared_ptr<EnvelopeSenderInterface> sender,
-                 const std::string& analyzer_public_key_pem,
-                 EncryptedMessage::EncryptionScheme analyzer_scheme,
-                 const std::string& shuffler_public_key_pem,
-                 EncryptedMessage::EncryptionScheme shuffler_scheme,
-                 std::ostream* ostream)
+TestApp::TestApp(
+    std::shared_ptr<ProjectContext> project_context,
+    std::shared_ptr<AnalyzerClientInterface> analyzer_client,
+    std::shared_ptr<encoder::ShufflerClientInterface> shuffler_client,
+    const std::string& analyzer_public_key_pem,
+    EncryptedMessage::EncryptionScheme analyzer_scheme,
+    const std::string& shuffler_public_key_pem,
+    EncryptedMessage::EncryptionScheme shuffler_scheme, std::ostream* ostream)
     : customer_id_(project_context->customer_id()),
       project_id_(project_context->project_id()),
       project_context_(project_context),
-      envelope_sender_(sender),
+      analyzer_client_(analyzer_client),
+      shuffler_client_(shuffler_client),
+      send_retryer_(new SendRetryer(shuffler_client_.get())),
+      shipping_manager_(new ShippingManager(
+          ShippingManager::SizeParams(kMaxBytesPerObservation,
+                                      kMaxBytesPerEnvelope, kMaxBytesTotal,
+                                      kMinEnvelopeSendSize),
+          // By using (kMaxSeconds, 0) here we are effectively putting the
+          // ShippingManager in manual mode. It will never send automatically
+          // and it will send immediately in response to RequestSendSoon().
+          ShippingManager::ScheduleParams(ShippingManager::kMaxSeconds,
+                                          std::chrono::seconds(0)),
+          ShippingManager::EnvelopeMakerParams(
+              analyzer_public_key_pem, analyzer_scheme, shuffler_public_key_pem,
+              shuffler_scheme),
+          ShippingManager::SendRetryerParams(kInitialRpcDeadline,
+                                             kDeadlinePerSendAttempt),
+          send_retryer_.get())),
       ostream_(ostream) {
-  envelope_maker_.reset(
-      new EnvelopeMaker(analyzer_public_key_pem, analyzer_scheme,
-                        shuffler_public_key_pem, shuffler_scheme));
+  shipping_manager_->Start();
 }
 
 void TestApp::Run() {
@@ -555,7 +542,16 @@ void TestApp::SendAndQuit() {
 
   Encode(encoding_config_ids, part_names, values);
 
-  envelope_sender_->Send(*envelope_maker_, skip_shuffler_);
+  SendAccumulatedObservations();
+}
+
+void TestApp::SendAccumulatedObservations() {
+  if (skip_shuffler_) {
+    auto envelope_maker = shipping_manager_->TakeActiveEnvelopeMaker();
+    analyzer_client_->SendToAnalyzer(envelope_maker->envelope());
+  } else {
+    SendToShuffler();
+  }
 }
 
 void TestApp::CommandLoop() {
@@ -624,14 +620,19 @@ bool TestApp::EncodeAsNewClient(const std::vector<uint32_t> encoding_config_ids,
   }
 
   // Add the observation to the EnvelopeMaker.
-  envelope_maker_->AddObservation(*result.observation,
-                                  std::move(result.metadata));
+  auto status = shipping_manager_->AddObservation(*result.observation,
+                                                  std::move(result.metadata));
+  if (status != ShippingManager::kOk) {
+    LOG(ERROR) << "AddObservation() failed with status " << status
+               << ". metric_id=" << metric_;
+    return false;
+  }
   return true;
 }
 
 // Generates FLAGS_num_clients independent Observations by encoding the
 // string value specified by the argument and adds the Observations
-// to the EnvelopeMaker.
+// to the ShippingManager.
 void TestApp::EncodeString(const std::string value) {
   for (size_t i = 0; i < FLAGS_num_clients; i++) {
     if (!EncodeStringAsNewClient(value)) {
@@ -642,7 +643,7 @@ void TestApp::EncodeString(const std::string value) {
 
 // Generates a new ClientSecret, constructs a new Encoder using that secret,
 // uses this Encoder to encode the string value specified by the
-// argument, and adds the resulting Observation to the EnvelopeMaker.
+// argument, and adds the resulting Observation to the ShippingManager.
 bool TestApp::EncodeStringAsNewClient(const std::string value) {
   std::unique_ptr<Encoder> encoder(
       new Encoder(project_context_, ClientSecret::GenerateNewSecret()));
@@ -654,14 +655,21 @@ bool TestApp::EncodeStringAsNewClient(const std::string value) {
                << ". value=" << value;
     return false;
   }
-  envelope_maker_->AddObservation(*result.observation,
-                                  std::move(result.metadata));
+
+  // Add the observation to the ShippingManager.
+  auto status = shipping_manager_->AddObservation(*result.observation,
+                                                  std::move(result.metadata));
+  if (status != ShippingManager::kOk) {
+    LOG(ERROR) << "AddObservation() failed with status " << status
+               << ". metric_id=" << metric_;
+    return false;
+  }
   return true;
 }
 
 // Generates FLAGS_num_clients independent Observations by encoding the
 // int value specified by the argument and adds the Observations
-// to the EnvelopeMaker.
+// to the ShippingManager.
 void TestApp::EncodeInt(int64_t value) {
   for (size_t i = 0; i < FLAGS_num_clients; i++) {
     if (!EncodeIntAsNewClient(value)) {
@@ -672,7 +680,7 @@ void TestApp::EncodeInt(int64_t value) {
 
 // Generates a new ClientSecret, constructs a new Encoder using that secret,
 // uses this Encoder to encode the int value specified by the
-// argument, and adds the resulting Observation to the EnvelopeMaker.
+// argument, and adds the resulting Observation to the ShippingManager.
 bool TestApp::EncodeIntAsNewClient(int64_t value) {
   std::unique_ptr<Encoder> encoder(
       new Encoder(project_context_, ClientSecret::GenerateNewSecret()));
@@ -684,8 +692,14 @@ bool TestApp::EncodeIntAsNewClient(int64_t value) {
                << ". value=" << value;
     return false;
   }
-  envelope_maker_->AddObservation(*result.observation,
-                                  std::move(result.metadata));
+  // Add the observation to the ShippingManager.
+  auto status = shipping_manager_->AddObservation(*result.observation,
+                                                  std::move(result.metadata));
+  if (status != ShippingManager::kOk) {
+    LOG(ERROR) << "AddObservation() failed with status " << status
+               << ". metric_id=" << metric_;
+    return false;
+  }
   return true;
 }
 
@@ -708,8 +722,14 @@ bool TestApp::EncodeIndexAsNewClient(uint32_t index) {
                << ". index=" << index;
     return false;
   }
-  envelope_maker_->AddObservation(*result.observation,
-                                  std::move(result.metadata));
+  // Add the observation to the ShippingManager.
+  auto status = shipping_manager_->AddObservation(*result.observation,
+                                                  std::move(result.metadata));
+  if (status != ShippingManager::kOk) {
+    LOG(ERROR) << "AddObservation() failed with status " << status
+               << ". metric_id=" << metric_;
+    return false;
+  }
   return true;
 }
 
@@ -884,9 +904,7 @@ void TestApp::Send(const std::vector<std::string>& command) {
     *ostream_ << "The send command doesn't take any arguments." << std::endl;
     return;
   }
-  envelope_sender_->Send(*envelope_maker_, skip_shuffler_);
-
-  envelope_maker_->Clear();
+  SendAccumulatedObservations();
 }
 
 void TestApp::Show(const std::vector<std::string>& command) {

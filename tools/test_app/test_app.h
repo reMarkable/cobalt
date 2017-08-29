@@ -37,16 +37,16 @@
 #include "analyzer/analyzer_service/analyzer.grpc.pb.h"
 #include "encoder/envelope_maker.h"
 #include "encoder/project_context.h"
+#include "encoder/send_retryer.h"
+#include "encoder/shipping_manager.h"
 #include "encoder/shuffler_client.h"
 
 namespace cobalt {
 
-// An abstract interface that encapsulates the Send() function. This may
-// be mocked in unit tests.
-class EnvelopeSenderInterface {
+// An abstract interface that may be mocked in unit tests.
+class AnalyzerClientInterface {
  public:
-  virtual void Send(const encoder::EnvelopeMaker& envelope_maker,
-                    bool skip_shuffler) = 0;
+  virtual void SendToAnalyzer(const Envelope& envelope) = 0;
 };
 
 // The Cobalt testing client application.
@@ -73,7 +73,8 @@ class TestApp {
 
   // Constructor. The |ostream| is used for emitting output in interactive mode.
   TestApp(std::shared_ptr<encoder::ProjectContext> project_context,
-          std::shared_ptr<EnvelopeSenderInterface> sender,
+          std::shared_ptr<AnalyzerClientInterface> analyzer_client,
+          std::shared_ptr<encoder::ShufflerClientInterface> shuffler_client,
           const std::string& analyzer_public_key_pem,
           EncryptedMessage::EncryptionScheme analyzer_encryption_scheme,
           const std::string& shuffler_public_key_pem,
@@ -149,8 +150,7 @@ class TestApp {
   // Observation to the EnvelopeMaker.
   bool EncodeIndexAsNewClient(uint32_t index);
 
-  void SendToAnalyzer();
-
+  void SendAccumulatedObservations();
   void SendToShuffler();
 
   bool ProcessCommand(const std::vector<std::string>& command);
@@ -200,8 +200,10 @@ class TestApp {
   // The TestApp is in interactive mode unless set_mode() is invoked.
   Mode mode_ = kInteractive;
   std::shared_ptr<encoder::ProjectContext> project_context_;
-  std::shared_ptr<EnvelopeSenderInterface> envelope_sender_;
-  std::unique_ptr<encoder::EnvelopeMaker> envelope_maker_;
+  std::shared_ptr<AnalyzerClientInterface> analyzer_client_;
+  std::shared_ptr<encoder::ShufflerClientInterface> shuffler_client_;
+  std::unique_ptr<encoder::send_retryer::SendRetryer> send_retryer_;
+  std::unique_ptr<encoder::ShippingManager> shipping_manager_;
   std::ostream* ostream_;
 };
 
