@@ -477,7 +477,7 @@ func waitForObservations(metricId uint32, expectedNum uint32) error {
 
 // sendObservations uses the cobalt_test_app to encode the given values into observations and send the
 // observations to the Shuffler or the Analyzer.
-func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, numClients uint) error {
+func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, numClients uint, repeatCount uint) error {
 	cmd := exec.Command(*testAppPath,
 		"-mode", "send-once",
 		"-registry", *configRegDirPath,
@@ -488,6 +488,7 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 		"-logtostderr", fmt.Sprintf("-v=%d", *subProcessVerbosity),
 		"-metric", strconv.Itoa(int(metricId)),
 		"-num_clients", strconv.Itoa(int(numClients)),
+		"-repeat", strconv.Itoa(int(repeatCount)),
 		fmt.Sprintf("-skip_shuffler=%t", skipShuffler),
 		"-values", flagString(values))
 	stdoutStderr, err := cmd.CombinedOutput()
@@ -500,8 +501,9 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 
 // sendForculusUrlObservations sends Observations containing a Forculus encryption of the
 // given |url| to the Shuffler. |numClients| different, independent
-// observations will be sent.
-func sendForculusUrlObservations(url string, numClients uint, t *testing.T) {
+// observations will be sent. The process of adding and sending will be repeated
+// |repeatCount| times.
+func sendForculusUrlObservations(url string, numClients uint, repeatCount uint, t *testing.T) {
 	const skipShuffler = false
 	values := []ValuePart{
 		ValuePart{
@@ -510,15 +512,15 @@ func sendForculusUrlObservations(url string, numClients uint, t *testing.T) {
 			forculusEncodingConfigId,
 		},
 	}
-	if err := sendObservations(urlMetricId, values, skipShuffler, numClients); err != nil {
+	if err := sendObservations(urlMetricId, values, skipShuffler, numClients, repeatCount); err != nil {
 		t.Fatalf("url=%s, numClient=%d, err=%v", url, numClients, err)
 	}
 }
 
 // sendBasicRapporHourObservations sends Observations containing a Basic RAPPOR encoding of the
 // given |hour| to the Shuffler. |numClients| different, independent observations
-// will be sent.
-func sendBasicRapporHourObservations(hour int, numClients uint, t *testing.T) {
+// will be sent. The process of adding and sending will be repeated |repeatCount| times.
+func sendBasicRapporHourObservations(hour int, numClients uint, repeatCount uint, t *testing.T) {
 	const skipShuffler = false
 	values := []ValuePart{
 		ValuePart{
@@ -527,15 +529,15 @@ func sendBasicRapporHourObservations(hour int, numClients uint, t *testing.T) {
 			basicRapporStringsEncodingConfigId,
 		},
 	}
-	if err := sendObservations(hourMetricId, values, skipShuffler, numClients); err != nil {
+	if err := sendObservations(hourMetricId, values, skipShuffler, numClients, repeatCount); err != nil {
 		t.Fatalf("hour=%d, numClient=%d, err=%v", hour, numClients, err)
 	}
 }
 
 // sendBasicRapporEventObservations sends Observations containing a Basic RAPPOR encoding of the
 // given |index| to the Shuffler. |numClients| different, independent observations
-// will be sent.
-func sendBasicRapporEventObservations(index int, numClients uint, t *testing.T) {
+// will be sent. The process of adding and sending will be repeated |repeatCount| times.
+func sendBasicRapporEventObservations(index int, numClients uint, repeatCount uint, t *testing.T) {
 	const skipShuffler = false
 	values := []ValuePart{
 		ValuePart{
@@ -544,7 +546,7 @@ func sendBasicRapporEventObservations(index int, numClients uint, t *testing.T) 
 			basicRapporIndexEncodingConfigId,
 		},
 	}
-	if err := sendObservations(eventMetricId, values, skipShuffler, numClients); err != nil {
+	if err := sendObservations(eventMetricId, values, skipShuffler, numClients, repeatCount); err != nil {
 		t.Fatalf("index=%d, numClient=%d, err=%v", index, numClients, err)
 	}
 }
@@ -584,10 +586,10 @@ func getCSVReport(reportConfigId uint32, includeStdErr bool, t *testing.T) strin
 // URLs.
 func TestForculusEncodingOfUrls(t *testing.T) {
 	// We send some observations to the Shuffler.
-	sendForculusUrlObservations("www.AAAA.com", 18, t)
-	sendForculusUrlObservations("www.BBBB.com", 19, t)
-	sendForculusUrlObservations("www.CCCC.com", 20, t)
-	sendForculusUrlObservations("www.DDDD.com", 21, t)
+	sendForculusUrlObservations("www.AAAA.com", 18, 1, t)
+	sendForculusUrlObservations("www.BBBB.com", 19, 1, t)
+	sendForculusUrlObservations("www.CCCC.com", 20, 1, t)
+	sendForculusUrlObservations("www.DDDD.com", 21, 1, t)
 
 	if *doShufflerThresholdTest {
 		// We have not yet sent 100 observations and the Shuffler's threshold is
@@ -604,20 +606,20 @@ func TestForculusEncodingOfUrls(t *testing.T) {
 
 	// We send additional observations to the Shuffler. This crosses the Shuffler's
 	// threshold and so all observations should now be sent to the Analyzer.
-	sendForculusUrlObservations("www.EEEE.com", 22, t)
-	sendForculusUrlObservations("www.FFFF.com", 23, t)
+	sendForculusUrlObservations("www.EEEE.com", 22, 2, t)
+	sendForculusUrlObservations("www.FFFF.com", 23, 3, t)
 
 	// There should now be 123 Observations sent to the Analyzer for metric 1.
 	// We wait for them.
-	if err := waitForObservations(urlMetricId, 123); err != nil {
+	if err := waitForObservations(urlMetricId, 191); err != nil {
 		t.Fatalf("%s", err)
 	}
 
 	// Finally we will run a report. This is the expected output of the report.
 	const expectedCSV = `www.CCCC.com,20.000
 www.DDDD.com,21.000
-www.EEEE.com,22.000
-www.FFFF.com,23.000
+www.EEEE.com,44.000
+www.FFFF.com,69.000
 `
 
 	// Generate the report, fetch it as a CSV, check it.
@@ -631,12 +633,12 @@ www.FFFF.com,23.000
 // Report Config 2. This uses Basic RAPPOR with integer categories for the
 // 24 hours of the day.
 func TestBasicRapporEncodingOfHours(t *testing.T) {
-	sendBasicRapporHourObservations(8, 501, t)
-	sendBasicRapporHourObservations(9, 1002, t)
-	sendBasicRapporHourObservations(10, 503, t)
-	sendBasicRapporHourObservations(16, 504, t)
-	sendBasicRapporHourObservations(17, 1005, t)
-	sendBasicRapporHourObservations(18, 506, t)
+	sendBasicRapporHourObservations(8, 501, 1, t)
+	sendBasicRapporHourObservations(9, 1002, 1, t)
+	sendBasicRapporHourObservations(10, 503, 1, t)
+	sendBasicRapporHourObservations(16, 504, 1, t)
+	sendBasicRapporHourObservations(17, 1005, 1, t)
+	sendBasicRapporHourObservations(18, 506, 1, t)
 
 	// There should now be 4021 Observations sent to the Analyzer for metric 2.
 	// We wait for them.
@@ -707,7 +709,7 @@ func TestBasicRapporEncodingOfEvents(t *testing.T) {
 	// Send observations for indices 0 through 29.
 	for index := 0; index < 30; index++ {
 		numClients := index + 1
-		sendBasicRapporEventObservations(index, uint(numClients), t)
+		sendBasicRapporEventObservations(index, uint(numClients), 1, t)
 	}
 
 	// There should 30*31/2 = 465 Observations sent to the Analyzer for metric 4.

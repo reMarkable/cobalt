@@ -113,6 +113,10 @@ DEFINE_string(
     " Used only in send-once mode to specify the multi-part value to"
     " encode and the encodings to use.");
 
+DEFINE_uint32(repeat, 1,
+              "Number of times to repeat the add-send cycle in the "
+              "non-interactive mode.");
+
 namespace {
 
 const size_t kMaxBytesPerObservation = 100 * 1024;
@@ -540,9 +544,11 @@ void TestApp::SendAndQuit() {
     }
   }
 
-  Encode(encoding_config_ids, part_names, values);
+  for (uint32_t i = 0; i < FLAGS_repeat; i++) {
+    Encode(encoding_config_ids, part_names, values);
 
-  SendAccumulatedObservations();
+    SendAccumulatedObservations();
+  }
 }
 
 void TestApp::SendAccumulatedObservations() {
