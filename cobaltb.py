@@ -101,8 +101,8 @@ def _build(args):
   ensureDir(OUT_DIR)
   savedir = os.getcwd()
   os.chdir(OUT_DIR)
-  subprocess.check_call(['cmake', '-G', 'Ninja','..'])
-  subprocess.check_call(['ninja'])
+  subprocess.check_call([args.cmake_path, '-G', 'Ninja','..'])
+  subprocess.check_call([args.ninja_path])
   os.chdir(savedir)
 
 def _lint(args):
@@ -744,6 +744,10 @@ def main():
   ########################################################
   sub_parser = subparsers.add_parser('build', parents=[parent_parser],
     help='Builds Cobalt.')
+  sub_parser.add_argument('--cmake_path', default='cmake',
+                          help='Path to CMake binary')
+  sub_parser.add_argument('--ninja_path', default='ninja',
+                          help='Path to Ninja binary')
   sub_parser.set_defaults(func=_build)
 
   ########################################################
