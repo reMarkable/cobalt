@@ -44,6 +44,7 @@ SET (DIR_PERF_TESTS "${CMAKE_BINARY_DIR}/perf_tests")
 # protobuf.so.8 (v2) preinstalled in a higher priority search path.  Instead we
 # want to link against protobuf v3
 set(PROTOBUF_LIBRARY ${DIR_SYSROOT}/lib/libprotobuf.so.10 grpc++ grpc)
+set(PROTOBUF_INCLUDE_DIR ${DIR_SYSROOT}/include)
 set(PROTOBUF_IMPORT_DIRS ${CMAKE_SOURCE_DIR})
 
 # If using protoc installed by setup.sh, cmake will warn us that it doesn't know
