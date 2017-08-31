@@ -139,17 +139,39 @@ ShippingManager::Status ShippingManager::AddObservation(
 void ShippingManager::RequestSendSoonLockHeld(MutexProtectedFields* fields) {
   fields->expedited_send_requested = true;
   fields->expedited_send_notifier.notify_all();
-}
-
-void ShippingManager::RequestSendSoon() {
-  VLOG(4) << "ShippingManager: Expedited send requested.";
-  auto locked = lock();
-  RequestSendSoonLockHeld(locked->fields);
   // We set waiting_for_schedule_ false here so that if the calling thread
   // invokes WaitUntilWorkerWaiting() after this then it will be waiting
   // for a *subsequent* time that the worker thread enters the
   // waiting-for-schedule state.
-  locked->fields->waiting_for_schedule = false;
+  fields->waiting_for_schedule = false;
+}
+
+void ShippingManager::RequestSendSoon() { RequestSendSoon(SendCallback()); }
+
+void ShippingManager::RequestSendSoon(SendCallback send_callback) {
+  VLOG(4) << "ShippingManager: Expedited send requested.";
+  auto locked = lock();
+  RequestSendSoonLockHeld(locked->fields);
+
+  // If we were given a SendCallback then do one of three things...
+  if (send_callback) {
+    if (locked->fields->active_envelope_maker->size() > 0) {
+      // If the active EnvelopeMaker is not empty put the SendCallback
+      // onto the on-deck queue so that it gets invoked after the next
+      // send that includes the active EnvelopeMaker.
+      locked->fields->on_deck_send_callback_queue.push_back(send_callback);
+    } else if (locked->fields->envelopes_to_send_total_bytes > 0) {
+      // If the active EnvelopeMaker is empty but the worker thread has
+      // some EnvelopeMakers it is currently dealing with then put the
+      // SendCallback directly onto the current queue so that it gets invoked
+      // after the next send attempt.
+      locked->fields->current_send_callback_queue.push_back(send_callback);
+    } else {
+      // Otherwise the ShippingManager has no Observations so invoke the
+      // SendCallback immediately.
+      send_callback(true);
+    }
+  }
 }
 
 bool ShippingManager::shut_down() { return lock()->fields->shut_down; }
@@ -277,6 +299,13 @@ void ShippingManager::PrepareForSendLockHeld(MutexProtectedFields* fields) {
   auto latest_envelope_maker = TakeActiveEnvelopeMakerLockHeld(fields);
   fields->envelopes_to_send_total_bytes += latest_envelope_maker->size();
   envelopes_to_send_.emplace_front(std::move(latest_envelope_maker));
+  // Copy on_deck_send_callback_queue onto the end of
+  // current_send_callback_queue and then clear current_send_callback_queue.
+  fields->current_send_callback_queue.insert(
+      fields->current_send_callback_queue.end(),
+      fields->on_deck_send_callback_queue.begin(),
+      fields->on_deck_send_callback_queue.end());
+  fields->on_deck_send_callback_queue.clear();
 }
 
 void ShippingManager::SendAllEnvelopes() {
@@ -284,6 +313,7 @@ void ShippingManager::SendAllEnvelopes() {
   while (!envelopes_to_send_.empty()) {
     SendOneEnvelope(&envelopes_that_failed);
   }
+  bool success = envelopes_that_failed.empty();
   envelopes_to_send_ = std::move(envelopes_that_failed);
   size_t envelopes_to_send_total_bytes = 0;
   for (const auto& env : envelopes_to_send_) {
@@ -292,12 +322,20 @@ void ShippingManager::SendAllEnvelopes() {
   VLOG(5) << "ShippingManager: envelopes_to_send_total_bytes="
           << envelopes_to_send_total_bytes;
 
-  auto locked = lock();
-  locked->fields->envelopes_to_send_total_bytes = envelopes_to_send_total_bytes;
-  if (envelopes_to_send_total_bytes +
-          locked->fields->active_envelope_maker->size() <
-      size_params_.max_bytes_total_) {
-    locked->fields->temporarily_full = false;
+  std::vector<SendCallback> callbacks_to_invoke;
+  {
+    auto locked = lock();
+    locked->fields->envelopes_to_send_total_bytes =
+        envelopes_to_send_total_bytes;
+    if (envelopes_to_send_total_bytes +
+            locked->fields->active_envelope_maker->size() <
+        size_params_.max_bytes_total_) {
+      locked->fields->temporarily_full = false;
+    }
+    callbacks_to_invoke.swap(locked->fields->current_send_callback_queue);
+  }
+  for (SendCallback& callback : callbacks_to_invoke) {
+    callback(success);
   }
 }
 

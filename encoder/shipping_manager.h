@@ -60,7 +60,7 @@ class ShippingManager {
     // max_bytes_per_observation: AddObservation() will return
     // kObservationTooBig if the given Observation's serialized size is bigger
     // than this.
-    //
+
     // max_bytes_per_envelope: When collecting Observations into Envelopes,
     // ShippingManager will not build an Envelope larger than this size. Since
     // ShippingManager sends a single Envelope in a gRPC request, this value
@@ -244,6 +244,19 @@ class ShippingManager {
   // has completed.
   void RequestSendSoon();
 
+  using SendCallback = std::function<void(bool)>;
+
+  // A version of RequestSendSoon() that provides feedback about the send.
+  // |send_callback| will be invoked with the result of the requested send
+  // attempt. More precisely, send_callback will be invoked after the
+  // ShippingManager has attempted to send all of the Observations that were
+  // added prior to the invocation of RequestSendSoon(). It will be invoked
+  // with true if all such Observations were succesfully sent. It will be
+  // invoked with false if some Observations were not able to be sent, but
+  // the status of any particular Observation may not be determined. This
+  // is useful mainly in tests.
+  void RequestSendSoon(SendCallback send_callback);
+
   // Blocks for |max_wait| seconds or until the worker thread has
   // successfully sent all previously added Observations and is idle, waiting
   // for more Observations to be added. This method is most useful if it
@@ -334,6 +347,21 @@ class ShippingManager {
 
     // This is the EnvelopeMaker into which new Observations are added.
     std::unique_ptr<EnvelopeMaker> active_envelope_maker;
+
+    // RequestSendSoon() enqueues callbacks here just in case
+    // active_envelope_maker is not empty. These callbacks will be invoked
+    // with the result of the next send attempt that includes
+    // active_envelope_maker.
+    std::vector<SendCallback> on_deck_send_callback_queue;
+
+    // The queue of callbacks that will be invoked when the next send
+    // attempt completes. The worker thread moves callbacks from
+    // on_deck_send_callback_queue to this queue at the same time that
+    // it picks up the active_envelope_maker. RequestSendSoon() enqueues
+    // callbacks directly here rather than onto on_deck_send_callback_queue
+    // just in case active_envelope_maker is empty but
+    // envelopes_to_send_total_bytes != 0.
+    std::vector<SendCallback> current_send_callback_queue;
 
     // Keeps track of the sum of the sizes of all Envelopes in
     // |envelopes_to_send_|.

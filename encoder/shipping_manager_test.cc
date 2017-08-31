@@ -107,17 +107,30 @@ struct FakeSendRetryer : public SendRetryerInterface {
     EXPECT_EQ(1, recovered_envelope.batch_size());
     EXPECT_EQ(kMetricId, recovered_envelope.batch(0).meta_data().metric_id());
 
-    std::lock_guard<std::mutex> lock(mutex);
+    std::unique_lock<std::mutex> lock(mutex);
     send_call_count++;
     observation_count +=
         recovered_envelope.batch(0).encrypted_observation_size();
-    send_called_notifier.notify_all();
-    return status_to_return;
+    // We grab the return value before we block. This allows the test
+    // thread to wait for us to block, then change the value of
+    // status_to_return for the *next* send without changing it for
+    // the currently blocking send.
+    grpc::Status status = status_to_return;
+    if (should_block) {
+      is_blocking = true;
+      send_is_blocking_notifier.notify_all();
+      send_can_exit_notifier.wait(lock, [this] { return !should_block; });
+      is_blocking = false;
+    }
+    return status;
   }
 
   std::mutex mutex;
+  bool should_block = false;
+  std::condition_variable send_can_exit_notifier;
+  bool is_blocking = false;
+  std::condition_variable send_is_blocking_notifier;
   grpc::Status status_to_return = grpc::Status::OK;
-  std::condition_variable send_called_notifier;
   int send_call_count = 0;
   int observation_count = 0;
 };
@@ -346,7 +359,14 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
   // execution of SendAllEnvelopes().
   for (int i = 0; i < 26; i++) {
     EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
-    shipping_manager_->RequestSendSoon();
+    if (i < 15) {
+      // After having added 15 Observations we have exceeded
+      // total_bytes_send_threshold (see the test TotalBytesSendThreshold below
+      // for that computation) and this means that each invocation of
+      // AddObservation() automatically invokes RequestSendSoon() and so we
+      // don't want to invoke it again here.
+      shipping_manager_->RequestSendSoon();
+    }
     shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
     EXPECT_TRUE(shipping_manager_->num_send_attempts() > (size_t)i);
     EXPECT_EQ(shipping_manager_->num_send_attempts(),
@@ -488,6 +508,165 @@ TEST_F(ShippingManagerTest, TotalBytesSendThreshold) {
 
   // All 16 Observations should have been sent in 4 envelopes as {5, 5, 5, 1}.
   CheckCallCount(4, 16);
+}
+
+// Test the version of the method RequestSendSoon() that takes a callback.
+// We test that the callback is invoked with success = true when the send
+// succeeds and with success = false when the send fails.
+TEST_F(ShippingManagerTest, RequestSendSoonWithCallback) {
+  Init(kMaxSeconds, std::chrono::seconds::zero());
+
+  // Invoke RequestSendSoon() with a callback before any Observations are added.
+  bool captured_success_arg = false;
+  shipping_manager_->RequestSendSoon([&captured_success_arg](bool success) {
+    captured_success_arg = success;
+  });
+  // Check that the callback was invoked synchronously with success = true.
+  CheckCallCount(0, 0);
+  EXPECT_EQ(0u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(0u, shipping_manager_->num_failed_attempts());
+  EXPECT_TRUE(captured_success_arg);
+
+  // Arrange for the first send to fail.
+  {
+    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
+    send_retryer_->status_to_return = grpc::Status::CANCELLED;
+  }
+
+  // Add an Observation, invoke RequestSendSoon() with a callback.
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  shipping_manager_->RequestSendSoon([&captured_success_arg](bool success) {
+    captured_success_arg = success;
+  });
+  shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
+
+  // Check that the callback was invoked with success = false.
+  CheckCallCount(1, 1);
+  EXPECT_EQ(1u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(1u, shipping_manager_->num_failed_attempts());
+  EXPECT_FALSE(captured_success_arg);
+
+  // Arrange for the next send to succeed.
+  {
+    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
+    send_retryer_->status_to_return = grpc::Status::OK;
+  }
+
+  // Don't add another Observation but invoke RequestSendSoon() with a callback.
+  shipping_manager_->RequestSendSoon([&captured_success_arg](bool success) {
+    captured_success_arg = success;
+  });
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
+
+  // Check that the callback was invoked with success = true.
+  CheckCallCount(2, 2);
+  EXPECT_EQ(2u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(1u, shipping_manager_->num_failed_attempts());
+  EXPECT_TRUE(captured_success_arg);
+
+  // Arrange for the next send to fail.
+  {
+    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
+    send_retryer_->status_to_return = grpc::Status::CANCELLED;
+  }
+
+  // Invoke RequestSendSoon without a callback just so that there is an
+  // Observation cached in the inner EnvelopeMaker.
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  shipping_manager_->RequestSendSoon();
+  shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
+  CheckCallCount(3, 3);
+  EXPECT_EQ(3u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(2u, shipping_manager_->num_failed_attempts());
+
+  // Arrange for the next send to succeed.
+  {
+    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
+    send_retryer_->status_to_return = grpc::Status::OK;
+  }
+
+  // Add an Observation, invoke RequestSendSoon() with a callback.
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  shipping_manager_->RequestSendSoon([&captured_success_arg](bool success) {
+    captured_success_arg = success;
+  });
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
+
+  // Check that the callback was invoked with success = true.
+  CheckCallCount(4, 5);
+  EXPECT_EQ(4u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(2u, shipping_manager_->num_failed_attempts());
+  EXPECT_TRUE(captured_success_arg);
+}
+
+// We test the following scenario: Suppose the worker thread is busy sending
+// one batch of Observations and concurrently we invoke AddObservation()
+// and RequestSendSoon() with a callback. The success status given to that
+// callback must reflect the success of the later send that includes the
+// newly added Observation and not the success of the send that was occurring
+// concurrently. To confirm this we arrange for the first send to succeed
+// and the second send to fail and check that the callback receives a |false|.
+TEST_F(ShippingManagerTest,
+       RequestSendSoonWithCallbackWhileWorkerThreadIsBusy) {
+  Init(kMaxSeconds, std::chrono::seconds::zero());
+  // Arrange that there is one Observation in the inner EnvelopeMaker
+  // by arranging for the first send attempt to fail.
+  {
+    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
+    send_retryer_->status_to_return = grpc::Status::CANCELLED;
+  }
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  shipping_manager_->RequestSendSoon();
+  shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
+  CheckCallCount(1, 1);
+  EXPECT_EQ(1u, shipping_manager_->num_send_attempts());
+  EXPECT_EQ(1u, shipping_manager_->num_failed_attempts());
+
+  // Arrange for the next send attempt to succeed but to block until
+  // we tell it to continue.
+  {
+    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
+    send_retryer_->status_to_return = grpc::Status::OK;
+    send_retryer_->should_block = true;
+  }
+
+  // Invoke RequestSendSoon(). This callback should receive success=true.
+  bool success1;
+  shipping_manager_->RequestSendSoon([&success1](bool success) {
+    { success1 = success; }
+  });
+
+  // Wait for the SendRetryer() to be blocking.
+  {
+    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
+    send_retryer_->send_is_blocking_notifier.wait(
+        lock, [this] { return send_retryer_->is_blocking; });
+  }
+
+  // Add an Observation and invoke RequestSendSoon() while the worker thread is
+  // busy sending the first Observation.
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  bool success2;
+  shipping_manager_->RequestSendSoon([&success2](bool success) {
+    { success2 = success; }
+  });
+
+  // Now release the worker thread by allowing Send() to terminate, and
+  // arrange for the second send attempt to fail.
+  {
+    std::unique_lock<std::mutex> lock(send_retryer_->mutex);
+    send_retryer_->status_to_return = grpc::Status::CANCELLED;
+    send_retryer_->should_block = false;
+    send_retryer_->send_can_exit_notifier.notify_all();
+  }
+
+  shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
+
+  // Check that callback 1 was invoked with success=true and callback 2
+  // was invoked with success = false.
+  EXPECT_TRUE(success1);
+  EXPECT_FALSE(success2);
 }
 
 }  // namespace encoder
