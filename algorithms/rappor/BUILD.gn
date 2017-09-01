@@ -18,6 +18,6 @@ static_library("rappor_encoder") {
     "//cobalt/config:cobalt_config_proto",
     "//cobalt/encoder:client_secret",
     "//cobalt/util/crypto_util",
-    "//lib/ftl",
+    "//garnet/public/lib/ftl",
   ]
 }

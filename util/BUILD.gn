@@ -13,7 +13,7 @@ static_library("encrypted_message_util") {
 
   deps = [
     "//cobalt:cobalt_proto",
-    "//lib/ftl",
+    "//garnet/public/lib/ftl",
   ]
 }
 
