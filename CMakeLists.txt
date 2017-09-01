@@ -69,8 +69,11 @@ protobuf_generate_cpp(COBALT_PROTO_SRCS COBALT_PROTO_HDRS
 # in the config directory.
 set(CONFIG_PROTO_SRCS
     "${CMAKE_BINARY_DIR}/config/encodings.pb.cc"
+    "${CMAKE_BINARY_DIR}/config/encodings.pb.h"
     "${CMAKE_BINARY_DIR}/config/metrics.pb.cc"
-    "${CMAKE_BINARY_DIR}/config/report_configs.pb.cc")
+    "${CMAKE_BINARY_DIR}/config/metrics.pb.h"
+    "${CMAKE_BINARY_DIR}/config/report_configs.pb.cc"
+    "${CMAKE_BINARY_DIR}/config/report_configs.pb.h")
 
 # Runs protoc proactively on the proto files in the top-level and config dirs.
 add_custom_target(build_protos
