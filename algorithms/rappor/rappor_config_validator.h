@@ -23,9 +23,6 @@
 #include "./observation.pb.h"
 #include "config/encodings.pb.h"
 
-// For the FRIEND_TEST macro.
-#include "third_party/googletest/googletest/include/gtest/gtest_prod.h"
-
 namespace cobalt {
 namespace rappor {
 
@@ -60,7 +57,7 @@ class RapporConfigValidator {
   std::vector<ValuePart>& categories() { return categories_; }
 
  private:
-  FRIEND_TEST(RapporConfigValidatorTest, TestMinPower2Above);
+  friend class RapporConfigValidatorTest_TestMinPower2Above_Test;
 
   // Returns the least power of 2 greater than or equal to x.
   static uint32_t MinPower2Above(uint16_t x);
