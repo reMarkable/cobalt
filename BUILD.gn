@@ -6,7 +6,7 @@ import("//third_party/protobuf/proto_library.gni")
 
 config("cobalt_config") {
   include_dirs = [
-    "//cobalt",
+    "//third_party/cobalt",
     "$root_gen_dir/cobalt",
   ]
 }

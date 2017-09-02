@@ -18,7 +18,7 @@ static_library("crypto_util") {
     "random.h"
   ]
   configs += [
-    "//cobalt:cobalt_config",
+    "//third_party/cobalt:cobalt_config",
   ]
 
   deps = [

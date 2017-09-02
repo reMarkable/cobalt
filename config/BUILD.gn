@@ -5,7 +5,7 @@
 import("//third_party/protobuf/proto_library.gni")
 
 proto_library("cobalt_config_proto") {
-  proto_in_dir = "//cobalt"
+  proto_in_dir = "//third_party/cobalt"
   sources = [
     "encodings.proto",
     "metrics.proto",
@@ -20,10 +20,10 @@ proto_library("cobalt_config_proto") {
   # cc_generator_options = "lite"
 
   deps = [
-    "//cobalt:cobalt_proto",
+    "//third_party/cobalt:cobalt_proto",
   ]
 
   extra_configs = [
-     "//cobalt:cobalt_config",
+     "//third_party/cobalt:cobalt_config",
   ]
 }

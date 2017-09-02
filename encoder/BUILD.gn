@@ -20,20 +20,20 @@ static_library("encoder") {
     "shuffler_client.h"
   ]
   public_configs = [
-    "//cobalt:cobalt_config",
+    "//third_party/cobalt:cobalt_config",
   ]
 
   deps = [
-    "//cobalt/algorithms/forculus:forculus_encoder",
-    "//cobalt/algorithms/rappor:rappor_encoder",
+    "//third_party/cobalt/algorithms/forculus:forculus_encoder",
+    "//third_party/cobalt/algorithms/rappor:rappor_encoder",
   ]
 
   public_deps = [
     ":client_secret",
-    "//cobalt:cobalt_proto",
-    "//cobalt/config:cobalt_config_proto",
-    "//cobalt/shuffler:shuffler_service",
-    "//cobalt/util:encrypted_message_util",
+    "//third_party/cobalt:cobalt_proto",
+    "//third_party/cobalt/config:cobalt_config_proto",
+    "//third_party/cobalt/shuffler:shuffler_service",
+    "//third_party/cobalt/util:encrypted_message_util",
     "//garnet/public/lib/ftl",
     "//third_party/grpc:grpc++",
   ]
@@ -45,10 +45,10 @@ static_library("client_secret") {
     "client_secret.h",
   ]
   configs += [
-    "//cobalt:cobalt_config",
+    "//third_party/cobalt:cobalt_config",
   ]
 
   deps = [
-    "//cobalt/util/crypto_util"
+    "//third_party/cobalt/util/crypto_util"
   ]
 }

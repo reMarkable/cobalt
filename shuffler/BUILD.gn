@@ -5,7 +5,7 @@
 import("//third_party/protobuf/proto_library.gni")
 
 proto_library("shuffler_service") {
-  proto_in_dir = "//cobalt"
+  proto_in_dir = "//third_party/cobalt"
   sources = [
     "shuffler.proto",
   ]
@@ -16,11 +16,11 @@ proto_library("shuffler_service") {
   cc_generator_options = "lite"
 
   deps = [
-    "//cobalt:cobalt_proto",
+    "//third_party/cobalt:cobalt_proto",
     "//third_party/grpc:grpc++",
   ]
 
   extra_configs = [
-     "//cobalt:cobalt_config",
+     "//third_party/cobalt:cobalt_config",
   ]
 }
