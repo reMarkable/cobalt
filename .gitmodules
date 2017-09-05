@@ -31,3 +31,7 @@
 [submodule "third_party/go/src/golang.org/x/crypto"]
 	path = third_party/go/src/golang.org/x/crypto
 	url = https://github.com/golang/crypto
+[submodule "config/config_parser/src/third_party/github.com/go-yaml/yaml"]
+	path = config/config_parser/src/third_party/github.com/go-yaml/yaml
+	url = https://fuchsia.googlesource.com/third_party/github.com/go-yaml/yaml
+	branch = v2
