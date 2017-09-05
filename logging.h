@@ -11,6 +11,7 @@
 #include "lib/ftl/logging.h"
 
 #define VLOG(verboselevel) FTL_VLOG(verboselevel)
+#define LOG(level) FTL_LOG(level)
 
 #define CHECK(condition) FTL_CHECK(condition)
 #define CHECK_EQ(val1, val2) FTL_CHECK((val1 == val2))

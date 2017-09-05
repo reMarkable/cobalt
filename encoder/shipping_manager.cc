@@ -386,9 +386,12 @@ void ShippingManager::SendOneEnvelope(
     return;
   }
 
-  VLOG(1) << "Cobalt send to Shuffler failed: (" << status.error_code() << ") "
-          << status.error_message()
-          << ". Observations have been re-enqueued for later.";
+  // Note(rudominer) We are intentionlly using LOG instead of VLOG here because
+  // we want this message to appear in the device INFO logs even if virtual
+  // logging is disabled.
+  LOG(INFO) << "Cobalt send to Shuffler failed: (" << status.error_code()
+            << ") " << status.error_message()
+            << ". Observations have been re-enqueued for later.";
   envelopes_that_failed->emplace_back(std::move(envelope_to_send));
 }
 

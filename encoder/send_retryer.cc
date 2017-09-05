@@ -105,8 +105,12 @@ grpc::Status SendRetryer::SendToShuffler(
 
     // Attempt the RPC.
     client_context->set_deadline(clock_->now() + rpc_deadline);
+    VLOG(4) << "Sending an RPC to the Shuffler with a deadline of "
+            << rpc_deadline.count() << " seconds.";
     auto status =
         shuffler_client_->SendToShuffler(encrypted_message, client_context);
+    VLOG(4) << "Response received from Shuffler: (" << status.error_code()
+            << ") " << status.error_message();
 
     // If the RPC succeeded or failed with a non-retryable error then we
     // are done.
