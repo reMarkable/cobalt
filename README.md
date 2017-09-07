@@ -500,9 +500,24 @@ first delete any previously upload secret keys by running
 Run this one time to provision static IPs for the Cobalt jobs.
 
 `./cobaltb.py deploy endpoint --job=report-master`
-Run this one time to configure the Cloud Endpoint. If you run this multiple
-times, it will upload multiple copies of the Cloud Endpoint configuration but
-will otherwise have no effect. (The latest uploaded config will be used.)
+
+`./cobaltb.py deploy endpoint --job=shuffler`
+Run these one time for the report-master and shuffler each to configure the
+Cloud Endpoints. If you run this multiple times, it will upload multiple copies
+of the Cloud Endpoint configuration but will otherwise have no effect. (The
+latest uploaded config will be used.)
+
+`./cobaltb.py deploy upload_certificate --job=report-master --dev-generate`
+
+`./cobaltb.py deploy upload_certificate --job=shuffler --dev-generate`
+Run these one time for the report-master and shuffler each to upload self-signed
+certificates. This command will generate a self-signed certificate using
+`openssl` and deploy it.  DO NOT USE FOR PRODUCTION!!! (See Deploying Cobalt to
+GKE in a Production Cluster for instructions on deploying certificates to
+production.)
+To upload a different certificate, you must first delete the existing
+certificate if there is one:
+`./cobaltb.py deploy delete_certificate --job=<job-name>`
 
 `./cobaltb.py deploy build`
 Run this to build Docker containers for the Shuffler, Analyzer Service and
@@ -632,6 +647,20 @@ containing the Analyzer's and Shuffler's private keys. These are the files
 section **Generating PEM Files** above. To upload different private keys,
 first delete any previously upload secret keys by running
 `./cobaltb.py --production_dir=<production_dir> deploy delete_secret_keys`
+
+```
+./cobaltb.py --production_dir=<production_dir> deploy upload_certificate \
+    --job=<job> \
+    --path-to-cert=<path-to-certificate-file> \
+    --path-to-key=<path-to-private-file>
+```
+Run this command once for each of the "report-master" and "shuffler" jobs.
+Generating keys and obtaining certificates is beyond the scope of this document.
+If you are a Googler and need to generate new certs, see
+[go/cobalt-get-certs](http://go/cobalt-get-certs)
+To upload a different certificate, you must first delete the existing
+certificate if there is one:
+`./cobaltb.py deploy delete_certificate --job=<job-name>`
 
 `./cobaltb.py --production_dir=<production_dir> deploy build`
 Run this to build Docker containers for the Shuffler, Analyzer Service and

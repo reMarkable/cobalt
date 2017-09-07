@@ -135,6 +135,8 @@ ANALYZER_CONFIG_FILE_NAMES = [
 
 ANALYZER_PRIVATE_KEY_SECRET_NAME = "analyzer-private-key"
 SHUFFLER_PRIVATE_KEY_SECRET_NAME = "shuffler-private-key"
+SHUFFLER_CERTIFICATE_SECRET_NAME = "shuffler-certificate-secret"
+REPORT_MASTER_CERTIFICATE_SECRET_NAME = "report-master-certificate-secret"
 
 def _ensure_dir(dir_path):
   """Ensures that the directory at |dir_path| exists. If not it is created.
@@ -268,10 +270,53 @@ def _form_context_name(cloud_project_prefix, cloud_project_name, cluster_zone,
   return "gke_%s_%s_%s" % (compound_project_name(cloud_project_prefix,
       cloud_project_name), cluster_zone, cluster_name)
 
-def _create_secret_from_file(secret_name, data_key, file_path, context):
-  subprocess.call(["kubectl", "create", "secret", "generic", secret_name,
-    "--from-file", "%s=%s"%(data_key, file_path),
-    "--context", context])
+def _create_secret_from_files(secret_name, files, context):
+  """Creates a Kubernetes secret from a set of files.
+
+  Args:
+    secret_name: {string} Name given to the secret.
+    files: {dict<string, string>} Maps keys (the reference used to access a
+      secret in Kubernetes) to local file paths.
+    context: {string} Specifies the project and cluster in which the secret is
+      to be created. (See _form_context_name)
+  """
+  cmd = ["kubectl", "create", "secret", "generic",
+      secret_name,
+      "--context", context]
+  for data_key, file_path in files.items():
+    cmd.extend(["--from-file", "%s=%s"%(data_key, file_path)])
+
+  subprocess.check_call(cmd)
+
+def create_cert_secret_for_shuffler(cloud_project_prefix, cloud_project_name,
+    cluster_zone, cluster_name, path_to_cert, path_to_key):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  # The Cloud Endpoints expects the names "nginx.crt" and "nginx.key".
+  _create_secret_from_files(SHUFFLER_CERTIFICATE_SECRET_NAME,
+      {'nginx.crt': path_to_cert,
+       'nginx.key': path_to_key}, context)
+
+def create_cert_secret_for_report_master(cloud_project_prefix,
+    cloud_project_name, cluster_zone, cluster_name, path_to_cert, path_to_key):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  # The Cloud Endpoints expects the names "nginx.crt" and "nginx.key".
+  _create_secret_from_files(REPORT_MASTER_CERTIFICATE_SECRET_NAME,
+      {'nginx.crt': path_to_cert,
+       'nginx.key': path_to_key}, context)
+
+def delete_cert_secret_for_shuffler(cloud_project_prefix, cloud_project_name,
+    cluster_zone, cluster_name):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  _delete_secret(SHUFFLER_CERTIFICATE_SECRET_NAME, context)
+
+def delete_cert_secret_for_report_master(cloud_project_prefix,
+    cloud_project_name, cluster_zone, cluster_name):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  _delete_secret(REPORT_MASTER_CERTIFICATE_SECRET_NAME, context)
 
 def _delete_secret(secret_name, context):
   subprocess.call(["kubectl", "delete", "secret",  secret_name,
@@ -281,17 +326,15 @@ def create_analyzer_private_key_secret(cloud_project_prefix,
     cloud_project_name, cluster_zone, cluster_name, path_to_pem):
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
-  _create_secret_from_file(ANALYZER_PRIVATE_KEY_SECRET_NAME,
-                           ANALYZER_PRIVATE_KEY_PEM_NAME,
-                           path_to_pem, context)
+  _create_secret_from_files(ANALYZER_PRIVATE_KEY_SECRET_NAME,
+      {ANALYZER_PRIVATE_KEY_PEM_NAME: path_to_pem}, context)
 
 def create_shuffler_private_key_secret(cloud_project_prefix,
     cloud_project_name, cluster_zone, cluster_name, path_to_pem):
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
-  _create_secret_from_file(SHUFFLER_PRIVATE_KEY_SECRET_NAME,
-                           SHUFFLER_PRIVATE_KEY_PEM_NAME,
-                           path_to_pem, context)
+  _create_secret_from_files(SHUFFLER_PRIVATE_KEY_SECRET_NAME,
+      {SHUFFLER_PRIVATE_KEY_PEM_NAME: path_to_pem}, context)
 
 def delete_analyzer_private_key_secret(cloud_project_prefix,
     cloud_project_name, cluster_zone, cluster_name):

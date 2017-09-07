@@ -22,6 +22,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 
 import tools.container_util as container_util
 import tools.cpplint as cpplint
@@ -54,6 +55,11 @@ BIGTABLE_TOOL_PATH = \
 
 _logger = logging.getLogger()
 _verbose_count = 0
+
+# The names nginx.crt and nginx.key are expected by Google Cloud Endpoints.
+SELF_SIGNED_CERTIFICATE_PATH = os.path.join(tempfile.gettempdir(), 'nginx.crt')
+SELF_SIGNED_PRIVATE_KEY_PATH = os.path.join(tempfile.gettempdir(), 'nginx.key')
+
 
 def _initLogging(verbose_count):
   """Ensures that the logger (obtained via logging.getLogger(), as usual) is
@@ -379,6 +385,11 @@ def _generate_keys(args):
   path = os.path.join(OUT_DIR, 'tools', 'key_generator', 'key_generator')
   subprocess.check_call([path])
 
+def _generate_self_signed_certificate():
+  subprocess.check_call(['openssl', 'req', '-x509', '-nodes', '-days', '365',
+    '-newkey', 'rsa:2048', '-keyout', SELF_SIGNED_PRIVATE_KEY_PATH, '-out',
+    SELF_SIGNED_CERTIFICATE_PATH])
+
 def _invoke_bigtable_tool(args, command):
   if not os.path.exists(bt_admin_service_account_credentials_file):
     print ('You must first create the file %s.' %
@@ -540,11 +551,52 @@ def _deploy_endpoint(args):
         args.cloud_project_name, args.shuffler_static_ip)
   else:
     print('Unknown job "%s". I only know how to configure endpoints for the '
-          '"report-master".' % args.job)
+          '"report-master" or the "shuffler".' % args.job)
 
 def _deploy_addresses(args):
   container_util.reserve_static_ip_addresses(args.cloud_project_prefix,
       args.cloud_project_name, args.cluster_zone)
+
+def _deploy_upload_certificate(args):
+  path_to_cert = args.path_to_cert
+  path_to_key = args.path_to_key
+  if args.dev_generate:
+    if path_to_cert or path_to_key:
+      print('You may not request for a self-signed certificate to be generated '
+            'and provide paths to an existing certificate or private key.')
+      return
+    path_to_cert = SELF_SIGNED_CERTIFICATE_PATH
+    path_to_key = SELF_SIGNED_PRIVATE_KEY_PATH
+    _generate_self_signed_certificate()
+
+  if not path_to_cert or not path_to_key:
+    print('Both --path-to-cert and --path-to-key must be set!')
+    return
+
+  if args.job == 'report-master':
+    container_util.create_cert_secret_for_report_master(
+        args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone,
+        args.cluster_name, path_to_cert, path_to_key)
+  elif args.job == 'shuffler':
+    container_util.create_cert_secret_for_shuffler(
+        args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone,
+        args.cluster_name, path_to_cert, path_to_key)
+  else:
+    print('Unknown job "%s". I only know how to deploy certificates for the '
+          '"report-master" or the "shuffler".' % args.job)
+
+def _deploy_delete_certificate(args):
+  if args.job == 'report-master':
+    container_util.delete_cert_secret_for_report_master(
+        args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone,
+        args.cluster_name)
+  elif args.job == 'shuffler':
+    container_util.delete_cert_secret_for_shuffler(
+        args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone,
+        args.cluster_name)
+  else:
+    print('Unknown job "%s". I only know how to delete certificates for the '
+          '"report-master" or the "shuffler".' % args.job)
 
 def _default_shuffler_config_file(cluster_settings):
   if cluster_settings['shuffler_config_file'] :
@@ -1212,6 +1264,34 @@ def main():
       help='Reserves static ip addresses for all the Cobalt jobs.')
   _add_cloud_access_args(sub_parser, cluster_settings)
   sub_parser.set_defaults(func=_deploy_addresses)
+
+  sub_parser = deploy_subparsers.add_parser('upload_certificate',
+      parents=[parent_parser],
+      help='Deploy certificates and associated private keys')
+  _add_gke_deployment_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--job',
+      help='The job whose certificate you wish to deploy. Valid choices: '
+           '"report-master", "shuffler". Required.')
+  sub_parser.add_argument('--dev-generate', default=False, action='store_true',
+      help='Generate a key and self-signed certificate and deploy them. If '
+           'this flag is set, you may not set path-to-cert or path-to-key. '
+           'DO NOT USE THIS FLAG WHEN DEPLOYING TO PRODUCTION!!!')
+  sub_parser.add_argument('--path-to-cert',
+      help='Path to the certificate to be deployed. (Required unless '
+           '--dev-generate is set.)')
+  sub_parser.add_argument('--path-to-key',
+      help='Path to the private key to be deployed. (Required unless '
+           '--dev-generate is set.)')
+  sub_parser.set_defaults(func=_deploy_upload_certificate)
+
+  sub_parser = deploy_subparsers.add_parser('delete_certificate',
+      parents=[parent_parser],
+      help='Delete certificates and associated private keys')
+  _add_gke_deployment_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--job',
+      help='The job whose certificate you wish to delete. Valid choices: '
+           '"report-master", "shuffler". Required.')
+  sub_parser.set_defaults(func=_deploy_delete_certificate)
 
   args = parser.parse_args()
   global _verbose_count
