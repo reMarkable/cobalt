@@ -488,12 +488,14 @@ def start_report_master(cloud_project_prefix,
   # These are the token replacements that must be made inside the deployment
   # template file.
   token_substitutions = {
-      '$$REPORT_MASTER_IMAGE_URI$$' : image_uri,
-      '$$BIGTABLE_PROJECT_NAME$$' : bigtable_project_name,
-      '$$BIGTABLE_INSTANCE_NAME$$' :bigtable_instance_name,
-      '$$REPORT_MASTER_STATIC_IP_ADDRESS$$' : static_ip_address,
+      '$$REPORT_MASTER_IMAGE_URI$$': image_uri,
+      '$$BIGTABLE_PROJECT_NAME$$': bigtable_project_name,
+      '$$BIGTABLE_INSTANCE_NAME$$': bigtable_instance_name,
+      '$$REPORT_MASTER_STATIC_IP_ADDRESS$$': static_ip_address,
       '$$ENDPOINT_NAME$$': endpoint_name,
-      '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id}
+      '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
+      '$$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$':
+      REPORT_MASTER_CERTIFICATE_SECRET_NAME}
   _start_gke_service(REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE,
                      REPORT_MASTER_DEPLOYMENT_FILE,
                      token_substitutions, context)
@@ -551,7 +553,8 @@ def start_shuffler(cloud_project_prefix,
       '$$SHUFFLER_PRIVATE_KEY_SECRET_NAME$$' : SHUFFLER_PRIVATE_KEY_SECRET_NAME,
       '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data,
       '$$ENDPOINT_NAME$$': endpoint_name,
-      '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id}
+      '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
+      '$$SHUFFLER_CERTIFICATE_SECRET_NAME$$': SHUFFLER_CERTIFICATE_SECRET_NAME}
   _start_gke_service(SHUFFLER_DEPLOYMENT_TEMPLATE_FILE,
                      SHUFFLER_DEPLOYMENT_FILE,
                      token_substitutions, context)

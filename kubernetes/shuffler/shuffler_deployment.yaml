@@ -41,12 +41,20 @@ spec:
         image: gcr.io/endpoints-release/endpoints-runtime:1
         args: [
           '-P', '8000',
+          '-S', '443',
           '-s', '$$ENDPOINT_NAME$$',
           '-v', '$$ENDPOINT_CONFIG_ID$$',
           '-a', 'grpc://127.0.0.1:5000'
           ]
         ports:
           - containerPort: 8000
+          - containerPort: 443
+        volumeMounts:
+          - mountPath: /etc/nginx/ssl
+            # The name must match the volumes.name for
+            # shuffler-certificate-storage.
+            name: shuffler-certificate-storage
+            readOnly: true
       - name: shuffler
         # The URI of a Docker image in a Docker repository.
         image: $$SHUFFLER_IMAGE_URI$$
@@ -94,6 +102,9 @@ spec:
         - name: shuffler-key-storage
           secret:
             secretName: $$SHUFFLER_PRIVATE_KEY_SECRET_NAME$$
+        - name: shuffler-certificate-storage
+          secret:
+            secretName: $$SHUFFLER_CERTIFICATE_SECRET_NAME$$
 ---
 # The defintion of the Service
 apiVersion: v1
@@ -114,8 +125,7 @@ spec:
     protocol: TCP
     name: shuffler-http2
     # Requests to this port are forwarded to the Endpoints
-    # implementation on port 8000. All clients should access Shuffler via
-    # this port.
+    # implementation on port 8000.
   - port: 8001
     # The port which the Endpoint implementation exposes within the cluster.
     # This must match the value passed to the Endpoints process in the '-P' flag
@@ -123,6 +133,12 @@ spec:
     targetPort: 8000
     protocol: TCP
     name: endpoint-http2
+    # Requests to this port are forwarded to the Endpoints implementation
+    # on the same port. Requests made to this port protected by TLS.
+    # All clients should access Shuffler via this port.
+  - port: 443
+    protocol: TCP
+    name: endpoint-https
   selector:
     # This must match the metadata.labels section of the Deployment above.
     name: shuffler

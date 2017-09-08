@@ -41,12 +41,20 @@ spec:
         image: gcr.io/endpoints-release/endpoints-runtime:1
         args: [
           '-P', '8000',
+          '-S', '443',
           '-s', '$$ENDPOINT_NAME$$',
           '-v', '$$ENDPOINT_CONFIG_ID$$',
           '-a', 'grpc://127.0.0.1:7000'
           ]
         ports:
           - containerPort: 8000
+          - containerPort: 443
+        volumeMounts:
+          - mountPath: /etc/nginx/ssl
+            # The name must match the volumes.name for
+            # report-master-certificate-storage.
+            name: report-master-certificate-storage
+            readOnly: true
       - name: report-master
         # The URI of a Docker image in a Docker repository.
         image: $$REPORT_MASTER_IMAGE_URI$$
@@ -66,6 +74,10 @@ spec:
           - '-v=3'
         ports:
           - containerPort: 7000
+      volumes:
+        - name: report-master-certificate-storage
+          secret:
+            secretName: $$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$
 ---
 # The defintion of the Service
 apiVersion: v1
@@ -86,8 +98,7 @@ spec:
     protocol: TCP
     name: report-master-http2
     # Requests to this port are forwarded to the Endpoints
-    # implementation on port 8000. All clients should access ReportMaster via
-    # this port.
+    # implementation on port 8000.
   - port: 8001
     # The port which the Endpoints implementation exposes within
     # the cluster. This must match the value passed to the Endpoints process in
@@ -95,6 +106,12 @@ spec:
     targetPort: 8000
     protocol: TCP
     name: endpoint-http2
+    # Requests to this port are forwarded to the Endpoints implementation
+    # on the same port. Requests made to this port protected by TLS.
+    # All clients should access Report Master via this port.
+  - port: 443
+    protocol: TCP
+    name: endpoint-https
   selector:
     # This must match the metadata.labels section of the Deployment above.
     name: report-master
