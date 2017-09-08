@@ -573,6 +573,9 @@ def _deploy_upload_certificate(args):
     print('Both --path-to-cert and --path-to-key must be set!')
     return
 
+  path_to_cert = os.path.abspath(path_to_cert)
+  path_to_key = os.path.abspath(path_to_key)
+
   if args.job == 'report-master':
     container_util.create_cert_secret_for_report_master(
         args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone,
