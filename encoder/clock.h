@@ -10,6 +10,8 @@
 // Allows us to mock out a clock for tests.
 class ClockInterface {
  public:
+  virtual ~ClockInterface() = default;
+
   virtual std::chrono::time_point<std::chrono::system_clock> now() = 0;
 };
 
