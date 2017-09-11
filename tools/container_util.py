@@ -584,7 +584,7 @@ def stop_shuffler(cloud_project_prefix,
       cluster_zone, cluster_name)
   _stop_gke_service(SHUFFLER_IMAGE_NAME, context)
 
-def login():
+def login(cloud_project_prefix, cloud_project_name):
   subprocess.check_call(["gcloud", "auth", "login", "--project",
     compound_project_name(cloud_project_prefix, cloud_project_name)])
 

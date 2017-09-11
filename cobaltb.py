@@ -449,7 +449,7 @@ def _deploy_show(args):
       args.cluster_zone, args.cluster_name)
 
 def _deploy_login(args):
-  container_util.login()
+  container_util.login(args.cloud_project_prefix, args.cloud_project_name)
 
 def _deploy_authenticate(args):
   container_util.authenticate(args.cluster_name, args.cloud_project_prefix,
@@ -1158,13 +1158,14 @@ def main():
       help='Login to gcloud. Invoke if any command fails and asks you to login '
       'to gcloud.')
   sub_parser.set_defaults(func=_deploy_login)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('authenticate',
       parents=[parent_parser], help='Refresh your authentication token if '
       'necessary. Also associates your local computer with a particular '
       'GKE cluster to which you will be deploying.')
   sub_parser.set_defaults(func=_deploy_authenticate)
-  _add_gke_deployment_args(sub_parser, cluster_settings)
+  _add_cloud_project_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('build',
       parents=[parent_parser], help='Rebuild all Docker images. '
