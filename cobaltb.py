@@ -200,9 +200,10 @@ def _test(args):
         public_uris = container_util.get_public_uris(args.cluster_name,
             args.cloud_project_prefix, args.cloud_project_name,
             args.cluster_zone)
-        analyzer_uri = public_uris["analyzer"]
-        report_master_uri = public_uris["report_master"]
-        shuffler_uri = public_uris["shuffler"]
+        analyzer_uri = args.analyzer_public_uri or public_uris["analyzer"]
+        report_master_uri = (args.report_master_public_uri
+            or public_uris["report_master"])
+        shuffler_uri = args.shuffler_public_uri or public_uris["shuffler"]
         if args.use_cloud_bt:
           # use_cloud_bt means to use local instances of the Cobalt processes
           # connected to a Cloud Bigtable. cobalt_on_personal_cluster means to
@@ -252,6 +253,8 @@ def _test(args):
         test_args = test_args + [
           "-do_shuffler_threshold_test=false",
         ]
+        if _parse_bool(args.test_with_tls):
+          test_args += [ "--use_tls" ]
     print '********************************************************'
     success = (test_runner.run_all_tests(
         test_dir, start_bt_emulator=start_bt_emulator,
@@ -719,6 +722,10 @@ def main():
     'shuffler_config_file': '',
     'cobalt_config_dir': '',
     'shuffler_use_memstore' : '',
+    'analyzer_public_uri': '',
+    'shuffler_public_uri': '',
+    'report_master_public_uri': '',
+    'test_with_tls': '',
   }
   if production_cluster_json_file:
     _cluster_settings_from_json(cluster_settings, production_cluster_json_file)
@@ -843,6 +850,18 @@ def main():
       '-use_cloud_bt or -cobalt_on_personal_cluster are specified.'
       ' default=%s'%cluster_settings['bigtable_instance_name'],
       default=cluster_settings['bigtable_instance_name'])
+  sub_parser.add_argument('--shuffler_public_uri',
+      default=cluster_settings['shuffler_public_uri'],
+      help='URI of the shuffler to be used for end to end tests.')
+  sub_parser.add_argument('--analyzer_public_uri',
+      default=cluster_settings['shuffler_public_uri'],
+      help='URI of the analyzer to be used for end to end tests.')
+  sub_parser.add_argument('--report_master_public_uri',
+      default=cluster_settings['report_master_public_uri'],
+      help='URI of the report master to be used for end to end tests.')
+  sub_parser.add_argument('--test_with_tls',
+      default=cluster_settings['test_with_tls'] or 'false',
+      help='Run end to end tests with tls enabled.')
 
   ########################################################
   # clean command

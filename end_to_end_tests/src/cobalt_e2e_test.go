@@ -258,6 +258,8 @@ var (
 	reportMasterUri = flag.String("report_master_uri", "", "The URI of the Report Master")
 	shufflerUri     = flag.String("shuffler_uri", "", "The URI of the Shuffler")
 
+	useTls = flag.Bool("use_tls", false, "Use TLS to connect to the Cobalt Services.")
+
 	analyzerPkPemFile = flag.String("analyzer_pk_pem_file", "", "Path to a file containing a PEM encoding of the public key of the Analyzer")
 	shufflerPkPemFile = flag.String("shuffler_pk_pem_file", "", "Path to a file containing a PEM encoding of the public key of the Shuffler")
 
@@ -320,7 +322,7 @@ func printWarningAndWait() {
 func init() {
 	flag.Parse()
 
-	reportClient = report_client.NewReportClient(customerId, projectId, *reportMasterUri, false, "")
+	reportClient = report_client.NewReportClient(customerId, projectId, *reportMasterUri, *useTls, "")
 
 	if *bigtableToolPath != "" {
 		// Since we are about to delete data from a real bigtable let's give a user a chance
@@ -491,6 +493,9 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 		"-repeat", strconv.Itoa(int(repeatCount)),
 		fmt.Sprintf("-skip_shuffler=%t", skipShuffler),
 		"-values", flagString(values))
+  if *useTls {
+    cmd.Args = append(cmd.Args, "-use_tls")
+  }
 	stdoutStderr, err := cmd.CombinedOutput()
 	message := string(stdoutStderr)
 	if len(message) > 0 {

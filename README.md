@@ -419,7 +419,11 @@ Its contents should be exactly the following
   "analyzer_service_static_ip" : "<optional-pre-allocated-static-ip>"",
   "shuffler_config_file" : "<optional-path-to-non-default-config-file>",
   "cobalt_config_dir" : "<optional-path-to-non-default-config-dir>",
-  "shuffler_use_memstore" : "<specify true or false. Default false.>"
+  "shuffler_use_memstore" : "<specify true or false. Default false.>",
+  "analyzer_public_uri": "<optional-public-uri-for-testing>",
+  "report_master_public_uri": "<optional-public-uri-for-testing>",
+  "shuffler_public_uri": "<optional-public-uri-for-testing>",
+  "test_with_tls": "<specify true or false. Default false.>"
 }
 ```
 
@@ -477,6 +481,12 @@ project name without the prefix and the colon.
 * shuffler_use_memstore: If not specified defaults to false meaning that the
   Shuffler will not use memstore but rather will use a persistent datastore.
   If specified it should be the string `true` or `false`.
+* analyzer_public_uri: The publicly-facing URI of the Analyzer Service. Used to
+  run end-to-end tests.
+* shuffler_public_uri: Same as above for the Shuffler.
+* report_master_public_uri: Same as above for the Report Master.
+* test_with_tls: If the services that the end-to-end tests are running against
+  use TLS, set this to "true". Any other value is "false".
 
 ### Deploying Cobalt to GKE
 

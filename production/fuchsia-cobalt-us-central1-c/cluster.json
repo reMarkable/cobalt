@@ -8,5 +8,8 @@
   "report_master_static_ip" : "104.197.76.143",
   "shuffler_config_file" : "shuffler/src/shuffler_config/config_v0.txt",
   "cobalt_config_dir" : "config/production",
-  "shuffler_use_memstore" : "true"
+  "shuffler_use_memstore" : "true",
+  "shuffler_public_uri": "shuffler.cobalt-api.fuchsia.com:443",
+  "report_master_public_uri": "reportmaster.cobalt-api.fuchsia.com:443",
+  "test_with_tls": "true"
 }
