@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -47,10 +48,10 @@ import (
 )
 
 var (
-	tls    = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
+	tls    = flag.Bool("tls", false, "Connection uses TLS if true or if the port for report_master_uri is 443, else plain TCP")
 	caFile = flag.String("ca_file", "", "The file containning the root CA certificate.")
 
-	reportMasterURI = flag.String("report_master_uri", "", "The URI of the ReportMaster Service")
+  reportMasterURI = flag.String("report_master_uri", "reportmaster.cobalt-api.fuchsia.com:443", "The hostname:port used to connect to the ReportMaster Service")
 
 	customerID     = flag.Uint("customer_id", 1, "The Cobalt customer ID.")
 	projectID      = flag.Uint("project_id", 1, "The Cobalt project ID.")
@@ -324,9 +325,13 @@ func (c *ReportClientCLI) ExecuteCommand() {
 func main() {
 	flag.Parse()
 
-	if *reportMasterURI == "" {
-		fmt.Println("The flag -report_master_uri is mandatory.")
+	_, port, err := net.SplitHostPort(*reportMasterURI)
+	if err != nil {
+		fmt.Println("Could not parse -report_master_uri:", err)
 		os.Exit(1)
+	}
+	if port == "443" {
+		*tls = true
 	}
 
 	cli := ReportClientCLI{
