@@ -24,6 +24,7 @@
 [submodule "third_party/glog"]
 	path = third_party/glog
 	url = https://fuchsia.googlesource.com/third_party/glog
+	branch = cobalt
 [submodule "third_party/go/src/github.com/syndtr/goleveldb"]
 	path = third_party/go/src/github.com/syndtr/goleveldb
 	url = https://github.com/syndtr/goleveldb
