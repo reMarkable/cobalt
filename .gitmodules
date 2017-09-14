@@ -4,6 +4,7 @@
 [submodule "third_party/googletest"]
 	path = third_party/googletest
 	url = https://fuchsia.googlesource.com/third_party/googletest/
+	branch = cobalt
 [submodule "third_party/go/src/github.com/golang/protobuf"]
 	path = third_party/go/src/github.com/golang/protobuf
 	url = https://fuchsia.googlesource.com/third_party/golang/protobuf/
