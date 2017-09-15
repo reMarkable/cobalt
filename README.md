@@ -420,10 +420,9 @@ Its contents should be exactly the following
   "shuffler_config_file" : "<optional-path-to-non-default-config-file>",
   "cobalt_config_dir" : "<optional-path-to-non-default-config-dir>",
   "shuffler_use_memstore" : "<specify true or false. Default false.>",
-  "analyzer_public_uri": "<optional-public-uri-for-testing>",
-  "report_master_public_uri": "<optional-public-uri-for-testing>",
-  "shuffler_public_uri": "<optional-public-uri-for-testing>",
-  "test_with_tls": "<specify true or false. Default false.>"
+  "report_master_preferred_address": "<host:port>",
+  "shuffler_preferred_address": "<host:port>",
+  "use_tls": "<specify true or false. Default false.>"
 }
 ```
 
@@ -438,6 +437,9 @@ For example:
   "bigtable_instance_name": "rudominer-test-1"
   "shuffler_config_file" : "shuffler/src/shuffler_config/config_demo.txt"
   "cobalt_config_dir" : "config/demo"
+  "shuffler_preferred_address": "shuffler.cobalt-api.fuchsia.com:443",
+  "report_master_preferred_address": "reportmaster.cobalt-api.fuchsia.com:443",
+  "use_tls": "true"
 }
 ```
 
@@ -481,12 +483,15 @@ project name without the prefix and the colon.
 * shuffler_use_memstore: If not specified defaults to false meaning that the
   Shuffler will not use memstore but rather will use a persistent datastore.
   If specified it should be the string `true` or `false`.
-* analyzer_public_uri: The publicly-facing URI of the Analyzer Service. Used to
-  run end-to-end tests.
-* shuffler_public_uri: Same as above for the Shuffler.
-* report_master_public_uri: Same as above for the Report Master.
-* test_with_tls: If the services that the end-to-end tests are running against
-  use TLS, set this to "true". Any other value is "false".
+* shuffler_preferred_address: The preferred connection string for targeting the
+  Shuffler, of the form <host>:<port>.  This has no effect on the server
+  deployment but rather acts as an instruction to clients regarding which
+  connection string to use when connecting to the server.
+* report_master_preferred_address: Same as above for the Report Master.
+* use_tls: This has no effect on the server deployment but rather acts as
+  an instruction to clients regarding whether or not to use TLS when connecting
+  to the Shuffler and ReportMaster. This should be set consistently with the
+  values of *shuffler_preferred_address* and *report_master_preferred_address*.
 
 ### Deploying Cobalt to GKE
 
@@ -617,10 +622,14 @@ following contents:
   "cluster_zone": "us-central1-c",
   "gce_pd_name": "cobalt",
   "bigtable_instance_name": "cobalt",
-  "shuffler_static_ip" : 130.211.188.46,
+  "shuffler_static_ip" : "130.211.188.46",
+  "report_master_static_ip" : "104.197.76.143",
   "shuffler_config_file" : "shuffler/src/shuffler_config/config_v0.txt",
   "cobalt_config_dir" : "config/production",
-  "shuffler_use_memstore" : "true"
+  "shuffler_use_memstore" : "true",
+  "shuffler_preferred_address": "shuffler.cobalt-api.fuchsia.com:443",
+  "report_master_preferred_address": "reportmaster.cobalt-api.fuchsia.com:443",
+  "use_tls": "true"
 }
 ```
 

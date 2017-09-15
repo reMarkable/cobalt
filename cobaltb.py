@@ -200,10 +200,11 @@ def _test(args):
         public_uris = container_util.get_public_uris(args.cluster_name,
             args.cloud_project_prefix, args.cloud_project_name,
             args.cluster_zone)
-        analyzer_uri = args.analyzer_public_uri or public_uris["analyzer"]
-        report_master_uri = (args.report_master_public_uri
+        analyzer_uri = public_uris["analyzer"]
+        report_master_uri = (args.report_master_preferred_address
             or public_uris["report_master"])
-        shuffler_uri = args.shuffler_public_uri or public_uris["shuffler"]
+        shuffler_uri = (args.shuffler_preferred_address
+            or public_uris["shuffler"])
         if args.use_cloud_bt:
           # use_cloud_bt means to use local instances of the Cobalt processes
           # connected to a Cloud Bigtable. cobalt_on_personal_cluster means to
@@ -253,7 +254,7 @@ def _test(args):
         test_args = test_args + [
           "-do_shuffler_threshold_test=false",
         ]
-        if _parse_bool(args.test_with_tls):
+        if _parse_bool(args.use_tls):
           test_args += [ "--use_tls" ]
     print '********************************************************'
     success = (test_runner.run_all_tests(
@@ -350,11 +351,12 @@ def _start_test_app(args):
   if args.cobalt_on_personal_cluster or args.production_dir:
     public_uris = container_util.get_public_uris(args.cluster_name,
         args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone)
-    analyzer_uri = public_uris["analyzer"]
-    shuffler_uri = public_uris["shuffler"]
+    shuffler_uri = args.shuffler_preferred_address or public_uris["shuffler"]
+    use_tls = _parse_bool(args.use_tls)
   process_starter.start_test_app(shuffler_uri=shuffler_uri,
       analyzer_uri=analyzer_uri,
       analyzer_pk_pem_file=analyzer_public_key_pem,
+      use_tls=use_tls,
       shuffler_pk_pem_file=shuffler_public_key_pem,
       cobalt_config_dir=args.cobalt_config_dir,
       project_id=args.project_id,
@@ -367,7 +369,8 @@ def _start_report_client(args):
   if args.cobalt_on_personal_cluster or args.production_dir:
     public_uris = container_util.get_public_uris(args.cluster_name,
         args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone)
-    report_master_uri = public_uris["report_master"]
+    report_master_uri = (args.report_master_preferred_address
+            or public_uris["report_master"])
   process_starter.start_report_client(
       report_master_uri=report_master_uri,
       project_id=args.project_id,
@@ -722,10 +725,9 @@ def main():
     'shuffler_config_file': '',
     'cobalt_config_dir': '',
     'shuffler_use_memstore' : '',
-    'analyzer_public_uri': '',
-    'shuffler_public_uri': '',
-    'report_master_public_uri': '',
-    'test_with_tls': '',
+    'shuffler_preferred_address': '',
+    'report_master_preferred_address': '',
+    'use_tls': '',
   }
   if production_cluster_json_file:
     _cluster_settings_from_json(cluster_settings, production_cluster_json_file)
@@ -850,18 +852,20 @@ def main():
       '-use_cloud_bt or -cobalt_on_personal_cluster are specified.'
       ' default=%s'%cluster_settings['bigtable_instance_name'],
       default=cluster_settings['bigtable_instance_name'])
-  sub_parser.add_argument('--shuffler_public_uri',
-      default=cluster_settings['shuffler_public_uri'],
-      help='URI of the shuffler to be used for end to end tests.')
-  sub_parser.add_argument('--analyzer_public_uri',
-      default=cluster_settings['shuffler_public_uri'],
-      help='URI of the analyzer to be used for end to end tests.')
-  sub_parser.add_argument('--report_master_public_uri',
-      default=cluster_settings['report_master_public_uri'],
-      help='URI of the report master to be used for end to end tests.')
-  sub_parser.add_argument('--test_with_tls',
-      default=cluster_settings['test_with_tls'] or 'false',
-      help='Run end to end tests with tls enabled.')
+  sub_parser.add_argument('--shuffler_preferred_address',
+      default=cluster_settings['shuffler_preferred_address'],
+      help='Address of the form <host>:<port> to be used by the '
+           'end to end test for connecting to the Shuffler. Optional. '
+           'default=%s'%cluster_settings['shuffler_preferred_address'])
+  sub_parser.add_argument('--report_master_preferred_address',
+      default=cluster_settings['report_master_preferred_address'],
+      help='Address of the form <host>:<port> to be used by the '
+           'end to end test for connecting to the ReportMaster. Optional. '
+           'default=%s'%cluster_settings['report_master_preferred_address'])
+  sub_parser.add_argument('--use_tls',
+      default=cluster_settings['use_tls'] or 'false',
+      help='Run end to end tests with tls enabled. '
+      'default=%s'%cluster_settings['use_tls'])
 
   ########################################################
   # clean command
@@ -994,6 +998,15 @@ def main():
     help='Specify the Cobalt project ID with which you wish to work. '
          'Must be in the range [1, 99]. Default = 1.',
     default=1)
+  sub_parser.add_argument('--shuffler_preferred_address',
+      default=cluster_settings['shuffler_preferred_address'],
+      help='Address of the form <host>:<port> to be used by the '
+           'test_app for connecting to the Shuffler. Optional. '
+           'default=%s'%cluster_settings['shuffler_preferred_address'])
+  sub_parser.add_argument('--use_tls',
+      default=cluster_settings['use_tls'] or 'false',
+      help='Run the test_app with tls enabled. '
+      'default=%s'%cluster_settings['use_tls'])
 
   sub_parser = start_subparsers.add_parser('report_client',
       parents=[parent_parser], help='Start the Cobalt report client.')
@@ -1010,6 +1023,11 @@ def main():
     help='Specify the Cobalt project ID from which you wish to query. '
          'Default = 1.',
     default=1)
+  sub_parser.add_argument('--report_master_preferred_address',
+      default=cluster_settings['report_master_preferred_address'],
+      help='Address of the form <host>:<port> to be used by the '
+           'report_client for connecting to the ReportMaster. Optional. '
+           'default=%s'%cluster_settings['report_master_preferred_address'])
 
   sub_parser = start_subparsers.add_parser('observation_querier',
       parents=[parent_parser], help='Start the Cobalt ObservationStore '

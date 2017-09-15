@@ -620,7 +620,7 @@ def get_public_uris(cluster_name,
 
   The returned dictionary will have keys "analyzer",
   "report_master", "shuffler". The value for each key will either
-  be None or a string representing a URI.
+  be None or a string containing an <ip-address>:<port> pair.
 
   """
 
