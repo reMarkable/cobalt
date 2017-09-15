@@ -244,7 +244,7 @@ class TestingQueryReportsResponseWriter
     : public grpc::WriterInterface<QueryReportsResponse> {
  public:
   bool Write(const QueryReportsResponse& response,
-             const grpc::WriteOptions& options) override {
+             grpc::WriteOptions options) override {
     responses.emplace_back(response);
     return true;
   }

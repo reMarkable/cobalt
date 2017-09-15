@@ -118,14 +118,10 @@ REPORT_MASTER_IMAGE_NAME = "report-master"
 SHUFFLER_IMAGE_NAME = "shuffler"
 
 COBALT_COMMON_SO_FILES = [os.path.join(SYS_ROOT_DIR, 'lib', f) for f in
-    ["libgoogleapis.so",
-     "libgrpc.so.1",
-     "libgrpc++.so.1",
-     "libprotobuf.so.10",
-     "libunwind.so.1",
-    ]]
+    ["libunwind.so.1"]]
 
-ROOTS_PEM = os.path.join(SYS_ROOT_DIR, 'share', 'grpc', 'roots.pem')
+ROOTS_PEM = os.path.join(SRC_ROOT_DIR, 'third_party', 'grpc', 'etc',
+                         'roots.pem')
 
 ANALYZER_CONFIG_FILE_NAMES = [
     "registered_encodings.txt",

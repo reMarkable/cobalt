@@ -16,5 +16,5 @@
 add_executable(key_generator
                key_generator_main.cc)
 target_link_libraries(key_generator
-                      cobalt_crypto
-                      glog)
+                      cobalt_crypto)
+add_cobalt_dependencies(key_generator)

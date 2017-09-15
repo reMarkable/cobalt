@@ -12,14 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Base cobalt image.  It's an ubuntu system with gRPC and protobuf
+# Base cobalt image.  It's an Ubuntu system with a couple of extra bits.
 
 FROM ubuntu:14.04
 
-COPY libgoogleapis.so /usr/lib/
-COPY libgrpc.so.1 /usr/lib/
-COPY libgrpc++.so.1 /usr/lib/
-COPY libprotobuf.so.10 /usr/lib/
 COPY libunwind.so.1 /usr/lib/
 COPY roots.pem /usr/share/grpc/
 

@@ -55,41 +55,6 @@ wait for the report to complete, and finally checks the result of the report.
 The code for the end-to-end test is written in Go and is in the
 *end_to_end_tests/src* directory.
 
-## Generating PEM Files
-Cobalt uses a custom public-key encryption scheme in which the Encoder encrypts
-Observations to the public key of the Analyzer before sending them to the
-Shuffler. This is a key part of the design of Cobalt and we refer to it
-via the slogan "The Shuffler shuffles sealed envelopes" meaning that the
-Shuffler does not get to see the data that it is shuffling. In order for this
-to work it is necessary for there to be public/private key PEM files that
-can be read by the Encoder and the Analyzer. The end-to-end test uses the
-PEM files located in the *end_to_end_tests* directory named
-*analyzer_private_key.pem.e2e_test* and
-*analyzer_public_key.pem.e2e_test*. But for running Cobalt in any other
-environment we do not want to check in a private key into source control
-and so we ask each developer to generate their own key pair.
-
-`./cobaltb.py generate_keys`
-
-Then follow the instructions to copy the generated contents into files
-named *analyzer_public.pem* and *analyzer_private.pem* in your
-source root directory. If these files are present they will automatically
-get used by several of the following steps including running the demo manually
-and deploying to Google Container Engine.
-
-### Encryption to the Shuffler
-In addition to the encryption to the Analyzer mentioned above there is a second
-layer of encryption in which *Envelopes* are encrypted to the public key of the
-*Shuffler*. The purpose of this layer of encryption is that TLS between the
-Encoder and the Shuffler may be terminated prior to reaching the Shuffler in
-some load-balanced environments. We need a second public/private key pair for
-this encryption. The end-to-end test uses the PEM files located in the
-*end_to_end_tests* directory named *shuffler_private_key.pem.e2e_test* and
-*shuffler_public_key.pem.e2e_test*. But for running Cobalt in any other
-environment follow the instructions above for generating *analyzer_public.pem*
-and *analyzer_private.pem* but this time create two new files named
-*shuffler_public.pem* and *shuffler_private.pem*
-
 ## Running the Demo Manually
 You can run a complete Cobalt system locally (for example in order to give a
 demo) as follows. Open seven different command-line console windows and run the
@@ -163,6 +128,41 @@ Analyzer
 * Use the demo_reporter to generate a report
   * Type `2` to run the Forculus report demo
   * Open the displayed URL in your browser and see the visualization.
+
+## Generating PEM Files
+Cobalt uses a custom public-key encryption scheme in which the Encoder encrypts
+Observations to the public key of the Analyzer before sending them to the
+Shuffler. This is a key part of the design of Cobalt and we refer to it
+via the slogan "The Shuffler shuffles sealed envelopes" meaning that the
+Shuffler does not get to see the data that it is shuffling. In order for this
+to work it is necessary for there to be public/private key PEM files that
+can be read by the Encoder and the Analyzer. The end-to-end test uses the
+PEM files located in the *end_to_end_tests* directory named
+*analyzer_private_key.pem.e2e_test* and
+*analyzer_public_key.pem.e2e_test*. But for running Cobalt in any other
+environment we do not want to check in a private key into source control
+and so we ask each developer to generate their own key pair.
+
+`./cobaltb.py generate_keys`
+
+Then follow the instructions to copy the generated contents into files
+named *analyzer_public.pem* and *analyzer_private.pem* in your
+source root directory. If these files are present they will automatically
+get used by several of the commands including running the demo manually
+and deploying to Google Container Engine (discussed below).
+
+### Encryption to the Shuffler
+In addition to the encryption to the Analyzer mentioned above there is a second
+layer of encryption in which *Envelopes* are encrypted to the public key of the
+*Shuffler*. The purpose of this layer of encryption is that TLS between the
+Encoder and the Shuffler may be terminated prior to reaching the Shuffler in
+some load-balanced environments. We need a second public/private key pair for
+this encryption. The end-to-end test uses the PEM files located in the
+*end_to_end_tests* directory named *shuffler_private_key.pem.e2e_test* and
+*shuffler_public_key.pem.e2e_test*. But for running Cobalt in any other
+environment follow the instructions above for generating *analyzer_public.pem*
+and *analyzer_private.pem* but this time create two new files named
+*shuffler_public.pem* and *shuffler_private.pem*
 
 ## Using TLS
 Communication to the Shuffler, Analyzer and ReportMaster uses gRPC which allows

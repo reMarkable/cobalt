@@ -16,5 +16,5 @@
 add_executable(bigtable_tool
                bigtable_tool_main.cc)
 target_link_libraries(bigtable_tool
-                      analyzer_store
-                      glog)
+                      analyzer_store)
+add_cobalt_dependencies(bigtable_tool)

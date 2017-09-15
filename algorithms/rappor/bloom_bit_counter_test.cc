@@ -40,7 +40,7 @@ RapporObservation RapporObservationFromString(
     uint32_t cohort, const std::string& binary_string) {
   RapporObservation obs;
   obs.set_cohort(cohort);
-  obs.set_data(std::move(BinaryStringToData(binary_string)));
+  obs.set_data(BinaryStringToData(binary_string));
   return obs;
 }
 

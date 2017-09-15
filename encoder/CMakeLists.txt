@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${COBALT_PROTO_HDRS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CONFIG_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 
 # client_secret library
 add_library(client_secret client_secret.cc)
 target_link_libraries(client_secret cobalt_crypto)
+add_cobalt_dependencies(client_secret)
 
 # encoder library
 add_library(encoder
@@ -26,21 +27,20 @@ add_library(encoder
             send_retryer.cc
             shipping_manager.cc
             shuffler_client.cc
-            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
+            ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(encoder
                       client_secret
                       encrypted_message_util
                       forculus_encrypter
-                      glog
                       rappor_encoder
                       shuffler_grpc_client)
+add_cobalt_dependencies(encoder)
 
 add_executable(encoder_tests
                client_secret_test.cc encoder_test.cc envelope_maker_test.cc
                send_retryer_test.cc shipping_manager_test.cc
                shuffler_client_test.cc)
 target_link_libraries(encoder_tests
-                      gtest gtest_main client_secret encoder
-                      ${PROTOBUF_LIBRARY})
-set_target_properties(encoder_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+                      client_secret
+                      encoder)
+add_cobalt_test_dependencies(encoder_tests ${DIR_GTESTS})

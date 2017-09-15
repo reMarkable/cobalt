@@ -17,21 +17,19 @@ add_library(test_app test_app.cc)
 target_link_libraries(test_app
                       analyzer_grpc_client
                       encoder
-                      glog
                       pem_util)
+add_cobalt_dependencies(test_app)
 
 # Build the cobalt_test_app executable.
 add_executable(cobalt_test_app
                test_app_main.cc)
 target_link_libraries(cobalt_test_app
-                      test_app
-                      glog)
+                      test_app)
+add_cobalt_dependencies(cobalt_test_app)
 
 # Build the tests
 add_executable(test_app_tests
                test_app_test.cc)
 target_link_libraries(test_app_tests
-                      test_app
-                      gtest gtest_main)
-set_target_properties(test_app_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+                      test_app)
+add_cobalt_test_dependencies(test_app_tests ${DIR_GTESTS})

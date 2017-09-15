@@ -15,69 +15,47 @@
 # Defines the output of the command that runs protoc on the .proto files located
 # in the report_master directory.
 
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS analyzer.proto)
+declare_proto_files_are_generated()
 
-# generate the gRPC service.  CMake doesn't support it by default.
-set(PROTO_GRPC "${CMAKE_CURRENT_BINARY_DIR}/analyzer.grpc.pb.cc")
-add_custom_command(OUTPUT ${PROTO_GRPC}
-    COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/analyzer.proto
-                -I ${CMAKE_SOURCE_DIR}
-                --grpc_out=${CMAKE_BINARY_DIR}
-                --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
-    DEPENDS analyzer.proto
-)
+# Generate the C++ bindings for the analyzer gRPC service.
+# Also compile the generated C++ files into a static library.
+cobalt_make_protobuf_cpp_lib(analyzer_grpc_client
+    ANALZER_SERVICE_PROTO_HDRS
+    true
+    analyzer)
 
-add_custom_target(build_analyzer_protos
-                  DEPENDS ${PROTO_SRCS}
-                  DEPENDS ${PROTO_GRPC})
-
-# Generate the Go bindings for Analyzer service.
-set(ANALYZER_PB_GO "${GO_PROTO_GEN_SRC_DIR}/analyzer/analyzer_service/analyzer.pb.go")
-
-# This allows us to indicate below that analyzer.pb.go depends on observation.pb.go
-set_source_files_properties(${OBSERVATION_PB_GO} PROPERTIES GENERATED TRUE)
-
-add_custom_command(OUTPUT "${ANALYZER_PB_GO}"
-    COMMAND ${GO_PROTOC}
-            ${CMAKE_CURRENT_SOURCE_DIR}/analyzer.proto
-            -I ${CMAKE_SOURCE_DIR}
-            --go_out=plugins=grpc,Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_SRC_DIR}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/analyzer.proto
-    DEPENDS ${OBSERVATION_PB_GO}
-)
-
-add_custom_target(build_analyzer_pb_go
-                  DEPENDS ${ANALYZER_PB_GO})
-# end: Generate the Go bindings for the Analyzer service.
-
-set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
-
-add_library(analyzer_grpc_client
-            ${PROTO_GRPC} ${PROTO_SRCS})
+# Generate the Go bindings for Analyzer gRPC service.
+set(use_grpc true)
+cobalt_protobuf_generate_go(generate_analyzer_pb_go_files
+                            ANALYZER_PB_GO_FILES
+                            use_grpc
+                            analyzer)
+add_dependencies(generate_analyzer_pb_go_files
+                 generate_config_pb_go_files
+                 generate_cobalt_pb_go_files)
 
 # Build the analyzer-service library
 add_library(analyzer_service_lib
             analyzer_service.cc
-            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS} ${PROTO_SRCS})
+            ${ANALZER_SERVICE_PROTO_HDRS}
+            ${CONFIG_PROTO_HDRS}
+            ${COBALT_PROTO_HDRS})
 target_link_libraries(analyzer_service_lib
                       analyzer_grpc_client
                       analyzer_store
                       encrypted_message_util
-                      pem_util
-                      glog
-                      ${PROTOBUF_LIBRARY})
+                      pem_util)
+add_cobalt_dependencies(analyzer_service_lib)
 
 # Build the analyzer_service executable
 add_executable(analyzer_service main.cc)
 target_link_libraries(analyzer_service analyzer_service_lib)
+add_cobalt_dependencies(analyzer_service)
 
 # Build the tests
 add_executable(analyzer_service_tests
                ${CMAKE_SOURCE_DIR}/analyzer/store/memory_store.cc
                analyzer_service_test.cc)
 target_link_libraries(analyzer_service_tests
-                      analyzer_service_lib
-                      gtest gtest_main)
-set_target_properties(analyzer_service_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+                      analyzer_service_lib)
+add_cobalt_test_dependencies(analyzer_service_tests ${DIR_GTESTS})

@@ -57,6 +57,8 @@ PERSONAL_CLUSTER_JSON_FILE = os.path.join(THIS_DIR, 'personal_cluster.json')
 BIGTABLE_TOOL_PATH = \
     os.path.join(OUT_DIR, 'tools', 'bigtable_tool', 'bigtable_tool')
 OPEN_SSL_CONFIG_FILE = os.path.join(THIS_DIR, 'self-signed-with-ip.cnf')
+GRPC_PEM_ROOTS = os.path.join(THIS_DIR, "third_party", "grpc",
+                              "etc", "roots.pem")
 
 _logger = logging.getLogger()
 _verbose_count = 0
@@ -1374,7 +1376,7 @@ def main():
       'necessary. Also associates your local computer with a particular '
       'GKE cluster to which you will be deploying.')
   sub_parser.set_defaults(func=_deploy_authenticate)
-  _add_cloud_project_args(sub_parser, cluster_settings)
+  _add_cloud_access_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('build',
       parents=[parent_parser], help='Rebuild all Docker images. '
@@ -1528,8 +1530,7 @@ def main():
   os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = \
       bt_admin_service_account_credentials_file
 
-  os.environ["GRPC_DEFAULT_SSL_ROOTS_FILE_PATH"] = os.path.abspath(
-      os.path.join(SYSROOT_DIR, 'share', 'grpc', 'roots.pem'))
+  os.environ["GRPC_DEFAULT_SSL_ROOTS_FILE_PATH"] = GRPC_PEM_ROOTS
 
   os.environ["GOROOT"] = "%s/golang" % SYSROOT_DIR
 

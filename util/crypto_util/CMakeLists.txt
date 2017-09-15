@@ -16,13 +16,12 @@ include_directories(BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/third_party/boringssl/in
 
 add_library(cobalt_crypto base64.cc cipher.cc errors.cc hash.cc mac.cc
             random.cc)
-target_link_libraries(cobalt_crypto crypto)
+add_cobalt_dependencies(cobalt_crypto)
 
 # Build an executable test binary. Include gtest headers at compile time
 # and gtest libraries at link time. Write the executable to the
 # out/gtests directory
 add_executable(cobalt_crypto_test base64_test.cc cipher_test.cc hash_test.cc
                mac_test.cc random_test.cc)
-target_link_libraries(cobalt_crypto_test gtest gtest_main cobalt_crypto)
-set_target_properties(cobalt_crypto_test PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+target_link_libraries(cobalt_crypto_test cobalt_crypto)
+add_cobalt_test_dependencies(cobalt_crypto_test ${DIR_GTESTS})

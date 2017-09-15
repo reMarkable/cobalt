@@ -15,23 +15,24 @@
 # The rappor directory contains the implementation of the RAPPOR encoder
 # (and will in the future contain the RAPPOR analysis code also.)
 
-set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${COBALT_PROTO_HDRS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CONFIG_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 
-add_library(rappor_config_validator rappor_config_validator.cc ${CONFIG_PROTO_SRCS})
+add_library(rappor_config_validator rappor_config_validator.cc ${CONFIG_PROTO_HDRS})
 target_link_libraries(rappor_config_validator
-                      client_secret glog ${PROTOBUF_LIBRARY})
+                      client_secret)
+add_cobalt_dependencies(rappor_config_validator)
 
 add_library(rappor_encoder rappor_encoder.cc
-            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
+            ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(rappor_encoder
-                      client_secret cobalt_crypto glog ${PROTOBUF_LIBRARY} rappor_config_validator)
+                      client_secret cobalt_crypto rappor_config_validator)
 
 add_library(rappor_analyzer
             basic_rappor_analyzer.cc bloom_bit_counter.cc rappor_analyzer.cc
-            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
+            ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(rappor_analyzer
-                      cobalt_crypto glog ${PROTOBUF_LIBRARY} rappor_config_validator)
+                      cobalt_crypto rappor_config_validator)
 
 # The test depends directly on Boring SSL for the deterministic random.
 include_directories(BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/third_party/boringssl/include")
@@ -39,6 +40,5 @@ add_executable(rappor_tests
                basic_rappor_analyzer_test.cc
                bloom_bit_counter_test rappor_encoder_test.cc rappor_analyzer_test.cc
                rappor_test_utils.cc rappor_test_utils_test.cc)
-target_link_libraries(rappor_tests rappor_encoder rappor_analyzer rappor_analyzer gtest gtest_main)
-set_target_properties(rappor_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+target_link_libraries(rappor_tests rappor_encoder rappor_analyzer rappor_analyzer)
+add_cobalt_test_dependencies(rappor_tests ${DIR_GTESTS})

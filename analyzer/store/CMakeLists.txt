@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${REPORT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${COBALT_PROTO_HDRS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CONFIG_PROTO_HDRS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${REPORT_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 
 # Build the analyzer store library
 add_library(analyzer_store
@@ -24,15 +24,14 @@ add_library(analyzer_store
             data_store.cc
             observation_store.cc
             report_store.cc
-            ${COBALT_PROTO_SRCS}
-            ${REPORT_PROTO_SRCS})
-
+            ${COBALT_PROTO_HDRS}
+            ${REPORT_PROTO_HDRS})
 target_link_libraries(analyzer_store
                       analyzer_config
                       cobalt_crypto
-                      glog
-                      googleapis
-                      ${PROTOBUF_LIBRARY})
+                      bigtable_grpc_client
+                      report_master_proto_lib)
+add_cobalt_dependencies(analyzer_store)
 
 add_library(report_store_testutils report_store_test_utils.cc)
 target_link_libraries(report_store_testutils analyzer_store)
@@ -43,10 +42,8 @@ add_executable(analyzer_store_tests
                memory_store_test.cc observation_store_test.cc report_store_test.cc)
 target_link_libraries(analyzer_store_tests
                       analyzer_store
-                      gtest gtest_main
                       report_store_testutils)
-set_target_properties(analyzer_store_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+add_cobalt_test_dependencies(analyzer_store_tests ${DIR_GTESTS})
 
 # Versions of our tests that expect the existence of a running local instance of
 # the Bigtable Emulator process.
@@ -56,10 +53,8 @@ add_executable(bigtable_emulator_tests
                report_store_emulator_test.cc)
 target_link_libraries(bigtable_emulator_tests
                       analyzer_store
-                      gtest gtest_main
                       report_store_testutils)
-set_target_properties(bigtable_emulator_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})
+add_cobalt_test_dependencies(bigtable_emulator_tests ${DIR_GTESTS_BT_EMULATOR})
 
 # Versions of our tests that connect to the real Cloud Bigtable. See
 # notes in bigtabe_cloud_helper.h for how this works.
@@ -69,7 +64,5 @@ add_executable(bigtable_cloud_tests
                report_store_cloud_test.cc)
 target_link_libraries(bigtable_cloud_tests
                       analyzer_store
-                      gtest gtest_main
                       report_store_testutils)
-set_target_properties(bigtable_cloud_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})
+add_cobalt_test_dependencies(bigtable_cloud_tests ${DIR_GTESTS_CLOUD_BT})

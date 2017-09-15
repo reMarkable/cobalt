@@ -15,23 +15,28 @@
 # The forculus directory contains the implementation of the ForculusEncoder
 # and the ForculusDecoder.
 
-set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${COBALT_PROTO_HDRS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CONFIG_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 
-add_library(forculus_utils ${CONFIG_PROTO_SRCS}
+add_library(forculus_utils ${CONFIG_PROTO_HDRS}
             forculus_utils.cc polynomial_computations.cc field_element.cc)
-target_link_libraries(forculus_utils datetime_util ${PROTOBUF_LIBRARY})
-add_dependencies(forculus_utils build_protos)
+target_link_libraries(forculus_utils
+                      config_proto_lib
+                      datetime_util)
+add_cobalt_dependencies(forculus_utils)
 
 add_library(forculus_encrypter forculus_encrypter.cc
-            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
+            ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(forculus_encrypter
-                      client_secret forculus_utils ${PROTOBUF_LIBRARY})
+                      client_secret forculus_utils
+                      cobalt_proto_lib config_proto_lib)
 
 add_library(forculus_analyzer forculus_analyzer.cc forculus_decrypter.cc
-            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS})
+            ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(forculus_analyzer
-                      forculus_utils glog ${PROTOBUF_LIBRARY})
+                      cobalt_proto_lib
+                      config_proto_lib
+                      forculus_utils)
 
 # Build an executable test binary. Include gtest headers at compile time
 # and gtest libraries at link time. Write the executable to the
@@ -43,17 +48,12 @@ add_executable(forculus_tests
                forculus_decrypter_test.cc
                forculus_analyzer_test.cc)
 target_link_libraries(forculus_tests
-                      forculus_encrypter forculus_analyzer
-                      gtest gtest_main)
-set_target_properties(forculus_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
-
+                      forculus_encrypter forculus_analyzer)
+add_cobalt_test_dependencies(forculus_tests ${DIR_GTESTS})
 
 # Build performance test binary
 add_executable(forculus_performance_test
                forculus_performance_test.cc)
 target_link_libraries(forculus_performance_test
-                      forculus_encrypter forculus_analyzer
-                      gtest gtest_main)
-set_target_properties(forculus_performance_test PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_PERF_TESTS})
+                      forculus_encrypter forculus_analyzer)
+add_cobalt_test_dependencies(forculus_performance_test ${DIR_PERF_TESTS})

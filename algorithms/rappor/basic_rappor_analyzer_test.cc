@@ -39,7 +39,7 @@ namespace {
 BasicRapporObservation BasicRapporObservationFromString(
     const std::string& binary_string) {
   BasicRapporObservation obs;
-  obs.set_data(std::move(BinaryStringToData(binary_string)));
+  obs.set_data(BinaryStringToData(binary_string));
   return obs;
 }
 

@@ -19,7 +19,7 @@
 set -e
 
 # Latest version of sysroot.  Update it after uploading.
-readonly VERSION="b5449f20690082433c97429b3121216dab909ce8"
+readonly VERSION="8827a901321f9e1483459fa3fe5167e30d0d7698"
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PREFIX="${SCRIPT_DIR}/sysroot"
@@ -132,66 +132,6 @@ if [ ! -f $PREFIX/bin/cmake ] ||
     tar xf go.tar.bz2 -C ../golang --strip-components 1
     ln -s ../golang/bin/go ../bin/go
     ln -s ../golang/bin/gofmt ../bin/gofmt
-fi
-
-# Install gflags
-if [ ! -f $PREFIX/lib/libgflags.a ] ; then
-    cd $WD
-    mkdir gflags
-    cd gflags
-    cmake -DCMAKE_INSTALL_PREFIX=$PREFIX $SCRIPT_DIR/third_party/gflags
-    make install
-fi
-
-# Install glog
-if [ ! -f $PREFIX/lib/libglog.a ] ; then
-    cd $WD
-    mkdir glog
-    cd glog
-    cmake -DCMAKE_INSTALL_PREFIX=$PREFIX $SCRIPT_DIR/third_party/glog
-    make install
-fi
-
-# Install protobuf 3
-if [ ! -f $PREFIX/bin/protoc ] ||
-   [ "$(protoc --version | awk '{print $2}')" != "3.0.0" ] ; then
-    cd $WD
-    wget https://github.com/google/protobuf/releases/download/v3.0.2/protobuf-cpp-3.0.2.tar.gz
-    tar zxf protobuf-cpp-3.0.2.tar.gz
-    cd protobuf-3.0.2
-    ./configure --prefix=$PREFIX
-    make install
-fi
-
-# Install gRPC
-if [ ! -f $PREFIX/bin/grpc_cpp_plugin ] ; then
-    cd $WD
-    git clone -b v1.0.0 https://github.com/grpc/grpc
-    cd grpc
-    git submodule update --init
-    make prefix=$PREFIX install
-fi
-
-# Install google APIs (C++ protobuf stubs)
-if [ ! -f $PREFIX/lib/libgoogleapis.so ] ; then
-    cd $WD
-    git clone https://github.com/googleapis/googleapis.git
-    cd googleapis
-    git checkout 2360492797130743eb4c78951fbef6023c1504b8
-    make LANGUAGE=cpp GPRCPLUGIN=`which grpc_cpp_plugin`
-
-    echo
-    echo Compiling libgoogleapis.  This will take 5 minutes.
-    cd gens
-    find . -name \*.cc \
-      | xargs clang++ -o libgoogleapis.so -fPIC -shared --std=c++11 -I .
-
-    mv libgoogleapis.so $PREFIX/lib
-
-    # copy headers
-    cd google
-    mkdir -p $PREFIX/include/google
-    find . -name \*.h -exec cp --parents {} $PREFIX/include/google/ \;
 fi
 
 # Build and install protoc-gen-go binary

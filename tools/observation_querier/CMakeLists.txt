@@ -15,22 +15,20 @@
 # Build the observation_querier library.
 add_library(observation_querier observation_querier.cc)
 target_link_libraries(observation_querier
-                      analyzer_store
-                      glog)
+                      analyzer_store)
+add_cobalt_dependencies(observation_querier)
 
 # Build the query_observations executable.
 add_executable(query_observations
                observation_querier_main.cc)
 target_link_libraries(query_observations
-                      observation_querier
-                      glog)
+                      observation_querier)
+add_cobalt_dependencies(query_observations)
 
 # Build the tests
 add_executable(observation_querier_tests
                ${CMAKE_SOURCE_DIR}/analyzer/store/memory_store.cc
                observation_querier_test.cc)
 target_link_libraries(observation_querier_tests
-                      observation_querier
-                      gtest gtest_main)
-set_target_properties(observation_querier_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+                      observation_querier)
+add_cobalt_test_dependencies(observation_querier_tests ${DIR_GTESTS})

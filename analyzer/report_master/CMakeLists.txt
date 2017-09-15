@@ -12,74 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Compile report_master.proto and report_internal.proto
-set(REPORT_PROTO_SRCS
-    "${CMAKE_CURRENT_BINARY_DIR}/report_master.pb.cc"
-    "${CMAKE_CURRENT_BINARY_DIR}/report_internal.pb.cc")
-set(REPORT_PROTO_HDRS
-    "${CMAKE_CURRENT_BINARY_DIR}/report_master.pb.h"
-    "${CMAKE_CURRENT_BINARY_DIR}/report_internal.pb.h")
-add_custom_command(OUTPUT ${REPORT_PROTO_HDRS}
-                   OUTPUT ${REPORT_PROTO_SRCS}
-    COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-                   ${CMAKE_CURRENT_SOURCE_DIR}/report_internal.proto
-        -I ${CMAKE_SOURCE_DIR}
-        --cpp_out=${CMAKE_BINARY_DIR}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_internal.proto
-)
+declare_proto_files_are_generated()
 
-# generate the gRPC service.  CMake doesn't support it by default.
-set(PROTO_GRPC "${CMAKE_CURRENT_BINARY_DIR}/report_master.grpc.pb.cc")
-add_custom_command(OUTPUT ${PROTO_GRPC}
-    COMMAND protoc ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-                -I ${CMAKE_SOURCE_DIR}
-                --grpc_out=${CMAKE_BINARY_DIR}
-                --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-)
-
-# generate the descriptor set to configure cloud endpoints.
-set(PROTO_DESCRIPTOR "${CMAKE_CURRENT_BINARY_DIR}/report_master.descriptor")
-add_custom_command(OUTPUT ${PROTO_DESCRIPTOR}
-    COMMAND protoc -I ${CMAKE_SOURCE_DIR}
-                --include_imports
-                --include_source_info ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-                --descriptor_set_out ${PROTO_DESCRIPTOR}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-)
-
-set(REPORT_PROTO_SRCS ${REPORT_PROTO_SRCS} ${PROTO_GRPC} ${PROTO_DESCRIPTOR})
-
-add_custom_target(build_report_protos
-                  DEPENDS ${REPORT_PROTO_SRCS})
-
+# Generate the C++ bindings for the ReportMaster gRPC service.
+# Also compile the generated C++ files into a static library.
+cobalt_make_protobuf_cpp_lib(report_master_proto_lib
+    REPORT_PROTO_HDRS
+    true
+    report_master report_internal)
 
 # Generate the Go bindings for ReportMaster gRPC service.
-set(REPORT_MASTER_PB_GO "${GO_PROTO_GEN_SRC_DIR}/analyzer/report_master/report_master.pb.go")
-set(ENCODINGS_PB_GO "${GO_PROTO_GEN_SRC_DIR}/config/encodings.pb.go")
+cobalt_protobuf_generate_go(generate_report_master_pb_go_files
+                            REPORT_MASTER_PB_GO_FILES
+                            true
+                            report_master)
+add_dependencies(generate_report_master_pb_go_files
+                 generate_config_pb_go_files
+                 generate_cobalt_pb_go_files)
 
-# This allows us to indicate below that report_master.pb.go depends on
-# observation.pb.go and encodings.pb.go
-set_source_files_properties(${OBSERVATION_PB_GO} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${ENCODINGS_PB_GO} PROPERTIES GENERATED TRUE)
-
-add_custom_command(OUTPUT "${REPORT_MASTER_PB_GO}"
-    COMMAND ${GO_PROTOC}
-            ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-            -I ${CMAKE_SOURCE_DIR}
-            --go_out=plugins=grpc,Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_SRC_DIR}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/report_master.proto
-    DEPENDS ${OBSERVATION_PB_GO}
-    DEPENDS ${ENCODINGS_PB_GO}
-)
-
-add_custom_target(build_report_master_pb_go
-                  DEPENDS ${REPORT_MASTER_PB_GO})
-# end: Generate the Go bindings for the ReportMaster gRPC service.
-
-set_source_files_properties(${COBALT_PROTO_SRCS} PROPERTIES GENERATED TRUE)
-set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+# Generate the descriptor set to configure cloud endpoints for the ReportMaster service.
+cobalt_generate_protobuf_descriptors(generate_report_master_descriptor
+                                     REPORT_MASTER_PROTO_DESCRIPTOR
+                                     report_master)
 
 # Build the ReportMaster library
 add_library(analyzer_report_master_lib
@@ -87,21 +41,22 @@ add_library(analyzer_report_master_lib
             report_executor.cc
             report_generator.cc
             report_master_service.cc
-            ${COBALT_PROTO_SRCS} ${CONFIG_PROTO_SRCS} ${REPORT_PROTO_SRCS} )
+            ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS} ${REPORT_PROTO_HDRS} )
 target_link_libraries(analyzer_report_master_lib
                       analyzer_config
                       analyzer_store
                       cobalt_crypto
                       pem_util
                       forculus_analyzer
-                      glog
                       rappor_analyzer
-                      ${PROTOBUF_LIBRARY})
+                      report_master_proto_lib)
+add_cobalt_dependencies(analyzer_report_master_lib)
 
 # Build the Report Master executable
 add_executable(analyzer_report_master main.cc)
 target_link_libraries(analyzer_report_master
                       analyzer_report_master_lib)
+add_cobalt_dependencies(analyzer_report_master)
 
 # Build the tests
 add_executable(analyzer_report_master_tests
@@ -113,10 +68,8 @@ add_executable(analyzer_report_master_tests
 target_link_libraries(analyzer_report_master_tests
                       analyzer_report_master_lib
                       encoder
-                      gtest gtest_main
                       report_store_testutils)
-set_target_properties(analyzer_report_master_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS})
+add_cobalt_test_dependencies(analyzer_report_master_tests ${DIR_GTESTS})
 
 # Versions of our tests that expect the existence of a running local instance of
 # the Bigtable Emulator process.
@@ -127,10 +80,8 @@ add_executable(analyzer_report_master_emulator_tests
 target_link_libraries(analyzer_report_master_emulator_tests
                       analyzer_report_master_lib
                       encoder
-                      gtest gtest_main
                       report_store_testutils)
-set_target_properties(analyzer_report_master_emulator_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_BT_EMULATOR})
+add_cobalt_test_dependencies(analyzer_report_master_emulator_tests ${DIR_GTESTS_BT_EMULATOR})
 
 # Versions of our tests that connect to the real Cloud Bigtable. See
 # notes in bigtabe_cloud_helper.h for how this works.
@@ -141,7 +92,5 @@ add_executable(analyzer_report_master_cloud_tests
 target_link_libraries(analyzer_report_master_cloud_tests
                       analyzer_report_master_lib
                       encoder
-                      gtest gtest_main
                       report_store_testutils)
-set_target_properties(analyzer_report_master_cloud_tests PROPERTIES
-                      RUNTIME_OUTPUT_DIRECTORY ${DIR_GTESTS_CLOUD_BT})
+add_cobalt_test_dependencies(analyzer_report_master_cloud_tests ${DIR_GTESTS_CLOUD_BT})

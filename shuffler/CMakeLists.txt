@@ -12,45 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Generate the C++ and Go bindings for Shuffler's protocol buffers
-set(SHUFFLER_PB_GO "${GO_PROTO_GEN_SRC_DIR}/shuffler/shuffler.pb.go")
-set(CONFIG_PB_GO "${GO_PROTO_GEN_SRC_DIR}/shuffler/config.pb.go")
-set(SHUFFLER_DB_PB_GO "${GO_PROTO_GEN_SRC_DIR}/shuffler/shuffler_db.pb.go")
 set(ANALYZER_PB_GO "${GO_PROTO_GEN_SRC_DIR}/analyzer/analyzer_service/analyzer.pb.go")
-add_custom_command(OUTPUT ${SHUFFLER_PB_GO}
-                          ${CONFIG_PB_GO}
-                          ${SHUFFLER_DB_PB_GO}
-                          ${CMAKE_CURRENT_BINARY_DIR}/shuffler.grpc.pb.cc
-                          ${CMAKE_CURRENT_BINARY_DIR}/shuffler.pb.cc
-    COMMAND ${GO_PROTOC}
-            ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
-            ${CMAKE_CURRENT_SOURCE_DIR}/config.proto
-            ${CMAKE_CURRENT_SOURCE_DIR}/shuffler_db.proto
-            -I ${CMAKE_SOURCE_DIR}
-            -I ${CMAKE_CURRENT_SOURCE_DIR}
-            -I ${CMAKE_SOURCE_DIR}/third_party/go/src
-            --go_out=plugins=grpc,Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${GO_PROTO_GEN_SRC_DIR}
-            --plugin=protoc-gen-grpc=`which grpc_cpp_plugin`
-            --grpc_out=${CMAKE_BINARY_DIR}
-            --cpp_out=${CMAKE_BINARY_DIR}
-    DEPENDS shuffler.proto
-    DEPENDS shuffler_db.proto
-    DEPENDS config.proto
-    DEPENDS ${ENCRYPED_MESSAGE_PB_GO}
-    DEPENDS ${OBSERVATION_PB_GO}
-    DEPENDS ${ANALYZER_PB_GO}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
+set_source_files_properties(${ANALYZER_PB_GO} PROPERTIES GENERATED TRUE)
 
-# generate the descriptor set to configure cloud endpoints.
-set(SHUFFLER_PROTO_DESCRIPTOR "${CMAKE_CURRENT_BINARY_DIR}/shuffler.descriptor")
-add_custom_command(OUTPUT ${SHUFFLER_PROTO_DESCRIPTOR}
-    COMMAND protoc -I ${CMAKE_SOURCE_DIR}
-                --include_imports
-                --include_source_info ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
-                --descriptor_set_out ${SHUFFLER_PROTO_DESCRIPTOR}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shuffler.proto
-)
+# Generate the C++ bindings for the Shuffler gRPC service.
+# Also compile the generated C++ files into a static library.
+cobalt_make_protobuf_cpp_lib(shuffler_grpc_client
+    SHUFFLER_PROTO_HDRS
+    true
+    shuffler)
+
+# Generate the Go bindings for all of the shuffler's protos and gRPC service.
+set(use_grpc true)
+cobalt_protobuf_generate_go(generate_shuffler_pb_go_files
+                            SHUFFLER_PB_GO_FILES
+                            use_grpc
+                            shuffler config shuffler_db)
+add_dependencies(generate_report_master_pb_go_files
+                 generate_config_pb_go_files
+                 generate_cobalt_pb_go_files)
+
+# Generate the descriptor set to configure cloud endpoints for the Shuffler service.
+cobalt_generate_protobuf_descriptors(generate_shuffler_descriptor
+                                     SHUFFLER_PROTO_DESCRIPTOR
+                                     shuffler)
 
 # Build shuffler executables
 set(SHUFFLER_BIN "${CMAKE_BINARY_DIR}/shuffler/shuffler")
@@ -71,10 +56,8 @@ set(LEVELDB_STORE_ITER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/storage/leveldb_stor
 add_custom_command(OUTPUT ${SHUFFLER_BIN}
     # Compiles shuffler_main and all its dependencies
     COMMAND ${GO_BIN} build -o ${SHUFFLER_BIN}
-    DEPENDS ${SHUFFLER_PB_GO}
-    DEPENDS ${SHUFFLER_DB_PB_GO}
+    DEPENDS ${SHUFFLER_PB_GO_FILES}
     DEPENDS ${ANALYZER_PB_GO}
-    DEPENDS ${CONFIG_PB_GO}
     DEPENDS ${CONFIG_SRC}
     DEPENDS ${DISPATCHER_SRC}
     DEPENDS ${RECEIVER_SRC}
@@ -89,9 +72,6 @@ add_custom_command(OUTPUT ${SHUFFLER_BIN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Build the protobuf/gRPC c++ library for accessing the shuffler
-add_library(shuffler_grpc_client shuffler.grpc.pb.cc shuffler.pb.cc)
-
 # Build dispatcher unit tests
 set(DISPATCHER_TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/dispatcher/dispatcher_test.go")
 set(DISPATCHER_TEST_BIN ${GO_TESTS}/dispatcher_test)
@@ -99,8 +79,8 @@ add_custom_command(OUTPUT ${DISPATCHER_TEST_BIN}
     COMMAND ${GO_BIN} test -c -o ${DISPATCHER_TEST_BIN} ${DISPATCHER_TEST_SRC}
             ${DISPATCHER_SRC}
     DEPENDS ${DISPATCHER_SRC} ${DISPATCHER_TEST_SRC}
-    DEPENDS ${SHUFFLER_PB_GO} ${ANALYZER_PB_GO}
-    DEPENDS ${CONFIG_PB_GO} ${SHUFFLER_DB_PB_GO}
+    DEPENDS ${SHUFFLER_PB_GO_FILES}
+    DEPENDS ${ANALYZER_PB_GO}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -111,8 +91,8 @@ add_custom_command(OUTPUT ${RECEIVER_TEST_BIN}
     COMMAND ${GO_BIN} test -c -o ${RECEIVER_TEST_BIN} ${RECEIVER_TEST_SRC}
             ${RECEIVER_SRC}
     DEPENDS ${RECEIVER_SRC} ${RECEIVER_TEST_SRC}
-    DEPENDS ${SHUFFLER_PB_GO} ${ANALYZER_PB_GO}
-    DEPENDS ${CONFIG_PB_GO} ${SHUFFLER_DB_PB_GO}
+    DEPENDS ${SHUFFLER_PB_GO_FILES}
+    DEPENDS ${ANALYZER_PB_GO}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -167,8 +147,8 @@ add_custom_command(OUTPUT ${STORAGE_TEST_BIN}
     DEPENDS ${LEVELDB_STORE_SRC} ${LEVELDB_STORE_TEST_SRC}
     DEPENDS ${KEY_UTIL_SRC} ${KEY_UTIL_TEST_SRC}
     DEPENDS ${STORE_ITER_SRC} ${MEM_STORE_ITER_SRC} ${LEVELDB_STORE_ITER_SRC}
-    DEPENDS ${SHUFFLER_PB_GO} ${ANALYZER_PB_GO}
-    DEPENDS ${CONFIG_PB_GO} ${SHUFFLER_DB_PB_GO}
+    DEPENDS ${SHUFFLER_PB_GO_FILES}
+    DEPENDS ${ANALYZER_PB_GO}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -189,9 +169,8 @@ add_custom_target(shuffler_all ALL
 # parallel builds to work.  Almost everything depends on the cobalt package
 # created by the shuffler_gen_pb target so do that first.
 add_custom_target(shuffler_gen_pb
-    DEPENDS ${SHUFFLER_PB_GO}
+    DEPENDS ${SHUFFLER_PB_GO_FILES}
             ${ANALYZER_PB_GO}
-            ${SHUFFLER_DB_PB_GO}
 )
 
 add_dependencies(shuffler_all shuffler_gen_pb)
