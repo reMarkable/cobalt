@@ -31,6 +31,7 @@
 #include "config/analyzer_config.h"
 #include "glog/logging.h"
 #include "util/crypto_util/base64.h"
+#include "util/pem_util.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -45,10 +46,18 @@ using store::BigtableStore;
 using store::DataStore;
 using store::ObservationStore;
 using store::ReportStore;
+using util::PemUtil;
 
 DEFINE_int32(port, 0,
              "The port that the ReportMaster Service should listen on.");
-DEFINE_string(tls_info, "", "TBD: Some info about TLS.");
+DEFINE_bool(use_tls, false,
+            "Should the ReportMaster use TLS for communicating with clients? "
+            "Default=false. (Note that in production the ReportMaster is "
+            "protected by Google Cloud Endpoints which does use TLS.)");
+DEFINE_string(tls_cert_file, "",
+              "Path to a TLS server cert file to use if use_tls=true.");
+DEFINE_string(tls_key_file, "",
+              "Path to a TLS server private key file to use if use_tls=true.");
 
 namespace {
 // Builds the string form of a report_id used in the public ReportMasterService
@@ -221,14 +230,27 @@ ReportMasterService::CreateFromFlagsOrDie() {
   CHECK(FLAGS_port) << "--port is a mandatory flag";
 
   std::shared_ptr<grpc::ServerCredentials> server_credentials;
-  if (FLAGS_tls_info.empty()) {
-    LOG(WARNING) << "WARNING: Using insecure server credentials. Pass "
-                    "-tls_info to enable TLS.";
-    server_credentials = grpc::InsecureServerCredentials();
-  } else {
+  if (FLAGS_use_tls) {
+    LOG(INFO) << "Using TLS.";
+    std::string tls_server_cert;
+    CHECK(PemUtil::ReadTextFile(FLAGS_tls_cert_file, &tls_server_cert))
+        << "Error reading tls cert file: " << FLAGS_tls_cert_file;
+    LOG(INFO) << "TLS server cert successfully read from  "
+              << FLAGS_tls_cert_file;
+    std::string tls_server_private_key;
+    CHECK(PemUtil::ReadTextFile(FLAGS_tls_key_file, &tls_server_private_key))
+        << "Error reading tls server private key file: " << FLAGS_tls_key_file;
+    LOG(INFO) << "TLS server private key successfully read from  "
+              << FLAGS_tls_key_file;
     grpc::SslServerCredentialsOptions options;
-    // TODO(rudominer) Set up options based on FLAGS_tls_info.
+    options.pem_key_cert_pairs.emplace_back();
+    options.pem_key_cert_pairs.back().private_key =
+        std::move(tls_server_private_key);
+    options.pem_key_cert_pairs.back().cert_chain = std::move(tls_server_cert);
     server_credentials = grpc::SslServerCredentials(options);
+  } else {
+    LOG(WARNING) << "Using insecure server credentials becuase -use_tls=false.";
+    server_credentials = grpc::InsecureServerCredentials();
   }
 
   return std::unique_ptr<ReportMasterService>(

@@ -92,6 +92,7 @@ target_link_libraries(analyzer_report_master_lib
                       analyzer_config
                       analyzer_store
                       cobalt_crypto
+                      pem_util
                       forculus_analyzer
                       glog
                       rappor_analyzer
