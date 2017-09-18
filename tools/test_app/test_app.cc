@@ -92,6 +92,9 @@ DEFINE_string(shuffler_pk_pem_file, "",
 DEFINE_bool(
     use_tls, false,
     "Should tls be used for the connection to the shuffler or the analyzer?");
+DEFINE_string(root_certs_pem_file, "",
+              "Full path to a file containing a PEM encoding of the TLS root "
+              "certificates to be used by the gRPC client.");
 DEFINE_uint32(deadline_seconds, 10, "RPC deadline.");
 DEFINE_string(registry, "", "Directory path of config registry.  Optional.");
 
@@ -435,8 +438,21 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
   std::shared_ptr<encoder::ShufflerClient> shuffler_client;
   if (!FLAGS_shuffler_uri.empty()) {
     VLOG(1) << "Connecting to Shuffler at " << FLAGS_shuffler_uri;
+    const char* pem_root_certs = nullptr;
+    std::string pem_root_certs_str;
+    if (FLAGS_use_tls) {
+      VLOG(1) << "Using TLS.";
+      if (!FLAGS_root_certs_pem_file.empty()) {
+        VLOG(1) << "Reading root certs from " << FLAGS_root_certs_pem_file;
+        CHECK(PemUtil::ReadTextFile(FLAGS_root_certs_pem_file,
+                                    &pem_root_certs_str));
+        pem_root_certs = pem_root_certs_str.c_str();
+      }
+    } else {
+      VLOG(1) << "NOT using TLS.";
+    }
     shuffler_client.reset(
-        new ShufflerClient(FLAGS_shuffler_uri, FLAGS_use_tls));
+        new ShufflerClient(FLAGS_shuffler_uri, FLAGS_use_tls, pem_root_certs));
   }
 
   auto analyzer_encryption_scheme = EncryptedMessage::NONE;

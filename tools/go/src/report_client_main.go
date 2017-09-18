@@ -51,7 +51,7 @@ var (
 	tls    = flag.Bool("tls", false, "Connection uses TLS if true or if the port for report_master_uri is 443, else plain TCP")
 	caFile = flag.String("ca_file", "", "The file containning the root CA certificate.")
 
-  reportMasterURI = flag.String("report_master_uri", "reportmaster.cobalt-api.fuchsia.com:443", "The hostname:port used to connect to the ReportMaster Service")
+	reportMasterURI = flag.String("report_master_uri", "reportmaster.cobalt-api.fuchsia.com:443", "The hostname:port used to connect to the ReportMaster Service")
 
 	customerID     = flag.Uint("customer_id", 1, "The Cobalt customer ID.")
 	projectID      = flag.Uint("project_id", 1, "The Cobalt project ID.")
@@ -159,6 +159,10 @@ func (c *ReportClientCLI) PrintHelp() {
 	fmt.Println()
 	fmt.Println("Cobalt command-line report client")
 	fmt.Printf("Report Master URI: %s\n", *reportMasterURI)
+	fmt.Printf("Using tls: %v\n", *tls)
+	if *tls && *caFile != "" {
+		fmt.Printf("root CA file: %s\n", *caFile)
+	}
 	fmt.Printf("Project ID: %d\n", *projectID)
 	fmt.Println("---------------------------------")
 	fmt.Printf("help                  \t Print this help message.\n")
