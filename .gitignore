@@ -1,5 +1,7 @@
 *.pyc
 *.pem
+*.crt
+*.key
 # We add the production public keys to source control.
 !production/google-dot-com-fuchsia-cobalt-us-central1-b/analyzer_public.pem
 !production/google-dot-com-fuchsia-cobalt-us-central1-b/shuffler_public.pem

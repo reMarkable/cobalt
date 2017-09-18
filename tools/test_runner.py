@@ -24,6 +24,9 @@ import time
 
 import tools.process_starter as process_starter
 
+from tools.process_starter import LOCALHOST_TLS_CERT_FILE
+from tools.process_starter import LOCALHOST_TLS_KEY_FILE
+
 THIS_DIR = os.path.dirname(__file__)
 SRC_ROOT_DIR = os.path.abspath(os.path.join(THIS_DIR, os.pardir))
 SYS_ROOT_DIR = os.path.join(SRC_ROOT_DIR, 'sysroot')
@@ -42,6 +45,9 @@ _logger = logging.getLogger()
 def run_all_tests(test_dir,
                   start_bt_emulator=False,
                   start_cobalt_processes=False,
+                  use_tls=False,
+                  tls_cert_file=LOCALHOST_TLS_CERT_FILE,
+                  tls_key_file=LOCALHOST_TLS_KEY_FILE,
                   bigtable_project_name = '',
                   bigtable_instance_name = '',
                   verbose_count=0,
@@ -61,7 +67,16 @@ def run_all_tests(test_dir,
       Shuffler, Analyzer Service and Report Master will be started before each
       test and killed afterwards.
 
-      args {list of strings} These will be passed to each test executable.
+      use_tls {bool} This is ignored unless start_cobalt_process=True. In that
+      case this flag will cause the processes (currently only the Shuffler
+      and the ReportMaster, not the Analyzer) to use tls for gRPC communicaton
+      with their client.
+
+      tls_cert_file, tls_key_file: If use_tls is True and start_cobalt_process
+      is True then these are the tls cert and key files to use when starting
+      the local processes.
+
+      test_args {list of strings} These will be passed to each test executable.
 
     Returns: 0 if all tests return 0, otherwise returns 1.
   """
@@ -99,11 +114,17 @@ def run_all_tests(test_dir,
             verbose_count=verbose_count, wait=False)
         time.sleep(1)
         report_master_process=process_starter.start_report_master(
+            use_tls=use_tls,
+            tls_cert_file=tls_cert_file,
+            tls_key_file=tls_key_file,
             bigtable_instance_name=bigtable_instance_name,
             bigtable_project_name=bigtable_project_name,
             verbose_count=verbose_count, wait=False)
         time.sleep(1)
         shuffler_process=process_starter.start_shuffler(
+          use_tls=use_tls,
+          tls_cert_file=tls_cert_file,
+          tls_key_file=tls_key_file,
           private_key_pem_file=E2E_TEST_SHUFFLER_PRIVATE_KEY_PEM,
           verbose_count=verbose_count, wait=False)
       print "Running %s..." % test_executable

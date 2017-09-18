@@ -1,0 +1,26 @@
+# This is an openssl coniguration file. It is used by cobaltb.py to generate
+# self-signed certificates with an IP address in the Subject Alternative Name
+# section. This is necessary in order to test gRPC locally using an
+# IP address. The tag <IP_ADDRESS> below is replaced by an IP
+# address in cobaltb.py.
+
+HOME			= .
+
+[ req ]
+distinguished_name	= req_distinguished_name
+x509_extensions	= v3_ca
+string_mask = utf8only
+
+[ req_distinguished_name ]
+commonName			= Common Name (Server FQDN)
+commonName_default = localhost
+commonName_max			= 64
+
+[ v3_ca ]
+subjectAltName = @alt_names
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer
+basicConstraints = CA:true
+
+[alt_names]
+IP.1 = @@@IP_ADDRESS@@@

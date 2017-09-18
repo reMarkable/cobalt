@@ -69,13 +69,13 @@ PEM files located in the *end_to_end_tests* directory named
 environment we do not want to check in a private key into source control
 and so we ask each developer to generate their own key pair.
 
-`./cobaltb.py keygen`
+`./cobaltb.py generate_keys`
 
 Then follow the instructions to copy the generated contents into files
 named *analyzer_public.pem* and *analyzer_private.pem* in your
-source root directory. These will get used by several of the following
-steps including running the demo manually and deploying to Google Container
-Engine.
+source root directory. If these files are present they will automatically
+get used by several of the following steps including running the demo manually
+and deploying to Google Container Engine.
 
 ### Encryption to the Shuffler
 In addition to the encryption to the Analyzer mentioned above there is a second
@@ -89,7 +89,6 @@ this encryption. The end-to-end test uses the PEM files located in the
 environment follow the instructions above for generating *analyzer_public.pem*
 and *analyzer_private.pem* but this time create two new files named
 *shuffler_public.pem* and *shuffler_private.pem*
-
 
 ## Running the Demo Manually
 You can run a complete Cobalt system locally (for example in order to give a
@@ -165,6 +164,24 @@ Analyzer
   * Type `2` to run the Forculus report demo
   * Open the displayed URL in your browser and see the visualization.
 
+## Using TLS
+Communication to the Shuffler, Analyzer and ReportMaster uses gRPC which allows
+for communication to be protectd by TLS. In our production clusters we always
+use TLS. When testing locally you may optionally enable TLS by passing the
+flag `--use_tls=true` to various commands. This is supported by
+
+ * `./cobaltb.py start shuffler`
+ * `./cobaltb.py start report_master`
+ * `./cobaltb.py start test_app`
+ * `./cobaltb.py start report_client`
+ * `./cobaltb.py test --tests=e2e`
+
+This commands use a TLS server private key and a TLS server certificate
+located in the *end_to_end_tests* directory and using the host name *localhost*.
+When running locally the clients connect to the servers using *localhost*
+by default. It is also possible to generate additional self-signed
+certificates for names other than *localhost* or for an IP address. See the
+section *Generating A Self-Signed TLS Certificate for Testing* below.
 
 ## Using Cloud Bigtable
 You can use [Cloud Bigtable](https://cloud.google.com/bigtable/) instead of a
@@ -323,6 +340,65 @@ than attempting to connect to a local instance of Bigtable Emulator.
 
 See the notes above about the flag `--cloud_project_prefix` and
 about creating a *personal_cluster.json* file.
+
+## Generating A Self-Signed TLS Certificate for Testing
+Above we discussed that the flag `--use_tls=true` may be passed to various
+commands when running Cobalt locally. This uses a TLS (key, cert) pair for
+the host name *localhost*. If you want to run clients locally
+but run the servers on a devel cluster on Google Container Engine (described
+below) then it is necessary to generate additional self-signed certificates
+using the IP address of the servers (Shuffler and Analyzer) in your devel
+cluster. You do this via the command
+
+`./cobaltb.py generate_cert --path-to-key=<path> --path-to-cert=<path> --ip_address=<address>`
+
+You must have openssl on your path. The key and cert will be written to
+the files specified and the cert will contain an "Alternate Name" field with
+the specified IP address. The openssl tool will also ask you to enter a
+CN (Common Name). If you would like to use the certificate to access a server
+using a name rather than an IP address then enter it there. Otherwise it
+doesn't matter what you use for the CN.
+
+The generated certificates may be used for two purposes:
+
+  * To run Cobalt locally using TLS but using a name other than `localhost` or
+ using an IP address.
+  * To run the Cobalt clients (i.e. the test_app and the report_client) locally
+  but run the servers in your devel cluster on GKE (described below.)
+
+### Using the generated certificates on the client
+In order to use the generted certificates on the client you need to pass a
+few flags in addition to `--use_tls`:
+
+ * `--tls_root_certs=<path-to-cert>`. A self-signed server cert
+ may also be used as the root cert (a.k.a CA cert) on the client.
+ * `--shuffler_preferred_name=<name or ip>` and
+ `--report_master_preferred_name=<name or ip>`. The name or IP address in the
+ cert must match the name or IP address used by the client in a request.
+
+ These flags may be passed to:
+ * `./cobaltb.py start test_app`
+ * `./cobaltb.py start report_client`
+ * `./cobaltb.py test --tests=e2e`
+
+### Using the generated certificates on servers running locally.
+In order to use the generated certificates on servers running locally
+(i.e. the Shuffler and the ReportMaster) you need to pass two flags in
+addition to `--use_tls`:
+
+ * `--tls_cert_file=<path-to-cert>`
+ * `--tls_key_file=<path-to-key>`
+
+These flags may be passed to:
+ * `./cobaltb.py start shuffler`
+ * `./cobaltb.py start report_master`
+ * `./cobaltb.py test --tests=e2e`
+
+### Using the generated certificates on servers running in your devel cluster
+In order to use the generated key and cert on the Shuffler and ReportMaster
+running in your devel cluster on GKE it is necessary to upload them using
+the command `./cobaltb.py deploy upload_certificate`. This
+is described in a later section.
 
 ## Google Container Engine (GKE)
 You can deploy the Shuffler, Analyzer Service and Report Master on Google
@@ -644,7 +720,7 @@ checked in to source control.
 The production Analyzer needs a file called `analyzer_private.pem` and the
 production Shuffler needs a file called `shuffler_public.pem`. The current
 procedure, which will likely change in the future, is for the developer that
-first creates the production cluster to run `./cobaltb.py keygen` twice
+first creates the production cluster to run `./cobaltb.py generate_keys` twice
 and create four files in the appropriate production directory named
 `analyzer_private.pem`, `analyzer_public.pem`, `shuffler_private.pem` and
 `shuffler_public.pem`. As described below, the private files are uploaded as

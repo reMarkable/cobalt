@@ -16,10 +16,12 @@
 """The Cobalt build system command-line interface."""
 
 import argparse
+import fileinput
 import json
 import logging
 import os
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
@@ -41,6 +43,8 @@ from tools.process_starter import DEFAULT_ANALYZER_SERVICE_PORT
 from tools.process_starter import DEFAULT_SHUFFLER_PORT
 from tools.process_starter import DEFAULT_REPORT_MASTER_PORT
 from tools.process_starter import DEMO_CONFIG_DIR
+from tools.process_starter import LOCALHOST_TLS_CERT_FILE
+from tools.process_starter import LOCALHOST_TLS_KEY_FILE
 from tools.process_starter import PRODUCTION_CONFIG_DIR
 from tools.process_starter import SHUFFLER_DEMO_CONFIG_FILE
 
@@ -52,14 +56,10 @@ PERSONAL_BT_ADMIN_SERVICE_ACCOUNT_CREDENTIALS_FILE = os.path.join(THIS_DIR,
 PERSONAL_CLUSTER_JSON_FILE = os.path.join(THIS_DIR, 'personal_cluster.json')
 BIGTABLE_TOOL_PATH = \
     os.path.join(OUT_DIR, 'tools', 'bigtable_tool', 'bigtable_tool')
+OPEN_SSL_CONFIG_FILE = os.path.join(THIS_DIR, 'self-signed-with-ip.cnf')
 
 _logger = logging.getLogger()
 _verbose_count = 0
-
-# The names nginx.crt and nginx.key are expected by Google Cloud Endpoints.
-SELF_SIGNED_CERTIFICATE_PATH = os.path.join(tempfile.gettempdir(), 'nginx.crt')
-SELF_SIGNED_PRIVATE_KEY_PATH = os.path.join(tempfile.gettempdir(), 'nginx.key')
-
 
 def _initLogging(verbose_count):
   """Ensures that the logger (obtained via logging.getLogger(), as usual) is
@@ -201,10 +201,8 @@ def _test(args):
             args.cloud_project_prefix, args.cloud_project_name,
             args.cluster_zone)
         analyzer_uri = public_uris["analyzer"]
-        report_master_uri = (args.report_master_preferred_address
-            or public_uris["report_master"])
-        shuffler_uri = (args.shuffler_preferred_address
-            or public_uris["shuffler"])
+        report_master_uri = public_uris["report_master"]
+        shuffler_uri = public_uris["shuffler"]
         if args.use_cloud_bt:
           # use_cloud_bt means to use local instances of the Cobalt processes
           # connected to a Cloud Bigtable. cobalt_on_personal_cluster means to
@@ -224,6 +222,9 @@ def _test(args):
         shuffler_pk_pem_file = os.path.join(pem_directory,
             'shuffler_public.pem')
         config_dir_path=PRODUCTION_CONFIG_DIR
+      report_master_uri = (args.report_master_preferred_address
+          or report_master_uri)
+      shuffler_uri = (args.shuffler_preferred_address or shuffler_uri)
       test_args = [
           "-analyzer_uri=%s" % analyzer_uri,
           "-analyzer_pk_pem_file=%s" % analyzer_pk_pem_file,
@@ -236,6 +237,9 @@ def _test(args):
           "-config_reg_dir_path=%s" % config_dir_path,
           "-sub_process_v=%d"%_verbose_count
       ]
+      use_tls = _parse_bool(args.use_tls)
+      if use_tls:
+        test_args += [ "-use_tls" ]
       if (args.use_cloud_bt or args.cobalt_on_personal_cluster or
           args.production_dir):
         bigtable_project_name_from_args = _compound_project_name(args)
@@ -246,6 +250,12 @@ def _test(args):
         ]
         bigtable_project_name = bigtable_project_name_from_args
         bigtable_instance_name = args.bigtable_instance_name
+      else:
+        # We are running the end-to-end test against local Cobalt servers
+        if use_tls:
+          test_args = test_args + [
+            "-ca_file=%s" % args.tls_root_certs
+          ]
       if args.production_dir:
         # When running the end-to-end test against the production instance of
         # Cobalt, it may not be true that the Shuffler has been configured
@@ -254,8 +264,6 @@ def _test(args):
         test_args = test_args + [
           "-do_shuffler_threshold_test=false",
         ]
-        if _parse_bool(args.use_tls):
-          test_args += [ "--use_tls" ]
     print '********************************************************'
     success = (test_runner.run_all_tests(
         test_dir, start_bt_emulator=start_bt_emulator,
@@ -263,6 +271,9 @@ def _test(args):
         bigtable_project_name=bigtable_project_name,
         bigtable_instance_name=bigtable_instance_name,
         verbose_count=_verbose_count,
+        use_tls=_parse_bool(args.use_tls),
+        tls_cert_file=args.tls_cert_file,
+        tls_key_file=args.tls_key_file,
         test_args=test_args) == 0) and success
 
   print
@@ -306,6 +317,9 @@ def _start_shuffler(args):
                                  use_memstore=args.use_memstore,
                                  erase_db=(not args.keep_existing_db),
                                  config_file=args.config_file,
+                                 use_tls=_parse_bool(args.use_tls),
+                                 tls_cert_file=args.tls_cert_file,
+                                 tls_key_file=args.tls_key_file,
                                  # Because it makes the demo more interesting
                                  # we use verbose_count at least 3.
                                  verbose_count=max(3, _verbose_count))
@@ -333,15 +347,20 @@ def _start_report_master(args):
       bigtable_project_name=bigtable_project_name,
       bigtable_instance_name=bigtable_instance_name,
       cobalt_config_dir=args.cobalt_config_dir,
+      use_tls=_parse_bool(args.use_tls),
+      tls_cert_file=args.tls_cert_file,
+      tls_key_file=args.tls_key_file,
       verbose_count=_verbose_count)
 
 def _start_test_app(args):
   analyzer_uri = "localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT
-  shuffler_uri = "localhost:%d" % DEFAULT_SHUFFLER_PORT
+  shuffler_uri = (args.shuffler_preferred_address or
+      "localhost:%d" % DEFAULT_SHUFFLER_PORT)
   analyzer_public_key_pem = \
     DEFAULT_ANALYZER_PUBLIC_KEY_PEM
   shuffler_public_key_pem = \
     DEFAULT_SHUFFLER_PUBLIC_KEY_PEM
+  use_tls = _parse_bool(args.use_tls)
   if args.production_dir:
     pem_directory = os.path.abspath(args.production_dir)
     analyzer_public_key_pem = os.path.join(pem_directory,
@@ -352,11 +371,11 @@ def _start_test_app(args):
     public_uris = container_util.get_public_uris(args.cluster_name,
         args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone)
     shuffler_uri = args.shuffler_preferred_address or public_uris["shuffler"]
-    use_tls = _parse_bool(args.use_tls)
   process_starter.start_test_app(shuffler_uri=shuffler_uri,
       analyzer_uri=analyzer_uri,
       analyzer_pk_pem_file=analyzer_public_key_pem,
       use_tls=use_tls,
+      root_certs_pem_file=args.tls_root_certs,
       shuffler_pk_pem_file=shuffler_public_key_pem,
       cobalt_config_dir=args.cobalt_config_dir,
       project_id=args.project_id,
@@ -365,7 +384,8 @@ def _start_test_app(args):
       verbose_count=max(3, _verbose_count))
 
 def _start_report_client(args):
-  report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
+  report_master_uri = (args.report_master_preferred_address or
+      "localhost:%d" % DEFAULT_REPORT_MASTER_PORT)
   if args.cobalt_on_personal_cluster or args.production_dir:
     public_uris = container_util.get_public_uris(args.cluster_name,
         args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone)
@@ -373,6 +393,8 @@ def _start_report_client(args):
             or public_uris["report_master"])
   process_starter.start_report_client(
       report_master_uri=report_master_uri,
+      use_tls=_parse_bool(args.use_tls),
+      root_certs_pem_file=args.tls_root_certs,
       project_id=args.project_id,
       verbose_count=_verbose_count)
 
@@ -391,10 +413,30 @@ def _generate_keys(args):
   path = os.path.join(OUT_DIR, 'tools', 'key_generator', 'key_generator')
   subprocess.check_call([path])
 
-def _generate_self_signed_certificate():
+def _generate_self_signed_certificate(key_file, cert_file,
+                                      ip_address='0.0.0.0'):
+  # First we build an openssl config file by replacing a token in our
+  # template file with the IP address.
+  token = '@@@IP_ADDRESS@@@'
+  openssl_config_file = os.path.join(OUT_DIR, 'self-signed-with-ip.cnf')
+  with open(openssl_config_file, 'w+b') as f:
+    for line in fileinput.input(OPEN_SSL_CONFIG_FILE):
+      if string.find(line, token) != -1:
+         line = line.replace(token, ip_address)
+      f.write(line)
+
+  # then we invoke openssl and point it at the config file we just generated.
   subprocess.check_call(['openssl', 'req', '-x509', '-nodes', '-days', '365',
-    '-newkey', 'rsa:2048', '-keyout', SELF_SIGNED_PRIVATE_KEY_PATH, '-out',
-    SELF_SIGNED_CERTIFICATE_PATH])
+    '-config', openssl_config_file,
+    '-newkey', 'rsa:2048', '-keyout', key_file, '-out',
+    cert_file])
+
+def _generate_cert(args):
+  if not (args.path_to_key and args.path_to_cert):
+    print '--path-to-key and --path-to-cert are both required.'
+    return
+  _generate_self_signed_certificate(args.path_to_key, args.path_to_cert,
+                                    args.ip_address)
 
 def _invoke_bigtable_tool(args, command):
   if not os.path.exists(bt_admin_service_account_credentials_file):
@@ -571,9 +613,10 @@ def _deploy_upload_certificate(args):
       print('You may not request for a self-signed certificate to be generated '
             'and provide paths to an existing certificate or private key.')
       return
-    path_to_cert = SELF_SIGNED_CERTIFICATE_PATH
-    path_to_key = SELF_SIGNED_PRIVATE_KEY_PATH
-    _generate_self_signed_certificate()
+    # The names nginx.crt and nginx.key are expected by Google Cloud Endpoints.
+    path_to_cert = os.path.join(tempfile.gettempdir(), 'nginx.crt')
+    path_to_key = os.path.join(tempfile.gettempdir(), 'nginx.key')
+    _generate_self_signed_certificate(path_to_key, path_to_cert)
 
   if not path_to_cert or not path_to_key:
     print('Both --path-to-cert and --path-to-key must be set!')
@@ -620,7 +663,29 @@ def _default_cobalt_config_dir(cluster_settings):
 def _default_shuffler_use_memstore(cluster_settings):
   if cluster_settings['shuffler_use_memstore']:
     return cluster_settings['shuffler_use_memstore']
-  return "false"
+  return 'false'
+
+def _default_use_tls(cobalt_is_running_on_gke, cluster_settings):
+  if cobalt_is_running_on_gke:
+    return cluster_settings['use_tls'] or 'false'
+  return 'false'
+
+def _default_tls_root_certs(cobalt_is_running_on_gke, cluster_settings):
+  if cobalt_is_running_on_gke:
+    return cluster_settings['tls_root_certs']
+  return LOCALHOST_TLS_CERT_FILE
+
+def _default_shuffler_preferred_address(cobalt_is_running_on_gke,
+                                        cluster_settings):
+  if cobalt_is_running_on_gke:
+    return cluster_settings['shuffler_preferred_address']
+  return ''
+
+def _default_report_master_preferred_address(cobalt_is_running_on_gke,
+                                             cluster_settings):
+  if cobalt_is_running_on_gke:
+    return cluster_settings['report_master_preferred_address']
+  return ''
 
 def _cluster_settings_from_json(cluster_settings, json_file_path):
   """ Reads cluster settings from a json file and adds them to a dictionary.
@@ -694,10 +759,12 @@ def _add_gke_deployment_args(parser, cluster_settings):
 
 def main():
   # We parse the command line flags twice. The first time we are looking
-  # only for a particular flag, namely --production_dir. This first pass
+  # only for two particular flags, namely --production_dir and
+  # --cobalt_on_personal_cluster. This first pass
   # will not print any help and will ignore all other flags.
   parser0 = argparse.ArgumentParser(add_help=False)
   parser0.add_argument('--production_dir', default='')
+  parser0.add_argument('-cobalt_on_personal_cluster', action='store_true')
   args0, ignore = parser0.parse_known_args()
   # If the flag --production_dir is passed then it must be the path to
   # a directory containing a file named cluster.json. The contents of this
@@ -728,6 +795,7 @@ def main():
     'shuffler_preferred_address': '',
     'report_master_preferred_address': '',
     'use_tls': '',
+    'tls_root_certs': '',
   }
   if production_cluster_json_file:
     _cluster_settings_from_json(cluster_settings, production_cluster_json_file)
@@ -744,6 +812,17 @@ def main():
         'analyzer_private.pem')
     shuffler_private_key_pem = os.path.join(pem_directory,
         'shuffler_private.pem')
+
+  cobalt_is_running_on_gke = (args0.cobalt_on_personal_cluster or
+      args0.production_dir)
+  default_use_tls = _default_use_tls(cobalt_is_running_on_gke, cluster_settings)
+  default_shuffler_preferred_address = _default_shuffler_preferred_address(
+      cobalt_is_running_on_gke, cluster_settings)
+  default_report_master_preferred_address = \
+      _default_report_master_preferred_address(cobalt_is_running_on_gke,
+                                               cluster_settings)
+  default_tls_root_certs = _default_tls_root_certs(cobalt_is_running_on_gke,
+      cluster_settings)
 
   parser = argparse.ArgumentParser(description='The Cobalt command-line '
       'interface.')
@@ -853,19 +932,41 @@ def main():
       ' default=%s'%cluster_settings['bigtable_instance_name'],
       default=cluster_settings['bigtable_instance_name'])
   sub_parser.add_argument('--shuffler_preferred_address',
-      default=cluster_settings['shuffler_preferred_address'],
+      default=default_shuffler_preferred_address,
       help='Address of the form <host>:<port> to be used by the '
-           'end to end test for connecting to the Shuffler. Optional. '
-           'default=%s'%cluster_settings['shuffler_preferred_address'])
+           'end-to-end test for connecting to the Shuffler. Optional. '
+           'If not specified then the default port will be used and, when '
+           'running locally, "localhost" will be used and when running on GKE '
+           'the IP address of the Shuffler will be automatically discovered.'
+           'default=%s'%default_shuffler_preferred_address)
   sub_parser.add_argument('--report_master_preferred_address',
-      default=cluster_settings['report_master_preferred_address'],
+      default=default_report_master_preferred_address,
       help='Address of the form <host>:<port> to be used by the '
-           'end to end test for connecting to the ReportMaster. Optional. '
-           'default=%s'%cluster_settings['report_master_preferred_address'])
+           'end-to-end for connecting to the ReportMaster. Optional. '
+           'If not specified then the default port will be used and, when '
+           'running locally, "localhost" will be used and when running on GKE '
+           'the IP address of the ReportMaster will be automatically '
+           'discovered. '
+           'default=%s'%default_report_master_preferred_address)
   sub_parser.add_argument('--use_tls',
-      default=cluster_settings['use_tls'] or 'false',
+      default=default_use_tls,
       help='Run end to end tests with tls enabled. '
-      'default=%s'%cluster_settings['use_tls'])
+      'default=%s'%default_use_tls)
+  sub_parser.add_argument('--tls_root_certs',
+      default=default_tls_root_certs,
+      help='When --use_tls=true then use this as the root certs file '
+      '(a.k.a the CA file). If not specified then gRPC defaults will be used. '
+      'default=%s'%default_tls_root_certs)
+  sub_parser.add_argument('--tls_cert_file',
+      default=LOCALHOST_TLS_CERT_FILE,
+      help='When --use_tls=true and the servers are being run locally, '
+      'then use this as the server cert file. '
+      'default=%s'%LOCALHOST_TLS_CERT_FILE)
+  sub_parser.add_argument('--tls_key_file',
+      default=LOCALHOST_TLS_KEY_FILE,
+      help='When --use_tls=true and the servers are being run locally, '
+      'then use this as the server private key file. '
+      'default=%s'%LOCALHOST_TLS_KEY_FILE)
 
   ########################################################
   # clean command
@@ -905,6 +1006,18 @@ def main():
       help='Path to the Shuffler configuration file. '
            'Default=%s' % SHUFFLER_DEMO_CONFIG_FILE,
       default=SHUFFLER_DEMO_CONFIG_FILE)
+  sub_parser.add_argument('--use_tls',
+      default='false',
+      help='Start the Shuffler with tls enabled. '
+      'default=false')
+  sub_parser.add_argument('--tls_cert_file',
+      default=LOCALHOST_TLS_CERT_FILE,
+      help='When --use_tls=true then use this as the cert file. '
+      'default=%s'%LOCALHOST_TLS_CERT_FILE)
+  sub_parser.add_argument('--tls_key_file',
+      default=LOCALHOST_TLS_KEY_FILE,
+      help='When --use_tls=true then use this as the server private key file. '
+      'default=%s'%LOCALHOST_TLS_KEY_FILE)
 
   sub_parser = start_subparsers.add_parser('analyzer_service',
       parents=[parent_parser], help='Start the Analyzer Service running locally'
@@ -979,6 +1092,18 @@ def main():
       help='Path of directory containing Cobalt configuration files. '
            'Default=%s' % DEMO_CONFIG_DIR,
       default=DEMO_CONFIG_DIR)
+  sub_parser.add_argument('--use_tls',
+      default='false',
+      help='Start the ReportMaster with tls enabled. '
+      'default=False')
+  sub_parser.add_argument('--tls_cert_file',
+      default=LOCALHOST_TLS_CERT_FILE,
+      help='When --use_tls=true then use this as the cert file. '
+      'default=%s'%LOCALHOST_TLS_CERT_FILE)
+  sub_parser.add_argument('--tls_key_file',
+      default=LOCALHOST_TLS_KEY_FILE,
+      help='When --use_tls=true then use this as the server private key file. '
+      'default=%s'%LOCALHOST_TLS_KEY_FILE)
 
   sub_parser = start_subparsers.add_parser('test_app',
       parents=[parent_parser], help='Start the Cobalt test client app.')
@@ -999,14 +1124,22 @@ def main():
          'Must be in the range [1, 99]. Default = 1.',
     default=1)
   sub_parser.add_argument('--shuffler_preferred_address',
-      default=cluster_settings['shuffler_preferred_address'],
+      default=default_shuffler_preferred_address,
       help='Address of the form <host>:<port> to be used by the '
            'test_app for connecting to the Shuffler. Optional. '
-           'default=%s'%cluster_settings['shuffler_preferred_address'])
+           'If not specified then the default port will be used and, when '
+           'running locally, "localhost" will be used and when running on GKE '
+           'the IP address of the Shuffler will be automatically discovered.'
+           'default=%s'%default_shuffler_preferred_address)
   sub_parser.add_argument('--use_tls',
-      default=cluster_settings['use_tls'] or 'false',
-      help='Run the test_app with tls enabled. '
-      'default=%s'%cluster_settings['use_tls'])
+      default=default_use_tls,
+      help='The test_app will use TLS to communicate with the Shuffler. '
+      'default=%s'%default_use_tls)
+  sub_parser.add_argument('--tls_root_certs',
+      default=default_tls_root_certs,
+      help='When --use_tls=true then use this as the root certs file '
+      '(a.k.a the CA file). If not specified then gRPC defaults will be used. '
+      'default=%s'%default_tls_root_certs)
 
   sub_parser = start_subparsers.add_parser('report_client',
       parents=[parent_parser], help='Start the Cobalt report client.')
@@ -1024,10 +1157,23 @@ def main():
          'Default = 1.',
     default=1)
   sub_parser.add_argument('--report_master_preferred_address',
-      default=cluster_settings['report_master_preferred_address'],
+      default=default_report_master_preferred_address,
       help='Address of the form <host>:<port> to be used by the '
            'report_client for connecting to the ReportMaster. Optional. '
-           'default=%s'%cluster_settings['report_master_preferred_address'])
+           'If not specified then the default port will be used and, when '
+           'running locally, "localhost" will be used and when running on GKE '
+           'the IP address of the ReportMaster will be automatically '
+           'discovered. '
+           'default=%s'%default_report_master_preferred_address)
+  sub_parser.add_argument('--use_tls',
+      default=default_use_tls,
+      help='The test_app will use TLS to communicate with the Shuffler. '
+      'default=%s'%default_use_tls)
+  sub_parser.add_argument('--tls_root_certs',
+      default=default_tls_root_certs,
+      help='When --use_tls=true then use this as the root certs file '
+      '(a.k.a the CA file). If not specified then gRPC defaults will be used. '
+      'default=%s'%default_tls_root_certs)
 
   sub_parser = start_subparsers.add_parser('observation_querier',
       parents=[parent_parser], help='Start the Cobalt ObservationStore '
@@ -1064,9 +1210,35 @@ def main():
     help='Start the Bigtable Emulator running locally.')
   sub_parser.set_defaults(func=_start_bigtable_emulator)
 
-  sub_parser = subparsers.add_parser('keygen', parents=[parent_parser],
+  ########################################################
+  # generate_keys command
+  ########################################################
+
+  sub_parser = subparsers.add_parser('generate_keys', parents=[parent_parser],
     help='Generate new public/private key pairs.')
   sub_parser.set_defaults(func=_generate_keys)
+
+  ########################################################
+  # generate_cert command
+  ########################################################
+
+  sub_parser = subparsers.add_parser('generate_cert', parents=[parent_parser],
+    help='Generate a self-signed TLS key/cert pair. You must have '
+    'openssl in your path.')
+  sub_parser.set_defaults(func=_generate_cert)
+  sub_parser.add_argument('--path-to-key',
+      default='',
+      help='Absolute or relative path to a private key file that should be '
+      'generated. Required.')
+  sub_parser.add_argument('--path-to-cert',
+      default='',
+      help='Absolute or relative path to a cert file that should be '
+      'generted. Required.')
+  sub_parser.add_argument('--ip-address', default='0.0.0.0',
+    help='Optional IP address. If specified the self-signed certificate will '
+    'include a Subject Alternative Name section containing the given IP '
+    'address. This is necessar in order to use the IP address in gRPC '
+    'requests.')
 
   ########################################################
   # bigtable command

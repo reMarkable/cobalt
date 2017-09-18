@@ -53,6 +53,11 @@ SHUFFLER_PRIVATE_KEY_PEM_NAME="shuffler_private.pem"
 DEFAULT_SHUFFLER_PRIVATE_KEY_PEM=os.path.join(SRC_ROOT_DIR,
                                               SHUFFLER_PRIVATE_KEY_PEM_NAME)
 
+LOCALHOST_TLS_CERT_FILE=os.path.join(SRC_ROOT_DIR, "end_to_end_tests",
+                                   "localhost.crt")
+LOCALHOST_TLS_KEY_FILE=os.path.join(SRC_ROOT_DIR, "end_to_end_tests",
+                                  "localhost.key")
+
 
 def kill_process(process, name):
   """ Kills the given process if it is running and waits for it to terminate.
@@ -109,6 +114,9 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
     use_memstore=False, erase_db=True, db_dir=SHUFFLER_TMP_DB_DIR,
     config_file=SHUFFLER_DEMO_CONFIG_FILE,
     private_key_pem_file=DEFAULT_SHUFFLER_PRIVATE_KEY_PEM,
+    use_tls=False,
+    tls_cert_file=LOCALHOST_TLS_CERT_FILE,
+    tls_key_file=LOCALHOST_TLS_KEY_FILE,
     verbose_count=0, wait=True):
   """Starts the Shuffler.
 
@@ -127,6 +135,10 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
         "-analyzer_uri", analyzer_uri,
         "-config_file", config_file,
         "-logtostderr"]
+  if use_tls:
+    cmd.append("-tls")
+    cmd.append("-cert_file=%s"%tls_cert_file)
+    cmd.append("-key_file=%s"%tls_key_file)
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
   if use_memstore:
@@ -174,6 +186,9 @@ REPORT_MASTER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'analyzer',
 def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
                         bigtable_project_name='', bigtable_instance_name='',
                         cobalt_config_dir=DEMO_CONFIG_DIR,
+                        use_tls=False,
+                        tls_cert_file=LOCALHOST_TLS_CERT_FILE,
+                        tls_key_file=LOCALHOST_TLS_KEY_FILE,
                         verbose_count=0, wait=True):
   print
   print "Starting the analyzer ReportMaster service..."
@@ -182,6 +197,10 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
       "-port", str(port),
       "-cobalt_config_dir", cobalt_config_dir,
       "-logtostderr"]
+  if use_tls:
+    cmd.append("-use_tls")
+    cmd.append("-tls_cert_file=%s"%tls_cert_file)
+    cmd.append("-tls_key_file=%s"%tls_key_file)
   if bigtable_project_name != '' and bigtable_instance_name != '':
     cmd = cmd + [
       "-bigtable_project_name",
@@ -199,6 +218,7 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
 TEST_APP_PATH = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'test_app',
                                 'cobalt_test_app'))
 def start_test_app(shuffler_uri='', analyzer_uri='', use_tls=False,
+                   root_certs_pem_file='',
                    analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM,
                    shuffler_pk_pem_file=DEFAULT_SHUFFLER_PUBLIC_KEY_PEM,
                    cobalt_config_dir=DEMO_CONFIG_DIR,
@@ -207,23 +227,35 @@ def start_test_app(shuffler_uri='', analyzer_uri='', use_tls=False,
   cmd = [TEST_APP_PATH,
       "-shuffler_uri", shuffler_uri,
       "-analyzer_uri", analyzer_uri,
-      "-use_tls", str(use_tls),
       "-analyzer_pk_pem_file", analyzer_pk_pem_file,
       "-shuffler_pk_pem_file", shuffler_pk_pem_file,
       "-registry", cobalt_config_dir,
       "-project", str(project_id),
       "-logtostderr"]
+  if (use_tls):
+    cmd.append("-use_tls")
+    if (root_certs_pem_file):
+      cmd.append("-root_certs_pem_file")
+      cmd.append(root_certs_pem_file)
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
 
-def start_report_client(report_master_uri='',  project_id=1,
+def start_report_client(report_master_uri='',
+                        use_tls=False,
+                        root_certs_pem_file=LOCALHOST_TLS_CERT_FILE,
+                        project_id=1,
                         verbose_count=0, wait=True):
   path = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'report_client'))
   cmd = [path,
       "-report_master_uri", report_master_uri,
       "-project_id", str(project_id),
       "-logtostderr"]
+  if (use_tls):
+    cmd.append("-tls")
+    if (root_certs_pem_file):
+      cmd.append("-ca_file")
+      cmd.append(root_certs_pem_file)
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait)
