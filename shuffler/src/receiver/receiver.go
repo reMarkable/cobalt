@@ -137,10 +137,13 @@ func (s *ShufflerServer) startServer() {
 		return
 	}
 	var opts []grpc.ServerOption
+	using_tls := false
 	if s.config.EnableTLS {
+		using_tls = true
+		glog.Infof("Reading tls cert file %s and tls key file %s.", s.config.CertFile, s.config.KeyFile)
 		creds, err := credentials.NewServerTLSFromFile(s.config.CertFile, s.config.KeyFile)
 		if err != nil {
-			glog.Error("Grpc: Failed to generate credentials:", err)
+			glog.Error("Grpc: Failed to create TLS credentials from files:", err)
 			return
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
@@ -148,7 +151,12 @@ func (s *ShufflerServer) startServer() {
 
 	grpcServer := grpc.NewServer(opts...)
 	shuffler.RegisterShufflerServer(grpcServer, s)
-	glog.Info("Shuffler is listening on port ", s.config.Port, "...")
+	tls_message := "."
+	if using_tls {
+		tls_message = " using TLS."
+	}
+	listening_message := fmt.Sprintf("Shuffler is listening on port %d%s", s.config.Port, tls_message)
+	glog.Info(listening_message)
 	grpcServer.Serve(lis)
 }
 
