@@ -22,6 +22,7 @@
 #include "algorithms/rappor/rappor_encoder.h"
 #include "config/encodings.pb.h"
 #include "config/metrics.pb.h"
+#include "util/crypto_util/random.h"
 #include "util/datetime_util.h"
 
 namespace cobalt {
@@ -247,6 +248,16 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
 
   // Create a new Observation and ObservationMetadata.
   result.observation.reset(new Observation());
+
+  // Generate the random_id field. Currently we use 8 bytes but our
+  // infrastructure allows us to change that in the future if we wish to. The
+  // random_id is used by the Analyzer Service as part of a unique row key
+  // for the observation in the Observation Store.
+  static const size_t kNumRandomBytes = 8;
+  result.observation->set_allocated_random_id(
+      new std::string(kNumRandomBytes, 0));
+  random_.RandomString(result.observation->mutable_random_id());
+
   result.metadata.reset(new ObservationMetadata());
   result.metadata->set_customer_id(customer_id_);
   result.metadata->set_project_id(project_id_);

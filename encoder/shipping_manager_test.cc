@@ -31,7 +31,7 @@ const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
 const uint32_t kMetricId = 1;
 const uint32_t kEncodingConfigId = 1;
-const size_t kNoOpencodingByteOverhead = 20;
+const size_t kNoOpEncodingByteOverhead = 30;
 const size_t kMaxBytesPerObservation = 50;
 const size_t kMaxBytesPerEnvelope = 200;
 const size_t kMaxBytesTotal = 1000;
@@ -161,10 +161,10 @@ class ShippingManagerTest : public ::testing::Test {
   }
 
   ShippingManager::Status AddObservation(size_t num_bytes) {
-    CHECK(num_bytes > kNoOpencodingByteOverhead);
+    CHECK(num_bytes > kNoOpEncodingByteOverhead) << " num_bytes=" << num_bytes;
     Encoder::Result result = encoder_.EncodeString(
         kMetricId, kEncodingConfigId,
-        std::string("x", num_bytes - kNoOpencodingByteOverhead));
+        std::string("x", num_bytes - kNoOpEncodingByteOverhead));
     return shipping_manager_->AddObservation(*result.observation,
                                              std::move(result.metadata));
   }
@@ -535,7 +535,8 @@ TEST_F(ShippingManagerTest, RequestSendSoonWithCallback) {
 
   // Add an Observation, invoke RequestSendSoon() with a callback.
   shipping_manager_->WaitUntilIdle(kMaxSeconds);
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  EXPECT_EQ(ShippingManager::kOk,
+            AddObservation(kNoOpEncodingByteOverhead + 1));
   shipping_manager_->RequestSendSoon([&captured_success_arg](bool success) {
     captured_success_arg = success;
   });
@@ -573,7 +574,8 @@ TEST_F(ShippingManagerTest, RequestSendSoonWithCallback) {
 
   // Invoke RequestSendSoon without a callback just so that there is an
   // Observation cached in the inner EnvelopeMaker.
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  EXPECT_EQ(ShippingManager::kOk,
+            AddObservation(kNoOpEncodingByteOverhead + 1));
   shipping_manager_->RequestSendSoon();
   shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
   CheckCallCount(3, 3);
@@ -587,7 +589,8 @@ TEST_F(ShippingManagerTest, RequestSendSoonWithCallback) {
   }
 
   // Add an Observation, invoke RequestSendSoon() with a callback.
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  EXPECT_EQ(ShippingManager::kOk,
+            AddObservation(kNoOpEncodingByteOverhead + 1));
   shipping_manager_->RequestSendSoon([&captured_success_arg](bool success) {
     captured_success_arg = success;
   });
@@ -616,7 +619,8 @@ TEST_F(ShippingManagerTest,
     std::unique_lock<std::mutex> lock(send_retryer_->mutex);
     send_retryer_->status_to_return = grpc::Status::CANCELLED;
   }
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  EXPECT_EQ(ShippingManager::kOk,
+            AddObservation(kNoOpEncodingByteOverhead + 1));
   shipping_manager_->RequestSendSoon();
   shipping_manager_->WaitUntilWorkerWaiting(kMaxSeconds);
   CheckCallCount(1, 1);
@@ -646,7 +650,8 @@ TEST_F(ShippingManagerTest,
 
   // Add an Observation and invoke RequestSendSoon() while the worker thread is
   // busy sending the first Observation.
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(25));
+  EXPECT_EQ(ShippingManager::kOk,
+            AddObservation(kNoOpEncodingByteOverhead + 1));
   bool success2;
   shipping_manager_->RequestSendSoon([&success2](bool success) {
     { success2 = success; }

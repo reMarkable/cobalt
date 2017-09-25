@@ -31,7 +31,7 @@ import (
 
 var (
 	// If true, tls is enabled for both server and client connections
-	tls = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
+	tls             = flag.Bool("tls", false, "Connection uses TLS if true, else plain TCP")
 	tls_to_analyzer = flag.Bool("tls_to_analyzer", false, "Use TLS to connect to the analyzer")
 
 	// shuffler server configuration flags

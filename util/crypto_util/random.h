@@ -16,6 +16,7 @@
 #define COBALT_UTIL_CRYPTO_UTIL_RANDOM_H_
 
 #include <cstdint>
+#include <string>
 
 #include "util/crypto_util/types.h"
 
@@ -32,6 +33,10 @@ class Random {
   // Writes |num| bytes of random data from a uniform distribution to buf.
   // The caller must ensure that |buf| has enough space.
   virtual void RandomBytes(byte *buf, std::size_t num);
+
+  // Writes |buf->size()| bytes of random data from a uniform distribution
+  // into buf.
+  void RandomString(std::string* buf);
 
   // Returns a uniformly random integer in the range [0, 2^32-1].
   uint32_t RandomUint32();

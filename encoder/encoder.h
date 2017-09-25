@@ -23,6 +23,7 @@
 #include "./observation.pb.h"
 #include "encoder/client_secret.h"
 #include "encoder/project_context.h"
+#include "util/crypto_util/random.h"
 
 namespace cobalt {
 namespace encoder {
@@ -101,7 +102,8 @@ class Encoder {
   };
 
   // The output of the Encode*() methods is a triple consisting of a status
-  // and, if the status is kOK, an observation and its metadata.
+  // and, if the status is kOK, a new observation and its metadata. The
+  // observation will have been assigned a new quasi-unique |random_id|.
   struct Result {
     Status status;
     std::unique_ptr<Observation> observation;
@@ -262,6 +264,7 @@ class Encoder {
   std::shared_ptr<ProjectContext> project_;
   ClientSecret client_secret_;
   time_t current_time_ = 0;
+  crypto::Random random_;
 };
 
 }  // namespace encoder

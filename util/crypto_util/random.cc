@@ -14,14 +14,16 @@
 
 #include <cmath>
 
-#include "util/crypto_util/random.h"
 #include "third_party/boringssl/include/openssl/rand.h"
+#include "util/crypto_util/random.h"
 
 namespace cobalt {
 namespace crypto {
 
-void Random::RandomBytes(byte *buf, std::size_t num) {
-  RAND_bytes(buf, num);
+void Random::RandomBytes(byte* buf, std::size_t num) { RAND_bytes(buf, num); }
+
+void Random::RandomString(std::string* buf) {
+  RandomBytes(reinterpret_cast<byte*>(&((*buf)[0])), buf->size());
 }
 
 uint32_t Random::RandomUint32() {
@@ -44,8 +46,8 @@ byte Random::RandomBits(float p) {
 
   // threshold is the integer n in the range [0, 2^32] such that
   // n/2^32 best approximates p.
-  uint64_t threshold = round(
-      static_cast<double>(p) * (static_cast<double>(UINT32_MAX) + 1));
+  uint64_t threshold =
+      round(static_cast<double>(p) * (static_cast<double>(UINT32_MAX) + 1));
 
   for (int i = 0; i < 8; i++) {
     uint8_t random_bit = (RandomUint32() < threshold);

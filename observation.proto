@@ -94,6 +94,13 @@ message Observation {
   // The keys are the names of the metric parts to which each ObservationPart
   // is associated.
   map<string, ObservationPart> parts = 1;
+
+  // A quasi-unique identifier for this observation. This is randomly generated
+  // on the client and used on the server as part of a fully-unique identifier.
+  // This field allows the add-observation operation to be idempotent: If the
+  // same observation is transmitted to the server twice then the server will
+  // store the observation only once.
+  bytes random_id = 2;
 }
 
 // ObservationMetadata describes the parts of an observation other than the
