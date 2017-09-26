@@ -14,7 +14,9 @@
 
 #include "analyzer/store/observation_store.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <utility>
@@ -24,12 +26,16 @@
 #include "analyzer/store/data_store.h"
 #include "analyzer/store/observation_store_internal.h"
 #include "glog/logging.h"
+#include "util/crypto_util/hash.h"
 #include "util/crypto_util/random.h"
 
 namespace cobalt {
 namespace analyzer {
 namespace store {
 
+using crypto::byte;
+using crypto::hash::DIGEST_SIZE;
+using crypto::hash::Hash;
 using internal::DayIndexFromRowKey;
 using internal::GenerateNewRowKey;
 using internal::ParseEncryptedObservationPart;
@@ -41,26 +47,81 @@ using internal::RangeStartKey;
 // observation_store_internal.h.
 namespace internal {
 
-// Returns the row key that encapsulates the given data.
+// Returns the row key that encapsulates the given data. In the current version
+// of Cobalt we are using human-readable row keys for the sake of debugability.
+// In the future we should replace this with a more compact representation.
+// The row key is 75 bytes long and is an ASCII string of the form:
+// <customer>:<project>:<metric>:<day>:<random>:<hash> where
+// customer: The customer id as a positive 10 digit decimal string
+// project: The project id as a positive 10 digit decimal string
+// metric: The metric id as a positive 10 digit decimal string
+// random: A random 64-bit number as a positive 20 digit decimal string
+// hash: A 32-bit hash of the Observation as a positive 10 digit decimal string.
+//
+// The first four components of the row key
+//     <customer>:<project>:<metric>:<day>
+// represent the metric-day. This unit is important because it is the unit on
+// which a report runs. The QueryObservations() method operates on whole
+// metric days.
+//
+// The remainder of the row key
+//  <random>:<hash>
+// serves to form, along with the metric-day, a unique identifier for the
+// Observation. The random 64-bit number is generated on the client. This allows
+// the add-observation operation to be idempotent: If the client sends us
+// the identical Observation twice we will only store it once. The hash is
+// computed on the server. It reduces the probability of collision while
+// maintaining idempotency. That is, using the <hash> maintains the property
+// that if the client sends us the identical Observation twice we will only
+// store it once, and it reduces the probability that we will receive what is
+// supposed to be two different Observations but store only one and discard
+// the other.
+//
+// In an earlier version of this code the last two components of the row key
+// were different:
+// <time>:<random> where
+// time: Arrival time in millis as a positive 20 digit decimal string
+// random: A random 32-bit number as a positive 10 digit decimal string.
+// Both the arrival time and the random were generated on the server. This older
+// scheme sufficed for obtaining unique identifiers but did not give us the
+// idempotency of the add-observation operation.
+//
+// Our Observation store will contain a mixture of both the old and the new
+// row keys. The new row key format was chosen in a way to make this harmless.
+// Because the last two components of the row key are never interpreted (in fact
+// they are never even parsed) they are only used for the purpose of having
+// unique row keys, there is no harm in replacing the old format with the new
+// one.
 std::string RowKey(uint32_t customer_id, uint32_t project_id,
-                   uint32_t metric_id, uint32_t day_index,
-                   uint64_t current_time_millis, uint32_t random) {
+                   uint32_t metric_id, uint32_t day_index, uint64_t random,
+                   uint32_t hash) {
   // We write five ten-digit numbers, plus one twenty-digit number plus five
   // colons. The string has size 76 to accommodate a trailing null character.
   std::string out(76, 0);
 
   // TODO(rudominer): Replace human-readable row key with smaller more efficient
   // representation.
-  // TODO(rudominer): Use (random, time) instead of (time, random) because this
-  // allows the ReportGenerator to be sharded based on random.
   std::snprintf(&out[0], out.size(), "%.10u:%.10u:%.10u:%.10u:%.20lu:%.10u",
-                customer_id, project_id, metric_id, day_index,
-                current_time_millis, random);
+                customer_id, project_id, metric_id, day_index, random, hash);
 
   // Discard the trailing null character.
   out.resize(75);
 
   return out;
+}
+
+// Returns a 32-bit hash of |observation| appropriate for use as the <hash>
+// component of a row key. See comments on RowKey() above.
+uint32_t HashObservation(const Observation& observation) {
+  std::string serialized_observation;
+  observation.SerializeToString(&serialized_observation);
+  byte hash_bytes[DIGEST_SIZE];
+  Hash(reinterpret_cast<const byte*>(serialized_observation.data()),
+       serialized_observation.size(), hash_bytes);
+  uint32_t return_value = 0;
+  std::memcpy(&return_value, hash_bytes,
+              std::min(DIGEST_SIZE, sizeof(return_value)));
+  return return_value;
 }
 
 // Returns the common prefix of all rows keys for the given metric.
@@ -108,21 +169,27 @@ std::string RangeLimitKey(uint32_t customer_id, uint32_t project_id,
   }
 }
 
-// Returns the current time expressed as a number of milliseonds since the
-// Unix epoch.
-uint64_t CurrentTimeMillis() {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(
-             std::chrono::system_clock::now().time_since_epoch())
-      .count();
-}
-
-// Generates a new row key for a row with the given data.
-std::string GenerateNewRowKey(uint32_t customer_id, uint32_t project_id,
-                              uint32_t metric_id, uint32_t day_index) {
-  cobalt::crypto::Random rand;
-  int32_t random = rand.RandomUint32();
-  return RowKey(customer_id, project_id, metric_id, day_index,
-                CurrentTimeMillis(), random);
+// Generates a new row key for a row for the given Observation.
+std::string GenerateNewRowKey(const ObservationMetadata& metadata,
+                              const Observation& observation) {
+  uint64_t random;
+  if (observation.random_id().size() > 0 &&
+      observation.random_id().size() != sizeof(random)) {
+    LOG(WARNING) << "Unexpected size for random_id field: "
+                 << observation.random_id().size();
+  }
+  if (observation.random_id().size() >= sizeof(random)) {
+    std::memcpy(&random, observation.random_id().data(), sizeof(random));
+    VLOG(5) << "ObservationStore: received random_id from client: " << random;
+  } else {
+    // If the client did not send us a random we will generate one.
+    cobalt::crypto::Random rand;
+    random = rand.RandomUint64();
+    VLOG(5) << "ObservationStore: No random_id from client.";
+  }
+  return RowKey(metadata.customer_id(), metadata.project_id(),
+                metadata.metric_id(), metadata.day_index(), random,
+                HashObservation(observation));
 }
 
 bool ParseEncryptedObservationPart(ObservationPart* observation_part,
@@ -139,8 +206,7 @@ ObservationStore::ObservationStore(std::shared_ptr<DataStore> store)
 Status ObservationStore::AddObservation(const ObservationMetadata& metadata,
                                         const Observation& observation) {
   DataStore::Row row;
-  row.key = GenerateNewRowKey(metadata.customer_id(), metadata.project_id(),
-                              metadata.metric_id(), metadata.day_index());
+  row.key = GenerateNewRowKey(metadata, observation);
   for (const auto& pair : observation.parts()) {
     std::string serialized_observation_part;
     pair.second.SerializeToString(&serialized_observation_part);
@@ -157,8 +223,7 @@ Status ObservationStore::AddObservationBatch(
   std::vector<DataStore::Row> rows;
   for (const Observation& observation : observations) {
     DataStore::Row row;
-    row.key = GenerateNewRowKey(metadata.customer_id(), metadata.project_id(),
-                                metadata.metric_id(), metadata.day_index());
+    row.key = GenerateNewRowKey(metadata, observation);
     for (const auto& pair : observation.parts()) {
       std::string serialized_observation_part;
       pair.second.SerializeToString(&serialized_observation_part);

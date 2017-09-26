@@ -28,8 +28,12 @@ namespace internal {
 
 // Returns the row key that encapsulates the given data.
 std::string RowKey(uint32_t customer_id, uint32_t project_id,
-                   uint32_t metric_id, uint32_t day_index,
-                   uint64_t current_time_millis, uint32_t random);
+                   uint32_t metric_id, uint32_t day_index, uint64_t random,
+                   uint32_t hash);
+
+// Returns a 32-bit hash of |observation| appropriate for use as the <hash>
+// component of a row key.
+uint32_t HashObservation(const Observation& observation);
 
 // Returns the day_index encoded by |row_key|.
 uint32_t DayIndexFromRowKey(const std::string& row_key);
@@ -47,9 +51,9 @@ std::string RangeStartKey(uint32_t customer_id, uint32_t project_id,
 std::string RangeLimitKey(uint32_t customer_id, uint32_t project_id,
                           uint32_t metric_id, uint32_t day_index);
 
-// Generates a new row key for a row with the given data.
-std::string GenerateNewRowKey(uint32_t customer_id, uint32_t project_id,
-                              uint32_t metric_id, uint32_t day_index);
+// Generates a new row key for a row for the given Observation.
+std::string GenerateNewRowKey(const ObservationMetadata& metadata,
+                              const Observation& observation);
 
 bool ParseEncryptedObservationPart(ObservationPart* observation_part,
                                    std::string bytes);

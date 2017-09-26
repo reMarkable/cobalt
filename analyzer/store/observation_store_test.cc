@@ -20,6 +20,8 @@
 #include "analyzer/store/memory_store_test_helper.h"
 #include "analyzer/store/observation_store_abstract_test.h"
 #include "analyzer/store/observation_store_internal.h"
+#include "gflags/gflags.h"
+#include "glog/logging.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
 namespace cobalt {
@@ -65,18 +67,62 @@ TEST(ObservationStoreInteralTest, RangeLimitKey) {
 
 // Tests the function GenerateNewRowKey
 TEST(ObservationStoreInteralTest, GenerateNewRowKey) {
-  std::string row_key = GenerateNewRowKey(12345, 23456, 34567, 45678);
-  // Check that row_key has the right length.
+  ObservationMetadata metadata;
+  Observation observation;
+  metadata.set_customer_id(12345);
+  metadata.set_project_id(23456);
+  metadata.set_metric_id(34567);
+  metadata.set_day_index(45678);
+  // Set the random id to
+  // 0000000100000001000000010000000100000001000000010000000100000001
+  // which is 72340172838076673 in decimal.
+  observation.set_random_id(std::string(8, 1));
+  std::string row_key = GenerateNewRowKey(metadata, observation);
   EXPECT_EQ(75u, row_key.size());
-  // Check that the last two fields are not identically zero.
-  EXPECT_NE(
-      "0000012345:0000023456:0000034567:0000045678:00000000000000000000:"
-      "0000000000",
+  // 0111713051 is the hash value we observed for the above-constructed
+  // Observation.
+  EXPECT_EQ(
+      "0000012345:0000023456:0000034567:0000045678:00072340172838076673:"
+      "0111713051",
       row_key);
-  // Check all but the last two fields. We don't check the time field or
-  // the random field.
-  row_key.resize(44);
-  EXPECT_EQ("0000012345:0000023456:0000034567:0000045678:", row_key);
+
+  // Set the random id to a string that is too long. In this case the server
+  // will use the first 8 bytes.
+  observation.set_random_id(std::string(10, 1));
+  row_key = GenerateNewRowKey(metadata, observation);
+  EXPECT_EQ(75u, row_key.size());
+  // 1435327612 is the hash value we observed for the above-constructed
+  // Observation.
+  EXPECT_EQ(
+      "0000012345:0000023456:0000034567:0000045678:00072340172838076673:"
+      "1435327612",
+      row_key);
+
+  // Set random_id to a string that is too short. In this case the server
+  // generates a random id.
+  observation.set_random_id(std::string(2, 1));
+  // Generate another row key.
+  row_key = GenerateNewRowKey(metadata, observation);
+  EXPECT_EQ(75u, row_key.size());
+  EXPECT_EQ("0000012345:0000023456:0000034567:0000045678:",
+            row_key.substr(0, 44));
+  // This is just a sanity check that the random_id part of the row key
+  // is not all zeroes.
+  EXPECT_NE(":00000000000000000000:", row_key.substr(43, 22));
+  // 1258035169 is the hash value we observed for the above-constructed
+  // Observation.
+  EXPECT_EQ(":1258035169", row_key.substr(64));
+
+  // Clear random_id.
+  observation.clear_random_id();
+  // Generate another row key.
+  row_key = GenerateNewRowKey(metadata, observation);
+  EXPECT_EQ(75u, row_key.size());
+  EXPECT_EQ("0000012345:0000023456:0000034567:0000045678:",
+            row_key.substr(0, 44));
+  // 1120186595 is the hash value we observed for the above-constructed
+  // Observation.
+  EXPECT_EQ(":1120186595", row_key.substr(64));
 }
 
 }  // namespace internal
@@ -90,3 +136,10 @@ INSTANTIATE_TYPED_TEST_CASE_P(ObservationStoreTest,
 }  // namespace store
 }  // namespace analyzer
 }  // namespace cobalt
+
+int main(int argc, char** argv) {
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}

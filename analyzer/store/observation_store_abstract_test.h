@@ -439,8 +439,8 @@ TYPED_TEST_P(ObservationStoreAbstractTest, QueryWithInvalidArguments) {
 
   // Try to use a pagination token that corresponds to a day index that
   // is too small. Expect kInvalidArguments.
-  std::string pagination_token = internal::GenerateNewRowKey(
-      customer_id, project_id, metric_id, first_day_index - 1);
+  std::string pagination_token = internal::RowKey(
+      customer_id, project_id, metric_id, first_day_index - 1, 0, 0);
 
   std::vector<std::string> parts;
   ObservationStore::QueryResponse query_response =
@@ -452,8 +452,8 @@ TYPED_TEST_P(ObservationStoreAbstractTest, QueryWithInvalidArguments) {
 
   // Switch to a pagination token that corresponds to first_day_index.
   // Expect kOK.
-  pagination_token = internal::GenerateNewRowKey(customer_id, project_id,
-                                                 metric_id, first_day_index);
+  pagination_token = internal::RowKey(customer_id, project_id, metric_id,
+                                      first_day_index, 0, 0);
   query_response = this->observation_store_->QueryObservations(
       customer_id, project_id, metric_id, first_day_index, last_day_index,
       parts, 100, pagination_token);
