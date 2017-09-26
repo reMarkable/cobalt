@@ -58,3 +58,7 @@
 	path = third_party/zlib
 	url = https://fuchsia.googlesource.com/third_party/zlib
 	branch = cobalt
+[submodule "third_party/benchmark"]
+	path = third_party/benchmark
+	url = https://fuchsia.googlesource.com/third_party/benchmark
+	branch = cobalt
