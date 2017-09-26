@@ -120,6 +120,11 @@ DEFINE_uint32(repeat, 1,
               "Number of times to repeat the add-send cycle in the "
               "non-interactive mode.");
 
+DEFINE_uint32(num_adds_per_observation, 1,
+              "Number of times each Observation should be added to the "
+              "envelope. Setting this to more than 1 allows us to test "
+              "idempotency.");
+
 namespace {
 
 const size_t kMaxBytesPerObservation = 100 * 1024;
@@ -641,9 +646,20 @@ bool TestApp::EncodeAsNewClient(const std::vector<uint32_t> encoding_config_ids,
     return false;
   }
 
-  // Add the observation to the EnvelopeMaker.
-  auto status = shipping_manager_->AddObservation(*result.observation,
-                                                  std::move(result.metadata));
+  // Add the observation to the EnvelopeMaker. For the sake of testing
+  // idempotency of the AddObservation() operation, we add the same Observation
+  // multiple times.
+  ShippingManager::Status status;
+  for (size_t i = 0; i < FLAGS_num_adds_per_observation; i++) {
+    uint64_t random_id;
+    std::memcpy(&random_id, result.observation->random_id().data(),
+                sizeof(random_id));
+    VLOG(5) << "Adding observation with random_id=" << random_id;
+    status = shipping_manager_->AddObservation(
+        *result.observation, std::unique_ptr<ObservationMetadata>(
+                                 new ObservationMetadata(*result.metadata)));
+  }
+
   if (status != ShippingManager::kOk) {
     LOG(ERROR) << "AddObservation() failed with status " << status
                << ". metric_id=" << metric_;

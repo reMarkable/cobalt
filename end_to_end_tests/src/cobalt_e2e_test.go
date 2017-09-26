@@ -493,6 +493,9 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 		"-num_clients", strconv.Itoa(int(numClients)),
 		"-repeat", strconv.Itoa(int(repeatCount)),
 		fmt.Sprintf("-skip_shuffler=%t", skipShuffler),
+		// Each obervation is sent to the Shuffler 3 times. This allows us to test
+		// that the add-observation operation is idempotent.
+		"-num_adds_per_observation", "3",
 		"-values", flagString(values))
 	if *useTls {
 		cmd.Args = append(cmd.Args, "-use_tls")
