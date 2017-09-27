@@ -67,7 +67,7 @@ var (
 	includeStdErrColumn = flag.Bool("include_std_err_column", false, "Should a standard error column be included in the report? "+
 		"Used in non-interactive mode only.")
 
-	csvFile = flag.String("csv_file", "", "If specified then the CSV report will be written to that file."+
+	csvFile = flag.String("csv_file", "", "If specified then the CSV report will be written to that file. "+
 		"Used in non-interactive mode only.")
 
 	deadlineSeconds = flag.Uint("deadline_seconds", 30, "Number of seconds to wait for a report to complete before failing.")
@@ -124,7 +124,7 @@ func (c *ReportClientCLI) PrintReportResults(includeStdErr bool) {
 func (c *ReportClientCLI) startReport(complete bool,
 	firstDayOffset int, lastDayOffset int, reportConfigId uint32) (string, error) {
 	if complete {
-		fmt.Printf("Generating a new report for Report Configuration %d cover all days...\n", reportConfigId)
+		fmt.Printf("Generating a new report for Report Configuration %d covering all days...\n", reportConfigId)
 		return c.reportClient.StartCompleteReport(reportConfigId)
 	} else {
 		fmt.Printf("Generating a new report for Report Configuration %d covering the relative day interval [%d, %d]...\n",
