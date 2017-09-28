@@ -241,7 +241,11 @@ def _test(args):
       ]
       use_tls = _parse_bool(args.use_tls)
       if use_tls:
-        test_args += [ "-use_tls" ]
+        test_args += [
+            "-use_tls",
+            "-report_master_root_certs=%s" % args.report_master_root_certs,
+            "-shuffler_root_certs=%s" % args.shuffler_root_certs
+        ]
       if (args.use_cloud_bt or args.cobalt_on_personal_cluster or
           args.production_dir):
         bigtable_project_name_from_args = _compound_project_name(args)
@@ -252,12 +256,6 @@ def _test(args):
         ]
         bigtable_project_name = bigtable_project_name_from_args
         bigtable_instance_name = args.bigtable_instance_name
-      else:
-        # We are running the end-to-end test against local Cobalt servers
-        if use_tls:
-          test_args = test_args + [
-            "-ca_file=%s" % args.tls_root_certs
-          ]
       if args.production_dir:
         # When running the end-to-end test against the production instance of
         # Cobalt, it may not be true that the Shuffler has been configured
@@ -377,7 +375,7 @@ def _start_test_app(args):
       analyzer_uri=analyzer_uri,
       analyzer_pk_pem_file=analyzer_public_key_pem,
       use_tls=use_tls,
-      root_certs_pem_file=args.tls_root_certs,
+      root_certs_pem_file=args.shuffler_root_certs,
       shuffler_pk_pem_file=shuffler_public_key_pem,
       cobalt_config_dir=args.cobalt_config_dir,
       project_id=args.project_id,
@@ -396,7 +394,7 @@ def _start_report_client(args):
   process_starter.start_report_client(
       report_master_uri=report_master_uri,
       use_tls=_parse_bool(args.use_tls),
-      root_certs_pem_file=args.tls_root_certs,
+      root_certs_pem_file=args.report_master_root_certs,
       project_id=args.project_id,
       verbose_count=_verbose_count)
 
@@ -416,15 +414,19 @@ def _generate_keys(args):
   subprocess.check_call([path])
 
 def _generate_self_signed_certificate(key_file, cert_file,
-                                      ip_address='0.0.0.0'):
-  # First we build an openssl config file by replacing a token in our
+                                      ip_address='127.0.0.1',
+                                      hostname='localhost'):
+  # First we build an openssl config file by replacing two tokens in our
   # template file with the IP address.
-  token = '@@@IP_ADDRESS@@@'
+  ip_address_token = '@@@IP_ADDRESS@@@'
+  hostname_token = '@@@HOSTNAME@@@'
   openssl_config_file = os.path.join(OUT_DIR, 'self-signed-with-ip.cnf')
   with open(openssl_config_file, 'w+b') as f:
     for line in fileinput.input(OPEN_SSL_CONFIG_FILE):
-      if string.find(line, token) != -1:
-         line = line.replace(token, ip_address)
+      if string.find(line, ip_address_token) != -1:
+         line = line.replace(ip_address_token, ip_address)
+      if string.find(line, hostname_token) != -1:
+         line = line.replace(hostname_token, hostname)
       f.write(line)
 
   # then we invoke openssl and point it at the config file we just generated.
@@ -438,7 +440,7 @@ def _generate_cert(args):
     print '--path-to-key and --path-to-cert are both required.'
     return
   _generate_self_signed_certificate(args.path_to_key, args.path_to_cert,
-                                    args.ip_address)
+                                    args.ip_address, args.hostname)
 
 def _invoke_bigtable_tool(args, command):
   if not os.path.exists(bt_admin_service_account_credentials_file):
@@ -610,15 +612,6 @@ def _deploy_addresses(args):
 def _deploy_upload_certificate(args):
   path_to_cert = args.path_to_cert
   path_to_key = args.path_to_key
-  if args.dev_generate:
-    if path_to_cert or path_to_key:
-      print('You may not request for a self-signed certificate to be generated '
-            'and provide paths to an existing certificate or private key.')
-      return
-    # The names nginx.crt and nginx.key are expected by Google Cloud Endpoints.
-    path_to_cert = os.path.join(tempfile.gettempdir(), 'nginx.crt')
-    path_to_key = os.path.join(tempfile.gettempdir(), 'nginx.key')
-    _generate_self_signed_certificate(path_to_key, path_to_cert)
 
   if not path_to_cert or not path_to_key:
     print('Both --path-to-cert and --path-to-key must be set!')
@@ -672,9 +665,14 @@ def _default_use_tls(cobalt_is_running_on_gke, cluster_settings):
     return cluster_settings['use_tls'] or 'false'
   return 'false'
 
-def _default_tls_root_certs(cobalt_is_running_on_gke, cluster_settings):
+def _default_shuffler_root_certs(cobalt_is_running_on_gke, cluster_settings):
   if cobalt_is_running_on_gke:
-    return cluster_settings['tls_root_certs']
+    return cluster_settings['shuffler_root_certs']
+  return LOCALHOST_TLS_CERT_FILE
+
+def _default_report_master_root_certs(cobalt_is_running_on_gke, cluster_settings):
+  if cobalt_is_running_on_gke:
+    return cluster_settings['report_master_root_certs']
   return LOCALHOST_TLS_CERT_FILE
 
 def _default_shuffler_preferred_address(cobalt_is_running_on_gke,
@@ -797,7 +795,8 @@ def main():
     'shuffler_preferred_address': '',
     'report_master_preferred_address': '',
     'use_tls': '',
-    'tls_root_certs': '',
+    'shuffler_root_certs': '',
+    'report_master_root_certs': '',
   }
   if production_cluster_json_file:
     _cluster_settings_from_json(cluster_settings, production_cluster_json_file)
@@ -823,8 +822,10 @@ def main():
   default_report_master_preferred_address = \
       _default_report_master_preferred_address(cobalt_is_running_on_gke,
                                                cluster_settings)
-  default_tls_root_certs = _default_tls_root_certs(cobalt_is_running_on_gke,
-      cluster_settings)
+  default_shuffler_root_certs = _default_shuffler_root_certs(
+      cobalt_is_running_on_gke, cluster_settings)
+  default_report_master_root_certs = _default_report_master_root_certs(
+      cobalt_is_running_on_gke, cluster_settings)
 
   parser = argparse.ArgumentParser(description='The Cobalt command-line '
       'interface.')
@@ -954,11 +955,18 @@ def main():
       default=default_use_tls,
       help='Run end to end tests with tls enabled. '
       'default=%s'%default_use_tls)
-  sub_parser.add_argument('--tls_root_certs',
-      default=default_tls_root_certs,
+  sub_parser.add_argument('--shuffler_root_certs',
+      default=default_shuffler_root_certs,
       help='When --use_tls=true then use this as the root certs file '
-      '(a.k.a the CA file). If not specified then gRPC defaults will be used. '
-      'default=%s'%default_tls_root_certs)
+      '(a.k.a the CA file) for the tls connection to the Shuffler. If not '
+      'specified then gRPC defaults will be used. '
+      'default=%s'%default_shuffler_root_certs)
+  sub_parser.add_argument('--report_master_root_certs',
+      default=default_report_master_root_certs,
+      help='When --use_tls=true then use this as the root certs file '
+      '(a.k.a the CA file) for the tls connection to the ReportMaster. If not '
+      'specified then gRPC defaults will be used. '
+      'default=%s'%default_report_master_root_certs)
   sub_parser.add_argument('--tls_cert_file',
       default=LOCALHOST_TLS_CERT_FILE,
       help='When --use_tls=true and the servers are being run locally, '
@@ -1137,11 +1145,12 @@ def main():
       default=default_use_tls,
       help='The test_app will use TLS to communicate with the Shuffler. '
       'default=%s'%default_use_tls)
-  sub_parser.add_argument('--tls_root_certs',
-      default=default_tls_root_certs,
+  sub_parser.add_argument('--shuffler_root_certs',
+      default=default_shuffler_root_certs,
       help='When --use_tls=true then use this as the root certs file '
-      '(a.k.a the CA file). If not specified then gRPC defaults will be used. '
-      'default=%s'%default_tls_root_certs)
+      '(a.k.a the CA file) for the tls connection to the Shuffler. If not '
+      'specified then gRPC defaults will be used. '
+      'default=%s'%default_shuffler_root_certs)
 
   sub_parser = start_subparsers.add_parser('report_client',
       parents=[parent_parser], help='Start the Cobalt report client.')
@@ -1171,11 +1180,12 @@ def main():
       default=default_use_tls,
       help='The test_app will use TLS to communicate with the Shuffler. '
       'default=%s'%default_use_tls)
-  sub_parser.add_argument('--tls_root_certs',
-      default=default_tls_root_certs,
+  sub_parser.add_argument('--report_master_root_certs',
+      default=default_report_master_root_certs,
       help='When --use_tls=true then use this as the root certs file '
-      '(a.k.a the CA file). If not specified then gRPC defaults will be used. '
-      'default=%s'%default_tls_root_certs)
+      '(a.k.a the CA file) for the tls connection to the ReportMaster. If not '
+      'specified then gRPC defaults will be used. '
+      'default=%s'%default_report_master_root_certs)
 
   sub_parser = start_subparsers.add_parser('observation_querier',
       parents=[parent_parser], help='Start the Cobalt ObservationStore '
@@ -1236,10 +1246,15 @@ def main():
       default='',
       help='Absolute or relative path to a cert file that should be '
       'generted. Required.')
-  sub_parser.add_argument('--ip-address', default='0.0.0.0',
+  sub_parser.add_argument('--ip-address', default='127.0.0.1',
     help='Optional IP address. If specified the self-signed certificate will '
     'include a Subject Alternative Name section containing the given IP '
-    'address. This is necessar in order to use the IP address in gRPC '
+    'address. This is necessary in order to use the IP address in gRPC '
+    'requests.')
+  sub_parser.add_argument('--hostname', default='localhost',
+    help='Optional HostName. If specified the self-signed certificate will '
+    'include a Subject Alternative Name section containing the hostname. '
+    'This is necessary in order to use the hostname in gRPC '
     'requests.')
 
   ########################################################
@@ -1487,10 +1502,6 @@ def main():
   sub_parser.add_argument('--job',
       help='The job whose certificate you wish to deploy. Valid choices: '
            '"report-master", "shuffler". Required.')
-  sub_parser.add_argument('--dev-generate', default=False, action='store_true',
-      help='Generate a key and self-signed certificate and deploy them. If '
-           'this flag is set, you may not set path-to-cert or path-to-key. '
-           'DO NOT USE THIS FLAG WHEN DEPLOYING TO PRODUCTION!!!')
   sub_parser.add_argument('--path-to-cert',
       help='Path to the certificate to be deployed. (Required unless '
            '--dev-generate is set.)')

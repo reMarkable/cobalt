@@ -258,8 +258,11 @@ var (
 	reportMasterUri = flag.String("report_master_uri", "", "The URI of the Report Master")
 	shufflerUri     = flag.String("shuffler_uri", "", "The URI of the Shuffler")
 
-	useTls = flag.Bool("use_tls", false, "Use TLS for gRPC connections (currently only to the Shuffler and ReportMaster.")
-	caFile = flag.String("ca_file", "", "Optional. A file containning the root CA certificates.")
+	useTls            = flag.Bool("use_tls", false, "Use TLS for gRPC connections (currently only to the Shuffler and ReportMaster.")
+	shufflerRootCerts = flag.String("shuffler_root_certs", "", "Optional. A file containning the root CA certificates to be used for "+
+		"the tls connection to the Shuffler.")
+	reportMasterRootCerts = flag.String("report_master_root_certs", "", "Optional. A file containning the root CA certificates to be used "+
+		"for the tls connection to the ReportMaster.")
 
 	analyzerPkPemFile = flag.String("analyzer_pk_pem_file", "", "Path to a file containing a PEM encoding of the public key of the Analyzer")
 	shufflerPkPemFile = flag.String("shuffler_pk_pem_file", "", "Path to a file containing a PEM encoding of the public key of the Shuffler")
@@ -323,7 +326,7 @@ func printWarningAndWait() {
 func init() {
 	flag.Parse()
 
-	reportClient = report_client.NewReportClient(customerId, projectId, *reportMasterUri, *useTls, *caFile)
+	reportClient = report_client.NewReportClient(customerId, projectId, *reportMasterUri, *useTls, *reportMasterRootCerts)
 
 	if *bigtableToolPath != "" {
 		// Since we are about to delete data from a real bigtable let's give a user a chance
@@ -499,8 +502,8 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 		"-values", flagString(values))
 	if *useTls {
 		cmd.Args = append(cmd.Args, "-use_tls")
-		if *caFile != "" {
-			cmd.Args = append(cmd.Args, "-root_certs_pem_file", *caFile)
+		if *shufflerRootCerts != "" {
+			cmd.Args = append(cmd.Args, "-root_certs_pem_file", *shufflerRootCerts)
 		}
 	}
 	stdoutStderr, err := cmd.CombinedOutput()

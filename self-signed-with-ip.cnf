@@ -1,8 +1,22 @@
-# This is an openssl coniguration file. It is used by cobaltb.py to generate
-# self-signed certificates with an IP address in the Subject Alternative Name
-# section. This is necessary in order to test gRPC locally using an
-# IP address. The tag <IP_ADDRESS> below is replaced by an IP
-# address in cobaltb.py.
+# This is an openssl configuration file. It is used by the command
+#          cobaltb.py generate_cert
+# to generate self-signed certificates. Using a configuration file like this
+# seems to be the only way to generate a certificate with an IP address in the
+# Subject Alternative Name section. This is necessary if you want to access
+# a server via an IP address. The tag <IP_ADDRESS> below is replaced by the
+# value of the flag --ip-address passed to the cobaltb.py generate_cert command
+# and the tag <HOSTNAME> below is replaced by the value of the flag --hostname.
+#
+# Note that if you plan to access the Shuffler via a host name (including a
+# a DNS name) then you must pass the host name to the --hostname flag.
+# openssl will also prompt you for the hostname to use as the CN (Common Name)
+# and you must enter it there also. But this is not sufficient because the C++
+# version of the gRPC tls client is strict in verifying the hostname: Because
+# the certificate contains at least one Subject Alternateive name (SAN) the
+# Common Name (CN) will not be used at all for host name verification. Therefore
+# the hostname must also be listed as a SAN. On the other hand the host name
+# must also be entered into openssl's CN prompt because it will get used as the
+# CN of the issuer.
 
 HOME			= .
 
@@ -24,3 +38,4 @@ basicConstraints = CA:true
 
 [alt_names]
 IP.1 = @@@IP_ADDRESS@@@
+DNS.1 = @@@HOSTNAME@@@

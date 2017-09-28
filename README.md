@@ -347,17 +347,16 @@ commands when running Cobalt locally. This uses a TLS (key, cert) pair for
 the host name *localhost*. If you want to run clients locally
 but run the servers on a devel cluster on Google Container Engine (described
 below) then it is necessary to generate additional self-signed certificates
-using the IP address of the servers (Shuffler and Analyzer) in your devel
-cluster. You do this via the command
+using the IP address and or the hostnames of the servers (Shuffler and Analyzer)
+in your devel cluster. You do this via the command
 
-`./cobaltb.py generate_cert --path-to-key=<path> --path-to-cert=<path> --ip_address=<address>`
+`./cobaltb.py generate_cert --path-to-key=<path> --path-to-cert=<path> --ip_address=<address> --hostname=<hostname>`
 
 You must have openssl on your path. The key and cert will be written to
-the files specified and the cert will contain an "Alternate Name" field with
-the specified IP address. The openssl tool will also ask you to enter a
-CN (Common Name). If you would like to use the certificate to access a server
-using a name rather than an IP address then enter it there. Otherwise it
-doesn't matter what you use for the CN.
+the files specified and the cert will contain two "Subject Alternative Name"
+fields with the specified IP address and hostname. The openssl tool will also
+ask you to enter a CN (Common Name). Enter the same hostname here that you
+passed to the --hostname flag.
 
 The generated certificates may be used for two purposes:
 
@@ -370,7 +369,8 @@ The generated certificates may be used for two purposes:
 In order to use the generted certificates on the client you need to pass a
 few flags in addition to `--use_tls`:
 
- * `--tls_root_certs=<path-to-cert>`. A self-signed server cert
+ * `--shuffler_root_certs=<path-to-cert>` and
+   `--report_master_root_certs=<path-to-cert>`. A self-signed server cert
  may also be used as the root cert (a.k.a CA cert) on the client.
  * `--shuffler_preferred_name=<name or ip>` and
  `--report_master_preferred_name=<name or ip>`. The name or IP address in the
@@ -498,7 +498,9 @@ Its contents should be exactly the following
   "shuffler_use_memstore" : "<specify true or false. Default false.>",
   "report_master_preferred_address": "<host:port>",
   "shuffler_preferred_address": "<host:port>",
-  "use_tls": "<specify true or false. Default false.>"
+  "use_tls": "<specify true or false. Default false.>",
+  "shuffler_root_certs": <path-to-cert-file>,
+  "report_master_root_certs": "<path-to-cert-file>"
 }
 ```
 
@@ -508,14 +510,16 @@ For example:
 {
   "cloud_project_name": "fuchsia-cobalt-testing",
   "cluster_name": "rudominer-test-1",
-  "cluster_zone": "us-central1-a",
-  "gce_pd_name": "rudominer-shuffler-1",
-  "bigtable_instance_name": "rudominer-test-1"
-  "shuffler_config_file" : "shuffler/src/shuffler_config/config_demo.txt"
-  "cobalt_config_dir" : "config/demo"
-  "shuffler_preferred_address": "shuffler.cobalt-api.fuchsia.com:443",
-  "report_master_preferred_address": "reportmaster.cobalt-api.fuchsia.com:443",
-  "use_tls": "true"
+  "cluster_zone": "us-central1-c",
+  "gce_pd_name": "rudominer-test-1",
+  "bigtable_instance_name": "rudominer-cobalt-testing",
+  "shuffler_config_file" : "shuffler/src/shuffler_config/config_demo.txt",
+  "cobalt_config_dir" : "config/demo",
+  "shuffler_preferred_address" : "shuffler.endpoints.fuchsia-cobalt-testing.cloud.goog:443",
+  "report_master_preferred_address" : "reportmaster.endpoints.fuchsia-cobalt-testing.cloud.goog:443",
+  "use_tls" : "true",
+  "report_master_root_certs" : "/home/rudominer/cobalt/src/fuchsia_cobalt_testing_report_master.crt",
+  "shuffler_root_certs" : "/home/rudominer/cobalt/src/fuchsia_cobalt_testing_shuffler.crt"
 }
 ```
 
@@ -568,6 +572,12 @@ project name without the prefix and the colon.
   an instruction to clients regarding whether or not to use TLS when connecting
   to the Shuffler and ReportMaster. This should be set consistently with the
   values of *shuffler_preferred_address* and *report_master_preferred_address*.
+* shuffler_root_certs: This has no effect on the server deployment but rather
+  acts as an instruction to the test_app regarding which root CA cert
+  file to use when making a TLS connection to the Shuffler. If this is not
+  specified then gRPC defaults will be used.
+* report_master_root_certs: Same as above but used for the report_client
+  connecting to the ReportMaster.
 
 ### Deploying Cobalt to GKE
 
@@ -598,14 +608,17 @@ Cloud Endpoints. If you run this multiple times, it will upload multiple copies
 of the Cloud Endpoint configuration but will otherwise have no effect. (The
 latest uploaded config will be used.)
 
-`./cobaltb.py deploy upload_certificate --job=report-master --dev-generate`
+```
+./cobaltb.py deploy upload_certificate \
+    --job=<job> \
+    --path-to-cert=<path-to-certificate-file> \
+    --path-to-key=<path-to-private-file>
+```
 
-`./cobaltb.py deploy upload_certificate --job=shuffler --dev-generate`
-Run these one time for the report-master and shuffler each to upload self-signed
-certificates. This command will generate a self-signed certificate using
-`openssl` and deploy it.  DO NOT USE FOR PRODUCTION!!! (See Deploying Cobalt to
-GKE in a Production Cluster for instructions on deploying certificates to
-production.)
+Run these one time for the report-master and shuffler each. If you wish
+to use self-signed certificates you may first create them using the command
+`./cobaltb.py generate_cert` described above.
+
 To upload a different certificate, you must first delete the existing
 certificate if there is one:
 `./cobaltb.py deploy delete_certificate --job=<job-name>`
