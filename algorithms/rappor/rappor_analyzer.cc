@@ -40,7 +40,23 @@ bool RapporAnalyzer::AddObservation(const RapporObservation& obs) {
 grpc::Status RapporAnalyzer::Analyze(
     std::vector<CandidateResult>* results_out) {
   CHECK(results_out);
+
+  // TODO(rudominer) Consider inserting here an analysis of the distribution
+  // of the number of Observations over the set of cohorts. The mathematics
+  // of our algorithm below assumes that this distribution is uniform. If
+  // it is not uniform in practice this may indicate a problem with client-
+  // side code and we may wish to take some corrective action.
+
   auto status = BuildCandidateMap();
+  if (!status.ok()) {
+    return status;
+  }
+
+  // This is the right-hand side vector b from the equation Ax = b that
+  // we are estimating. See comments on the declaration of
+  // ExtractEstimatedBitCountRatios() for a description of this vector.
+  Eigen::VectorXf est_bit_count_ratios;
+  status = ExtractEstimatedBitCountRatios(&est_bit_count_ratios);
   if (!status.ok()) {
     return status;
   }
@@ -48,6 +64,40 @@ grpc::Status RapporAnalyzer::Analyze(
   //////////////////////////////////////////////////////
   // TODO(azani, mironov) Put LASSO analysis here.
   /////////////////////////////////////////////////////
+
+  return grpc::Status::OK;
+}
+
+grpc::Status RapporAnalyzer::ExtractEstimatedBitCountRatios(
+    Eigen::VectorXf* est_bit_count_ratios) {
+  CHECK(est_bit_count_ratios);
+
+  if (!config_->valid()) {
+    return grpc::Status(grpc::FAILED_PRECONDITION,
+                        "Invalid RapporConfig passed to constructor.");
+  }
+
+  const uint32_t num_bits = config_->num_bits();
+  const uint32_t num_cohorts = config_->num_cohorts();
+
+  est_bit_count_ratios->resize(num_cohorts * num_bits);
+
+  const std::vector<CohortCounts>& estimated_counts =
+      bit_counter_.EstimateCounts();
+  CHECK(estimated_counts.size() == num_cohorts);
+
+  int cohort_block_base = 0;
+  for (auto& cohort_data : estimated_counts) {
+    CHECK(cohort_data.count_estimates.size() == num_bits);
+    for (size_t bit_index = 0; bit_index < num_bits; bit_index++) {
+      // |bit_index| is an index "from the right".
+      size_t bloom_index = num_bits - 1 - bit_index;
+      (*est_bit_count_ratios)(cohort_block_base + bloom_index) =
+          cohort_data.count_estimates[bit_index] /
+          static_cast<double>(cohort_data.num_observations);
+    }
+    cohort_block_base += num_bits;
+  }
 
   return grpc::Status::OK;
 }
@@ -119,9 +169,9 @@ grpc::Status RapporAnalyzer::BuildCandidateMap() {
       // Add triplets to the sparse matrix representation. For the current
       // column and the current block of rows we add a 1 into the row
       // corresponding to the index of each set bit in the Bloom filter.
-      for (size_t bit_index = 0; bit_index < num_bits; bit_index++) {
-        if (bloom_filter[bit_index]) {
-          int row = row_block_base + bit_index;
+      for (size_t bloom_index = 0; bloom_index < num_bits; bloom_index++) {
+        if (bloom_filter[bloom_index]) {
+          int row = row_block_base + bloom_index;
           sparse_matrix_triplets.emplace_back(row, column, 1.0);
         }
       }
@@ -143,3 +193,57 @@ grpc::Status RapporAnalyzer::BuildCandidateMap() {
 
 }  // namespace rappor
 }  // namespace cobalt
+
+/*
+
+Justification for the formula used in ExtractEstimatedBitCountRatios
+-------------------------------------------------------------------
+See the comments at the declaration of the method
+ExtractEstimatedBitCountRatios() in rappor_analyzer.h for the context and
+the definitions of the symbols used here.
+
+Here we justify the use of the formula
+
+     est_bit_count_ratios[i*k +j] = est_count_i_j / n_i.
+
+Let A be the binary sparse matrix produced by the method BuildCandidateMap()
+and stored in candidate_matrix_. Let b be the column vector produced by
+the method ExtractEstimatedBitCountRatios() and stored in the variable
+est_bit_count_ratios.  In RapporAnalyzer::Analyze() we compute an estimate
+of a solution to the equation Ax = b. The question we want to address here
+is how do we know we are using the correct value of b? In particular, why is it
+appropriate to divide each entry by n_i, the number of observations from
+cohort i?
+
+The assumption that underlies the justifcation is that the probability of
+a given candidate string occurring is the same in each cohort. That is, there
+is a probability distribution vector x_0 of length s = # of candidates such
+that for each cohort i < m, and each candidate index r < s,
+x_0[r] =
+   (number of true observations of candidate r in cohort i) /
+        (number of observations from cohort i)
+
+Assume such an x_0 exists. Now let n_i = (number of observations from cohort i).
+Then consider the vector b_i = A (n_i) x_0. We are only concerned with the
+entries in b_i corresponding to cohort i, that is the entries
+i*k + j for 0 <= j < k. Fix such a j and note that
+b_i[i*k + j] = "the true count of 1's for bit j in cohort i". That is, the
+count of 1's for bit j in cohort i prior to flipping bits for randomized
+response. In other words, the count of 1's if we use p = 0, q = 1.
+
+Dividing both sides of the equation A (n_i) x_0 = b_i by n_i and focusing
+only on cohort i we get
+     A x_0 [i*k + j] = "the true count of 1's for bit j in cohort i" / n_i
+
+Let b* = A x_0. Then we have:
+
+(i) x_0 is a solution to the equation Ax = b*
+(ii) b*[i*k + j] = "the true count of 1's for bit j in cohort i" / n_i
+
+This justifies our use of the vector b. We have
+ b[i*k + j] = "the estimated count of 1's for bit j in cohort i" / n_i
+
+ and we seek an estimate to an x such that Ax = b. Such an x may therefore
+ naturally be considered to be an estimate of x_0.
+
+*/

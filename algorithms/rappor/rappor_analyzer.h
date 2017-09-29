@@ -132,6 +132,26 @@ class RapporAnalyzer {
     std::vector<CohortMap> candidate_cohort_maps;
   };
 
+  // Computes the column vector est_bit_count_ratios. This method should be
+  // invoked after all Observations have been added via AddObservation().
+  //
+  // est_bit_count_ratios is a column vector of length m * k where
+  // m = # of cohorts
+  // k = # of Bloom filter bits per cohort.
+  //
+  // For i < m, j < k, est_bit_count_ratios[i*k +j] = est_count_i_j / n_i
+  // where
+  // est_count_i_j = the estimate of the true number of times that bit j was
+  //                 set in cohort i.
+  // n_i           = the number of observations from cohort i
+  //
+  // These values are extracted from the BloomBitCounter.
+  //
+  // See the note at the bottom of rappor_anlayzer.cc for a justification of this
+  // formula.
+  grpc::Status ExtractEstimatedBitCountRatios(
+      Eigen::VectorXf* est_bit_count_ratios);
+
   BloomBitCounter bit_counter_;
 
   std::shared_ptr<RapporConfigValidator> config_;

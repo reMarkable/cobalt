@@ -58,6 +58,17 @@ RapporConfig Config(uint32_t num_bloom_bits, uint32_t num_cohorts,
   return config;
 }
 
+// Given a string of "0"s and "1"s of length a multiple of 8, and a cohort,
+// returns a RapporObservation for the given cohort whose data is equal to the
+// bytes whose binary representation is given by the string.
+RapporObservation RapporObservationFromString(
+    uint32_t cohort, const std::string& binary_string) {
+  RapporObservation obs;
+  obs.set_cohort(cohort);
+  obs.set_data(BinaryStringToData(binary_string));
+  return obs;
+}
+
 }  // namespace
 
 class RapporAnalyzerTest : public ::testing::Test {
@@ -151,6 +162,16 @@ class RapporAnalyzerTest : public ::testing::Test {
 
   const Eigen::SparseMatrix<float, Eigen::RowMajor>& candidate_matrix() {
     return analyzer_->candidate_matrix_;
+  }
+
+  void AddObservation(uint32_t cohort, std::string binary_string) {
+    EXPECT_TRUE(analyzer_->AddObservation(
+        RapporObservationFromString(cohort, binary_string)));
+  }
+
+  void ExtractEstimatedBitCountRatios(Eigen::VectorXf* est_bit_count_ratios) {
+    EXPECT_TRUE(
+        analyzer_->ExtractEstimatedBitCountRatios(est_bit_count_ratios).ok());
   }
 
   RapporConfig config_;
@@ -338,6 +359,60 @@ TEST_F(RapporAnalyzerTest, BuildCandidateMapCompareWithEncoder) {
     EXPECT_EQ(BuildBitString(candidate, encoder.cohort()),
               DataToBinaryString(observation.data()));
   }
+}
+
+// Tests the function ExtractEstimatedBitCountRatios(). We build one small
+// estimated bit count ratio vector and explicitly check its values. We
+// use no-randomness: p = 0, q = 1 so that the estimated bit counts are
+// identical to the true bit counts.
+TEST_F(RapporAnalyzerTest, ExtractEstimatedBitCountRatiosSmallNonRandomTest) {
+  static const uint32_t kNumCandidates = 10;
+  static const uint32_t kNumCohorts = 3;
+  static const uint32_t kNumHashes = 2;
+  static const uint32_t kNumBloomBits = 8;
+  SetAnalyzer(kNumCandidates, kNumBloomBits, kNumCohorts, kNumHashes);
+  AddObservation(0, "00001010");
+  AddObservation(0, "00010010");
+  AddObservation(1, "00001010");
+  AddObservation(1, "00010010");
+  AddObservation(1, "00100010");
+  AddObservation(2, "00001010");
+  AddObservation(2, "00010010");
+  AddObservation(2, "00010010");
+  AddObservation(2, "00100010");
+
+  Eigen::VectorXf est_bit_count_ratios;
+  ExtractEstimatedBitCountRatios(&est_bit_count_ratios);
+
+  std::ostringstream stream;
+  stream << est_bit_count_ratios.block(0, 0, kNumCohorts * kNumBloomBits, 1);
+
+  const char* kExpectedVectorString =
+      "       0\n"
+      "       0\n"
+      "       0\n"
+      "     0.5\n"
+      "     0.5\n"
+      "       0\n"
+      "       1\n"
+      "       0\n"
+      "       0\n"
+      "       0\n"
+      "0.333333\n"
+      "0.333333\n"
+      "0.333333\n"
+      "       0\n"
+      "       1\n"
+      "       0\n"
+      "       0\n"
+      "       0\n"
+      "    0.25\n"
+      "     0.5\n"
+      "    0.25\n"
+      "       0\n"
+      "       1\n"
+      "       0";
+  EXPECT_EQ(kExpectedVectorString, stream.str());
 }
 
 }  // namespace rappor
