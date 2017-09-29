@@ -62,3 +62,9 @@
 	path = third_party/benchmark
 	url = https://fuchsia.googlesource.com/third_party/benchmark
 	branch = cobalt
+[submodule "third_party/eigen"]
+	path = third_party/eigen
+	url = https://fuchsia.googlesource.com/third_party/eigen
+[submodule "third_party/lossmin"]
+	path = third_party/lossmin
+	url = https://fuchsia.googlesource.com/lossmin

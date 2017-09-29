@@ -515,4 +515,7 @@ add_subdirectory(shuffler)
 add_subdirectory(tools)
 add_subdirectory(util)
 
+# Third-party directories that we include using the simpler add_subdirectory method
+add_subdirectory(third_party/lossmin)
+
 
