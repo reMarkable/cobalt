@@ -46,7 +46,7 @@ void PopulateRapporCandidateList(uint32_t num_candidates,
   }
 }
 
-// Makes a RapporConfig with the given data (and num_hashes=2).
+// Makes a RapporConfig with the given data.
 RapporConfig Config(uint32_t num_bloom_bits, uint32_t num_cohorts,
                     uint32_t num_hashes, double p, double q) {
   RapporConfig config;
@@ -76,11 +76,11 @@ class RapporAnalyzerTest : public ::testing::Test {
   void BuildCandidateMap() {
     EXPECT_EQ(grpc::OK, analyzer_->BuildCandidateMap().error_code());
 
-    uint32_t num_candidates =
+    const uint32_t num_candidates =
         analyzer_->candidate_map_.candidate_list->candidates_size();
-    uint32_t num_cohorts = analyzer_->config_->num_cohorts();
-    uint32_t num_hashes = analyzer_->config_->num_hashes();
-    uint32_t num_bits = analyzer_->config_->num_bits();
+    const uint32_t num_cohorts = analyzer_->config_->num_cohorts();
+    const uint32_t num_hashes = analyzer_->config_->num_hashes();
+    const uint32_t num_bits = analyzer_->config_->num_bits();
 
     // Expect the number of candidates to be correct,
     EXPECT_EQ(num_candidates,
@@ -110,6 +110,13 @@ class RapporAnalyzerTest : public ::testing::Test {
         }
       }
     }
+
+    // Validate the associated sparse matrix.
+    EXPECT_EQ(num_candidates, candidate_matrix().cols());
+    EXPECT_EQ(num_cohorts * num_bits, candidate_matrix().rows());
+    EXPECT_LE(num_candidates * num_cohorts, candidate_matrix().nonZeros());
+    EXPECT_GE(num_candidates * num_cohorts * num_hashes,
+              candidate_matrix().nonZeros());
   }
 
   // This should be invoked after BuildCandidateMap. It returns the bit index
@@ -140,6 +147,10 @@ class RapporAnalyzerTest : public ::testing::Test {
         analyzer_->candidate_map_.candidate_cohort_maps[candidate_index]
             .cohort_hashes[cohort_index]
             .bit_indices);
+  }
+
+  const Eigen::SparseMatrix<float, Eigen::RowMajor>& candidate_matrix() {
+    return analyzer_->candidate_matrix_;
   }
 
   RapporConfig config_;
@@ -187,6 +198,97 @@ TEST_F(RapporAnalyzerTest, BuildCandidateMapSmallTest) {
       }
     }
   }
+
+  // Check the associated sparse matrix.
+  std::ostringstream stream;
+  stream << candidate_matrix().block(0, 0, kNumCohorts * kNumBloomBits,
+                                     kNumCandidates);
+  const char* kExpectedMatrixString =
+      "0 0 0 0 0 \n"
+      "0 0 0 0 0 \n"
+      "1 1 0 1 0 \n"
+      "0 0 0 0 1 \n"
+      "1 0 1 0 0 \n"
+      "0 0 0 0 0 \n"
+      "0 1 0 1 1 \n"
+      "0 0 1 0 0 \n"
+      "0 1 0 0 0 \n"
+      "1 0 0 0 0 \n"
+      "0 0 0 0 0 \n"
+      "0 1 0 1 0 \n"
+      "0 0 0 0 1 \n"
+      "1 0 1 1 0 \n"
+      "0 0 0 0 1 \n"
+      "0 0 1 0 0 \n"
+      "0 0 0 0 0 \n"
+      "1 0 0 0 1 \n"
+      "0 0 0 0 0 \n"
+      "0 0 1 1 0 \n"
+      "1 0 0 0 0 \n"
+      "0 1 0 1 1 \n"
+      "0 0 1 0 0 \n"
+      "0 1 0 0 0 \n";
+  EXPECT_EQ(kExpectedMatrixString, stream.str());
+}
+
+// This test is identical to the previous test except that kNumBloomBits = 4
+// instead of 8. The purpose of this test is to force the situation in which
+// the two hash functions for a given cohort and a given candidate give the
+// same value. For example below we see that for candidate 0, cohort 1, both
+// hash functions yielded a 2. We want to test that the associated sparse
+// matrix has a "1" in the corresponding position (in this case that is
+// row 5, column 0) and does not have a "2" in that position. In other words
+// we want to test that we correctly added only one entry to the list of
+// triples that defined the sparse matrix and not two entries.
+TEST_F(RapporAnalyzerTest, BuildCandidateMapSmallTestWithDuplicates) {
+  static const uint32_t kNumCandidates = 5;
+  static const uint32_t kNumCohorts = 3;
+  static const uint32_t kNumHashes = 2;
+  static const uint32_t kNumBloomBits = 4;
+
+  SetAnalyzer(kNumCandidates, kNumBloomBits, kNumCohorts, kNumHashes);
+  BuildCandidateMap();
+
+  // clang-format off
+  int expected_bit_indices[kNumCandidates][kNumCohorts*kNumHashes] = {
+  // cihj means cohort = i and hash-index = j.
+  // c0h0 c0h1 c1h0 c1h1 c2h0 c2h2
+      {3,   1,   2,   2,   3,   2},  // candidate 0
+      {1,   1,   0,   3,   2,   0},  // candidate 1
+      {3,   0,   2,   0,   1,   0},  // candidate 2
+      {1,   1,   2,   0,   2,   0},  // candidate 3
+      {1,   0,   3,   1,   2,   2},  // candidate 4
+  };
+  // clang-format on
+
+  for (size_t candidate = 0; candidate < kNumCandidates; candidate++) {
+    for (size_t cohort = 0; cohort < kNumCohorts; cohort++) {
+      for (size_t hash = 0; hash < kNumHashes; hash++) {
+        EXPECT_EQ(expected_bit_indices[candidate][cohort * kNumHashes + hash],
+                  GetCandidateMapValue(candidate, cohort, hash))
+            << "(" << candidate << "," << cohort * kNumHashes + hash << ")";
+      }
+    }
+  }
+
+  // Check the associated sparse matrix.
+  std::ostringstream stream;
+  stream << candidate_matrix().block(0, 0, kNumCohorts * kNumBloomBits,
+                                     kNumCandidates);
+  const char* kExpectedMatrixString =
+      "1 0 1 0 0 \n"
+      "0 0 0 0 0 \n"
+      "1 1 0 1 1 \n"
+      "0 0 1 0 1 \n"
+      "0 1 0 0 1 \n"
+      "1 0 1 1 0 \n"
+      "0 0 0 0 1 \n"
+      "0 1 1 1 0 \n"
+      "1 0 0 0 0 \n"
+      "1 1 0 1 1 \n"
+      "0 0 1 0 0 \n"
+      "0 1 1 1 0 \n";
+  EXPECT_EQ(kExpectedMatrixString, stream.str());
 }
 
 // Tests the function BuildCandidateMap. We build many different CandidateMaps

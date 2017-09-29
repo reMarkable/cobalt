@@ -25,6 +25,7 @@
 #include "config/encodings.pb.h"
 #include "config/report_configs.pb.h"
 #include "grpc++/grpc++.h"
+#include "third_party/eigen/Eigen/SparseCore"
 
 namespace cobalt {
 namespace rappor {
@@ -61,6 +62,7 @@ class RapporAnalyzer {
   // observations added via AddObservation() must have been encoded using this
   // config. If the config is not valid then all calls to AddObservation()
   // will return false.
+  // Does not take ownership of |candidates|.
   // TODO(rudominer) Enhance this API to also accept DP release parameters.
   explicit RapporAnalyzer(const RapporConfig& config,
                           const RapporCandidateList* candidates);
@@ -87,7 +89,8 @@ class RapporAnalyzer {
  private:
   friend class RapporAnalyzerTest;
 
-  // Builds the RAPPOR CandidateMap based on the data passed to the constructor.
+  // Builds the RAPPOR CandidateMap and the associated sparse matrix based on
+  // the data passed to the constructor.
   grpc::Status BuildCandidateMap();
 
   // An instance of Hashes is implicitly associated with a given
@@ -134,6 +137,24 @@ class RapporAnalyzer {
   std::shared_ptr<RapporConfigValidator> config_;
 
   CandidateMap candidate_map_;
+
+  // candidate_matrix_ is a representation of candidate_map_ as a sparse matrix.
+  // It is an (m * k) X s sparse binary matrix, where
+  // m = # of cohorts
+  // k = # of Bloom filter bits per cohort
+  // s = # of candidates
+  // and for i < m, j < k, r < s candidate_matrix_[i*k + j, r] = 1 iff
+  // candidate_map_.candidate_cohort_maps[r].cohort_hashes[i].bit_indices[g] =
+  //     k - j
+  // for at least one g < h where h = # of hashes.
+  //
+  // In other words, if one of the hash functions for cohort i hashes candidate
+  // r to bit j (indexed from the left) then we put a 1 in column r, row
+  // i*k + j.
+  //
+  // The expression (k - j) above is due to the fact that
+  // candidate_map_ indexes bits from the right instead of from the left.
+  Eigen::SparseMatrix<float, Eigen::RowMajor> candidate_matrix_;
 };
 
 }  // namespace rappor

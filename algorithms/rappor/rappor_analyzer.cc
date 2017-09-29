@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 
 #include "algorithms/rappor/rappor_encoder.h"
+
 #include "util/crypto_util/hash.h"
 
 namespace cobalt {
@@ -57,19 +58,20 @@ grpc::Status RapporAnalyzer::BuildCandidateMap() {
                         "Invalid RapporConfig passed to constructor.");
   }
 
-  // TODO(rudominer) Consider caching the CandidateMaps. The same RAPPOR
-  // analysis will likely be run every day with the same RapporConfig and
-  // RapporCandidateList but different sets of Observatons. Since the
-  // CandidateMap does not depend on the Observations, we can cache them
-  // (for example in Bigtable.) Alternatively, instead of caching the
-  // CandidateMap itself we could also cache the sparse binary matrix that will
-  // be generated based on the CandidateMap and used as one of the inputs
-  // to the LASSO algorithm.
+  // TODO(rudominer) We should cache candidate_matrix_ rather than recomputing
+  // candidate_map_ and candidate_matrix_ each time.
 
-  uint32_t num_bits = config_->num_bits();
-  uint32_t num_cohorts = config_->num_cohorts();
-  uint32_t num_hashes = config_->num_hashes();
+  const uint32_t num_bits = config_->num_bits();
+  const uint32_t num_cohorts = config_->num_cohorts();
+  const uint32_t num_hashes = config_->num_hashes();
+  const uint32_t num_candidates =
+      candidate_map_.candidate_list->candidates_size();
 
+  candidate_matrix_.resize(num_cohorts * num_bits, num_candidates);
+  std::vector<Eigen::Triplet<float>> sparse_matrix_triplets;
+  sparse_matrix_triplets.reserve(num_candidates * num_cohorts * num_hashes);
+
+  int column = 0;
   for (const std::string& candidate :
        candidate_map_.candidate_list->candidates()) {
     // In rappor_encoder.cc it is not std::strings that are encoded but rather
@@ -85,6 +87,7 @@ grpc::Status RapporAnalyzer::BuildCandidateMap() {
     CohortMap& cohort_map = candidate_map_.candidate_cohort_maps.back();
 
     // Iterate through the cohorts.
+    int row_block_base = 0;
     for (size_t cohort = 0; cohort < num_cohorts; cohort++) {
       // Append an instance of |Hashes| for this cohort.
       cohort_map.cohort_hashes.emplace_back();
@@ -99,13 +102,42 @@ grpc::Status RapporAnalyzer::BuildCandidateMap() {
                             "Hash operation failed unexpectedly.");
       }
 
+      // bloom_filter is indexed "from the left". That is bloom_filter[0]
+      // corresponds to the most significant bit of the first byte of the
+      // Bloom filter.
+      std::vector<bool> bloom_filter(num_bits, false);
+
       // Extract one bit index for each of the hashes in the Bloom filter.
       for (size_t hash_index = 0; hash_index < num_hashes; hash_index++) {
-        hashes.bit_indices.push_back(
-            RapporEncoder::ExtractBitIndex(hashed_value, hash_index, num_bits));
+        uint32_t bit_index =
+            RapporEncoder::ExtractBitIndex(hashed_value, hash_index, num_bits);
+        hashes.bit_indices.push_back(bit_index);
+        // |bit_index| is an index "from the right".
+        bloom_filter[num_bits - 1 - bit_index] = true;
       }
+
+      // Add triplets to the sparse matrix representation. For the current
+      // column and the current block of rows we add a 1 into the row
+      // corresponding to the index of each set bit in the Bloom filter.
+      for (size_t bit_index = 0; bit_index < num_bits; bit_index++) {
+        if (bloom_filter[bit_index]) {
+          int row = row_block_base + bit_index;
+          sparse_matrix_triplets.emplace_back(row, column, 1.0);
+        }
+      }
+
+      // In our sparse matrix representation each cohort corresponds to a block
+      // of |num_bits| rows.
+      row_block_base += num_bits;
     }
+    // In our sparse matrix representation a column corresponds to a candidate.
+    column++;
+    row_block_base = 0;
   }
+
+  candidate_matrix_.setFromTriplets(sparse_matrix_triplets.begin(),
+                                    sparse_matrix_triplets.end());
+
   return grpc::Status::OK;
 }
 
