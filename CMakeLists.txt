@@ -505,6 +505,10 @@ macro(add_cobalt_test_dependencies target_name test_dir)
       PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${test_dir})
 endmacro()
 
+# Third-party directories that we include using the simpler add_subdirectory method
+include_directories(BEFORE SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lossmin")
+add_subdirectory(third_party/lossmin/lossmin)
+
 # Project directories
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)
@@ -514,8 +518,5 @@ add_subdirectory(end_to_end_tests)
 add_subdirectory(shuffler)
 add_subdirectory(tools)
 add_subdirectory(util)
-
-# Third-party directories that we include using the simpler add_subdirectory method
-add_subdirectory(third_party/lossmin)
 
 
