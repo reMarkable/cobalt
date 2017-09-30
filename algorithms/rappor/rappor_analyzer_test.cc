@@ -174,6 +174,61 @@ class RapporAnalyzerTest : public ::testing::Test {
         analyzer_->ExtractEstimatedBitCountRatios(est_bit_count_ratios).ok());
   }
 
+  // Invokes the Analyze() method using the given parameters. Checks that
+  // the algorithms converges and that the result vector has the correct length.
+  // Doesn't check the result vector at all but uses LOG(ERROR) statments
+  // to print the true candidate counts and the computed estimates to the
+  // console for the sake of experimentation.
+  void DoExperimentWithAnalyze(const std::string& case_label,
+                               uint32_t num_candidates, uint32_t num_bloom_bits,
+                               uint32_t num_cohorts, uint32_t num_hashes,
+                               std::vector<int> candidate_indices,
+                               std::vector<int> true_candidate_counts) {
+    SetAnalyzer(num_candidates, num_bloom_bits, num_cohorts, num_hashes);
+
+    for (auto index : candidate_indices) {
+      // Construct a new encoder with a new ClientSecret so that a random
+      // cohort is selected.
+      RapporEncoder encoder(config_, ClientSecret::GenerateNewSecret());
+
+      // Encode the current candidate string using |encoder|.
+      ValuePart value_part;
+      value_part.set_string_value(CandidateString(index));
+      RapporObservation observation;
+      encoder.Encode(value_part, &observation);
+      EXPECT_TRUE(analyzer_->AddObservation(observation));
+    }
+
+    std::vector<CandidateResult> results;
+    auto status = analyzer_->Analyze(&results);
+    if (!status.ok()) {
+      EXPECT_EQ(grpc::OK, status.error_code());
+      return;
+    }
+
+    if (results.size() != num_candidates) {
+      EXPECT_EQ(num_candidates, results.size());
+      return;
+    }
+
+    std::vector<int> count_estimates(num_candidates);
+    for (size_t i = 0; i < num_candidates; i++) {
+      count_estimates[i] = static_cast<int>(round(results[i].count_estimate));
+    }
+    std::ostringstream true_stream;
+    for (auto x : true_candidate_counts) {
+      true_stream << x << " ";
+    }
+    LOG(ERROR) << "-------------------------------------";
+    LOG(ERROR) << case_label;
+    LOG(ERROR) << "True counts: " << true_stream.str();
+    std::ostringstream estimate_stream;
+    for (auto x : count_estimates) {
+      estimate_stream << x << " ";
+    }
+    LOG(ERROR) << "  Estimates: " << estimate_stream.str();
+  }
+
   RapporConfig config_;
   std::unique_ptr<RapporAnalyzer> analyzer_;
 
@@ -316,7 +371,8 @@ TEST_F(RapporAnalyzerTest, BuildCandidateMapSmallTestWithDuplicates) {
 // with many different parameters. We are testing firstly that the procedure
 // completes without error, secondly that the shape of the produced
 // data structure is correct and thirdly that the bit indexes are in the range
-// [0, num_bloom_bits). The latter two checks occur inside of BuildCandidateMap.
+// [0, num_bloom_bits). The latter two checks occur inside of
+// BuildCandidateMap.
 TEST_F(RapporAnalyzerTest, BuildCandidateMapSmokeTest) {
   for (auto num_candidates : {11, 51, 99}) {
     for (auto num_cohorts : {23, 45}) {
@@ -413,6 +469,48 @@ TEST_F(RapporAnalyzerTest, ExtractEstimatedBitCountRatiosSmallNonRandomTest) {
       "       1\n"
       "       0";
   EXPECT_EQ(kExpectedVectorString, stream.str());
+}
+
+// This is not really a test so much as an experiment with the Analyze() method.
+// It invokes Analyze() in a few very simple cases, checks that the the
+// algorithm converges and that the result vector has the correct size. Then
+// it prints out the true candidate counts and the computed estimates.
+TEST_F(RapporAnalyzerTest, ExperimentWithAnalyze) {
+  static const uint32_t kNumCandidates = 10;
+  static const uint32_t kNumCohorts = 3;
+  static const uint32_t kNumHashes = 2;
+  static const uint32_t kNumBloomBits = 8;
+
+  std::vector<int> candidate_indices(100, 5);
+  std::vector<int> true_candidate_counts = {0, 0, 0, 0, 0, 100, 0, 0, 0, 0};
+  DoExperimentWithAnalyze("p=0, q=1, only candidate 5", kNumCandidates,
+                          kNumBloomBits, kNumCohorts, kNumHashes,
+                          candidate_indices, true_candidate_counts);
+
+  candidate_indices = std::vector<int>(20, 1);
+  candidate_indices.insert(candidate_indices.end(), 20, 4);
+  candidate_indices.insert(candidate_indices.end(), 60, 9);
+  true_candidate_counts = {0, 20, 0, 0, 20, 0, 0, 0, 0, 60};
+  DoExperimentWithAnalyze("p=0, q=1, several candidates", kNumCandidates,
+                          kNumBloomBits, kNumCohorts, kNumHashes,
+                          candidate_indices, true_candidate_counts);
+
+  prob_0_becomes_1_ = 0.1;
+  prob_1_stays_1_ = 0.9;
+
+  candidate_indices = std::vector<int>(100, 5);
+  true_candidate_counts = {0, 0, 0, 0, 0, 100, 0, 0, 0, 0};
+  DoExperimentWithAnalyze("p=0.1, q=0.9, only candidate 5", kNumCandidates,
+                          kNumBloomBits, kNumCohorts, kNumHashes,
+                          candidate_indices, true_candidate_counts);
+
+  candidate_indices = std::vector<int>(20, 1);
+  candidate_indices.insert(candidate_indices.end(), 20, 4);
+  candidate_indices.insert(candidate_indices.end(), 60, 9);
+  true_candidate_counts = {0, 20, 0, 0, 20, 0, 0, 0, 0, 60};
+  DoExperimentWithAnalyze("p=0.1, q=0.9, several candidates", kNumCandidates,
+                          kNumBloomBits, kNumCohorts, kNumHashes,
+                          candidate_indices, true_candidate_counts);
 }
 
 }  // namespace rappor

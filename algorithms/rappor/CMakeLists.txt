@@ -32,7 +32,8 @@ add_library(rappor_analyzer
             basic_rappor_analyzer.cc bloom_bit_counter.cc rappor_analyzer.cc
             ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(rappor_analyzer
-                      cobalt_crypto rappor_config_validator)
+                      cobalt_crypto rappor_config_validator
+                      lossmin_minimizers lossmin_loss_functions)
 
 # The test depends directly on Boring SSL for the deterministic random.
 include_directories(BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/third_party/boringssl/include")

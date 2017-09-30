@@ -17,7 +17,9 @@
 #include <glog/logging.h>
 
 #include "algorithms/rappor/rappor_encoder.h"
-
+#include "third_party/lossmin/lossmin/losses/inner-product-loss-function.h"
+#include "third_party/lossmin/lossmin/minimizers/gradient-evaluator.h"
+#include "third_party/lossmin/lossmin/minimizers/parallel-boosting-with-momentum.h"
 #include "util/crypto_util/hash.h"
 
 namespace cobalt {
@@ -61,9 +63,72 @@ grpc::Status RapporAnalyzer::Analyze(
     return status;
   }
 
-  //////////////////////////////////////////////////////
-  // TODO(azani, mironov) Put LASSO analysis here.
-  /////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////
+  // Note(rudominer) The code below is a temporary proof-of-concept.
+  // It is not intended to be used for Cobalt production. The goal is to
+  // estimate a solution to Ax=b where A is the candidate_matrix_ and b is
+  // the est_bit_count_ratios vector. Below we use the
+  // ParallelBoostingWithMomentum minimizer from the lossmin library with a
+  // LinearRegressionLossFunction. Although this code gives seemingly good
+  // results in very simple test situations, I have no confidence that
+  // this implementation is correct and I fully expect this code to be
+  // rewritten by somebody more expert than me on this topic.
+  // The purpose of this code is mostly to act as a starting point
+  // and in particular to indicate how the lossmin and Eigen libraries may be
+  // integrated into this class.
+  //
+  // TODO(mironov) Rewrite this code to be what we actually want.
+  //
+  ///////////////////////////////////////////////////////////////////////////
+
+  // Note(rudominer) The GradientEvaluator constructor takes a
+  // const LabelSet& parameter but est_bit_count_ratios is a
+  // VectorXf. These types are different:
+  // LabelSet = Matrix<float, Dynamic, Dynamic, RowMajor>
+  // VectorXf = Matrix<float, Dynamic, 1>
+  // These are different in two ways: VectorXf has a static number of columns
+  // and VectorXf uses ColumnMajor order.
+  // Here we copy est_bit_count_ratios to a label set before passing it to
+  // the GradientEvaluator. This works fine. Some notes about this:
+  // (1) Eigen defines copy constructors that do the right thing.
+  // (2) There is no compilation error if we pass est_bit_count_ratios directly
+  //     to the GradientEvaluator constructor. Somehow this works--I'm not sure
+  //     why. But doing this leads to some unknown memory corruption which
+  //     causes very bad non-deterministic runtime behavior. Be careful not
+  //     to do this.
+  // (3) We could avoid doing a copy here by just declaring est_bit_count_ratios
+  //     as a LabelSet to begin with. But I don't like doing this because it
+  //     makes the code less understandable to define a known column vector
+  //     as a matrix with a dynamic number of columns in RowMajor order.
+  lossmin::LabelSet as_label_set = est_bit_count_ratios;
+  lossmin::LinearRegressionLossFunction loss_function;
+  lossmin::GradientEvaluator grad_eval(candidate_matrix_, as_label_set,
+                                       &loss_function);
+  // Note(rudominer) The two "0.0" parameters below are l1 and l2 the weights
+  // given to the l1 and l2 norms of w in the loss function. In order to
+  // have behvior similar to the LASSO implementation we want to set l1 > 0.
+  // However I have found that when I set l1 > 0 then the algorithm does
+  // not converge. I don't know why.
+  lossmin::ParallelBoostingWithMomentum minimizer(0.0, 0.0, grad_eval);
+  minimizer.Setup();
+
+  const int num_candidates = candidate_matrix_.cols();
+  // Initialize the weight vector to the constant 1/n vector.
+  lossmin::Weights est_candidate_weights =
+      lossmin::Weights::Constant(num_candidates, 1.0 / num_candidates);
+  std::vector<float> loss_not_used;
+  if (!minimizer.Run(10000, &est_candidate_weights, &loss_not_used)) {
+    std::string message =
+        "ParallelBoostingWithMomentum did not converge after 10,000 epochs.";
+    LOG(ERROR) << message;
+    return grpc::Status(grpc::INTERNAL, message);
+  }
+
+  results_out->resize(num_candidates);
+  for (auto i = 0; i < num_candidates; i++) {
+    results_out->at(i).count_estimate =
+        est_candidate_weights(i) * bit_counter_.num_observations();
+  }
 
   return grpc::Status::OK;
 }
