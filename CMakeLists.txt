@@ -525,6 +525,7 @@ set(CONFIG_PROTO_HDRS
     "${CMAKE_BINARY_DIR}/config/metrics.pb.h"
     "${CMAKE_BINARY_DIR}/config/report_configs.pb.h")
 set(CONFIG_PB_GO_FILES
+    "${GO_PROTO_GEN_SRC_DIR}/config/config.pb.go"
     "${GO_PROTO_GEN_SRC_DIR}/config/encodings.pb.go"
     "${GO_PROTO_GEN_SRC_DIR}/config/metrics.pb.go"
     "${GO_PROTO_GEN_SRC_DIR}/config/reports.pb.go"

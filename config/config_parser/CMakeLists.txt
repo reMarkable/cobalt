@@ -33,7 +33,8 @@ add_custom_command(OUTPUT ${YAMLPB_TEST_BIN}
 set(CONFIG_PARSER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list.go
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_config.go)
 set(CONFIG_PARSER_TEST_BIN ${GO_TESTS}/config_parser_test)
-set(CONFIG_PARSER_TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list_test.go)
+set(CONFIG_PARSER_TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list_test.go
+                            ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_config_test.go)
 add_custom_command(OUTPUT ${CONFIG_PARSER_TEST_BIN}
     COMMAND ${GO_BIN} test -c -o ${CONFIG_PARSER_TEST_BIN} ${CONFIG_PARSER_TEST_SRC} ${CONFIG_PARSER_SRC}
     DEPENDS ${CONFIG_PARSER_SRC}

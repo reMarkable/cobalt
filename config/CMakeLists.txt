@@ -25,7 +25,7 @@ cobalt_make_protobuf_cpp_lib(config_proto_lib
 cobalt_protobuf_generate_go(generate_config_pb_go_files
                             CONFIG_PB_GO_FILES
                             false
-                            encodings metrics report_configs)
+                            config encodings metrics report_configs)
 
 # Build the analyzer_config library
 add_library(analyzer_config
