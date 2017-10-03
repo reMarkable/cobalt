@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(config_parser)
+
 # Generate the C++ bindings for the config .proto files.
 # Also compile the generated C++ files into a static library.
 cobalt_make_protobuf_cpp_lib(config_proto_lib
