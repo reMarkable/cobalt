@@ -63,6 +63,10 @@ class RapporAnalyzer {
   // config. If the config is not valid then all calls to AddObservation()
   // will return false.
   // Does not take ownership of |candidates|.
+  //
+  // If |candidates| is NULL or empty then AddObservation() may still succeed
+  // but Analyze() will return INVALID_ARGUMENT.
+  //
   // TODO(rudominer) Enhance this API to also accept DP release parameters.
   explicit RapporAnalyzer(const RapporConfig& config,
                           const RapporCandidateList* candidates);
@@ -147,8 +151,8 @@ class RapporAnalyzer {
   //
   // These values are extracted from the BloomBitCounter.
   //
-  // See the note at the bottom of rappor_anlayzer.cc for a justification of this
-  // formula.
+  // See the note at the bottom of rappor_anlayzer.cc for a justification of
+  // this formula.
   grpc::Status ExtractEstimatedBitCountRatios(
       Eigen::VectorXf* est_bit_count_ratios);
 

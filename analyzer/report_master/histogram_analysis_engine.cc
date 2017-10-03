@@ -21,6 +21,7 @@
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"
 #include "algorithms/rappor/basic_rappor_analyzer.h"
+#include "algorithms/rappor/rappor_analyzer.h"
 #include "glog/logging.h"
 
 namespace cobalt {
@@ -29,6 +30,7 @@ namespace analyzer {
 using config::AnalyzerConfig;
 using forculus::ForculusAnalyzer;
 using rappor::BasicRapporAnalyzer;
+using rappor::RapporAnalyzer;
 using store::ObservationStore;
 using store::ReportStore;
 
@@ -48,6 +50,9 @@ bool CheckConsistentEncoding(const EncodingConfig& encoding_config,
       break;
     case ObservationPart::kRappor:
       consistent = encoding_config.has_rappor();
+      break;
+    case ObservationPart::kUnencoded:
+      consistent = encoding_config.has_no_op_encoding();
       break;
     case ObservationPart::VALUE_NOT_SET:
       consistent = false;
@@ -117,19 +122,53 @@ class ForculusAdapter : public DecoderAdapter {
 // A concrete subclass of DecoderAdapter that adapts to a
 // StringRapporAnalyzer.
 //
-// NOTE: String RAPPOR analysis is not yet implemented in Cobalt.
+// NOTE: String RAPPOR analysis is not yet fully implemented in Cobalt.
 ///////////////////////////////////////////////////////////////////////////
 class RapporAdapter : public DecoderAdapter {
  public:
+  RapporAdapter(const ReportId& report_id, const RapporConfig& config,
+                const RapporCandidateList* candidates)
+      : report_id_(report_id),
+        analyzer_(new RapporAnalyzer(config, candidates)),
+        candidates_(candidates) {}
+
   bool ProcessObservationPart(uint32_t day_index,
                               const ObservationPart& obs) override {
-    return false;
+    return analyzer_->AddObservation(obs.rappor());
   }
 
   grpc::Status PerformAnalysis(std::vector<ReportRow>* results) override {
-    return grpc::Status(grpc::UNIMPLEMENTED,
-                        "String RAPPOR analysis in not yet implemented.");
+    std::vector<rappor::CandidateResult> candidate_results;
+    auto status = analyzer_->Analyze(&candidate_results);
+    if (!status.ok()) {
+      LOG(ERROR) << "String RAPPOR analysis failed with status=("
+                 << status.error_code() << ") " << status.error_message()
+                 << " For report_id=" << ReportStore::ToString(report_id_);
+      return status;
+    }
+    // If candidates_ is null or empty then analyzer_->Analyze() will return
+    // INVALID_ARGUMENT. If we are here then RAPPR analysis succeeded.
+    CHECK((int)candidate_results.size() == candidates_->candidates_size());
+    size_t candidate_index = 0;
+    for (auto& candidate_result : candidate_results) {
+      results->emplace_back();
+      HistogramReportRow* row = results->back().mutable_histogram();
+      ValuePart v;
+      v.set_string_value(candidates_->candidates(candidate_index++));
+      row->mutable_value()->Swap(&v);
+      row->set_count_estimate(candidate_result.count_estimate);
+      row->set_std_error(candidate_result.std_error);
+    }
+    // TODO(rudominer) We are not using some of the data that the
+    // RapporAnalyzer can return to us such as observation_errors().
+    // Consider adding monitoring around this.
+    return grpc::Status::OK;
   }
+
+ private:
+  ReportId report_id_;
+  std::unique_ptr<RapporAnalyzer> analyzer_;
+  const RapporCandidateList* candidates_;  // not owned.
 };
 
 ////////////////////////////////////////////////////////////////////////////
@@ -144,7 +183,7 @@ class BasicRapporAdapter : public DecoderAdapter {
                      const IndexLabels* index_labels)
       : report_id_(report_id),
         analyzer_(new BasicRapporAnalyzer(config)),
-        index_labels(index_labels) {}
+        index_labels_(index_labels) {}
 
   bool ProcessObservationPart(uint32_t day_index,
                               const ObservationPart& obs) override {
@@ -161,10 +200,10 @@ class BasicRapporAdapter : public DecoderAdapter {
       // into some enumerated set defined outside of the Cobalt configuration,
       // then check whether we were given an index label for this index and
       // if so attach the label to the report row.
-      if (index_labels != nullptr &&
+      if (index_labels_ != nullptr &&
           row->value().data_case() == ValuePart::kIndexValue) {
-        auto iter = index_labels->labels().find(row->value().index_value());
-        if (iter != index_labels->labels().end()) {
+        auto iter = index_labels_->labels().find(row->value().index_value());
+        if (iter != index_labels_->labels().end()) {
           row->set_label(iter->second);
         }
       }
@@ -180,7 +219,7 @@ class BasicRapporAdapter : public DecoderAdapter {
  private:
   ReportId report_id_;
   std::unique_ptr<BasicRapporAnalyzer> analyzer_;
-  const IndexLabels* index_labels;  // not owned.
+  const IndexLabels* index_labels_;  // not owned.
 };
 
 ////////////////////////////////////////////////////////////////////////////
@@ -275,8 +314,21 @@ std::unique_ptr<DecoderAdapter> HistogramAnalysisEngine::NewDecoder(
     case EncodingConfig::kForculus:
       return std::unique_ptr<DecoderAdapter>(
           new ForculusAdapter(report_id_, encoding_config->forculus()));
-    case EncodingConfig::kRappor:
-      return std::unique_ptr<DecoderAdapter>(new RapporAdapter);
+    case EncodingConfig::kRappor: {
+      const RapporCandidateList* rappor_candidates = nullptr;
+      if (report_variable_->has_rappor_candidates()) {
+        rappor_candidates = &(report_variable_->rappor_candidates());
+      } else {
+        LOG(ERROR) << "HistogramAnalysisEngine: Received an observation with "
+                      "encoding_config_id="
+                   << encoding_config->id()
+                   << " for String RAPPOR but no RAPPOR candidates are "
+                      "specified for report_id="
+                   << ReportStore::ToString(report_id_);
+      }
+      return std::unique_ptr<DecoderAdapter>(new RapporAdapter(
+          report_id_, encoding_config->rappor(), rappor_candidates));
+    }
     case EncodingConfig::kBasicRappor: {
       const IndexLabels* index_labels = nullptr;
       if (report_variable_->has_index_labels()) {

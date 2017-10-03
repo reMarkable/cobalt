@@ -31,19 +31,19 @@ namespace {
 bool CommonValidate(float prob_0_becomes_1, float prob_1_stays_1,
                     float prob_rr) {
   if (prob_0_becomes_1 < 0.0 || prob_0_becomes_1 > 1.0) {
-    VLOG(3) << "prob_0_becomes_1 is not valid";
+    VLOG(1) << "prob_0_becomes_1 is not valid";
     return false;
   }
   if (prob_1_stays_1 < 0.0 || prob_1_stays_1 > 1.0) {
-    VLOG(3) << "prob_1_stays_1 < 0.0  is not valid";
+    VLOG(1) << "prob_1_stays_1 < 0.0  is not valid";
     return false;
   }
   if (prob_0_becomes_1 == prob_1_stays_1) {
-    VLOG(3) << "prob_0_becomes_1 == prob_1_stays_1";
+    VLOG(1) << "prob_0_becomes_1 == prob_1_stays_1";
     return false;
   }
   if (prob_rr != 0.0) {
-    VLOG(3) << "prob_rr not supported";
+    VLOG(1) << "prob_rr not supported";
     return false;
   }
   return true;

@@ -45,6 +45,7 @@ const uint32_t kIndexMetricId = 2;
 const uint32_t kForculusEncodingConfigId = 1;
 const uint32_t kBasicRapporStringEncodingConfigId = 2;
 const uint32_t kBasicRapporIndexEncodingConfigId = 3;
+const uint32_t kStringRapporEncodingConfigId = 4;
 const uint32_t kStringReportConfigId = 1;
 const uint32_t kIndexReportConfigId = 2;
 const char kPartName[] = "Part1";
@@ -126,6 +127,20 @@ element {
   }
 }
 
+# EncodingConfig 4 is String RAPPOR with no randomness.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  rappor {
+    prob_0_becomes_1: 0.0
+    prob_1_stays_1: 1.0
+    num_bloom_bits: 8
+    num_hashes: 2
+    num_cohorts: 2
+  }
+}
+
 )";
 
 const char* kReportConfigText = R"(
@@ -136,6 +151,11 @@ element {
   metric_id: 1
   variable {
     metric_part: "Part1"
+    rappor_candidates {
+      candidates: "Apple"
+      candidates: "Banana"
+      candidates: "Cantaloupe"
+    }
   }
 }
 
@@ -435,6 +455,54 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     }
   }
 
+  // Invokes MakeAndProcessStringObservationPart many times using the
+  // StringRappor encoding.
+  void MakeAndProcessStringRapporObservations() {
+    for (int i = 0; i < 100; i++) {
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Apple", kStringRapporEncodingConfigId));
+    }
+    for (int i = 0; i < 200; i++) {
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Banana", kStringRapporEncodingConfigId));
+    }
+    for (int i = 0; i < 300; i++) {
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Cantaloupe", kStringRapporEncodingConfigId));
+    }
+  }
+
+  void DoStringRapporTest() {
+    Init(kStringReportConfigId);
+    MakeAndProcessStringRapporObservations();
+
+    // Perform the analysis.
+    std::vector<ReportRow> report_rows;
+    auto status = analysis_engine_->PerformAnalysis(&report_rows).error_code();
+    if (grpc::OK != status) {
+      EXPECT_EQ(grpc::OK, status);
+      return;
+    }
+
+    // Check the results.
+    if (3u != report_rows.size()) {
+      EXPECT_EQ(3u, report_rows.size());
+      return;
+    }
+    for (const auto& report_row : report_rows) {
+      // In String RAPPOR we currently do not implement std_error.
+      EXPECT_EQ(0, report_row.histogram().std_error());
+      EXPECT_GT(report_row.histogram().count_estimate(), 0);
+      ValuePart recovered_value;
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
+      EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
+      std::string string_value = recovered_value.string_value();
+      EXPECT_TRUE(string_value == "Apple" || string_value == "Banana" ||
+                  string_value == "Cantaloupe");
+    }
+  }
+
   void DoMixedEncodingTest() {
     Init(kStringReportConfigId);
     MakeAndProcessForculusObservations();
@@ -461,6 +529,8 @@ TEST_F(HistogramAnalysisEngineTest, BasicRapporString) {
 TEST_F(HistogramAnalysisEngineTest, BasicRapporIndex) {
   DoBasicRapporIndexTest();
 }
+
+TEST_F(HistogramAnalysisEngineTest, StringRappor) { DoStringRapporTest(); }
 
 TEST_F(HistogramAnalysisEngineTest, MixedEncoding) { DoMixedEncodingTest(); }
 

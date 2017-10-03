@@ -36,6 +36,7 @@ RapporAnalyzer::RapporAnalyzer(const RapporConfig& config,
 }
 
 bool RapporAnalyzer::AddObservation(const RapporObservation& obs) {
+  VLOG(5) << "RapporAnalyzer::AddObservation() cohort=" << obs.cohort();
   return bit_counter_.AddObservation(obs);
 }
 
@@ -135,11 +136,19 @@ grpc::Status RapporAnalyzer::Analyze(
 
 grpc::Status RapporAnalyzer::ExtractEstimatedBitCountRatios(
     Eigen::VectorXf* est_bit_count_ratios) {
+  VLOG(5) << "RapporAnalyzer::ExtractEstimatedBitCountRatios()";
   CHECK(est_bit_count_ratios);
 
   if (!config_->valid()) {
-    return grpc::Status(grpc::FAILED_PRECONDITION,
+    return grpc::Status(grpc::INVALID_ARGUMENT,
                         "Invalid RapporConfig passed to constructor.");
+  }
+
+  if (candidate_map_.candidate_list == nullptr ||
+      candidate_map_.candidate_list->candidates_size() == 0) {
+    return grpc::Status(grpc::INVALID_ARGUMENT,
+                        "Cannot perform RAPPOR analysis because no candidate "
+                        "list was specified.");
   }
 
   const uint32_t num_bits = config_->num_bits();
@@ -168,9 +177,17 @@ grpc::Status RapporAnalyzer::ExtractEstimatedBitCountRatios(
 }
 
 grpc::Status RapporAnalyzer::BuildCandidateMap() {
+  VLOG(5) << "RapporAnalyzer::BuildCandidateMap()";
   if (!config_->valid()) {
     return grpc::Status(grpc::FAILED_PRECONDITION,
                         "Invalid RapporConfig passed to constructor.");
+  }
+
+  if (candidate_map_.candidate_list == nullptr ||
+      candidate_map_.candidate_list->candidates_size() == 0) {
+    return grpc::Status(grpc::INVALID_ARGUMENT,
+                        "Cannot perform RAPPOR analysis because no candidate "
+                        "list was specified.");
   }
 
   // TODO(rudominer) We should cache candidate_matrix_ rather than recomputing
@@ -181,6 +198,17 @@ grpc::Status RapporAnalyzer::BuildCandidateMap() {
   const uint32_t num_hashes = config_->num_hashes();
   const uint32_t num_candidates =
       candidate_map_.candidate_list->candidates_size();
+
+  if (VLOG_IS_ON(4)) {
+    VLOG(4) << "RapporAnalyzer: Start list of " << num_candidates
+            << " candidates:";
+    for (const std::string& candidate :
+         candidate_map_.candidate_list->candidates()) {
+      VLOG(4) << "RapporAnalyzer: candidate: " << candidate;
+    }
+    VLOG(4) << "RapporAnalyzer: End list of " << num_candidates
+            << " candidates.";
+  }
 
   candidate_matrix_.resize(num_cohorts * num_bits, num_candidates);
   std::vector<Eigen::Triplet<float>> sparse_matrix_triplets;
