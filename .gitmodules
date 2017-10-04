@@ -37,7 +37,7 @@
 [submodule "third_party/protobuf"]
 	path = third_party/protobuf
 	url = https://fuchsia.googlesource.com/third_party/protobuf/
-	branch = cobalt
+	branch = cobalt-v3.4.1
 [submodule "third_party/grpc"]
 	path = third_party/grpc
 	url = https://fuchsia.googlesource.com/third_party/grpc
