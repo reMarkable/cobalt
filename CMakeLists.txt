@@ -155,6 +155,41 @@ link_directories(${PROTOBUF_LIB_DIR})
 # In the CMake build for protobuf we name the full protobuf library protobuf_full_cobalt.
 set(PROTOBUF_FULL_LIB_NAME protobuf_full_cobalt)
 
+# Build c-ares as an external project.
+set(CARES_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/cares)
+set(CARES_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/cares)
+set(CARES_LIB_DIR ${CARES_INSTALL_DIR}/src/CARES_external_project-build)
+ExternalProject_Add(CARES_external_project
+                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/cares
+                    PREFIX      ${CARES_INSTALL_DIR}
+                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_INSTALL_PREFIX:PATH=${CARES_INSTALL_DIR}
+                                -Wno-sign-compare -Wno-ignored-qualifiers
+                                -Wno-deprecated-register -Wno-unused-function
+                                -Wno-unused-local-typedef
+                                -Wno-macro-redefined
+                    INSTALL_COMMAND ""
+                   )
+include_directories(BEFORE SYSTEM ${CARES_INCLUDE_DIR})
+link_directories(${CARES_LIB_DIR})
+
+# Build zlib as an external project.
+set(ZLIB_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/zlib)
+set(ZLIB_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/zlib)
+set(ZLIB_LIB_DIR ${ZLIB_INSTALL_DIR}/src/ZLIB_external_project-build)
+ExternalProject_Add(ZLIB_external_project
+                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/zlib
+                    PREFIX      ${ZLIB_INSTALL_DIR}
+                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_INSTALL_PREFIX:PATH=${ZLIB_INSTALL_DIR}
+                                -Wno-sign-compare -Wno-ignored-qualifiers
+                                -Wno-deprecated-register -Wno-unused-function
+                                -Wno-unused-local-typedef
+                                -Wno-macro-redefined
+                    INSTALL_COMMAND ""
+                   )
+include_directories(BEFORE SYSTEM ${ZLIB_INCLUDE_DIR})
+link_directories(${ZLIB_LIB_DIR})
 
 # Build grpc as an external project.
 set(GRPC_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/grpc)
@@ -167,8 +202,13 @@ ExternalProject_Add(grpc_external_project
                     INSTALL_DIR ${GRPC_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GRPC_INSTALL_DIR}
+                                -DgRPC_ZLIB_PROVIDER=explicit
                                 -DZLIB_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib
+                                -D_gRPC_ZLIB_LIBRARIES=z
+                                -DgRPC_ZLIB_LIB_DIR=${ZLIB_LIB_DIR}
+                                -DgRPC_CARES_PROVIDER=explicit
                                 -DCARES_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/cares
+                                -DgRPC_CARES_LIB_DIR=${CARES_LIB_DIR}
                                 -DBENCHMARK_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/benchmark
                                 -DgRPC_PROTOBUF_PROVIDER=explicit
                                 -DPROTOBUF_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/protobuf
