@@ -1,12 +1,14 @@
 # sysroot
 
-All of Cobalt's dependencies (both compile and run-time) are installed in the
-sysroot directory using the `setup.sh` script.  To avoid having to compile the
-dependencies every time, a packaged binary version of sysroot is stored on
-Google storage.  `cobaltb.py setup` will download the pre-built sysroot from
-Google storage.
+Cobalt's build tools (CMake, toolchain, ninja, go and protoc-gen-go) and some
+other developer tools (bigtable tool and cloud SDK) are downloaded pre-builts
+installed into the sysroot directory using the `setup.sh` script. Normally
+this script should be invoked via the command `cobaltb.py setup`. This
+causes a single `sysroot.tgz` file to be downloaded from Google Cloud Storage.
+The sha1 hash of the downloaded file is verified.
 
-To upload a new version of sysroot on Google storage do the following:
+To build and upload a new version of sysroot to Google storage do the
+following:
 
 * `rm -fr sysroot`
 * `./setup.sh -u`

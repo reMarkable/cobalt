@@ -19,7 +19,7 @@
 set -e
 
 # Latest version of sysroot.  Update it after uploading.
-readonly VERSION="8827a901321f9e1483459fa3fe5167e30d0d7698"
+readonly VERSION="b36aaf0629868e9fdc23bea6189cf17e03ec836e"
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PREFIX="${SCRIPT_DIR}/sysroot"
@@ -156,7 +156,7 @@ fi
 
 # Install gcloud
 if [ ! -f $GCLOUD_DIR/google-cloud-sdk/bin/gcloud ] ; then
-    SDK=google-cloud-sdk-168.0.0-linux-x86_64.tar.gz
+    SDK=google-cloud-sdk-174.0.0-linux-x86_64.tar.gz
 
     cd $WD
     mkdir -p $GCLOUD_DIR
