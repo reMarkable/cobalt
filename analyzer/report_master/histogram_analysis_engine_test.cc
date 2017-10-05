@@ -46,6 +46,7 @@ const uint32_t kForculusEncodingConfigId = 1;
 const uint32_t kBasicRapporStringEncodingConfigId = 2;
 const uint32_t kBasicRapporIndexEncodingConfigId = 3;
 const uint32_t kStringRapporEncodingConfigId = 4;
+const uint32_t kNoOpEncodingConfigId = 5;
 const uint32_t kStringReportConfigId = 1;
 const uint32_t kIndexReportConfigId = 2;
 const char kPartName[] = "Part1";
@@ -138,6 +139,15 @@ element {
     num_bloom_bits: 8
     num_hashes: 2
     num_cohorts: 2
+  }
+}
+
+# EncodingConfig 5 is the No-Op encoding.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  no_op_encoding {
   }
 }
 
@@ -503,6 +513,120 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     }
   }
 
+  // Invokes MakeAndProcessStringObservationPart many times using the NoOp
+  // encoding. Three strings are encoded: "hello" 20 times,
+  // "goodbye" 19 times and "peace" 21 times.
+  void MakeAndProcessUnencodedStringObservations() {
+    // Add the word "hello" 20 times.
+    for (size_t i = 0; i < 20; i++) {
+      EXPECT_TRUE(
+          MakeAndProcessStringObservationPart("hello", kNoOpEncodingConfigId));
+    }
+    // Add the word "goodbye" 19 times.
+    for (size_t i = 0; i < 19; i++) {
+      EXPECT_TRUE(MakeAndProcessStringObservationPart("goodbye",
+                                                      kNoOpEncodingConfigId));
+    }
+    // Add the word "peace" 21 times.
+    for (size_t i = 0; i < 21; i++) {
+      EXPECT_TRUE(
+          MakeAndProcessStringObservationPart("peace", kNoOpEncodingConfigId));
+    }
+  }
+
+  // Tests the HistogramAnalysisEngine when it is used on a homogeneous set of
+  // Observations, all of which were encoded using the same NoOp
+  // EncodingConfig.
+  void DoUnencodedStringTest() {
+    Init(kStringReportConfigId);
+    MakeAndProcessUnencodedStringObservations();
+
+    // Perform the analysis.
+    std::vector<ReportRow> report_rows;
+    EXPECT_TRUE(analysis_engine_->PerformAnalysis(&report_rows).ok());
+
+    // Check the results.
+    EXPECT_EQ(3u, report_rows.size());
+    for (const auto& report_row : report_rows) {
+      EXPECT_EQ(0, report_row.histogram().std_error());
+      ValuePart recovered_value;
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
+
+      EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
+      std::string string_value = recovered_value.string_value();
+      int count_estimate = report_row.histogram().count_estimate();
+      switch (count_estimate) {
+        case 19:
+          EXPECT_EQ("goodbye", string_value);
+          break;
+        case 20:
+          EXPECT_EQ("hello", string_value);
+          break;
+        case 21:
+          EXPECT_EQ("peace", string_value);
+          break;
+        default:
+          FAIL() << "Unexpected count for value " << string_value << ": "
+                 << count_estimate;
+      }
+    }
+  }
+
+  // Invokes MakeAndProcessIndexObservationPart several times: Once for
+  // index 0, twice for index 1, ... 10 times for index 9, all using the
+  // ID of the NoOp encoding.
+  void MakeAndProcessUnencodedIndexObservations() {
+    for (int index = 0; index < 10; index++) {
+      for (int count = 1; count <= index + 1; count++)
+        EXPECT_TRUE(
+            MakeAndProcessIndexObservationPart(index, kNoOpEncodingConfigId));
+    }
+  }
+
+  // Tests HistogramAnalysisEngine in the case where it performs a NoOp
+  // report using Observations of type INDEX. We test that the correct
+  // human-readable labels from the ReportConfig are applied to the correct
+  // report rows.
+  void DoUnencodedIndexTest() {
+    Init(kIndexReportConfigId);
+    MakeAndProcessUnencodedIndexObservations();
+
+    // Perform the analysis.
+    std::vector<ReportRow> report_rows;
+    EXPECT_TRUE(analysis_engine_->PerformAnalysis(&report_rows).ok());
+
+    // Check the results.
+    EXPECT_EQ(10u, report_rows.size());
+    for (const auto& report_row : report_rows) {
+      EXPECT_EQ(0, report_row.histogram().std_error());
+      ValuePart recovered_value;
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
+      EXPECT_EQ(ValuePart::kIndexValue, recovered_value.data_case());
+      uint32_t index = recovered_value.index_value();
+      EXPECT_TRUE(index >= 0 && index <= 9) << index;
+      // For indices i=0..9 we added i+1 Observations.
+      EXPECT_EQ(report_row.histogram().count_estimate(), index + 1);
+      // We added labels for indices 0, 1 and 5 but not the others.
+      switch (index) {
+        case 0: {
+          EXPECT_EQ("Event A", report_row.histogram().label());
+          break;
+        }
+        case 1: {
+          EXPECT_EQ("Event B", report_row.histogram().label());
+          break;
+        }
+        case 5: {
+          EXPECT_EQ("Event F", report_row.histogram().label());
+          break;
+        }
+        default: { EXPECT_EQ("", report_row.histogram().label()); }
+      }
+    }
+  }
+
   void DoMixedEncodingTest() {
     Init(kStringReportConfigId);
     MakeAndProcessForculusObservations();
@@ -531,6 +655,14 @@ TEST_F(HistogramAnalysisEngineTest, BasicRapporIndex) {
 }
 
 TEST_F(HistogramAnalysisEngineTest, StringRappor) { DoStringRapporTest(); }
+
+TEST_F(HistogramAnalysisEngineTest, UnencodedStrings) {
+  DoUnencodedStringTest();
+}
+
+TEST_F(HistogramAnalysisEngineTest, UnencodedIndices) {
+  DoUnencodedIndexTest();
+}
 
 TEST_F(HistogramAnalysisEngineTest, MixedEncoding) { DoMixedEncodingTest(); }
 

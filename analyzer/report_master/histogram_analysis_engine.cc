@@ -223,6 +223,67 @@ class BasicRapporAdapter : public DecoderAdapter {
 };
 
 ////////////////////////////////////////////////////////////////////////////
+/// class NoOpAdapter
+//
+// A concrete subclass of DecoderAdapter that collects counts of
+// UnencodedObservations in a hash map.
+///////////////////////////////////////////////////////////////////////////
+class NoOpAdapter : public DecoderAdapter {
+ public:
+  NoOpAdapter(const ReportId& report_id,
+              const cobalt::NoOpEncodingConfig& config,
+              const IndexLabels* index_labels)
+      : report_id_(report_id), config_(config), index_labels_(index_labels) {}
+
+  bool ProcessObservationPart(uint32_t day_index,
+                              const ObservationPart& obs) override {
+    std::string serialized_value;
+    if (!obs.unencoded().unencoded_value().SerializeToString(
+            &serialized_value)) {
+      return false;
+    }
+    // For safety we will accept only up to 10,000 different values.
+    static const size_t kMaxNumValues = 10000;
+    if (counts_.size() >= kMaxNumValues) {
+      LOG(ERROR) << "Report truncated! May not exceed " << kMaxNumValues
+                 << " different values."
+                 << " report_id=" << ReportStore::ToString(report_id_);
+      return false;
+    }
+    counts_[serialized_value]++;
+    return true;
+  }
+
+  grpc::Status PerformAnalysis(std::vector<ReportRow>* results) override {
+    for (const auto& pair : counts_) {
+      results->emplace_back();
+      HistogramReportRow* row = results->back().mutable_histogram();
+      row->mutable_value()->ParseFromString(pair.first);
+      row->set_count_estimate(pair.second);
+      row->set_std_error(0);
+      // If the value is of type INDEX, meaning that it represents an index
+      // into some enumerated set defined outside of the Cobalt configuration,
+      // then check whether we were given an index label for this index and
+      // if so attach the label to the report row.
+      if (index_labels_ != nullptr &&
+          row->value().data_case() == ValuePart::kIndexValue) {
+        auto iter = index_labels_->labels().find(row->value().index_value());
+        if (iter != index_labels_->labels().end()) {
+          row->set_label(iter->second);
+        }
+      }
+    }
+    return grpc::Status::OK;
+  }
+
+ private:
+  ReportId report_id_;
+  cobalt::NoOpEncodingConfig config_;
+  std::map<std::string, size_t> counts_;
+  const IndexLabels* index_labels_;  // not owned.
+};
+
+////////////////////////////////////////////////////////////////////////////
 /// HistogramAnalysisEngine methods.
 ///////////////////////////////////////////////////////////////////////////
 HistogramAnalysisEngine::HistogramAnalysisEngine(
@@ -310,6 +371,10 @@ DecoderAdapter* HistogramAnalysisEngine::GetDecoder(
 
 std::unique_ptr<DecoderAdapter> HistogramAnalysisEngine::NewDecoder(
     const EncodingConfig* encoding_config) {
+  const IndexLabels* index_labels = nullptr;
+  if (report_variable_->has_index_labels()) {
+    index_labels = &(report_variable_->index_labels());
+  }
   switch (encoding_config->config_case()) {
     case EncodingConfig::kForculus:
       return std::unique_ptr<DecoderAdapter>(
@@ -330,12 +395,12 @@ std::unique_ptr<DecoderAdapter> HistogramAnalysisEngine::NewDecoder(
           report_id_, encoding_config->rappor(), rappor_candidates));
     }
     case EncodingConfig::kBasicRappor: {
-      const IndexLabels* index_labels = nullptr;
-      if (report_variable_->has_index_labels()) {
-        index_labels = &(report_variable_->index_labels());
-      }
       return std::unique_ptr<DecoderAdapter>(new BasicRapporAdapter(
           report_id_, encoding_config->basic_rappor(), index_labels));
+    }
+    case EncodingConfig::kNoOpEncoding: {
+      return std::unique_ptr<DecoderAdapter>(new NoOpAdapter(
+          report_id_, encoding_config->no_op_encoding(), index_labels));
     }
     default:
       LOG(FATAL) << "Unexpected EncodingConfig type "
