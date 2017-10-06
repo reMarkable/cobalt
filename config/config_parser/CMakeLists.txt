@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set_source_files_properties(${YAMLPB_TEST_PB_GO} PROPERTIES GENERATED TRUE)
-
 cobalt_protobuf_generate_go(generate_yamlpb_test_pb_go_files
                             YAMLPB_TEST_PB_GO
                             false
@@ -39,7 +37,7 @@ add_custom_command(OUTPUT ${CONFIG_PARSER_TEST_BIN}
     COMMAND ${GO_BIN} test -c -o ${CONFIG_PARSER_TEST_BIN} ${CONFIG_PARSER_TEST_SRC} ${CONFIG_PARSER_SRC}
     DEPENDS ${CONFIG_PARSER_SRC}
     DEPENDS ${CONFIG_PARSER_TEST_SRC}
-    DEPENDS ${CONFIG_PARSER_TEST_PB_GO}
+    DEPENDS ${CONFIG_PB_GO_FILES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
