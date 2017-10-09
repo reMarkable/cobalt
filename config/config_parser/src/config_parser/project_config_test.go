@@ -39,8 +39,9 @@ encoding_configs:
 - id: 2
 report_configs:
 - id: 1
-  metric_id: 5
+  metric_id: 1
 - id: 2
+  metric_id: 1
 `
 	c := projectConfig{
 		customerId: 1,
@@ -91,12 +92,13 @@ report_configs:
 				CustomerId: 1,
 				ProjectId:  10,
 				Id:         1,
-				MetricId:   5,
+				MetricId:   1,
 			},
 			&config.ReportConfig{
 				CustomerId: 1,
 				ProjectId:  10,
 				Id:         2,
+				MetricId:   1,
 			},
 		},
 	}
@@ -199,5 +201,124 @@ report_configs:
 
 	if err := parseProjectConfig(y, &c); err == nil {
 		t.Error("Accepted non-unique report id.")
+	}
+}
+
+// Test that a report config with an unknown metric id gets rejected.
+func TestParseProjectConfigUnknownMetricIdInReportConfig(t *testing.T) {
+	y := `
+report_configs:
+- id: 1
+  metric_id: 10
+`
+	c := projectConfig{}
+
+	if err := parseProjectConfig(y, &c); err == nil {
+		t.Error("Accepted report config with unknown metric id.")
+	}
+}
+
+// Check that valid report variables are accepted.
+func TestValidateReportVariables(t *testing.T) {
+	m := config.Metric{
+		Parts: map[string]*config.MetricPart{
+			"int_part":    &config.MetricPart{DataType: config.MetricPart_INT},
+			"string_part": &config.MetricPart{DataType: config.MetricPart_STRING},
+			"blob_part":   &config.MetricPart{DataType: config.MetricPart_BLOB},
+			"index_part":  &config.MetricPart{DataType: config.MetricPart_INDEX},
+		},
+	}
+
+	c := config.ReportConfig{
+		Variable: []*config.ReportVariable{
+			&config.ReportVariable{
+				MetricPart: "int_part",
+			},
+			&config.ReportVariable{
+				MetricPart:  "index_part",
+				IndexLabels: &config.IndexLabels{Labels: map[uint32]string{0: "zero"}},
+			},
+			&config.ReportVariable{
+				MetricPart:       "string_part",
+				RapporCandidates: &config.RapporCandidateList{Candidates: []string{"hello"}},
+			},
+		},
+	}
+
+	if err := validateReportVariables(c, m); err != nil {
+		t.Error(err)
+	}
+}
+
+// Test that a report variable referring to an unknown metric part will be rejected.
+func TestValidateReportVariablesUnknownMetricPart(t *testing.T) {
+	m := config.Metric{}
+
+	c := config.ReportConfig{
+		Variable: []*config.ReportVariable{
+			&config.ReportVariable{
+				MetricPart: "int_part",
+			},
+		},
+	}
+
+	if err := validateReportVariables(c, m); err == nil {
+		t.Error("Report with unknown metric part was accepted.")
+	}
+}
+
+// Test that if a report variable specifies index labels, the metric part it
+// refers to must be of type index.
+func TestValidateReportVariablesIndexLablesNonIndexMetric(t *testing.T) {
+	m := config.Metric{
+		Parts: map[string]*config.MetricPart{
+			"int_part": &config.MetricPart{DataType: config.MetricPart_INT},
+		},
+	}
+
+	c := config.ReportConfig{
+		Variable: []*config.ReportVariable{
+			&config.ReportVariable{
+				MetricPart:  "int_part",
+				IndexLabels: &config.IndexLabels{Labels: map[uint32]string{0: "zero"}},
+			},
+		},
+	}
+
+	if err := validateReportVariables(c, m); err == nil {
+		t.Error("Report with with index labels specified for a non-index metric part accepted.")
+	}
+}
+
+// Test that if a report variable specifies rappor candidates, the metric part
+// it refers to must be of type string.
+func TestValidateReportVarialesRapporCandidatesNonStringMetric(t *testing.T) {
+	m := config.Metric{
+		Parts: map[string]*config.MetricPart{
+			"int_part": &config.MetricPart{DataType: config.MetricPart_INT},
+		},
+	}
+
+	c := config.ReportConfig{
+		Variable: []*config.ReportVariable{
+			&config.ReportVariable{
+				MetricPart:       "int_part",
+				RapporCandidates: &config.RapporCandidateList{Candidates: []string{"alpha"}},
+			},
+		},
+	}
+
+	if err := validateReportVariables(c, m); err == nil {
+		t.Error("Report with with rappor candidates specified for a non-string metric part accepted.")
+	}
+}
+
+func TestValidateMetricNoNilMetricPart(t *testing.T) {
+	m := config.Metric{
+		Parts: map[string]*config.MetricPart{"int_part": nil},
+	}
+
+	if err := validateMetric(m); err == nil {
+		t.Error("Metric with nil metric part was accepted.")
 	}
 }

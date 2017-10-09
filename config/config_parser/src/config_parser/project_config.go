@@ -21,6 +21,7 @@ package config_parser
 import (
 	"config"
 	"fmt"
+	"github.com/golang/glog"
 	"yamlpb"
 )
 
@@ -41,9 +42,13 @@ func parseProjectConfig(y string, c *projectConfig) (err error) {
 		return fmt.Errorf("Error while parsing yaml: %v", err)
 	}
 
-	// TODO(azani): Validate that metrics and encodings referred to exist.
-	metricIds := map[uint32]bool{}
+	// Maps metric ids to the metric's index in c.projectConfig.MetricConfigs.
+	metrics := map[uint32]uint32{}
+
+	// Set of encoding ids. Used to detect duplicates.
 	encodingIds := map[uint32]bool{}
+
+	// Set of report ids. Used to detect duplicates.
 	reportIds := map[uint32]bool{}
 	for i, e := range c.projectConfig.EncodingConfigs {
 		if encodingIds[e.Id] {
@@ -55,10 +60,14 @@ func parseProjectConfig(y string, c *projectConfig) (err error) {
 	}
 
 	for i, e := range c.projectConfig.MetricConfigs {
-		if metricIds[e.Id] {
+		if _, ok := metrics[e.Id]; ok {
 			return fmt.Errorf("Metric id '%v' is repeated in metric config entry number %v. Metric ids must be unique.", e.Id, i)
 		}
-		metricIds[e.Id] = true
+		metrics[e.Id] = uint32(i)
+
+		if err := validateMetric(*e); err != nil {
+			return fmt.Errorf("Error validating metric %v (%v): %v", e.Name, e.Id, err)
+		}
 		e.CustomerId = c.customerId
 		e.ProjectId = c.projectId
 	}
@@ -70,6 +79,63 @@ func parseProjectConfig(y string, c *projectConfig) (err error) {
 		reportIds[e.Id] = true
 		e.CustomerId = c.customerId
 		e.ProjectId = c.projectId
+
+		if _, ok := metrics[e.MetricId]; !ok {
+			return fmt.Errorf("Error validating report %v (%v): There is no metric id %v.", e.Name, e.Id, e.MetricId)
+		}
+
+		m := c.projectConfig.MetricConfigs[metrics[e.MetricId]]
+		if err := validateReportVariables(*e, *m); err != nil {
+			return fmt.Errorf("Error validating report %v (%v): %v", e.Name, e.Id, err)
+		}
+	}
+
+	return nil
+}
+
+func validateMetric(m config.Metric) (err error) {
+	for k, v := range m.Parts {
+		if v == nil {
+			return fmt.Errorf("Metric part '%v' is null. This is not allowed.", k)
+		}
+	}
+
+	return nil
+}
+
+// Checks that the report variables are compatible with the specific metric.
+func validateReportVariables(c config.ReportConfig, m config.Metric) (err error) {
+	if len(c.Variable) == 0 {
+		glog.Warningf("Report '%v' (Customer %v, Project %v Id %v) does not have any report variables.", c.Name, c.CustomerId, c.ProjectId, c.Id)
+		return nil
+	}
+
+	for i, v := range c.Variable {
+		if v == nil {
+			return fmt.Errorf("Report Variable in position %v is null. This is not allowed.", i)
+		}
+
+		// Check that the metric part being referenced can be found.
+		p, ok := m.Parts[v.MetricPart]
+		if !ok {
+			return fmt.Errorf("Metric part '%v' is not present in metric '%v'.", v.MetricPart, m.Name)
+		}
+
+		// Checks that if index labels are found, the metric part referred to is an index.
+		if v.IndexLabels != nil && len(v.IndexLabels.Labels) > 0 && p.DataType != config.MetricPart_INDEX {
+			return fmt.Errorf("Report variable %v has index labels specified "+
+				"which implies referring to an index metric part. But metric part '%v'"+
+				"of metric '%v' (%v) is of type %v.",
+				i, v.MetricPart, m.Name, m.Id, config.MetricPart_DataType_name[int32(p.DataType)])
+		}
+
+		// Checks that if RAPPOR candidates are found, the metric part referred to is a string.
+		if v.RapporCandidates != nil && len(v.RapporCandidates.Candidates) > 0 && p.DataType != config.MetricPart_STRING {
+			return fmt.Errorf("Report variable %v has RAPPOR candidates specified "+
+				"which implies referring to a string metric part. But metric part '%v'"+
+				"of metric '%v' (%v) is of type %v.",
+				i, v.MetricPart, m.Name, m.Id, config.MetricPart_DataType_name[int32(p.DataType)])
+		}
 	}
 
 	return nil
