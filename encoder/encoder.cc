@@ -47,13 +47,13 @@ Encoder::Status Encoder::EncodeForculus(
     uint32_t day_index, ObservationPart* observation_part) {
   switch (data_type) {
     case MetricPart::INT: {
-      VLOG(3) << "Forculus doesn't support INTs: (" << customer_id_ << ", "
-              << project_id_ << ", " << encoding_config_id << ")";
+      LOG(ERROR) << "Forculus doesn't support INTs: (" << customer_id_ << ", "
+                 << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
     case MetricPart::INDEX: {
-      VLOG(3) << "Forculus doesn't support INDEXes: (" << customer_id_ << ", "
-              << project_id_ << ", " << encoding_config_id << ")";
+      LOG(ERROR) << "Forculus doesn't support INDEXes: (" << customer_id_
+                 << ", " << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
     default:
@@ -74,8 +74,8 @@ Encoder::Status Encoder::EncodeForculus(
       return kInvalidConfig;
 
     case ForculusEncrypter::kEncryptionFailed:
-      VLOG(3) << "Forculs encryption failed for encoding (" << customer_id_
-              << ", " << project_id_ << ", " << encoding_config_id << ")";
+      LOG(ERROR) << "Forculs encryption failed for encoding (" << customer_id_
+                 << ", " << project_id_ << ", " << encoding_config_id << ")";
       return kEncodingFailed;
   }
 }
@@ -89,18 +89,18 @@ Encoder::Status Encoder::EncodeRappor(uint32_t metric_id,
                                       ObservationPart* observation_part) {
   switch (data_type) {
     case MetricPart::INT: {
-      VLOG(3) << "RAPPOR doesn't support INTs: (" << customer_id_ << ", "
-              << project_id_ << ", " << encoding_config_id << ")";
+      LOG(ERROR) << "RAPPOR doesn't support INTs: (" << customer_id_ << ", "
+                 << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
     case MetricPart::INDEX: {
-      VLOG(3) << "RAPPOR doesn't support INDEXes: (" << customer_id_ << ", "
-              << project_id_ << ", " << encoding_config_id << ")";
+      LOG(ERROR) << "RAPPOR doesn't support INDEXes: (" << customer_id_ << ", "
+                 << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
     case MetricPart::BLOB: {
-      VLOG(3) << "RAPPOR doesn't support Blobs: (" << customer_id_ << ", "
-              << project_id_ << ", " << encoding_config_id << ")";
+      LOG(ERROR) << "RAPPOR doesn't support Blobs: (" << customer_id_ << ", "
+                 << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
     default:
@@ -116,9 +116,9 @@ Encoder::Status Encoder::EncodeRappor(uint32_t metric_id,
       return kInvalidConfig;
 
     case rappor::kInvalidInput:
-      VLOG(3) << "Invalid arguments to RapporEncoder for encoding ("
-              << customer_id_ << ", " << project_id_ << ", "
-              << encoding_config_id << ")";
+      LOG(ERROR) << "Invalid arguments to RapporEncoder for encoding ("
+                 << customer_id_ << ", " << project_id_ << ", "
+                 << encoding_config_id << ")";
       return kInvalidArguments;
   }
 }
@@ -130,8 +130,8 @@ Encoder::Status Encoder::EncodeBasicRappor(
     ObservationPart* observation_part) {
   switch (data_type) {
     case MetricPart::BLOB: {
-      VLOG(3) << "Basic RAPPOR doesn't support Blobs: (" << customer_id_ << ", "
-              << project_id_ << ", " << encoding_config_id << ")";
+      LOG(ERROR) << "Basic RAPPOR doesn't support Blobs: (" << customer_id_
+                 << ", " << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
     default:
@@ -149,9 +149,9 @@ Encoder::Status Encoder::EncodeBasicRappor(
       return kInvalidConfig;
 
     case rappor::kInvalidInput:
-      VLOG(3) << "Invalid arguments to BasicRapporEncoder for encoding ("
-              << customer_id_ << ", " << project_id_ << ", "
-              << encoding_config_id << ")";
+      LOG(ERROR) << "Invalid arguments to BasicRapporEncoder for encoding ("
+                 << customer_id_ << ", " << project_id_ << ", "
+                 << encoding_config_id << ")";
       return kInvalidArguments;
   }
 }
@@ -214,8 +214,8 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
   const Metric* metric = project_->Metric(metric_id);
   if (!metric) {
     // No such metric.
-    VLOG(3) << "No such metric: (" << customer_id_ << ", " << project_id_
-            << ", " << metric_id << ")";
+    LOG(ERROR) << "No such metric: (" << customer_id_ << ", " << project_id_
+               << ", " << metric_id << ")";
     result.status = kInvalidArguments;
     return result;
   }
@@ -223,9 +223,9 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
   // Check that the number of values provided equals the number of metric
   // parts.
   if (metric->parts().size() != value.parts_.size()) {
-    VLOG(3) << "Metric (" << customer_id_ << ", " << project_id_ << ", "
-            << metric_id << ") does not have " << value.parts_.size()
-            << " part(s)";
+    LOG(ERROR) << "Metric (" << customer_id_ << ", " << project_id_ << ", "
+               << metric_id << ") does not have " << value.parts_.size()
+               << " part(s)";
     result.status = kInvalidArguments;
     return result;
   }
@@ -240,8 +240,8 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
   uint32_t day_index = TimeToDayIndex(current_time, metric->time_zone_policy());
   if (day_index == UINT32_MAX) {
     // Invalid Metric: No time_zone_policy.
-    VLOG(3) << "TimeZonePolicy unset for metric: (" << customer_id_ << ", "
-            << project_id_ << ", " << metric_id << ")";
+    LOG(ERROR) << "TimeZonePolicy unset for metric: (" << customer_id_ << ", "
+               << project_id_ << ", " << metric_id << ")";
     result.status = kInvalidConfig;
     return result;
   }
@@ -282,9 +282,9 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
     } else {
       metric_part_iterator = metric->parts().find(part_name);
       if (metric_part_iterator == metric->parts().cend()) {
-        VLOG(3) << "Metric (" << customer_id_ << ", " << project_id_ << ", "
-                << metric_id << ") does not have a part named " << part_name
-                << ".";
+        LOG(ERROR) << "Metric (" << customer_id_ << ", " << project_id_ << ", "
+                   << metric_id << ") does not have a part named " << part_name
+                   << ".";
         result.status = kInvalidArguments;
         return result;
       }
@@ -294,9 +294,9 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
     // Check that the data type of the ValuePart matches the data_type of the
     // MetricPart.
     if (metric_part.data_type() != value_part_data.data_type) {
-      VLOG(3) << "Metric part (" << customer_id_ << ", " << project_id_ << ", "
-              << metric_id << ")-" << part_name << " is not of type "
-              << value_part_data.data_type << ".";
+      LOG(ERROR) << "Metric part (" << customer_id_ << ", " << project_id_
+                 << ", " << metric_id << ")-" << part_name << " is not of type "
+                 << value_part_data.data_type << ".";
       result.status = kInvalidArguments;
       return result;
     }
@@ -306,9 +306,9 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
         project_->EncodingConfig(value_part_data.encoding_config_id);
     if (!encoding_config) {
       // No such encoding config.
-      VLOG(3) << "No such encoding config: (" << customer_id_ << ", "
-              << project_id_ << ", " << value_part_data.encoding_config_id
-              << ")";
+      LOG(ERROR) << "No such encoding config: (" << customer_id_ << ", "
+                 << project_id_ << ", " << value_part_data.encoding_config_id
+                 << ")";
       result.status = kInvalidArguments;
       return result;
     }

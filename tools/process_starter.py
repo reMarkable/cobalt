@@ -158,8 +158,8 @@ ANALYZER_SERVICE_PATH = os.path.abspath(os.path.join(OUT_DIR, 'analyzer',
 def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
     bigtable_project_name='', bigtable_instance_name='',
     private_key_pem_file=DEFAULT_ANALYZER_PRIVATE_KEY_PEM,
-
-    verbose_count=0, wait=True):
+    verbose_count=0, vmodule=None,
+    wait=True):
   print
   print "Starting the analyzer service..."
   print
@@ -179,6 +179,8 @@ def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
     cmd.append("-for_testing_only_use_bigtable_emulator")
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
+  if vmodule:
+    cmd.append("-vmodule=%s"%vmodule)
   return execute_command(cmd, wait)
 
 REPORT_MASTER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'analyzer',
@@ -189,7 +191,8 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
                         use_tls=False,
                         tls_cert_file=LOCALHOST_TLS_CERT_FILE,
                         tls_key_file=LOCALHOST_TLS_KEY_FILE,
-                        verbose_count=0, wait=True):
+                        verbose_count=0, vmodule=None,
+                        wait=True):
   print
   print "Starting the analyzer ReportMaster service..."
   print
@@ -213,6 +216,8 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
     cmd.append("-for_testing_only_use_bigtable_emulator")
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
+  if vmodule:
+    cmd.append("-vmodule=%s"%vmodule)
   return execute_command(cmd, wait)
 
 TEST_APP_PATH = os.path.abspath(os.path.join(OUT_DIR, 'tools', 'test_app',

@@ -105,7 +105,9 @@ grpc::Status AnalyzerServiceImpl::AddObservations(
     grpc::ServerContext* context, const ObservationBatch* batch,
     google::protobuf::Empty* empty) {
   VLOG(3) << "Received batch of " << batch->encrypted_observation_size()
-          << " observations.";
+          << " observations for metric (" << batch->meta_data().customer_id()
+          << ", " << batch->meta_data().project_id() << ", "
+          << batch->meta_data().metric_id() << ")";
   std::vector<Observation> observations(batch->encrypted_observation_size());
   size_t index = 0;
   for (const EncryptedMessage& em : batch->encrypted_observation()) {

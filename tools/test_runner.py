@@ -51,6 +51,7 @@ def run_all_tests(test_dir,
                   bigtable_project_name = '',
                   bigtable_instance_name = '',
                   verbose_count=0,
+                  vmodule=None,
                   test_args=None):
   """ Runs the tests in the given directory.
 
@@ -75,6 +76,13 @@ def run_all_tests(test_dir,
       tls_cert_file, tls_key_file: If use_tls is True and start_cobalt_process
       is True then these are the tls cert and key files to use when starting
       the local processes.
+
+      vmodule: If this is a non-empty string it will be passed as the
+      value of the -vmodule= flag to some of the processes. This flag is used
+      to enable per-module verbose logging. See the gLog documentation.
+      Currently we support this flag only for the AnalyzerService and the
+      ReportMaster and so this flag is ignored unles start_cobatl_processes is
+      True.
 
       test_args {list of strings} These will be passed to each test executable.
 
@@ -111,7 +119,8 @@ def run_all_tests(test_dir,
             bigtable_instance_name=bigtable_instance_name,
             bigtable_project_name=bigtable_project_name,
             private_key_pem_file=E2E_TEST_ANALYZER_PRIVATE_KEY_PEM,
-            verbose_count=verbose_count, wait=False)
+            verbose_count=verbose_count, vmodule=vmodule,
+            wait=False)
         time.sleep(1)
         report_master_process=process_starter.start_report_master(
             use_tls=use_tls,
@@ -119,7 +128,8 @@ def run_all_tests(test_dir,
             tls_key_file=tls_key_file,
             bigtable_instance_name=bigtable_instance_name,
             bigtable_project_name=bigtable_project_name,
-            verbose_count=verbose_count, wait=False)
+            verbose_count=verbose_count, vmodule=vmodule,
+            wait=False)
         time.sleep(1)
         shuffler_process=process_starter.start_shuffler(
           use_tls=use_tls,

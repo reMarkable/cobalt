@@ -214,7 +214,7 @@ TestApp::Mode ParseMode() {
 // Reads the PEM file at the specified path and writes the contents into
 // |*pem_out|. Returns true for success or false for failure.
 bool ReadPublicKeyPem(const std::string& pem_file, std::string* pem_out) {
-  VLOG(1) << "Reading PEM file at " << pem_file;
+  VLOG(2) << "Reading PEM file at " << pem_file;
   if (PemUtil::ReadTextFile(pem_file, pem_out)) {
     return true;
   }
@@ -228,7 +228,7 @@ bool ReadPublicKeyPem(const std::string& pem_file, std::string* pem_out) {
 // -project flags.
 std::shared_ptr<ProjectContext> LoadProjectContext(
     const std::string& registration_dir_path) {
-  VLOG(1) << "Loading Cobalt configuration from " << registration_dir_path;
+  VLOG(2) << "Loading Cobalt configuration from " << registration_dir_path;
 
   // Load the encoding registry.
   char fname[PATH_MAX];
@@ -285,7 +285,6 @@ std::vector<std::string> ParseCSV(const std::string& line) {
 
   std::string cell;
   while (std::getline(line_stream, cell, ',')) {
-    std::remove(cell.begin(), cell.end(), ' ');
     if (!cell.empty()) {
       cells.push_back(cell);
     }
@@ -304,6 +303,15 @@ std::shared_ptr<grpc::ChannelCredentials> CreateChannelCredentials(
   } else {
     return grpc::InsecureChannelCredentials();
   }
+}
+
+template <class T>
+std::string ToString(std::vector<T> v) {
+  std::ostringstream stream;
+  for (const T& i : v) {
+    stream << i << " ";
+  }
+  return stream.str();
 }
 
 }  // namespace
@@ -346,7 +354,7 @@ class AnalyzerClient : public AnalyzerClientInterface {
     for (const ObservationBatch& batch : envelope.batch()) {
       if (mode_ == TestApp::kInteractive) {
       } else {
-        VLOG(1) << "Sending to analyzer with deadline = "
+        VLOG(2) << "Sending to analyzer with deadline = "
                 << FLAGS_deadline_seconds << " seconds...";
       }
       std::unique_ptr<grpc::ClientContext> context(new grpc::ClientContext());
@@ -359,7 +367,7 @@ class AnalyzerClient : public AnalyzerClientInterface {
         if (mode_ == TestApp::kInteractive) {
           std::cout << "Sent to Analyzer" << std::endl;
         } else {
-          VLOG(1) << "Sent to Analyzer";
+          VLOG(2) << "Sent to Analyzer";
         }
       } else {
         if (mode_ == TestApp::kInteractive) {
@@ -392,7 +400,7 @@ void TestApp::SendToShuffler() {
   }
 
   if (mode_ != TestApp::kInteractive) {
-    VLOG(1) << "Sending to shuffler with deadline = " << FLAGS_deadline_seconds
+    VLOG(2) << "Sending to shuffler with deadline = " << FLAGS_deadline_seconds
             << " seconds...";
   }
   shipping_manager_->RequestSendSoon();
@@ -402,7 +410,7 @@ void TestApp::SendToShuffler() {
     if (mode_ == TestApp::kInteractive) {
       std::cout << "Sent to Shuffler." << std::endl;
     } else {
-      VLOG(1) << "Sent to Shuffler";
+      VLOG(2) << "Sent to Shuffler";
     }
     return;
   } else {
@@ -442,19 +450,19 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
 
   std::shared_ptr<encoder::ShufflerClient> shuffler_client;
   if (!FLAGS_shuffler_uri.empty()) {
-    VLOG(1) << "Connecting to Shuffler at " << FLAGS_shuffler_uri;
+    VLOG(2) << "Connecting to Shuffler at " << FLAGS_shuffler_uri;
     const char* pem_root_certs = nullptr;
     std::string pem_root_certs_str;
     if (FLAGS_use_tls) {
-      VLOG(1) << "Using TLS.";
+      VLOG(2) << "Using TLS.";
       if (!FLAGS_root_certs_pem_file.empty()) {
-        VLOG(1) << "Reading root certs from " << FLAGS_root_certs_pem_file;
+        VLOG(2) << "Reading root certs from " << FLAGS_root_certs_pem_file;
         CHECK(PemUtil::ReadTextFile(FLAGS_root_certs_pem_file,
                                     &pem_root_certs_str));
         pem_root_certs = pem_root_certs_str.c_str();
       }
     } else {
-      VLOG(1) << "NOT using TLS.";
+      VLOG(2) << "NOT using TLS.";
     }
     shuffler_client.reset(
         new ShufflerClient(FLAGS_shuffler_uri, FLAGS_use_tls, pem_root_certs));
@@ -463,7 +471,7 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
   auto analyzer_encryption_scheme = EncryptedMessage::NONE;
   std::string analyzer_public_key_pem = "";
   if (FLAGS_analyzer_pk_pem_file.empty()) {
-    VLOG(1) << "WARNING: Encryption of Observations to the Analzyer not being "
+    VLOG(2) << "WARNING: Encryption of Observations to the Analzyer not being "
                "used. Pass the flag -analyzer_pk_pem_file";
   } else if (ReadPublicKeyPem(FLAGS_analyzer_pk_pem_file,
                               &analyzer_public_key_pem)) {
@@ -472,7 +480,7 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
   auto shuffler_encryption_scheme = EncryptedMessage::NONE;
   std::string shuffler_public_key_pem = "";
   if (FLAGS_shuffler_pk_pem_file.empty()) {
-    VLOG(1) << "WARNING: Encryption of Envelopes to the Shuffler not being "
+    VLOG(2) << "WARNING: Encryption of Envelopes to the Shuffler not being "
                "used. Pass the flag -shuffler_pk_pem_file";
   } else if (ReadPublicKeyPem(FLAGS_shuffler_pk_pem_file,
                               &shuffler_public_key_pem)) {
@@ -542,6 +550,7 @@ void TestApp::RunAutomatic() {
 }
 
 void TestApp::SendAndQuit() {
+  VLOG(1) << "--values=" << FLAGS_values;
   auto value_triples = ParseCSV(FLAGS_values);
   if (value_triples.empty()) {
     LOG(ERROR) << "--values was not set.";
@@ -566,6 +575,9 @@ void TestApp::SendAndQuit() {
   }
 
   for (uint32_t i = 0; i < FLAGS_repeat; i++) {
+    VLOG(2) << "encoding_config_ids=" << ToString(encoding_config_ids)
+            << " part_names=" << ToString(part_names)
+            << " values=" << ToString(values);
     Encode(encoding_config_ids, part_names, values);
 
     SendAccumulatedObservations();

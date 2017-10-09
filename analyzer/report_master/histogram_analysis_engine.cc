@@ -242,6 +242,24 @@ class NoOpAdapter : public DecoderAdapter {
             &serialized_value)) {
       return false;
     }
+    if (VLOG_IS_ON(5)) {
+      std::ostringstream str;
+      const auto& value = obs.unencoded().unencoded_value();
+      switch (value.data_case()) {
+        case ValuePart::kStringValue:
+          str << value.string_value();
+          break;
+        case ValuePart::kIntValue:
+          str << value.int_value();
+          break;
+        case ValuePart::kIndexValue:
+          str << "index=" << value.index_value();
+          break;
+        default:
+          str << "[UNKNOWN DATA TYPE]";
+      }
+      VLOG(5) << "NoOpAdapter::ProcessObservationPart: " << str.str();
+    }
     // For safety we will accept only up to 10,000 different values.
     static const size_t kMaxNumValues = 10000;
     if (counts_.size() >= kMaxNumValues) {

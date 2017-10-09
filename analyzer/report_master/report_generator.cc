@@ -231,7 +231,9 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
   // We iteratively query in batches of size 1000.
   static const size_t kMaxResultsPerIteration = 1000;
   do {
-    VLOG(4) << "Querying for 1000 observations...";
+    VLOG(4) << "Querying for 1000 observations from metric ("
+            << report_config.customer_id() << ", " << report_config.project_id()
+            << ", " << report_config.metric_id() << ")";
     query_response = observation_store_->QueryObservations(
         report_config.customer_id(), report_config.project_id(),
         report_config.metric_id(), start_day_index, end_day_index, parts,

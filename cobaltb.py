@@ -271,6 +271,7 @@ def _test(args):
         bigtable_project_name=bigtable_project_name,
         bigtable_instance_name=bigtable_instance_name,
         verbose_count=_verbose_count,
+        vmodule=_vmodule,
         use_tls=_parse_bool(args.use_tls),
         tls_cert_file=args.tls_cert_file,
         tls_key_file=args.tls_key_file,
@@ -875,6 +876,16 @@ def main():
   parent_parser.add_argument('--verbose',
     help='Be verbose (multiple times for more)',
     default=0, dest='verbose_count', action='count')
+  parser.add_argument('--vmodule',
+    help='A string to use for the GLog -vmodule flag when running the Cobalt '
+    'processes locally. Currently only used for the end-to-end test. '
+    'Optional.)',
+    default='')
+  parent_parser.add_argument('--vmodule',
+    help='A string to use for the GLog -vmodule flag when running the Cobalt'
+    'processes locally. Currently only used for the end-to-end test. '
+    'Optional.)',
+    default='')
 
   subparsers = parser.add_subparsers()
 
@@ -1523,6 +1534,8 @@ def main():
   global _verbose_count
   _verbose_count = args.verbose_count
   _initLogging(_verbose_count)
+  global _vmodule
+  _vmodule = args.vmodule
 
   # Extend paths to include third-party dependencies
   os.environ["PATH"] = \
