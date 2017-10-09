@@ -182,6 +182,40 @@ element {
   }
 }
 
+#### Metric (1, 1, 5)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  name: "Fuchsia Module Usage"
+  description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
+  parts {
+    key: "module"
+    value {
+      description: "A module identifier"
+      data_type: STRING
+    }
+  }
+}
+
+#### Metric (1, 1, 6)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  name: "Device Type"
+  description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
+  parts {
+    key: "device"
+    value {
+      description: "Which type of device is Fuchsia running on"
+      data_type: INDEX
+    }
+  }
+}
+
 ## Project 2: Fuchsia Test App
 
 #####################################################################

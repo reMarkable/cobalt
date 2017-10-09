@@ -90,6 +90,15 @@ element {
   }
 }
 
+# Encoding (1, 1, 6) is the No-Op encoding.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  no_op_encoding {
+  }
+}
+
 #########################
 # Customer 2 (Acme)
 ########################

@@ -94,6 +94,48 @@ element {
   }
 }
 
+#### ReportConfig (1, 1, 5)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  name: "Fuchsia Module Usage"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 5
+  variable {
+    metric_part: "module"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}
+
+#### ReportConfig (1, 1, 6)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  name: "Fuschsia Device Start Counts"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 6
+  variable {
+    metric_part: "device"
+    index_labels {
+      labels {
+         key: 0
+         value: "Type A"
+      }
+      labels {
+         key: 1
+         value: "Type B"
+      }
+      labels {
+         key: 25
+         value: "Type Z"
+      }
+    }
+  }
+}
+
 #########################
 # Customer 2 (Acme)
 ########################

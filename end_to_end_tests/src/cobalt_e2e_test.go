@@ -54,7 +54,8 @@ end-to-end test. Therefore it is important that the configuration of
 (customerID=1, projectID=1) in the config/demo and config/production directories
 be kept in sync with this test.
 
-Below we copy the config registration for projectID=1 from those files.
+Below we copy the subset of the config registration from those files that is
+actually used by this test.
 
 #### Metric (1, 1, 1)
 element {
@@ -107,6 +108,40 @@ element {
   }
 }
 
+#### Metric (1, 1, 5)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  name: "Fuchsia Module Usage"
+  description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
+  parts {
+    key: "module"
+    value {
+      description: "A module identifier"
+      data_type: STRING
+    }
+  }
+}
+
+#### Metric (1, 1, 6)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  name: "Device Type"
+  description: "This is a fictional metric used for the development of Cobalt."
+  time_zone_policy: LOCAL
+  parts {
+    key: "device"
+    value {
+      description: "Which type of device is Fuchsia running on"
+      data_type: INDEX
+    }
+  }
+}
+
 #### Encoding (1, 1, 1)
 element {
   customer_id: 1
@@ -144,6 +179,15 @@ element {
     indexed_categories: {
       num_categories: 100
     }
+  }
+}
+
+# Encoding (1, 1, 6) is the No-Op encoding.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  no_op_encoding {
   }
 }
 
@@ -204,6 +248,48 @@ element {
   }
 }
 
+#### ReportConfig (1, 1, 5)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  name: "Fuchsia Module Usage"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 5
+  variable {
+    metric_part: "module"
+  }
+  aggregation_epoch_type: DAY
+  report_delay_days: 1
+}
+
+#### ReportConfig (1, 1, 6)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  name: "Fuschsia Device Start Counts"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 6
+  variable {
+    metric_part: "device"
+    index_labels {
+      labels {
+         key: 0
+         value: "Type A"
+      }
+      labels {
+         key: 1
+         value: "Type B"
+      }
+      labels {
+         key: 25
+         value: "Type Z"
+      }
+    }
+  }
+}
+
 */
 
 package main
@@ -231,21 +317,28 @@ const (
 	customerId = 1
 	projectId  = 1
 
-	urlMetricId   = 1
-	hourMetricId  = 2
-	eventMetricId = 4
+	urlMetricId    = 1
+	hourMetricId   = 2
+	eventMetricId  = 4
+	moduleMetricId = 5
+	deviceMetricId = 6
 
 	forculusEncodingConfigId           = 1
 	basicRapporStringsEncodingConfigId = 2
 	basicRapporIndexEncodingConfigId   = 5
+	noOpEncodingConfigId               = 6
 
-	forculusUrlReportConfigId      = 1
-	basicRapporHourReportConfigId  = 2
-	basicRapporEventReportConfigId = 4
+	urlReportConfigId    = 1
+	hourReportConfigId   = 2
+	eventReportConfigId  = 4
+	moduleReportConfigId = 5
+	deviceReportConfigId = 6
 
-	hourMetricPartName  = "hour"
-	urlMetricPartName   = "url"
-	eventMetricPartName = "event"
+	hourMetricPartName   = "hour"
+	urlMetricPartName    = "url"
+	eventMetricPartName  = "event"
+	moduleMetricPartName = "module"
+	deviceMetricPartName = "device"
 )
 
 var (
@@ -332,28 +425,20 @@ func init() {
 		// Since we are about to delete data from a real bigtable let's give a user a chance
 		// to cancel if something horrible has gone wrong.
 		printWarningAndWait()
-		fmt.Printf("*** Deleting observations from the Observation Store at %s;%s for project (%d, %d), metrics %d, %d and %d.\n",
-			*bigtableProjectName, *bigtableInstanceName, customerId, projectId, urlMetricId, hourMetricId, eventMetricId)
-		if err := invokeBigtableTool("delete_observations", urlMetricId, 0); err != nil {
-			panic(fmt.Sprintf("Error deleting observations for url metric [%v].", err))
+		fmt.Printf("*** Deleting observations from the Observation Store at %s;%s for project (%d, %d), metrics %d, %d, %d, %d and %d.\n",
+			*bigtableProjectName, *bigtableInstanceName, customerId, projectId, urlMetricId, hourMetricId, eventMetricId, moduleMetricId, deviceMetricId)
+		for _, metricId := range []int{urlMetricId, hourMetricId, eventMetricId, moduleMetricId, deviceMetricId} {
+			if err := invokeBigtableTool("delete_observations", metricId, 0); err != nil {
+				panic(fmt.Sprintf("Error deleting observations for metric [%v].", err))
+			}
 		}
-		if err := invokeBigtableTool("delete_observations", hourMetricId, 0); err != nil {
-			panic(fmt.Sprintf("Error deleting observations for hour metric [%v].", err))
-		}
-		if err := invokeBigtableTool("delete_observations", eventMetricId, 0); err != nil {
-			panic(fmt.Sprintf("Error deleting observations for event metric [%v].", err))
-		}
-		fmt.Printf("*** Deleting reports from the Report Store at %s;%s for project (%d, %d), report configs %d, %d and %d.\n",
+		fmt.Printf("*** Deleting reports from the Report Store at %s;%s for project (%d, %d), report configs %d, %d, %d, %d and %d.\n",
 			*bigtableProjectName, *bigtableInstanceName, customerId, projectId,
-			forculusUrlReportConfigId, basicRapporHourReportConfigId, basicRapporEventReportConfigId)
-		if err := invokeBigtableTool("delete_reports", 0, forculusUrlReportConfigId); err != nil {
-			panic(fmt.Sprintf("Error deleting forculus URL reports [%v].", err))
-		}
-		if err := invokeBigtableTool("delete_reports", 0, basicRapporHourReportConfigId); err != nil {
-			panic(fmt.Sprintf("Error deleting basic RAPPOR hour reports [%v].", err))
-		}
-		if err := invokeBigtableTool("delete_reports", 0, basicRapporEventReportConfigId); err != nil {
-			panic(fmt.Sprintf("Error deleting basic RAPPOR hour reports [%v].", err))
+			urlReportConfigId, hourReportConfigId, eventReportConfigId, moduleReportConfigId, deviceReportConfigId)
+		for _, reportConfigId := range []int{urlReportConfigId, hourReportConfigId, eventReportConfigId, moduleReportConfigId, deviceReportConfigId} {
+			if err := invokeBigtableTool("delete_reports", 0, reportConfigId); err != nil {
+				panic(fmt.Sprintf("Error deleting reports [%v].", err))
+			}
 		}
 	}
 }
@@ -494,6 +579,12 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 		"-logtostderr", fmt.Sprintf("-v=%d", *subProcessVerbosity),
 		"-metric", strconv.Itoa(int(metricId)),
 		"-num_clients", strconv.Itoa(int(numClients)),
+		// We perform the generate-add-send operation repeateCount times. This
+		// allows us to test re-using the same instance of the Cobalt Client
+		// for multiple send attempts. Note that this differs from
+		// -num_adds_per_observation below in that this flag actually causes
+		// additional Observations to be saved in the ObservationStore but
+		// -num_adds_per_observation does not.
 		"-repeat", strconv.Itoa(int(repeatCount)),
 		fmt.Sprintf("-skip_shuffler=%t", skipShuffler),
 		// Each obervation is sent to the Shuffler 3 times. This allows us to test
@@ -514,56 +605,109 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 	return err
 }
 
+// sendStringObservations sends Observations of the given string |value| to the Shuffler,
+// for the specified metric part, using the specified encoding. |numClients| different, independent
+// observations will be sent. The process of adding and sending will be repeated
+// |repeatCount| times.
+func sendStringObservations(metricId uint32, partName string, encodingConfigId uint32, value string, numClients uint, repeatCount uint, t *testing.T) {
+	const skipShuffler = false
+	values := []ValuePart{
+		ValuePart{
+			partName,
+			value,
+			encodingConfigId,
+		},
+	}
+	if err := sendObservations(metricId, values, skipShuffler, numClients, repeatCount); err != nil {
+		t.Fatalf("url=%s, numClient=%d, err=%v", value, numClients, err)
+	}
+}
+
+// sendIntObservations sends Observations of the given integer |value| to the Shuffler,
+// for the specified metric part, using the specified encoding. |numClients| different, independent
+// observations will be sent. The process of adding and sending will be repeated |repeatCount| times.
+func sendIntObservations(metricId uint32, partName string, encodingConfigId uint32, value int, numClients uint, repeatCount uint, t *testing.T) {
+	const skipShuffler = false
+	values := []ValuePart{
+		ValuePart{
+			hourMetricPartName,
+			strconv.Itoa(value),
+			basicRapporStringsEncodingConfigId,
+		},
+	}
+	if err := sendObservations(hourMetricId, values, skipShuffler, numClients, repeatCount); err != nil {
+		t.Fatalf("hour=%d, numClient=%d, err=%v", value, numClients, err)
+	}
+}
+
+// sendIndexedObservations sends Observations of type index to the Shuffler with the given data.
+// |numClients| different, independent observations will be sent. The process of adding and sending will be repeated
+// |repeatCount| times.
+func sendIndexedObservations(metricId uint32, partName string, encodingConfigId uint32, index int, numClients uint, repeatCount uint, t *testing.T) {
+	const skipShuffler = false
+	values := []ValuePart{
+		ValuePart{
+			partName,
+			fmt.Sprintf("index=%d", index),
+			encodingConfigId,
+		},
+	}
+	if err := sendObservations(metricId, values, skipShuffler, numClients, repeatCount); err != nil {
+		t.Fatalf("index=%d, numClient=%d, err=%v", index, numClients, err)
+	}
+}
+
+// sendUrlObservations sends Observations of the given |url| to the Shuffler,
+// using the specified encoding. |numClients| different, independent
+// observations will be sent. The process of adding and sending will be repeated
+// |repeatCount| times.
+func sendUrlObservations(encodingConfigId uint32, url string, numClients uint, repeatCount uint, t *testing.T) {
+	sendStringObservations(urlMetricId, urlMetricPartName, encodingConfigId, url, numClients, repeatCount, t)
+}
+
+// sendModuleObservations sends Observations of the given |moudle| to the Shuffler,
+// using the specified encoding. |numClients| different, independent
+// observations will be sent. The process of adding and sending will be repeated
+// |repeatCount| times.
+func sendModuleObservations(encodingConfigId uint32, module string, numClients uint, repeatCount uint, t *testing.T) {
+	sendStringObservations(moduleMetricId, moduleMetricPartName, encodingConfigId, module, numClients, repeatCount, t)
+}
+
 // sendForculusUrlObservations sends Observations containing a Forculus encryption of the
 // given |url| to the Shuffler. |numClients| different, independent
 // observations will be sent. The process of adding and sending will be repeated
 // |repeatCount| times.
 func sendForculusUrlObservations(url string, numClients uint, repeatCount uint, t *testing.T) {
-	const skipShuffler = false
-	values := []ValuePart{
-		ValuePart{
-			urlMetricPartName,
-			url,
-			forculusEncodingConfigId,
-		},
-	}
-	if err := sendObservations(urlMetricId, values, skipShuffler, numClients, repeatCount); err != nil {
-		t.Fatalf("url=%s, numClient=%d, err=%v", url, numClients, err)
-	}
+	sendUrlObservations(forculusEncodingConfigId, url, numClients, repeatCount, t)
 }
 
 // sendBasicRapporHourObservations sends Observations containing a Basic RAPPOR encoding of the
 // given |hour| to the Shuffler. |numClients| different, independent observations
 // will be sent. The process of adding and sending will be repeated |repeatCount| times.
 func sendBasicRapporHourObservations(hour int, numClients uint, repeatCount uint, t *testing.T) {
-	const skipShuffler = false
-	values := []ValuePart{
-		ValuePart{
-			hourMetricPartName,
-			strconv.Itoa(hour),
-			basicRapporStringsEncodingConfigId,
-		},
-	}
-	if err := sendObservations(hourMetricId, values, skipShuffler, numClients, repeatCount); err != nil {
-		t.Fatalf("hour=%d, numClient=%d, err=%v", hour, numClients, err)
-	}
+	sendIntObservations(hourMetricId, hourMetricPartName, basicRapporStringsEncodingConfigId, hour, numClients, repeatCount, t)
 }
 
 // sendBasicRapporEventObservations sends Observations containing a Basic RAPPOR encoding of the
 // given |index| to the Shuffler. |numClients| different, independent observations
 // will be sent. The process of adding and sending will be repeated |repeatCount| times.
 func sendBasicRapporEventObservations(index int, numClients uint, repeatCount uint, t *testing.T) {
-	const skipShuffler = false
-	values := []ValuePart{
-		ValuePart{
-			eventMetricPartName,
-			fmt.Sprintf("index=%d", index),
-			basicRapporIndexEncodingConfigId,
-		},
-	}
-	if err := sendObservations(eventMetricId, values, skipShuffler, numClients, repeatCount); err != nil {
-		t.Fatalf("index=%d, numClient=%d, err=%v", index, numClients, err)
-	}
+	sendIndexedObservations(eventMetricId, eventMetricPartName, basicRapporIndexEncodingConfigId, index, numClients, repeatCount, t)
+}
+
+// sendUnencodedModuleObservations sends unencoded Observations of the
+// given |module| to the Shuffler. |numClients| different, independent
+// observations will be sent. The process of adding and sending will be repeated
+// |repeatCount| times.
+func sendUnencodedModuleObservations(module string, numClients uint, repeatCount uint, t *testing.T) {
+	sendModuleObservations(noOpEncodingConfigId, module, numClients, repeatCount, t)
+}
+
+// sendUnencodedDeviceObservations sends unencoded Observations containing the given |index| to the Shuffler.
+// |numClients| different, independent observations will be sent. The process of adding and sending will be
+// repeated |repeatCount| times.
+func sendUnencodedDeviceObservations(index int, numClients uint, repeatCount uint, t *testing.T) {
+	sendIndexedObservations(deviceMetricId, deviceMetricPartName, noOpEncodingConfigId, index, numClients, repeatCount, t)
 }
 
 // getReport asks the ReportMaster to start a new report for the given |reportConfigId|
@@ -600,6 +744,7 @@ func getCSVReport(reportConfigId uint32, includeStdErr bool, t *testing.T) strin
 // Report Config 1. This uses Forculus with a threshold of 20 to count
 // URLs.
 func TestForculusEncodingOfUrls(t *testing.T) {
+	fmt.Println("TestForculusEncodingOfUrls")
 	// We send some observations to the Shuffler.
 	sendForculusUrlObservations("www.AAAA.com", 18, 1, t)
 	sendForculusUrlObservations("www.BBBB.com", 19, 1, t)
@@ -621,11 +766,14 @@ func TestForculusEncodingOfUrls(t *testing.T) {
 
 	// We send additional observations to the Shuffler. This crosses the Shuffler's
 	// threshold and so all observations should now be sent to the Analyzer.
+	// Note that the third parameter below is repeatCount meaning that we
+	// ask the test_app to repeat the generate-add-send operation that many
+	// times.
 	sendForculusUrlObservations("www.EEEE.com", 22, 2, t)
 	sendForculusUrlObservations("www.FFFF.com", 23, 3, t)
 
-	// There should now be 123 Observations sent to the Analyzer for metric 1.
-	// We wait for them.
+	// There should now be 18+19+20+21+22+22+23+23+23 = 191 Observations sent to
+	// the Analyzer for metric 1. We wait for them.
 	if err := waitForObservations(urlMetricId, 191); err != nil {
 		t.Fatalf("%s", err)
 	}
@@ -638,7 +786,7 @@ www.FFFF.com,69.000
 `
 
 	// Generate the report, fetch it as a CSV, check it.
-	csv := getCSVReport(forculusUrlReportConfigId, false, t)
+	csv := getCSVReport(urlReportConfigId, false, t)
 	if csv != expectedCSV {
 		t.Errorf("Got csv:[%s]", csv)
 	}
@@ -648,6 +796,7 @@ www.FFFF.com,69.000
 // Report Config 2. This uses Basic RAPPOR with integer categories for the
 // 24 hours of the day.
 func TestBasicRapporEncodingOfHours(t *testing.T) {
+	fmt.Println("TestBasicRapporEncodingOfHours")
 	sendBasicRapporHourObservations(8, 501, 1, t)
 	sendBasicRapporHourObservations(9, 1002, 1, t)
 	sendBasicRapporHourObservations(10, 503, 1, t)
@@ -661,7 +810,7 @@ func TestBasicRapporEncodingOfHours(t *testing.T) {
 		t.Fatalf("%s", err)
 	}
 
-	report := getReport(basicRapporHourReportConfigId, true, t)
+	report := getReport(hourReportConfigId, true, t)
 	if report.Metadata.State != report_master.ReportState_COMPLETED_SUCCESSFULLY {
 		t.Fatalf("report.Metadata.State=%v", report.Metadata.State)
 	}
@@ -721,6 +870,7 @@ func TestBasicRapporEncodingOfHours(t *testing.T) {
 // which some of the indices have been associated with labels in the
 // report config.
 func TestBasicRapporEncodingOfEvents(t *testing.T) {
+	fmt.Println("TestBasicRapporEncodingOfEvents")
 	// Send observations for indices 0 through 29.
 	for index := 0; index < 30; index++ {
 		numClients := index + 1
@@ -733,7 +883,7 @@ func TestBasicRapporEncodingOfEvents(t *testing.T) {
 		t.Fatalf("%s", err)
 	}
 
-	report := getReport(basicRapporEventReportConfigId, true, t)
+	report := getReport(eventReportConfigId, true, t)
 	if report.Metadata.State != report_master.ReportState_COMPLETED_SUCCESSFULLY {
 		t.Fatalf("report.Metadata.State=%v", report.Metadata.State)
 	}
@@ -780,6 +930,112 @@ func TestBasicRapporEncodingOfEvents(t *testing.T) {
 		if index >= 30 {
 			expectedCount = 0
 		}
+		if int(val) != expectedCount {
+			t.Errorf("Expected %d, got %d", expectedCount, int(val))
+			continue
+		}
+
+	}
+}
+
+// We run the full Cobalt pipeline using Metric 5, Encoding Config 6 and
+// Report Config 5. This uses the NoOp encoding with module names as strings.
+func TestUnencodedModules(t *testing.T) {
+	fmt.Println("TestUnencodedModules")
+	// We send some observations to the Shuffler.
+	// Note that the third parameter below is repeatCount meaning that we
+	// ask the test_app to repeat the generate-add-send operation that many
+	// times.
+	sendUnencodedModuleObservations("Module A", 18, 1, t)
+	sendUnencodedModuleObservations("Module B", 19, 1, t)
+	sendUnencodedModuleObservations("Module C", 20, 1, t)
+	sendUnencodedModuleObservations("Module D", 21, 1, t)
+	sendUnencodedModuleObservations("Module E", 22, 2, t)
+	sendUnencodedModuleObservations("Module F", 23, 3, t)
+
+	// There should now be 18+19+20+21+22+22+23+23+23 = 191 Observations sent to
+	// the Analyzer for metric 5. We wait for them.
+	if err := waitForObservations(moduleMetricId, 191); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	// Finally we will run a report. This is the expected output of the report.
+	const expectedCSV = `Module A,18.000
+Module B,19.000
+Module C,20.000
+Module D,21.000
+Module E,44.000
+Module F,69.000
+`
+
+	// Generate the report, fetch it as a CSV, check it.
+	csv := getCSVReport(moduleReportConfigId, false, t)
+	if csv != expectedCSV {
+		t.Errorf("Got csv:[%s]", csv)
+	}
+}
+
+// We run the full Cobalt pipeline using Metric 6, Encoding Config 6 and
+// Report Config 6. This uses the NoOp encoding. Indices 0, 1 and 25 have
+// been given labels in the report config.
+func TestUnencodedDeviceIndexes(t *testing.T) {
+	fmt.Println("TestUnencodedDeviceIndexes")
+	// Send observations for indices 0 through 29.
+	for index := 0; index < 30; index++ {
+		numClients := index + 1
+		sendUnencodedDeviceObservations(index, uint(numClients), 1, t)
+	}
+
+	// There should 30*31/2 = 465 Observations sent to the Analyzer for metric 6.
+	// We wait for them.
+	if err := waitForObservations(deviceMetricId, 465); err != nil {
+		t.Fatalf("%s", err)
+	}
+
+	report := getReport(deviceReportConfigId, true, t)
+	if report.Metadata.State != report_master.ReportState_COMPLETED_SUCCESSFULLY {
+		t.Fatalf("report.Metadata.State=%v", report.Metadata.State)
+	}
+	includeStdErr := true
+	supressEmptyRows := false
+	rows := report_client.ReportToStrings(report, includeStdErr, supressEmptyRows)
+	if rows == nil {
+		t.Fatalf("rows is nil")
+	}
+	if len(rows) != 30 {
+		t.Fatalf("len(rows)=%d", len(rows))
+	}
+
+	for index := 0; index < 30; index++ {
+		if len(rows[index]) != 3 {
+			t.Fatalf("len(rows[index])=%d", len(rows[index]))
+		}
+		var expectedRowKey string
+		switch index {
+		case 0:
+			expectedRowKey = "Type A"
+			break
+		case 1:
+			expectedRowKey = "Type B"
+			break
+		case 25:
+			expectedRowKey = "Type Z"
+			break
+		default:
+			expectedRowKey = fmt.Sprintf("<index %d>", index)
+		}
+		if rows[index][0] != expectedRowKey {
+			t.Errorf("Expected %s, got %s", expectedRowKey, rows[index][0])
+			continue
+		}
+
+		val, err := strconv.ParseFloat(rows[index][1], 32)
+		if err != nil {
+			t.Errorf("Error parsing %s as float: %v", rows[index][1], err)
+			continue
+		}
+
+		expectedCount := index + 1
 		if int(val) != expectedCount {
 			t.Errorf("Expected %d, got %d", expectedCount, int(val))
 			continue
