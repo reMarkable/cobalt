@@ -86,7 +86,8 @@ def run_all_tests(test_dir,
 
       test_args {list of strings} These will be passed to each test executable.
 
-    Returns: 0 if all tests return 0, otherwise returns 1.
+    Returns: A list of strings indicating which tests failed. Returns None or
+             to indicate success.
   """
   tdir = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'out', test_dir))
 
@@ -94,7 +95,7 @@ def run_all_tests(test_dir,
     print "\n*************** ERROR ****************"
     print "Directory %s does not exist." % tdir
     print "Run 'cobaltb.py build' first."
-    return 1
+    return ["Directory %s does not exist." % tdir]
 
   if test_args is None:
     test_args = []
@@ -104,7 +105,7 @@ def run_all_tests(test_dir,
 
   print "Running all tests in %s " % tdir
   print "Test arguments: '%s'" % test_args
-  all_passed = True
+  failure_list = []
   for test_executable in os.listdir(tdir):
     bt_emulator_process = None
     shuffler_process = None
@@ -141,7 +142,8 @@ def run_all_tests(test_dir,
       path = os.path.abspath(os.path.join(tdir, test_executable))
       command = [path] + test_args
       return_code = subprocess.call(command)
-      all_passed = all_passed and return_code == 0
+      if return_code != 0:
+        failure_list.append(test_executable)
       if return_code < 0:
         print
         print "****** WARNING Process terminated by signal %d" % (- return_code)
@@ -154,9 +156,9 @@ def run_all_tests(test_dir,
                                    "Report Master")
       process_starter.kill_process(bt_emulator_process,
                                    "Cloud Bigtable Emulator")
-  if all_passed:
-    return 0
+  if failure_list:
+    return failure_list
   else:
-    return 1
+    return None
 
 

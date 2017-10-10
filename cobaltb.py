@@ -121,7 +121,8 @@ def _lint(args):
 TEST_FILTERS =['all', 'gtests', 'nogtests', 'gotests', 'nogotests',
                'btemulator', 'nobtemulator', 'e2e', 'noe2e', 'cloud_bt', 'perf']
 
-# Returns 0 if all tests return 0, otherwise returns 1.
+# Returns 0 if all tests pass, otherwise returns 1. Prints a failure or success
+# message.
 def _test(args):
   # A map from positive filter specifiers to the list of test directories
   # it represents. Note that 'cloud_bt' and 'perf' tests are special. They are
@@ -152,7 +153,7 @@ def _test(args):
   else:
     test_dirs = FILTER_MAP[args.tests]
 
-  success = True
+  failure_list = []
   print ("Will run tests in the following directories: %s." %
       ", ".join(test_dirs))
 
@@ -174,11 +175,11 @@ def _test(args):
       bigtable_project_name_from_args = _compound_project_name(args)
       if bigtable_project_name_from_args == '':
         print '--cloud_project_name must be specified'
-        success = False
+        failure_list.append('gtests_cloud_bt')
         break
       if args.bigtable_instance_name == '':
         print '--bigtable_instance_name must be specified'
-        success = False
+        failure_list.append('gtests_cloud_bt')
         break
       test_args = [
           "--bigtable_project_name=%s" % bigtable_project_name_from_args,
@@ -197,7 +198,7 @@ def _test(args):
         if args.cobalt_on_personal_cluster and args.production_dir:
           print ("Do not specify both --production_dir and "
                  "-cobalt_on_personal_cluster.")
-          success = False
+          failure_list.append('e2e_tests')
           break
         public_uris = container_util.get_public_uris(args.cluster_name,
             args.cloud_project_prefix, args.cloud_project_name,
@@ -212,7 +213,7 @@ def _test(args):
           # are inconsistent.
           print ("Do not specify both --use_cloud_bt and "
                  "-cobalt_on_personal_cluster or --production_dir.")
-          success = False
+          failure_list.append('e2e_tests')
           break
       if args.cobalt_on_personal_cluster:
         analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM
@@ -265,7 +266,7 @@ def _test(args):
           "-do_shuffler_threshold_test=false",
         ]
     print '********************************************************'
-    success = (test_runner.run_all_tests(
+    this_failure_list = test_runner.run_all_tests(
         test_dir, start_bt_emulator=start_bt_emulator,
         start_cobalt_processes=start_cobalt_processes,
         bigtable_project_name=bigtable_project_name,
@@ -275,15 +276,18 @@ def _test(args):
         use_tls=_parse_bool(args.use_tls),
         tls_cert_file=args.tls_cert_file,
         tls_key_file=args.tls_key_file,
-        test_args=test_args) == 0) and success
+        test_args=test_args)
+    if this_failure_list:
+      failure_list.append("%s (%s)" % (test_dir, this_failure_list))
 
   print
-  if success:
+  if failure_list:
+    print '******************* SOME TESTS FAILED *******************'
+    print 'failures = %s' % failure_list
+    return 1
+  else:
     print '******************* ALL TESTS PASSED *******************'
     return 0
-  else:
-    print '******************* SOME TESTS FAILED *******************'
-    return 1
 
 # Files and directories in the out directory to NOT delete when doing
 # a partial clean.
