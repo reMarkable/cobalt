@@ -43,18 +43,26 @@ class BigtableStoreEmulatorFactory {
     static const char kTestInstance[] = "TestInstance";
     static const char kDefaultUrl[] = "localhost:9000";
 
-    BigtableAdmin bigtable_admin(kDefaultUrl,
-                                 grpc::InsecureChannelCredentials(),
-                                 kTestProject, kTestInstance);
-
-    // Wait for up to 10 seconds for the Bigtable Emulator to start listening.
-    if (!bigtable_admin.WaitForConnected(std::chrono::system_clock::now() +
-                                         std::chrono::seconds(10))) {
-      LOG(FATAL) << "Waited for 10 seconds to connect to Bigtable Emulator.";
+    std::unique_ptr<BigtableAdmin> bigtable_admin;
+    // Try three times to connect to the Bigtable Emulator.
+    for (int attempt = 0; attempt < 3; attempt++) {
+      bigtable_admin.reset(new BigtableAdmin(kDefaultUrl,
+                                             grpc::InsecureChannelCredentials(),
+                                             kTestProject, kTestInstance));
+      // Wait for up to 5 seconds for the Bigtable Emulator to start listening.
+      if (!bigtable_admin->WaitForConnected(std::chrono::system_clock::now() +
+                                            std::chrono::seconds(5))) {
+        bigtable_admin.reset();
+      } else {
+        break;
+      }
+    }
+    if (!bigtable_admin) {
+      LOG(FATAL) << "Unable to connect to Bigtable Emulator.";
     }
 
     // Make sure the tables have been created.
-    if (!bigtable_admin.CreateTablesIfNecessary()) {
+    if (!bigtable_admin->CreateTablesIfNecessary()) {
       LOG(FATAL) << "Unable to create the Cobalt BigTables.";
     }
 
