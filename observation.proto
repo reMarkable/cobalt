@@ -89,6 +89,35 @@ message ObservationPart {
   uint32 encoding_config_id = 5;  // e.g. 114=(Forculus with threshold=50)
 }
 
+// A SystemProfile describes the client system on which an Observation
+// is collected.
+message SystemProfile {
+  enum OS {
+    UNKNOWN_OS = 0;
+    FUCHSIA = 1;
+    LINUX = 2;
+  }
+
+  enum ARCH {
+    UNKNOWN_ARCH = 0;
+    X86_64 = 1;
+    ARM_64 = 2;
+  }
+
+  // Information on the CPU (obtained by CPUID on X86).
+  message CPU {
+    // A 12 character string naming the vendor, e.g. "GeniuneIntel".
+    string vendor_name = 1;
+
+    // The signature reported by CPUID (from EAX).
+    uint32 signature = 2;
+  }
+
+  OS os = 1;
+  ARCH arch = 2;
+  CPU cpu = 3;
+}
+
 // An Observation consists of one or more ObservationParts.
 message Observation {
   // The keys are the names of the metric parts to which each ObservationPart
@@ -124,6 +153,14 @@ message ObservationMetadata {
   // different time zone. The Encoder client is free to add some random noise to
   // the time at which an event occurred and this might change the day.
   uint32 day_index = 4;
+
+  // The profile of the client system on which the Observation was collected.
+  // This field is populated in ObservationMetadata that are sent from the
+  // Shuffler to the Analyzer but not in ObservationMetada sent from a
+  // client to the Shuffler. Instead the SystemProfile is sent just once
+  // per Envelope and the Shuffler copies it into individual
+  // ObservationMetadata.
+  SystemProfile system_profile = 5;
 }
 
 // A batch of encrypted Observations with common metadata. This is the unit
@@ -146,4 +183,10 @@ message ObservationBatch {
 // is the unit sent from an Encoder client to a Shuffler.
 message Envelope {
   repeated ObservationBatch batch = 1;
+
+  // The profile of the client system from which this Envelope is being sent.
+  // To minimize the data sent from a client, this is included only once
+  // per Envelope. The Shuffler is responsible for copying this into the
+  // individual ObservationMetadata contained in this Envelope.
+  SystemProfile system_profile = 3;
 }

@@ -27,6 +27,7 @@ add_library(encoder
             send_retryer.cc
             shipping_manager.cc
             shuffler_client.cc
+            system_data.cc
             ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(encoder
                       client_secret
@@ -39,7 +40,7 @@ add_cobalt_dependencies(encoder)
 add_executable(encoder_tests
                client_secret_test.cc encoder_test.cc envelope_maker_test.cc
                send_retryer_test.cc shipping_manager_test.cc
-               shuffler_client_test.cc)
+               shuffler_client_test.cc system_data_test.cc)
 target_link_libraries(encoder_tests
                       client_secret
                       encoder)

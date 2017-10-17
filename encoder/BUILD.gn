@@ -18,6 +18,8 @@ static_library("encoder") {
     "shipping_manager.h",
     "shuffler_client.cc",
     "shuffler_client.h",
+    "system_data.cc",
+    "system_data.h",
   ]
   public_configs = [ "//third_party/cobalt:cobalt_config" ]
 
@@ -59,6 +61,7 @@ source_set("unittests") {
     "send_retryer_test.cc",
     "shipping_manager_test.cc",
     "shuffler_client_test.cc",
+    "system_data_test.cc",
   ]
 
   deps = [
