@@ -94,9 +94,13 @@ func parseProjectConfig(y string, c *projectConfig) (err error) {
 }
 
 func validateMetric(m config.Metric) (err error) {
-	for k, v := range m.Parts {
+	for name, v := range m.Parts {
 		if v == nil {
-			return fmt.Errorf("Metric part '%v' is null. This is not allowed.", k)
+			return fmt.Errorf("Metric part '%v' is null. This is not allowed.", name)
+		}
+
+		if !validNameRegexp.MatchString(name) {
+			return fmt.Errorf("Metric part name '%v' is invalid. Metric part names must match the regular expression '%v'.", name, validNameRegexp)
 		}
 	}
 

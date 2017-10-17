@@ -27,7 +27,7 @@ import (
 
 const customerId = 1
 
-var validNameRegexp = regexp.MustCompile("^[_a-zA-Z][_a-zA-Z0-9]{1,81}$")
+var validNameRegexp = regexp.MustCompile("^[a-zA-Z][_a-zA-Z0-9]{1,81}$")
 
 // Parse a list of customers appending all their projects to the projectConfig
 // list that was passed in.
