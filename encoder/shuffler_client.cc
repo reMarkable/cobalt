@@ -54,7 +54,8 @@ grpc::Status ShufflerClient::SendToShuffler(
     context = temp_context.get();
   }
   shuffler::ShufflerResponse resp;
-  context->set_idempotent(true);
+  // TODO(rudominer): Re-enable when can be confirmed to work with endpoints.
+  // context->set_idempotent(true);
   return shuffler_stub_->Process(context, encrypted_message, &resp);
 }
 
