@@ -19,9 +19,9 @@
 #include <utility>
 
 #include "./encrypted_message.pb.h"
-#include "gflags/gflags.h"
-#include "glog/logging.h"
-#include "third_party/googletest/googletest/include/gtest/gtest.h"
+#include "./gtest.h"
+#include "./logging.h"
+#include "third_party/gflags/include/gflags/gflags.h"
 
 namespace cobalt {
 namespace encoder {

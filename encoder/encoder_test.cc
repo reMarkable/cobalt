@@ -14,13 +14,13 @@
 
 #include "encoder/encoder.h"
 
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <utility>
 
+#include "./gtest.h"
+#include "./logging.h"
 #include "encoder/client_secret.h"
 #include "encoder/project_context.h"
-#include "third_party/googletest/googletest/include/gtest/gtest.h"
+#include "third_party/gflags/include/gflags/gflags.h"
 
 namespace cobalt {
 namespace encoder {
@@ -697,7 +697,6 @@ TEST(EncoderTest, AdvancedApiWithErrors) {
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-  google::InstallFailureSignalHandler();
+  INIT_LOGGING(argv[0]);
   return RUN_ALL_TESTS();
 }

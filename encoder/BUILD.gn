@@ -52,3 +52,31 @@ static_library("client_secret") {
     "//third_party/cobalt/util/crypto_util"
   ]
 }
+
+source_set("unittests") {
+  testonly = true
+
+  sources = [
+    "client_secret_test.cc",
+    "encoder_test.cc",
+    "envelope_maker_test.cc",
+    "send_retryer_test.cc",
+    "shipping_manager_test.cc",
+    "shuffler_client_test.cc",
+  ]
+
+  deps = [
+    ":encoder",
+    "//third_party/gflags",
+    "//third_party/gtest",
+    # Note(rudominer) We need protobuf full here for deserializing ASCII
+    # protos as part of the test.
+    "//third_party/protobuf:protobuf_full",
+  ]
+
+  configs += [
+    "//third_party/cobalt:cobalt_config",
+  ]
+}
+
+

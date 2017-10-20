@@ -11,11 +11,11 @@
 #include <vector>
 
 #include "./encrypted_message.pb.h"
+#include "./gtest.h"
+#include "./logging.h"
 #include "encoder/clock.h"
 #include "encoder/shuffler_client.h"
-#include "gflags/gflags.h"
-#include "glog/logging.h"
-#include "third_party/googletest/googletest/include/gtest/gtest.h"
+#include "third_party/gflags/include/gflags/gflags.h"
 
 namespace cobalt {
 namespace encoder {
@@ -33,6 +33,8 @@ class FakeShufflerClient : public ShufflerClientInterface {
   FakeShufflerClient(IncrementingClock* incrementing_clock,
                      CancelHandle* cancel_handle)
       : incrementing_clock(incrementing_clock), cancel_handle(cancel_handle) {}
+
+  ~FakeShufflerClient() {};
 
   grpc::Status SendToShuffler(const EncryptedMessage& encrypted_message,
                               grpc::ClientContext* context = nullptr) override {

@@ -7,8 +7,17 @@
 
 #ifdef HAVE_GLOG
 #include <glog/logging.h>
+
+#define INIT_LOGGING(val) \
+{ \
+  google::InitGoogleLogging(val); \
+  google::InstallFailureSignalHandler(); \
+}
+
 #elif defined(__Fuchsia__)
 #include "lib/fxl/logging.h"
+
+#define INIT_LOGGING(val)
 
 #define VLOG(verboselevel) FXL_VLOG(verboselevel)
 #define LOG(level) FXL_LOG(level)

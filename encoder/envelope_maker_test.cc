@@ -14,14 +14,14 @@
 
 #include "encoder/envelope_maker.h"
 
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <utility>
 
+#include "./gtest.h"
+#include "./logging.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
-#include "third_party/googletest/googletest/include/gtest/gtest.h"
+#include "third_party/gflags/include/gflags/gflags.h"
 #include "util/encrypted_message_util.h"
 
 namespace cobalt {

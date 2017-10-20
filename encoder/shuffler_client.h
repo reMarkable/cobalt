@@ -26,6 +26,8 @@ namespace encoder {
 
 class ShufflerClientInterface {
  public:
+  virtual ~ShufflerClientInterface() = default;
+
   // Send the given |encrypted_message| to the Shuffler. It should be an
   // encryped Envelope as given by the output of
   // EnvelopeMaker::MakeEncryptedEnvelope().
@@ -57,6 +59,8 @@ class ShufflerClient : public ShufflerClientInterface {
   // pointing to a file on the file system containing the roots.
   ShufflerClient(const std::string& uri, bool use_tls,
                  const char* pem_root_certs = nullptr);
+
+  virtual ~ShufflerClient() = default;
 
   // Send the given |encrypted_message| to the Shuffler. It should be an
   // encryped Envelope as given by the output of

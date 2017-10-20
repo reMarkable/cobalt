@@ -22,6 +22,8 @@ class CancelHandle;
 // This is abstracted so that it may be mocked in tests.
 class SendRetryerInterface {
  public:
+  virtual ~SendRetryerInterface() = default;
+
   virtual grpc::Status SendToShuffler(
       std::chrono::seconds initial_rpc_deadline,
       std::chrono::seconds overerall_deadline,
@@ -37,6 +39,8 @@ class SendRetryer : public SendRetryerInterface {
  public:
   // Does not take ownership of |shuffler_client|.
   explicit SendRetryer(ShufflerClientInterface* shuffler_client);
+
+  virtual ~SendRetryer() = default;
 
   // Uses the wrapped ShufflerClient to send the given |encrypted_message| to
   // the Shuffler. It should be an encrypted Envelope as given by the output of
