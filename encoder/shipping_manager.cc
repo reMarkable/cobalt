@@ -137,6 +137,7 @@ ShippingManager::Status ShippingManager::AddObservation(
 
 // The caller must hold a lock on mutex_.
 void ShippingManager::RequestSendSoonLockHeld(MutexProtectedFields* fields) {
+  VLOG(6) << "ShippingManager::RequestSendSoonLockHeld()";
   fields->expedited_send_requested = true;
   fields->expedited_send_notifier.notify_all();
   // We set waiting_for_schedule_ false here so that if the calling thread
@@ -168,7 +169,8 @@ void ShippingManager::RequestSendSoon(SendCallback send_callback) {
       locked->fields->current_send_callback_queue.push_back(send_callback);
     } else {
       // Otherwise the ShippingManager has no Observations so invoke the
-      // SendCallback immediately.
+      // SendCallback immediately and clear expedited_send_requested.
+      locked->fields->expedited_send_requested = false;
       send_callback(true);
     }
   }
