@@ -20,7 +20,5 @@ proto_library("shuffler_service") {
     "//third_party/grpc:grpc++",
   ]
 
-  extra_configs = [
-     "//third_party/cobalt:cobalt_config",
-  ]
+  extra_configs = [ "//third_party/cobalt:cobalt_config" ]
 }

@@ -5,41 +5,34 @@
 static_library("encrypted_message_util") {
   sources = [
     "encrypted_message_util.cc",
-    "encrypted_message_util.h"
+    "encrypted_message_util.h",
   ]
-  configs += [
-    "//third_party/cobalt:cobalt_config",
-  ]
+  configs += [ "//third_party/cobalt:cobalt_config" ]
 
   deps = [
-    "//third_party/cobalt:cobalt_proto",
     "//garnet/public/lib/fxl",
+    "//third_party/cobalt:cobalt_proto",
   ]
 }
 
 static_library("datetime_util") {
   sources = [
     "datetime_util.cc",
-    "datetime_util.h"
+    "datetime_util.h",
   ]
-  configs += [
-    "//third_party/cobalt:cobalt_config",
-  ]
+  configs += [ "//third_party/cobalt:cobalt_config" ]
   deps = [
-    "//third_party/cobalt/config:cobalt_config_proto"
+    "//third_party/cobalt/config:cobalt_config_proto",
   ]
 }
 
 static_library("pem_util") {
   sources = [
     "pem_util.cc",
-    "pem_util.h"
+    "pem_util.h",
   ]
-  configs += [
-    "//third_party/cobalt:cobalt_config",
-  ]
+  configs += [ "//third_party/cobalt:cobalt_config" ]
   deps = [
-    "//third_party/cobalt/util/crypto_util"
+    "//third_party/cobalt/util/crypto_util",
   ]
 }
-

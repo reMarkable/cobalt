@@ -11,17 +11,15 @@ static_library("forculus_encoder") {
     "forculus_utils.cc",
     "forculus_utils.h",
     "polynomial_computations.cc",
-    "polynomial_computations.h"
+    "polynomial_computations.h",
   ]
-  configs += [
-    "//third_party/cobalt:cobalt_config",
-  ]
+  configs += [ "//third_party/cobalt:cobalt_config" ]
 
   public_deps = [
     "//third_party/cobalt:cobalt_proto",
     "//third_party/cobalt/config:cobalt_config_proto",
     "//third_party/cobalt/encoder:client_secret",
     "//third_party/cobalt/util:datetime_util",
-    "//third_party/cobalt/util/crypto_util"
+    "//third_party/cobalt/util/crypto_util",
   ]
 }

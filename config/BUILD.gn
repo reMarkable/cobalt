@@ -13,6 +13,7 @@ proto_library("cobalt_config_proto") {
   ]
   import_dirs = [ "//third_party/protobuf/src" ]
   generate_python = false
+
   # TODO(rudominer) Uncomment this line so that we can use Protobuf Lite
   # in Fuchsia. In order to do this we need to replace the use of
   # TextFormat with some other way of parsing a message from a human-readable
@@ -23,7 +24,5 @@ proto_library("cobalt_config_proto") {
     "//third_party/cobalt:cobalt_proto",
   ]
 
-  extra_configs = [
-     "//third_party/cobalt:cobalt_config",
-  ]
+  extra_configs = [ "//third_party/cobalt:cobalt_config" ]
 }
