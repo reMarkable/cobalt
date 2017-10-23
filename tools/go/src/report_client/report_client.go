@@ -34,6 +34,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/oauth"
 )
 
 // The ReportMasterStub interface provides an abstraction layer that allows
@@ -70,13 +71,16 @@ type ReportClient struct {
 // A fixed |customerId| and |projectId| is specified.
 //
 // If |tls| is false an insecure connection is used, and the remaining
-// parameters or ignored, otherwise TLS is used
+// parameters are ignored, otherwise TLS is used
+//
+// If |skipOauth| is false and |tls| is true, an OAuth token will be obtained
+// to authenticate to the server.
 //
 // |caFile| is optional. If non-empty it should specify the path to a file
 // containing a PEM encoding of root certificates to use for TLS.
 //
 // Logs and crashes on any failure.
-func NewReportClient(customerId uint32, projectId uint32, uri string, tls bool, caFile string) *ReportClient {
+func NewReportClient(customerId uint32, projectId uint32, uri string, tls bool, skipOauth bool, caFile string) *ReportClient {
 	grpcStubImpl := gRPCReportMasterStub{}
 
 	client := ReportClient{
@@ -98,9 +102,15 @@ func NewReportClient(customerId uint32, projectId uint32, uri string, tls bool, 
 			creds = credentials.NewClientTLSFromCert(nil, "")
 		}
 		opts = append(opts, grpc.WithTransportCredentials(creds))
+
+		if !skipOauth {
+			// If TLS is enabled, we can also do authentication.
+			opts = append(opts, grpc.WithPerRPCCredentials(oauth.TokenSource{getTokenSource()}))
+		}
 	} else {
 		opts = append(opts, grpc.WithInsecure())
 	}
+
 	opts = append(opts, grpc.WithBlock())
 	opts = append(opts, grpc.WithTimeout(10*time.Second))
 

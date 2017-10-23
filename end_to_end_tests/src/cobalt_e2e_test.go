@@ -352,6 +352,7 @@ var (
 	shufflerUri     = flag.String("shuffler_uri", "", "The URI of the Shuffler")
 
 	useTls            = flag.Bool("use_tls", false, "Use TLS for gRPC connections (currently only to the Shuffler and ReportMaster.")
+	skipOauth         = flag.Bool("skip_oauth", false, "Do not attempt to authenticate with the ReportMaster using OAuth.")
 	shufflerRootCerts = flag.String("shuffler_root_certs", "", "Optional. A file containning the root CA certificates to be used for "+
 		"the tls connection to the Shuffler.")
 	reportMasterRootCerts = flag.String("report_master_root_certs", "", "Optional. A file containning the root CA certificates to be used "+
@@ -419,7 +420,7 @@ func printWarningAndWait() {
 func init() {
 	flag.Parse()
 
-	reportClient = report_client.NewReportClient(customerId, projectId, *reportMasterUri, *useTls, *reportMasterRootCerts)
+	reportClient = report_client.NewReportClient(customerId, projectId, *reportMasterUri, *useTls, *skipOauth, *reportMasterRootCerts)
 
 	if *bigtableToolPath != "" {
 		// Since we are about to delete data from a real bigtable let's give a user a chance

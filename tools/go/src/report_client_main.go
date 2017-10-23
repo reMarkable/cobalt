@@ -48,8 +48,9 @@ import (
 )
 
 var (
-	tls    = flag.Bool("tls", false, "Connection uses TLS if true or if the port for report_master_uri is 443, else plain TCP")
-	caFile = flag.String("ca_file", "", "The file containning the root CA certificate.")
+	tls       = flag.Bool("tls", false, "Connection uses TLS if true or if the port for report_master_uri is 443, else plain TCP")
+	caFile    = flag.String("ca_file", "", "The file containning the root CA certificate.")
+	skipOauth = flag.Bool("skip_oauth", false, "Do not attempt to authenticate with the server using OAuth.")
 
 	reportMasterURI = flag.String("report_master_uri", "reportmaster.cobalt-api.fuchsia.com:443", "The hostname:port used to connect to the ReportMaster Service")
 
@@ -340,7 +341,7 @@ func main() {
 
 	cli := ReportClientCLI{
 		reportClient: report_client.NewReportClient(uint32(*customerID), uint32(*projectID),
-			*reportMasterURI, *tls, *caFile),
+			*reportMasterURI, *tls, *skipOauth, *caFile),
 	}
 
 	if *interactive {

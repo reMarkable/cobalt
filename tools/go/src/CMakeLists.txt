@@ -17,7 +17,8 @@ set(REPORT_MASTER_PB_GO "${CMAKE_BINARY_DIR}/go-proto-gen/src/analyzer/report_ma
 set_source_files_properties(${REPORT_MASTER_PB_GO} PROPERTIES GENERATED TRUE)
 
 # Build report client binary.
-set(REPORT_CLIENT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/report_client/report_client.go")
+set(REPORT_CLIENT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/report_client/report_client.go"
+                      "${CMAKE_CURRENT_SOURCE_DIR}/report_client/oauth.go")
 set(REPORT_CLIENT_BINARY "${CMAKE_BINARY_DIR}/tools/report_client")
 add_custom_command(OUTPUT ${REPORT_CLIENT_BINARY}
     # Compiles report_client_main and all its dependencies
