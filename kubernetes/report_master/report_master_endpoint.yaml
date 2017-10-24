@@ -15,10 +15,24 @@ title: Cobalt Report Master gRPC API
 apis:
 - name: cobalt.analyzer.ReportMaster
 
-# API usage restrictions.
 usage:
   rules:
   # All methods can be called without an API Key.
-  # TODO(azani): Restrict access.
   - selector: "*"
     allow_unregistered_calls: true
+
+authentication:
+  providers:
+  - id: google_auth
+    issuer: https://accounts.google.com
+    # This is the OAuth 2.0 Client ID for the report_client application. It is
+    # registered with Google and it is hard-coded into the report_client's Go
+    # code.
+    audiences: 915138408459-535q0s4l88eppnidvidhlcdvavdcgtfq.apps.googleusercontent.com
+  rules:
+    - selector: "*"
+      allow_without_credential: false
+      oauth:
+        canonical_scopes: https://www.googleapis.com/auth/userinfo.email
+      requirements:
+        - provider_id: google_auth
