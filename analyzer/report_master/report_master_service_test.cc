@@ -25,5 +25,37 @@ INSTANTIATE_TYPED_TEST_CASE_P(ReportMasterServiceTest,
                               ReportMasterServiceAbstractTest,
                               store::MemoryStoreFactory);
 
-}  // namespace analyzer
-}  // namespace cobalt
+// Checks that permissions are checked on all methods of ReportMasterService.
+TEST(ReportMasterServiceFriendTest, AuthEnforcerTest) {
+  std::shared_ptr<store::ObservationStore> observation_store;
+  std::shared_ptr<store::ReportStore> report_store;
+  std::shared_ptr<config::AnalyzerConfig> analyzer_config;
+  std::shared_ptr<grpc::ServerCredentials> server_credentials;
+  std::shared_ptr<AuthEnforcer> auth_enforcer(new NegativeEnforcer());
+
+  ReportMasterService service(0, observation_store, report_store,
+                              analyzer_config, server_credentials,
+                              auth_enforcer);
+
+  StartReportRequest start_request;
+  StartReportResponse start_response;
+  EXPECT_EQ(grpc::StatusCode::PERMISSION_DENIED,
+            service.StartReport(nullptr, &start_request, &start_response)
+                .error_code());
+
+  GetReportRequest get_request;
+  Report get_response;
+  EXPECT_EQ(
+      grpc::StatusCode::PERMISSION_DENIED,
+      service.GetReport(nullptr, &get_request, &get_response).error_code());
+
+  QueryReportsRequest query_request;
+  TestingQueryReportsResponseWriter query_response;
+  EXPECT_EQ(
+      grpc::StatusCode::PERMISSION_DENIED,
+      service.QueryReportsInternal(nullptr, &query_request, &query_response)
+          .error_code());
+}
+
+} // namespace analyzer
+} // namespace cobalt

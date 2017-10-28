@@ -37,6 +37,7 @@ cobalt_generate_protobuf_descriptors(generate_report_master_descriptor
 
 # Build the ReportMaster library
 add_library(analyzer_report_master_lib
+            auth_enforcer.cc
             histogram_analysis_engine.cc
             report_executor.cc
             report_generator.cc
@@ -61,6 +62,7 @@ add_cobalt_dependencies(analyzer_report_master)
 # Build the tests
 add_executable(analyzer_report_master_tests
                ${CMAKE_SOURCE_DIR}/analyzer/store/memory_store.cc
+               auth_enforcer_test.cc
                histogram_analysis_engine_test.cc
                report_executor_test.cc
                report_generator_test.cc

@@ -227,6 +227,9 @@ ReportMasterService::CreateFromFlagsOrDie() {
   std::shared_ptr<AnalyzerConfig> analyzer_config(
       AnalyzerConfig::CreateFromFlagsOrDie().release());
 
+  std::shared_ptr<AuthEnforcer> auth_enforcer =
+    AuthEnforcer::CreateFromFlagsOrDie();
+
   CHECK(FLAGS_port) << "--port is a mandatory flag";
 
   std::shared_ptr<grpc::ServerCredentials> server_credentials;
@@ -255,14 +258,16 @@ ReportMasterService::CreateFromFlagsOrDie() {
 
   return std::unique_ptr<ReportMasterService>(
       new ReportMasterService(FLAGS_port, observation_store, report_store,
-                              analyzer_config, server_credentials));
+                              analyzer_config, server_credentials,
+                              auth_enforcer));
 }
 
 ReportMasterService::ReportMasterService(
     int port, std::shared_ptr<store::ObservationStore> observation_store,
     std::shared_ptr<store::ReportStore> report_store,
     std::shared_ptr<config::AnalyzerConfig> analyzer_config,
-    std::shared_ptr<grpc::ServerCredentials> server_credentials)
+    std::shared_ptr<grpc::ServerCredentials> server_credentials,
+    std::shared_ptr<AuthEnforcer> auth_enforcer)
     : port_(port),
       observation_store_(observation_store),
       report_store_(report_store),
@@ -271,7 +276,8 @@ ReportMasterService::ReportMasterService(
           report_store_,
           std::unique_ptr<ReportGenerator>(new ReportGenerator(
               analyzer_config_, observation_store_, report_store_)))),
-      server_credentials_(server_credentials) {}
+      server_credentials_(server_credentials),
+      auth_enforcer_(auth_enforcer) {}
 
 void ReportMasterService::Start() {
   // Start the ReportExecutor worker thread.
@@ -305,11 +311,25 @@ grpc::Status ReportMasterService::StartReport(ServerContext* context,
                                               const StartReportRequest* request,
                                               StartReportResponse* response) {
   CHECK(request);
+  grpc::Status auth_status = auth_enforcer_->CheckAuthorization(context,
+      request->customer_id(), request->project_id(),
+      request->report_config_id());
+  if (!auth_status.ok()) {
+    return auth_status;
+  }
+
+  return StartReportNoAuth(request, response);
+}
+
+grpc::Status ReportMasterService::StartReportNoAuth(
+    const StartReportRequest* request, StartReportResponse* response) {
+  CHECK(request);
   CHECK(response);
   response->Clear();
   uint32_t customer_id = request->customer_id();
   uint32_t project_id = request->project_id();
   uint32_t report_config_id = request->report_config_id();
+
 
   // Fetch the ReportConfig from the registry and validate it.
   const ReportConfig* report_config;
@@ -423,6 +443,26 @@ grpc::Status ReportMasterService::GetReport(ServerContext* context,
                                             const GetReportRequest* request,
                                             Report* response) {
   CHECK(request);
+  // Parse the report_id.
+  ReportId report_id;
+  auto status = ReportIdFromString(request->report_id(), &report_id);
+  if (!status.ok()) {
+    return status;
+  }
+
+  grpc::Status auth_status = auth_enforcer_->CheckAuthorization(context,
+      report_id.customer_id(), report_id.project_id(),
+      report_id.report_config_id());
+  if (!auth_status.ok()) {
+    return auth_status;
+  }
+
+  return GetReportNoAuth(request, response);
+}
+
+grpc::Status ReportMasterService::GetReportNoAuth(
+    const GetReportRequest* request, Report* response) {
+  CHECK(request);
   CHECK(response);
   response->Clear();
   // Parse the report_id.
@@ -475,6 +515,19 @@ grpc::Status ReportMasterService::QueryReportsInternal(
     ServerContext* context, const QueryReportsRequest* request,
     grpc::WriterInterface<QueryReportsResponse>* writer) {
   CHECK(request);
+  grpc::Status auth_status = auth_enforcer_->CheckAuthorization(context,
+      request->customer_id(), request->project_id(),
+      request->report_config_id());
+  if (!auth_status.ok()) {
+    return auth_status;
+  }
+  return QueryReportsNoAuth(request, writer);
+}
+
+grpc::Status ReportMasterService::QueryReportsNoAuth(
+    const QueryReportsRequest* request,
+    grpc::WriterInterface<QueryReportsResponse>* writer) {
+  CHECK(request);
   CHECK(writer);
   // The max number of ReportMetadata we send back in each QueryReportsResponse.
   static const size_t kBatchSize = 100;
@@ -483,6 +536,7 @@ grpc::Status ReportMasterService::QueryReportsInternal(
   uint32_t customer_id = request->customer_id();
   uint32_t project_id = request->project_id();
   uint32_t report_config_id = request->report_config_id();
+
   int64_t interval_start_time_seconds = request->first_timestamp().seconds();
   int64_t interval_limit_time_seconds = request->limit_timestamp().seconds();
   if (request->limit_timestamp().nanos() > 0) {

@@ -308,9 +308,10 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
         new config::AnalyzerConfig(encoding_config_registry, metric_registry,
                                    report_config_registry));
 
+    std::shared_ptr<AuthEnforcer> auth_enforcer(new NullEnforcer());
     report_master_service_.reset(new ReportMasterService(
         0, observation_store_, report_store_, analyzer_config,
-        grpc::InsecureServerCredentials()));
+        grpc::InsecureServerCredentials(), auth_enforcer));
 
     report_master_service_->StartWorkerThread();
   }

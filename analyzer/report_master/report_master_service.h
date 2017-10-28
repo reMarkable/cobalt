@@ -19,12 +19,14 @@
 #include <string>
 #include <vector>
 
+#include "analyzer/report_master/auth_enforcer.h"
 #include "analyzer/report_master/report_executor.h"
 #include "analyzer/report_master/report_master.grpc.pb.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
 #include "config/analyzer_config.h"
 #include "grpc++/grpc++.h"
+#include "third_party/googletest/googletest/include/gtest/gtest_prod.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -37,7 +39,8 @@ class ReportMasterService final : public ReportMaster::Service {
       int port, std::shared_ptr<store::ObservationStore> observation_store,
       std::shared_ptr<store::ReportStore> report_store,
       std::shared_ptr<config::AnalyzerConfig> analyzer_config,
-      std::shared_ptr<grpc::ServerCredentials> server_credentials);
+      std::shared_ptr<grpc::ServerCredentials> server_credentials,
+      std::shared_ptr<AuthEnforcer> auth_enforcer);
 
   // Starts the service
   void Start();
@@ -61,10 +64,29 @@ class ReportMasterService final : public ReportMaster::Service {
       grpc::ServerContext* context, const QueryReportsRequest* request,
       grpc::ServerWriter<QueryReportsResponse>* writer) override;
 
+  // StartReportNoAuth is identical to StartReport, but authorization is not
+  // checked when it is run.
+  grpc::Status StartReportNoAuth(const StartReportRequest* request,
+      StartReportResponse* response);
+
+  // GetReportNoAuth is identical to GetReports but authorization is not
+  // checked when it is run.
+  grpc::Status GetReportNoAuth(const GetReportRequest* request,
+      Report* response);
+
+  // QueryReportNoAuth is identical to QueryReports but authorization is not
+  // checked when it is run.
+  grpc::Status QueryReportsNoAuth(const QueryReportsRequest* request,
+      grpc::WriterInterface<QueryReportsResponse>* writer);
+
  private:
   // Makes all instantiations of ReportMasterServiceAbstractTest friends.
   template <class X>
   friend class ReportMasterServiceAbstractTest;
+
+  // Allows this test to access private members of ReportMasterService.
+  FRIEND_TEST(ReportMasterServiceFriendTest, AuthEnforcerTest);
+
 
   // Gets amd validates a ReportConfig. Returns OK or
   // does Log(ERROR) and returns an error status on error.
@@ -135,6 +157,7 @@ class ReportMasterService final : public ReportMaster::Service {
       grpc::ServerContext* context, const QueryReportsRequest* request,
       grpc::WriterInterface<QueryReportsResponse>* writer);
 
+
   // Returns the string version of a ReportId as used in the gRPC API. This
   // is exposed for use by tests.
   std::string static MakeStringReportId(const ReportId& report_id);
@@ -146,6 +169,7 @@ class ReportMasterService final : public ReportMaster::Service {
   std::unique_ptr<ReportExecutor> report_executor_;
   std::shared_ptr<grpc::ServerCredentials> server_credentials_;
   std::unique_ptr<grpc::Server> server_;
+  std::shared_ptr<AuthEnforcer> auth_enforcer_;
 };
 
 }  // namespace analyzer
