@@ -41,7 +41,8 @@ ShippingManager::ShippingManager(
                                 schedule_params_.schedule_interval_) {
   CHECK(send_retryer);
   _mutex_protected_fields_do_not_access_directly_.active_envelope_maker.reset(
-      new EnvelopeMaker(envelope_maker_params.analyzer_public_key_pem_,
+      new EnvelopeMaker(envelope_maker_params.system_data_,
+                        envelope_maker_params.analyzer_public_key_pem_,
                         envelope_maker_params.analyzer_scheme_,
                         envelope_maker_params.shuffler_public_key_pem_,
                         envelope_maker_params.shuffler_scheme_,
@@ -285,7 +286,8 @@ void ShippingManager::Run() {
 std::unique_ptr<EnvelopeMaker> ShippingManager::TakeActiveEnvelopeMakerLockHeld(
     MutexProtectedFields* fields) {
   std::unique_ptr<EnvelopeMaker> latest_envelope_maker(
-      new EnvelopeMaker(envelope_maker_params_.analyzer_public_key_pem_,
+      new EnvelopeMaker(envelope_maker_params_.system_data_,
+                        envelope_maker_params_.analyzer_public_key_pem_,
                         envelope_maker_params_.analyzer_scheme_,
                         envelope_maker_params_.shuffler_public_key_pem_,
                         envelope_maker_params_.shuffler_scheme_,

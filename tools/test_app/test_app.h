@@ -40,6 +40,7 @@
 #include "encoder/send_retryer.h"
 #include "encoder/shipping_manager.h"
 #include "encoder/shuffler_client.h"
+#include "encoder/system_data.h"
 
 namespace cobalt {
 
@@ -75,6 +76,7 @@ class TestApp {
   TestApp(std::shared_ptr<encoder::ProjectContext> project_context,
           std::shared_ptr<AnalyzerClientInterface> analyzer_client,
           std::shared_ptr<encoder::ShufflerClientInterface> shuffler_client,
+          std::unique_ptr<encoder::SystemData> system_data,
           const std::string& analyzer_public_key_pem,
           EncryptedMessage::EncryptionScheme analyzer_encryption_scheme,
           const std::string& shuffler_public_key_pem,
@@ -203,6 +205,7 @@ class TestApp {
   std::shared_ptr<AnalyzerClientInterface> analyzer_client_;
   std::shared_ptr<encoder::ShufflerClientInterface> shuffler_client_;
   std::unique_ptr<encoder::send_retryer::SendRetryer> send_retryer_;
+  std::unique_ptr<encoder::SystemData> system_data_;
   std::unique_ptr<encoder::ShippingManager> shipping_manager_;
   std::ostream* ostream_;
 };

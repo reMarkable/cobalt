@@ -21,16 +21,23 @@
 namespace cobalt {
 namespace encoder {
 
-EnvelopeMaker::EnvelopeMaker(const std::string& analyzer_public_key_pem,
+EnvelopeMaker::EnvelopeMaker(const SystemDataInterface* system_data,
+                             const std::string& analyzer_public_key_pem,
                              EncryptedMessage::EncryptionScheme analyzer_scheme,
                              const std::string& shuffler_public_key_pem,
                              EncryptedMessage::EncryptionScheme shuffler_scheme,
                              size_t max_bytes_each_observation,
                              size_t max_num_bytes)
-    : encrypt_to_analyzer_(analyzer_public_key_pem, analyzer_scheme),
+    : system_data_(system_data),
+      encrypt_to_analyzer_(analyzer_public_key_pem, analyzer_scheme),
       encrypt_to_shuffler_(shuffler_public_key_pem, shuffler_scheme),
       max_bytes_each_observation_(max_bytes_each_observation),
-      max_num_bytes_(max_num_bytes) {}
+      max_num_bytes_(max_num_bytes) {
+  if (system_data) {
+    envelope_.mutable_system_profile()->CopyFrom(
+        system_data->system_profile());
+  }
+}
 
 EnvelopeMaker::AddStatus EnvelopeMaker::AddObservation(
     const Observation& observation,

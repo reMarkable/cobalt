@@ -34,7 +34,7 @@ class FakeShufflerClient : public ShufflerClientInterface {
                      CancelHandle* cancel_handle)
       : incrementing_clock(incrementing_clock), cancel_handle(cancel_handle) {}
 
-  ~FakeShufflerClient() {};
+  ~FakeShufflerClient() {}
 
   grpc::Status SendToShuffler(const EncryptedMessage& encrypted_message,
                               grpc::ClientContext* context = nullptr) override {

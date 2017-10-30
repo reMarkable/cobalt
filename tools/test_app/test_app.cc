@@ -49,6 +49,7 @@ using encoder::send_retryer::SendRetryer;
 using encoder::ShippingManager;
 using encoder::ShufflerClient;
 using encoder::ShufflerClientInterface;
+using encoder::SystemData;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
@@ -487,8 +488,10 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
     shuffler_encryption_scheme = EncryptedMessage::HYBRID_ECDH_V1;
   }
 
+  std::unique_ptr<SystemData> system_data(new SystemData());
+
   auto test_app = std::unique_ptr<TestApp>(new TestApp(
-      project_context, analyzer_client, shuffler_client,
+      project_context, analyzer_client, shuffler_client, std::move(system_data),
       analyzer_public_key_pem, analyzer_encryption_scheme,
       shuffler_public_key_pem, shuffler_encryption_scheme, &std::cout));
   test_app->set_metric(FLAGS_metric);
@@ -501,6 +504,7 @@ TestApp::TestApp(
     std::shared_ptr<ProjectContext> project_context,
     std::shared_ptr<AnalyzerClientInterface> analyzer_client,
     std::shared_ptr<encoder::ShufflerClientInterface> shuffler_client,
+    std::unique_ptr<encoder::SystemData> system_data,
     const std::string& analyzer_public_key_pem,
     EncryptedMessage::EncryptionScheme analyzer_scheme,
     const std::string& shuffler_public_key_pem,
@@ -511,6 +515,7 @@ TestApp::TestApp(
       analyzer_client_(analyzer_client),
       shuffler_client_(shuffler_client),
       send_retryer_(new SendRetryer(shuffler_client_.get())),
+      system_data_(std::move(system_data)),
       shipping_manager_(new ShippingManager(
           ShippingManager::SizeParams(kMaxBytesPerObservation,
                                       kMaxBytesPerEnvelope, kMaxBytesTotal,
@@ -521,8 +526,8 @@ TestApp::TestApp(
           ShippingManager::ScheduleParams(ShippingManager::kMaxSeconds,
                                           std::chrono::seconds(0)),
           ShippingManager::EnvelopeMakerParams(
-              analyzer_public_key_pem, analyzer_scheme, shuffler_public_key_pem,
-              shuffler_scheme),
+              system_data.get(), analyzer_public_key_pem, analyzer_scheme,
+              shuffler_public_key_pem, shuffler_scheme),
           ShippingManager::SendRetryerParams(kInitialRpcDeadline,
                                              kDeadlinePerSendAttempt),
           send_retryer_.get())),

@@ -141,17 +141,20 @@ class ShippingManager {
   // EnvelopeMaker constructor.
   class EnvelopeMakerParams {
    public:
-    EnvelopeMakerParams(std::string analyzer_public_key_pem,
+    EnvelopeMakerParams(const SystemDataInterface* system_data,
+                        std::string analyzer_public_key_pem,
                         EncryptedMessage::EncryptionScheme analyzer_scheme,
                         std::string shuffler_public_key_pem,
                         EncryptedMessage::EncryptionScheme shuffler_scheme)
-        : analyzer_public_key_pem_(analyzer_public_key_pem),
+        : system_data_(system_data),
+          analyzer_public_key_pem_(analyzer_public_key_pem),
           analyzer_scheme_(analyzer_scheme),
           shuffler_public_key_pem_(shuffler_public_key_pem),
           shuffler_scheme_(shuffler_scheme) {}
 
    private:
     friend class ShippingManager;
+    const SystemDataInterface* system_data_;  // not owned
     std::string analyzer_public_key_pem_;
     EncryptedMessage::EncryptionScheme analyzer_scheme_;
     std::string shuffler_public_key_pem_;

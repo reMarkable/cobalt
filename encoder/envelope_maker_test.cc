@@ -21,6 +21,7 @@
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
+#include "encoder/system_data.h"
 #include "third_party/gflags/include/gflags/gflags.h"
 #include "util/encrypted_message_util.h"
 
@@ -144,14 +145,39 @@ std::shared_ptr<ProjectContext> GetTestProject() {
       kCustomerId, kProjectId, metric_registry, encoding_registry));
 }
 
+class FakeSystemData : public SystemDataInterface {
+ public:
+  FakeSystemData() {
+    system_profile_.set_os(SystemProfile::FUCHSIA);
+    system_profile_.set_arch(SystemProfile::ARM_64);
+    system_profile_.mutable_cpu()->set_vendor_name("Fake Vendor Name");
+    system_profile_.mutable_cpu()->set_signature(1234567);
+  }
+
+  const SystemProfile& system_profile() const override {
+    return system_profile_;
+  };
+
+  static void CheckSystemProfile(const Envelope& envelope) {
+    EXPECT_EQ(SystemProfile::FUCHSIA, envelope.system_profile().os());
+    EXPECT_EQ(SystemProfile::ARM_64, envelope.system_profile().arch());
+    EXPECT_EQ("Fake Vendor Name",
+              envelope.system_profile().cpu().vendor_name());
+    EXPECT_EQ(1234567u, envelope.system_profile().cpu().signature());
+  }
+
+ private:
+  SystemProfile system_profile_;
+};
+
 }  // namespace
 
 class EnvelopeMakerTest : public ::testing::Test {
  public:
   EnvelopeMakerTest()
-      : envelope_maker_(
-            new EnvelopeMaker(kAnalyzerPublicKey, EncryptedMessage::NONE,
-                              kShufflerPublicKey, EncryptedMessage::NONE)),
+      : envelope_maker_(new EnvelopeMaker(
+            &fake_system_data_, kAnalyzerPublicKey, EncryptedMessage::NONE,
+            kShufflerPublicKey, EncryptedMessage::NONE)),
         project_(GetTestProject()),
         encoder_(project_, ClientSecret::GenerateNewSecret()) {
     // Set a static current time so we can test the day_index computation.
@@ -165,8 +191,9 @@ class EnvelopeMakerTest : public ::testing::Test {
       size_t max_num_bytes = SIZE_MAX) {
     std::unique_ptr<EnvelopeMaker> return_val = std::move(envelope_maker_);
     envelope_maker_.reset(new EnvelopeMaker(
-        kAnalyzerPublicKey, EncryptedMessage::NONE, kShufflerPublicKey,
-        EncryptedMessage::NONE, max_bytes_each_observation, max_num_bytes));
+        &fake_system_data_, kAnalyzerPublicKey, EncryptedMessage::NONE,
+        kShufflerPublicKey, EncryptedMessage::NONE, max_bytes_each_observation,
+        max_num_bytes));
     return return_val;
   }
 
@@ -342,9 +369,11 @@ class EnvelopeMakerTest : public ::testing::Test {
       EXPECT_EQ(i + 1, recovered_envelope.batch(i).meta_data().metric_id());
       EXPECT_EQ(4, recovered_envelope.batch(i).encrypted_observation_size());
     }
+    FakeSystemData::CheckSystemProfile(recovered_envelope);
   }
 
  protected:
+  FakeSystemData fake_system_data_;
   std::unique_ptr<EnvelopeMaker> envelope_maker_;
   std::shared_ptr<ProjectContext> project_;
   Encoder encoder_;

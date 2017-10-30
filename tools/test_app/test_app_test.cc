@@ -33,6 +33,7 @@ using config::MetricRegistry;
 using encoder::EnvelopeMaker;
 using encoder::ProjectContext;
 using encoder::ShufflerClientInterface;
+using encoder::SystemData;
 
 namespace {
 const uint32_t kCustomerId = 1;
@@ -256,8 +257,9 @@ class TestAppTest : public ::testing::Test {
       : fake_analyzer_client_(new FakeAnalyzerClient()),
         fake_shuffler_client_(new FakeShufflerClient()),
         test_app_(GetTestProject(), fake_analyzer_client_,
-                  fake_shuffler_client_, "", EncryptedMessage::NONE, "",
-                  EncryptedMessage::NONE, &output_stream_) {}
+                  fake_shuffler_client_, std::unique_ptr<SystemData>(), "",
+                  EncryptedMessage::NONE, "", EncryptedMessage::NONE,
+                  &output_stream_) {}
 
  protected:
   // Clears the contents of the TestApp's output stream and returns the

@@ -92,6 +92,31 @@ std::shared_ptr<ProjectContext> GetTestProject() {
       kCustomerId, kProjectId, metric_registry, encoding_registry));
 }
 
+class FakeSystemData : public SystemDataInterface {
+ public:
+  FakeSystemData() {
+    system_profile_.set_os(SystemProfile::FUCHSIA);
+    system_profile_.set_arch(SystemProfile::ARM_64);
+    system_profile_.mutable_cpu()->set_vendor_name("Fake Vendor Name");
+    system_profile_.mutable_cpu()->set_signature(1234567);
+  }
+
+  const SystemProfile& system_profile() const override {
+    return system_profile_;
+  };
+
+  static void CheckSystemProfile(const Envelope& envelope) {
+    EXPECT_EQ(SystemProfile::FUCHSIA, envelope.system_profile().os());
+    EXPECT_EQ(SystemProfile::ARM_64, envelope.system_profile().arch());
+    EXPECT_EQ("Fake Vendor Name",
+              envelope.system_profile().cpu().vendor_name());
+    EXPECT_EQ(1234567u, envelope.system_profile().cpu().signature());
+  }
+
+ private:
+  SystemProfile system_profile_;
+};
+
 struct FakeSendRetryer : public SendRetryerInterface {
   grpc::Status SendToShuffler(
       std::chrono::seconds initial_rpc_deadline,
@@ -106,6 +131,7 @@ struct FakeSendRetryer : public SendRetryerInterface {
         decrypter.DecryptMessage(encrypted_message, &recovered_envelope));
     EXPECT_EQ(1, recovered_envelope.batch_size());
     EXPECT_EQ(kMetricId, recovered_envelope.batch(0).meta_data().metric_id());
+    FakeSystemData::CheckSystemProfile(recovered_envelope);
 
     std::unique_lock<std::mutex> lock(mutex);
     send_call_count++;
@@ -152,7 +178,8 @@ class ShippingManagerTest : public ::testing::Test {
                                     kMaxBytesPerEnvelope, kMaxBytesTotal,
                                     kMinEnvelopeSendSize),
         ShippingManager::ScheduleParams(schedule_interval, min_interval),
-        ShippingManager::EnvelopeMakerParams("", EncryptedMessage::NONE, "",
+        ShippingManager::EnvelopeMakerParams(&system_data_, "",
+                                             EncryptedMessage::NONE, "",
                                              EncryptedMessage::NONE),
         ShippingManager::SendRetryerParams(kInitialRpcDeadline,
                                            kDeadlinePerSendAttempt),
@@ -175,6 +202,7 @@ class ShippingManagerTest : public ::testing::Test {
     EXPECT_EQ(expected_observation_count, send_retryer_->observation_count);
   }
 
+  FakeSystemData system_data_;
   std::unique_ptr<FakeSendRetryer> send_retryer_;
   std::unique_ptr<ShippingManager> shipping_manager_;
   std::shared_ptr<ProjectContext> project_;
