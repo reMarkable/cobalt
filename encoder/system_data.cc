@@ -80,11 +80,12 @@ void SystemData::PopulateSystemProfile() {
 
 #elif defined(__aarch64__)
 
-  system_profile_.set_os(SystemProfile::ARM_64);
+  system_profile_.set_arch(SystemProfile::ARM_64);
+  // TODO(rudominer) Implement CpuInfo on ARM.
 
 #else
 
-  system_profile_.set_os(SystemProfile::UNKNOWN_ARCH);
+  system_profile_.set_arch(SystemProfile::UNKNOWN_ARCH);
 
 #endif
 }
