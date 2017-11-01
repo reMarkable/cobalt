@@ -94,7 +94,19 @@ func (s *ShufflerServer) Process(ctx context.Context,
 	// data store for dispatcher to consume and forward to Analyzer based on
 	// some dispatch criteria. The data store shuffles the order of the
 	// Observation before persisting.
-	if err := s.store.AddAllObservations(envelope.GetBatch(), storage.GetDayIndexUtc(time.Now())); err != nil {
+	batches := envelope.GetBatch()
+	systemProfile := envelope.GetSystemProfile()
+	if systemProfile != nil {
+		// For efficiency the client only sends the SystemProfile once per envelope.
+		// Since we are about to break the Envelope up and shuffle its contents
+		// in with other Envelopes, here we copy the SystemProfile from the
+		// Envelope into each of the MetaData.
+		for _, b := range batches {
+			profile := *systemProfile
+			b.MetaData.SystemProfile = &profile
+		}
+	}
+	if err := s.store.AddAllObservations(batches, storage.GetDayIndexUtc(time.Now())); err != nil {
 		return nil, err
 	}
 

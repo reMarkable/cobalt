@@ -16,7 +16,6 @@ package receiver
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -26,49 +25,71 @@ import (
 	"util"
 )
 
+// envelopeData represents a test Envelope to be passed to the Receiver.process()
+// method and the list of expected bucket keys for the buckets that should be
+// created.
+type envelopeData struct {
+	envelope           *shufflerpb.Envelope
+	expectedBucketKeys []shufflerpb.ObservationMetadata
+}
+
 // makeEnvelope creates an Envelope containing |numBatches| ObservationBatches
 // containing |numObservationsPerBatch| EncryptedMessages each containing
-// random ciphertext bytes.
-func makeEnvelope(numBatches int, numObservationsPerBatch int) *shufflerpb.Envelope {
+// random ciphertext bytes. It returns an envelopeData containing the newly
+// constructed Envelope and the expected list of keys for the store buckets that
+// should be created when the Receiver processes the Envelope.
+func makeEnvelope(numBatches int, numObservationsPerBatch int) envelopeData {
 	var batch []*shufflerpb.ObservationBatch
+	var expectedBucketKeys []shufflerpb.ObservationMetadata
 	for i := 1; i <= numBatches; i++ {
+		metadata := storage.NewObservationMetaData(i)
+		expectedBucketKeys = append(expectedBucketKeys, *metadata)
+		// We set the SystemProfile in the ObservationMetadata to nil to simulate
+		// the fact that this is what the Encoder sends to the Shuffler in an
+		// Envelope. We want to test that the Receiver will correctly copy the SystemProfile
+		// from the Envelope into each ObservationMetadata.
+		metadata.SystemProfile = nil
 		batch = append(batch, &shufflerpb.ObservationBatch{
-			MetaData:             storage.NewObservationMetaData(i),
+			MetaData:             metadata,
 			EncryptedObservation: storage.MakeRandomEncryptedMsgs(numObservationsPerBatch),
 		})
 	}
 
-	return &shufflerpb.Envelope{Batch: batch}
+	return envelopeData{
+		envelope:           &shufflerpb.Envelope{SystemProfile: storage.NewFakeSystemProfile(), Batch: batch},
+		expectedBucketKeys: expectedBucketKeys,
+	}
 }
 
 // makeTestEnvelopes creates sample envelopes with different configuration for
 // testing.
-func makeTestEnvelopes() []*shufflerpb.Envelope {
-	emptyEnvelope := &shufflerpb.Envelope{}
+func makeTestEnvelopes() []envelopeData {
+	emptyEnvelope := makeEnvelope(0, 0)
 	envelopeWithOneObservation := makeEnvelope(1, 1)
 	envelopeWithMultipleObservations := makeEnvelope(1, 7)
 	envelopeWithHybridObservations := makeEnvelope(10, 5)
-	return []*shufflerpb.Envelope{emptyEnvelope, envelopeWithOneObservation, envelopeWithMultipleObservations, envelopeWithHybridObservations}
+	return []envelopeData{emptyEnvelope, envelopeWithOneObservation, envelopeWithMultipleObservations, envelopeWithHybridObservations}
 }
 
 func TestMemStoreShuffler(t *testing.T) {
-	for _, envelope := range makeTestEnvelopes() {
-		doTestProcess(t, envelope, storage.NewMemStore())
+	for _, envelopeData := range makeTestEnvelopes() {
+		doTestProcess(t, envelopeData.envelope, envelopeData.expectedBucketKeys, storage.NewMemStore())
 	}
 }
 
 func TestLevelDBShuffler(t *testing.T) {
-	for _, envelope := range makeTestEnvelopes() {
+	for _, envelopeData := range makeTestEnvelopes() {
 		levelDBStore, err := storage.NewLevelDBStore("/tmp")
 		if err != nil {
 			t.Errorf("Failed to initialize leveldb store")
 			return
 		}
-		doTestProcess(t, envelope, levelDBStore)
+		doTestProcess(t, envelopeData.envelope, envelopeData.expectedBucketKeys, levelDBStore)
 	}
 }
 
-func doTestProcess(t *testing.T, envelope *shufflerpb.Envelope, store storage.Store) {
+func doTestProcess(t *testing.T, envelope *shufflerpb.Envelope,
+	expectedBucketKeys []shufflerpb.ObservationMetadata, store storage.Store) {
 	data, err := proto.Marshal(envelope)
 	if err != nil {
 		t.Fatalf("Error in marshalling envelope data: %v", err)
@@ -89,21 +110,26 @@ func doTestProcess(t *testing.T, envelope *shufflerpb.Envelope, store storage.St
 		decrypter: util.NewMessageDecrypter(""),
 	}
 
+	expectErr := len(envelope.GetBatch()) == 0
 	_, err = shuffler.Process(context.Background(), eMsg)
 
-	if err != nil && !reflect.DeepEqual(envelope, &shufflerpb.Envelope{}) {
-		t.Fatalf("Expected success, got error: %v", err)
+	if expectErr && err == nil {
+		t.Fatalf("Expected Process() to return an error for envelope |%v|", envelope)
 	}
 
-	for _, batch := range envelope.GetBatch() {
+	if !expectErr && err != nil {
+		t.Fatalf("Unexpected error returned from Process() for envelope |%v|: %v", envelope, err)
+	}
+
+	for i, batch := range envelope.GetBatch() {
 		numObservations := len(batch.GetEncryptedObservation())
 		if numObservations == 0 {
 			continue
 		}
 
-		om := batch.GetMetaData()
-		storage.CheckNumObservations(t, shuffler.store, om, numObservations)
-		storage.CheckGetObservations(t, shuffler.store, om, batch.GetEncryptedObservation())
+		key := expectedBucketKeys[i]
+		storage.CheckNumObservations(t, shuffler.store, &key, numObservations)
+		storage.CheckGetObservations(t, shuffler.store, &key, batch.GetEncryptedObservation())
 	}
 
 	// clear store contents before testing a new envelope

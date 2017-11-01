@@ -30,14 +30,23 @@ import (
 
 var r = util.NewDeterministicRandom(int64(1))
 
-// NewObservationMetaData constructs fake observation metadata for testing.
+func NewFakeSystemProfile() *cobalt.SystemProfile {
+	return &cobalt.SystemProfile{
+		Os: cobalt.SystemProfile_FUCHSIA,
+		Cpu: &cobalt.SystemProfile_CPU{
+			VendorName: "FakeVendorName",
+		},
+	}
+}
+
 func NewObservationMetaData(testID int) *cobalt.ObservationMetadata {
 	id := uint32(testID)
 	return &cobalt.ObservationMetadata{
-		CustomerId: id,
-		ProjectId:  id,
-		MetricId:   id,
-		DayIndex:   id,
+		CustomerId:    id,
+		ProjectId:     id,
+		MetricId:      id,
+		DayIndex:      id,
+		SystemProfile: NewFakeSystemProfile(),
 	}
 }
 
@@ -81,7 +90,8 @@ func NewObservationBatchForMetadata(om *cobalt.ObservationMetadata, numMsgs int)
 func MakeObservationBatches(numBatches int) []*cobalt.ObservationBatch {
 	var batches []*cobalt.ObservationBatch
 	for i := 1; i <= numBatches; i++ {
-		batches = append(batches, NewObservationBatchForMetadata(NewObservationMetaData(i), i))
+		batches = append(batches,
+			NewObservationBatchForMetadata(NewObservationMetaData(i), i))
 	}
 	return batches
 }
@@ -148,10 +158,12 @@ func CheckObservations(t *testing.T, store Store, om *cobalt.ObservationMetadata
 	iter, err := store.GetObservations(om)
 	if err != nil {
 		t.Errorf("GetObservations: got error %v for metadata [%v]", err, om)
+		return nil
 	}
 
 	if iter == nil {
 		t.Errorf("GetObservations: got empty iterator for metadata [%v]", om)
+		return nil
 	}
 
 	var gotObVals []*shuffler.ObservationVal
@@ -159,11 +171,13 @@ func CheckObservations(t *testing.T, store Store, om *cobalt.ObservationMetadata
 		obVal, iErr := iter.Get()
 		if iErr != nil {
 			t.Errorf("got error on iter.Get() for key [%v]: %v", om, err)
+			return gotObVals
 		}
 		gotObVals = append(gotObVals, obVal)
 	}
 	if err := iter.Release(); err != nil {
 		t.Errorf("got error on iter.Release() for metadata [%v]: %v", om, err)
+		return gotObVals
 	}
 
 	if len(gotObVals) != expectedNumObs {
