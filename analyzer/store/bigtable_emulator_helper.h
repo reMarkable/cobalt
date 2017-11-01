@@ -18,6 +18,7 @@
 #include <glog/logging.h>
 
 #include <chrono>
+#include <memory>
 
 #include "analyzer/store/bigtable_admin.h"
 #include "analyzer/store/bigtable_names.h"

@@ -4,6 +4,8 @@
 
 #include "analyzer/report_master/auth_enforcer.h"
 
+#include <string>
+
 #include "glog/logging.h"
 #include "third_party/rapidjson/rapidjson/document.h"
 #include "util/crypto_util/base64.h"
@@ -165,5 +167,5 @@ grpc::Status LogOnlyEnforcer::CheckAuthorization(grpc::ServerContext *context,
   return grpc::Status::OK;
 }
 
-} // namespace analyzer
-} // namespace cobalt
+}  // namespace analyzer
+}  // namespace cobalt

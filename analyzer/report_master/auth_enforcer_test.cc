@@ -5,6 +5,7 @@
 #include "analyzer/report_master/auth_enforcer.h"
 
 #include <memory>
+#include <string>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -17,12 +18,12 @@ class GoogleEmailEnforcerTest : public testing::Test {
  protected:
   static grpc::Status GetEmailFromEncodedUserInfo(
       const std::string &encoded_user_info, std::string *email) {
-    return GoogleEmailEnforcer::GetEmailFromEncodedUserInfo(
-        encoded_user_info, email);
+    return GoogleEmailEnforcer::GetEmailFromEncodedUserInfo(encoded_user_info,
+                                                            email);
   }
 
-  static grpc::Status GetEmailFromServerContext(
-      grpc::ServerContext *context, std::string *email) {
+  static grpc::Status GetEmailFromServerContext(grpc::ServerContext *context,
+                                                std::string *email) {
     return GoogleEmailEnforcer::GetEmailFromServerContext(context, email);
   }
 
@@ -47,7 +48,6 @@ TEST_F(GoogleEmailEnforcerTest, CheckGoogleEmail) {
   // Only accept google.com email addresses.
   ASSERT_FALSE(CheckGoogleEmail("alex@gmail.com"));
 }
-
 
 TEST_F(GoogleEmailEnforcerTest, GetEmailFromServerContextTest) {
   std::string email;
@@ -99,5 +99,5 @@ TEST(LogOnlyEnforcerTest, AlwaysOK) {
   ASSERT_TRUE(neg.CheckAuthorization(nullptr, 0, 0, 0).ok());
 }
 
-} // namespace analyzer
-} // namespace cobalt
+}  // namespace analyzer
+}  // namespace cobalt

@@ -6,6 +6,7 @@
 #define COBALT_ANALYZER_REPORT_MASTER_AUTH_ENFORCER_H_
 
 #include <memory>
+#include <string>
 
 #include "grpc++/grpc++.h"
 
@@ -18,7 +19,7 @@ namespace analyzer {
 // Calls to CheckAuthorization return grpc::Status::OK if the call being checked
 // is authorized and PERMISSION_DENIED or UNAUTHENTICATED otherwise.
 class AuthEnforcer {
-public:
+ public:
   virtual grpc::Status CheckAuthorization(grpc::ServerContext *context,
                                           uint32_t customer_id,
                                           uint32_t project_id,
@@ -30,7 +31,7 @@ public:
 
 // NullEnforcer allows all requests.
 class NullEnforcer final : public AuthEnforcer {
-public:
+ public:
   grpc::Status CheckAuthorization(grpc::ServerContext *context,
                                   uint32_t customer_id, uint32_t project_id,
                                   uint32_t report_config_id) override;
@@ -39,7 +40,7 @@ public:
 
 // NegativeEnforcer always denies permission. It is used for testing.
 class NegativeEnforcer final : public AuthEnforcer {
-public:
+ public:
   grpc::Status CheckAuthorization(grpc::ServerContext *context,
                                   uint32_t customer_id, uint32_t project_id,
                                   uint32_t report_config_id) override;
@@ -50,19 +51,19 @@ public:
 // endpoints service. This enforcer then checks that the authenticated user
 // is a google.com account.
 class GoogleEmailEnforcer final : public AuthEnforcer {
-public:
+ public:
   grpc::Status CheckAuthorization(grpc::ServerContext *context,
                                   uint32_t customer_id, uint32_t project_id,
                                   uint32_t report_config_id) override;
   virtual ~GoogleEmailEnforcer() = default;
 
-private:
+ private:
   friend class GoogleEmailEnforcerTest;
 
   static grpc::Status GetEmailFromEncodedUserInfo(
       const std::string &encoded_user_info, std::string *email);
-  static grpc::Status GetEmailFromServerContext(
-      grpc::ServerContext *context, std::string *email);
+  static grpc::Status GetEmailFromServerContext(grpc::ServerContext *context,
+                                                std::string *email);
   static bool CheckGoogleEmail(std::string email);
 };
 
@@ -71,18 +72,18 @@ private:
 // The purpose of LogOnlyEnforcer is to be able to see what would be the effect
 // of turning on authorization.
 class LogOnlyEnforcer final : public AuthEnforcer {
-public:
+ public:
   grpc::Status CheckAuthorization(grpc::ServerContext *context,
                                   uint32_t customer_id, uint32_t project_id,
                                   uint32_t report_config_id) override;
   virtual ~LogOnlyEnforcer() = default;
-  LogOnlyEnforcer(std::shared_ptr<AuthEnforcer> auth_enforcer);
+  explicit LogOnlyEnforcer(std::shared_ptr<AuthEnforcer> auth_enforcer);
 
-private:
+ private:
   std::shared_ptr<AuthEnforcer> enforcer_;
 };
 
-} // namespace analyzer
-} // namespace cobalt
+}  // namespace analyzer
+}  // namespace cobalt
 
-#endif // COBALT_ANALYZER_REPORT_MASTER_AUTH_ENFORCER_H_
+#endif  // COBALT_ANALYZER_REPORT_MASTER_AUTH_ENFORCER_H_

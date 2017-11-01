@@ -57,5 +57,5 @@ TEST(ReportMasterServiceFriendTest, AuthEnforcerTest) {
           .error_code());
 }
 
-} // namespace analyzer
-} // namespace cobalt
+}  // namespace analyzer
+}  // namespace cobalt
