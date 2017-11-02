@@ -7,8 +7,8 @@
 
 #include <memory>
 
-#include "encoder/clock.h"
 #include "encoder/shuffler_client.h"
+#include "util/clock.h"
 
 namespace cobalt {
 namespace encoder {
@@ -96,7 +96,7 @@ class SendRetryer : public SendRetryerInterface {
   std::chrono::milliseconds initial_sleep_ = std::chrono::milliseconds(1000);
 
   // The clock is abstracted so that friend tests can set a non-system clock.
-  std::unique_ptr<ClockInterface> clock_;
+  std::unique_ptr<util::ClockInterface> clock_;
 };
 
 // An object that provides a way to cancel an invocation of SendToShuffler().

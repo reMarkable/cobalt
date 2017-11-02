@@ -25,12 +25,15 @@
 #include "analyzer/store/data_store.h"
 #include "glog/logging.h"
 #include "util/crypto_util/random.h"
+#include "util/datetime_util.h"
 
 using google::protobuf::MessageLite;
 
 namespace cobalt {
 namespace analyzer {
 namespace store {
+
+using util::ToUnixSeconds;
 
 namespace {
 // We currently do not support reports with more than this many rows.
@@ -220,7 +223,7 @@ Status ReportStore::StartNewReport(
     ReportId* report_id) {
   CHECK(report_id);
   // Complete the report_id.
-  report_id->set_creation_time_seconds(clock_->CurrentTimeSeconds());
+  report_id->set_creation_time_seconds(ToUnixSeconds(clock_->now()));
   report_id->set_instance_id(RandomUint32());
 
   // Build a serialized ReportMetadataLite.
@@ -286,7 +289,7 @@ Status ReportStore::StartDependentReport(const ReportId& report_id) {
   metadata.set_state(IN_PROGRESS);
 
   // Set the start time to the current time.
-  metadata.set_start_time_seconds(clock_->CurrentTimeSeconds());
+  metadata.set_start_time_seconds(ToUnixSeconds(clock_->now()));
 
   return WriteMetadata(report_id, metadata);
 }
@@ -299,13 +302,13 @@ Status ReportStore::EndReport(const ReportId& report_id, bool success,
     return status;
   }
 
-  metadata.set_finish_time_seconds(clock_->CurrentTimeSeconds());
+  metadata.set_finish_time_seconds(ToUnixSeconds(clock_->now()));
   metadata.set_state(success ? COMPLETED_SUCCESSFULLY : TERMINATED);
 
   if (!message.empty()) {
     auto* info_message = metadata.add_info_messages();
     info_message->mutable_timestamp()->set_seconds(
-        clock_->CurrentTimeSeconds());
+        ToUnixSeconds(clock_->now()));
     info_message->set_message(message);
   }
 

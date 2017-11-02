@@ -11,12 +11,14 @@
 #include "encoder/send_retryer.h"
 
 #include "./logging.h"
-#include "encoder/clock.h"
 #include "encoder/shuffler_client.h"
+#include "util/clock.h"
 
 namespace cobalt {
 namespace encoder {
 namespace send_retryer {
+
+using util::SystemClock;
 
 namespace {
 

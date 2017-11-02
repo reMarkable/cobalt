@@ -29,6 +29,7 @@ add_library(analyzer_store
 target_link_libraries(analyzer_store
                       analyzer_config
                       cobalt_crypto
+                      datetime_util
                       bigtable_grpc_client
                       report_master_proto_lib)
 add_cobalt_dependencies(analyzer_store)

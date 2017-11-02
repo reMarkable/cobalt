@@ -13,13 +13,15 @@
 #include "./encrypted_message.pb.h"
 #include "./gtest.h"
 #include "./logging.h"
-#include "encoder/clock.h"
 #include "encoder/shuffler_client.h"
 #include "third_party/gflags/include/gflags/gflags.h"
+#include "util/clock.h"
 
 namespace cobalt {
 namespace encoder {
 namespace send_retryer {
+
+using util::IncrementingClock;
 
 namespace {
 

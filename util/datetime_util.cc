@@ -84,8 +84,8 @@ uint32_t CalendarDateToDayIndex(const CalendarDate& calendar_date) {
   // datetime_util_test.cc.
 
   if (calendar_date.year < 1970 || calendar_date.year >= 10000 ||
-    calendar_date.month < 1 || calendar_date.month > 12 ||
-    calendar_date.day_of_month < 1 || calendar_date.day_of_month > 31) {
+      calendar_date.month < 1 || calendar_date.month > 12 ||
+      calendar_date.day_of_month < 1 || calendar_date.day_of_month > 31) {
     return kInvalidIndex;
   }
 
@@ -116,13 +116,13 @@ uint32_t CalendarDateToDayIndex(const CalendarDate& calendar_date) {
   // n=6 (August) -> 30*6 + 4
   // etc.
   const uint32_t doy =
-      (153 * (calendar_date.month + (calendar_date.month > 2 ? -3 : 9)) + 2) / 5
-      + calendar_date.day_of_month - 1;
+      (153 * (calendar_date.month + (calendar_date.month > 2 ? -3 : 9)) + 2) /
+          5 +
+      calendar_date.day_of_month - 1;
 
   // Now we compute the day of the era. This is relatively easy using
   // the formula for leap years described at the top of this file.
   const int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-
 
   // shift epoch from 0-03-01 to 1970-01-01
   return era * kNumDaysPerEra + doe - kEpochOffset;
@@ -157,9 +157,8 @@ uint32_t DayIndexToMonthIndex(uint32_t day_index) {
 }
 
 uint32_t CalendarDateToMonthIndex(const CalendarDate& calendar_date) {
-  if (calendar_date.year < 1970 ||
-     calendar_date.month < 1 ||
-     calendar_date.month > 12) {
+  if (calendar_date.year < 1970 || calendar_date.month < 1 ||
+      calendar_date.month > 12) {
     return UINT32_MAX;
   }
   return 12 * (calendar_date.year - 1970) + calendar_date.month - 1;
@@ -169,10 +168,22 @@ CalendarDate MonthIndexToCalendarDate(uint32_t month_index) {
   CalendarDate calendar_date;
   calendar_date.day_of_month = 1;
   calendar_date.month = (month_index % 12) + 1;
-  calendar_date.year = month_index/12 + 1970;
+  calendar_date.year = month_index / 12 + 1970;
   return calendar_date;
+}
+
+// Returns the the given time as a number of seconds since the Unix epoch.
+int64_t ToUnixSeconds(std::chrono::system_clock::time_point t) {
+  return (std::chrono::duration_cast<std::chrono::seconds>(
+              t.time_since_epoch()))
+      .count();
+}
+
+// Returns the given number of seconds since the Unix epoch as a time_point.
+std::chrono::system_clock::time_point FromUnixSeconds(int64_t seconds) {
+  return std::chrono::system_clock::time_point(
+      std::chrono::system_clock::duration(std::chrono::seconds(seconds)));
 }
 
 }  // namespace util
 }  // namespace cobalt
-

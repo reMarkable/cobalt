@@ -22,7 +22,7 @@
 #include "analyzer/report_master/report_internal.pb.h"
 #include "analyzer/report_master/report_master.pb.h"
 #include "analyzer/store/data_store.h"
-#include "util/datetime_util.h"
+#include "util/clock.h"
 
 namespace cobalt {
 namespace analyzer {

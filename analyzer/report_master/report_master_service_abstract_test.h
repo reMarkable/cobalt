@@ -67,7 +67,7 @@ static const size_t kForculusThreshold = 20;
 static const time_t kSomeTimestamp = 1480647356;
 // This is the day index for Friday Dec 2, 2016
 static const uint32_t kDayIndex = 17137;
-// We will use a StationaryClock with the time fixed to this time in order
+// We will use a fake clock with the time fixed to this time in order
 // to test that time-related fields are set correctly by ReportMasterService.
 static const int64_t kFixedTimeSeconds = 1234567;
 
@@ -264,8 +264,9 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
       : data_store_(StoreFactoryClass::NewStore()),
         observation_store_(new store::ObservationStore(data_store_)),
         report_store_(new store::ReportStore(data_store_)),
-        clock_(new util::StationaryClock()) {
-    clock_->set_current_time_seconds(kFixedTimeSeconds);
+        clock_(new util::IncrementingClock()) {
+    clock_->set_time(util::FromUnixSeconds(kFixedTimeSeconds));
+    clock_->set_increment(std::chrono::seconds(0));
     report_store_->set_clock(clock_);
   }
 
@@ -550,7 +551,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
   }
 
   void set_current_time_seconds(int64_t current_time_seconds) {
-    clock_->set_current_time_seconds(current_time_seconds);
+    clock_->set_time(util::FromUnixSeconds(current_time_seconds));
   }
 
   // Writes Metadata directly into the ReportStore simulating the case that
@@ -606,7 +607,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
   std::shared_ptr<store::ObservationStore> observation_store_;
   std::shared_ptr<store::ReportStore> report_store_;
   std::unique_ptr<ReportMasterService> report_master_service_;
-  std::shared_ptr<util::StationaryClock> clock_;
+  std::shared_ptr<util::IncrementingClock> clock_;
 };
 
 TYPED_TEST_CASE_P(ReportMasterServiceAbstractTest);

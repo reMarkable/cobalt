@@ -2,23 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef COBALT_ENCODER_CLOCK_H_
-#define COBALT_ENCODER_CLOCK_H_
+#ifndef COBALT_UTIL_CLOCK_H_
+#define COBALT_UTIL_CLOCK_H_
 
 #include <chrono>
+
+namespace cobalt {
+namespace util {
 
 // Allows us to mock out a clock for tests.
 class ClockInterface {
  public:
   virtual ~ClockInterface() = default;
 
-  virtual std::chrono::time_point<std::chrono::system_clock> now() = 0;
+  virtual std::chrono::system_clock::time_point now() = 0;
 };
 
 // A clock that returns the real system time.
 class SystemClock : public ClockInterface {
  public:
-  std::chrono::time_point<std::chrono::system_clock> now() override {
+  std::chrono::system_clock::time_point now() override {
     return std::chrono::system_clock::now();
   }
 };
@@ -26,18 +29,20 @@ class SystemClock : public ClockInterface {
 // A clock that returns an incrementing sequence of tics each time it is called.
 class IncrementingClock : public ClockInterface {
  public:
-  std::chrono::time_point<std::chrono::system_clock> now() override {
+  std::chrono::system_clock::time_point now() override {
     time_ += increment_;
     return time_;
   }
 
   // Return the current value of time_ without advancing time.
-  std::chrono::time_point<std::chrono::system_clock> peek_now() {
-    return time_;
-  }
+  std::chrono::system_clock::time_point peek_now() { return time_; }
 
   void set_increment(std::chrono::system_clock::duration increment) {
     increment_ = increment;
+  }
+
+  void set_time(std::chrono::system_clock::time_point t) {
+    time_ = t;
   }
 
  private:
@@ -48,4 +53,7 @@ class IncrementingClock : public ClockInterface {
       std::chrono::system_clock::duration(1);
 };
 
-#endif  // COBALT_ENCODER_CLOCK_H_
+}  // namespace util
+}  // namespace cobalt
+
+#endif  // COBALT_UTIL_CLOCK_H_

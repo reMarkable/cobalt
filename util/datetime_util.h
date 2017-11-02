@@ -137,36 +137,12 @@ uint32_t CalendarDateToMonthIndex(const CalendarDate& calendar_date);
 // first day of that month epoch.
 CalendarDate MonthIndexToCalendarDate(uint32_t month_index);
 
-// An abstract clock interface.
-class ClockInterface {
- public:
-  virtual int64_t CurrentTimeSeconds() = 0;
-};
+// Returns the the given time as a number of seconds since the Unix epoch.
+int64_t ToUnixSeconds(std::chrono::system_clock::time_point t);
 
-// An implementation of ClockInterface that uses the system clock.
-class SystemClock : public ClockInterface {
- public:
-  int64_t CurrentTimeSeconds() override {
-    return std::chrono::duration_cast<std::chrono::seconds>(
-               std::chrono::system_clock::now().time_since_epoch())
-        .count();
-  }
-};
+// Returns the given number of seconds since the Unix epoch as a time_point.
+std::chrono::system_clock::time_point FromUnixSeconds(int64_t seconds);
 
-// An implementation of ClockInterface that returns a fixed, settable value.
-class StationaryClock : public ClockInterface {
- public:
-  StationaryClock() { current_time_seconds_ = 0; }
-
-  int64_t CurrentTimeSeconds() override { return current_time_seconds_; }
-
-  void set_current_time_seconds(int64_t current_time_seconds) {
-    current_time_seconds_ = current_time_seconds;
-  }
-
- private:
-  std::atomic<int64_t> current_time_seconds_;
-};
 
 }  // namespace util
 }  // namespace cobalt
