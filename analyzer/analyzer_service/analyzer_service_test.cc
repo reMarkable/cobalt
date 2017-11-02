@@ -109,15 +109,17 @@ TEST_F(AnalyzerServiceTest, TestGRPC) {
 
   // Query the ObservationStore
   std::vector<std::string> parts;
+  bool include_system_profile = false;
   auto query_response = observation_store_->QueryObservations(
-      kCustomerId, kProjectId, kMetricId, 0, UINT32_MAX, parts, UINT32_MAX, "");
+      kCustomerId, kProjectId, kMetricId, 0, UINT32_MAX, parts,
+      include_system_profile, UINT32_MAX, "");
   ASSERT_EQ(store::kOK, query_response.status);
 
   // There should be one Observation in the response.
   ASSERT_EQ(1u, query_response.results.size());
 
   // It should have day_index = 1;
-  ASSERT_EQ(1u, query_response.results[0].day_index);
+  ASSERT_EQ(1u, query_response.results[0].metadata.day_index());
 
   // It should have one part
   ASSERT_EQ(1u, query_response.results[0].observation.parts().size());

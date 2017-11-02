@@ -79,11 +79,11 @@ TEST(ObservationStoreInteralTest, GenerateNewRowKey) {
   observation.set_random_id(std::string(8, 1));
   std::string row_key = GenerateNewRowKey(metadata, observation);
   EXPECT_EQ(75u, row_key.size());
-  // 0111713051 is the hash value we observed for the above-constructed
+  // 1329713394 is the hash value we observed for the above-constructed
   // Observation.
   EXPECT_EQ(
       "0000012345:0000023456:0000034567:0000045678:00072340172838076673:"
-      "0111713051",
+      "1329713394",
       row_key);
 
   // Set the random id to a string that is too long. In this case the server
@@ -91,11 +91,11 @@ TEST(ObservationStoreInteralTest, GenerateNewRowKey) {
   observation.set_random_id(std::string(10, 1));
   row_key = GenerateNewRowKey(metadata, observation);
   EXPECT_EQ(75u, row_key.size());
-  // 1435327612 is the hash value we observed for the above-constructed
+  // 1577527722 is the hash value we observed for the above-constructed
   // Observation.
   EXPECT_EQ(
       "0000012345:0000023456:0000034567:0000045678:00072340172838076673:"
-      "1435327612",
+      "1577527722",
       row_key);
 
   // Set random_id to a string that is too short. In this case the server
@@ -109,9 +109,9 @@ TEST(ObservationStoreInteralTest, GenerateNewRowKey) {
   // This is just a sanity check that the random_id part of the row key
   // is not all zeroes.
   EXPECT_NE(":00000000000000000000:", row_key.substr(43, 22));
-  // 1258035169 is the hash value we observed for the above-constructed
+  // 2704129519 is the hash value we observed for the above-constructed
   // Observation.
-  EXPECT_EQ(":1258035169", row_key.substr(64));
+  EXPECT_EQ(":2704129519", row_key.substr(64));
 
   // Clear random_id.
   observation.clear_random_id();
@@ -120,9 +120,9 @@ TEST(ObservationStoreInteralTest, GenerateNewRowKey) {
   EXPECT_EQ(75u, row_key.size());
   EXPECT_EQ("0000012345:0000023456:0000034567:0000045678:",
             row_key.substr(0, 44));
-  // 1120186595 is the hash value we observed for the above-constructed
+  // 3640671349 is the hash value we observed for the above-constructed
   // Observation.
-  EXPECT_EQ(":1120186595", row_key.substr(64));
+  EXPECT_EQ(":3640671349", row_key.substr(64));
 }
 
 }  // namespace internal

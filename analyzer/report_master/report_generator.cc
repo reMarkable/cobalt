@@ -228,6 +228,10 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
   query_response.pagination_token = "";
   std::vector<std::string> parts(1);
   parts[0] = variables[0].report_variable->metric_part();
+
+  // TODO(rudominer) Support reports that include the SystemProfile.
+  bool include_system_profile = false;
+
   // We iteratively query in batches of size 1000.
   static const size_t kMaxResultsPerIteration = 1000;
   do {
@@ -237,7 +241,8 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
     query_response = observation_store_->QueryObservations(
         report_config.customer_id(), report_config.project_id(),
         report_config.metric_id(), start_day_index, end_day_index, parts,
-        kMaxResultsPerIteration, query_response.pagination_token);
+        include_system_profile, kMaxResultsPerIteration,
+        query_response.pagination_token);
 
     if (query_response.status != store::kOK) {
       std::ostringstream stream;
@@ -260,7 +265,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
       // TODO(rudominer) This method returns false when the Observation was
       // bad in some way. This should be kept track of through a monitoring
       // counter.
-      analysis_engine.ProcessObservationPart(query_result.day_index,
+      analysis_engine.ProcessObservationPart(query_result.metadata.day_index(),
                                              observation_part);
     }
   } while (!query_response.pagination_token.empty());

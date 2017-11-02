@@ -230,7 +230,7 @@ void ObservationQuerier::CountObservations() {
   do {
     auto query_response = observation_store_->QueryObservations(
         customer_, project_, FLAGS_metric, 0, INT32_MAX,
-        std::vector<std::string>(), batch_size, pagination_token);
+        std::vector<std::string>(), true, batch_size, pagination_token);
     if (query_response.status != analyzer::store::kOK) {
       LOG(FATAL) << "Query failed with code: " << query_response.status;
       return;
@@ -299,7 +299,7 @@ void ObservationQuerier::Query(const std::vector<std::string>& command) {
 
   auto query_response = observation_store_->QueryObservations(
       customer_, project_, metric_, 0, INT32_MAX, std::vector<std::string>(),
-      max_num, "");
+      true, max_num, "");
 
   if (query_response.status != analyzer::store::kOK) {
     *ostream_ << "Query failed with code: " << query_response.status

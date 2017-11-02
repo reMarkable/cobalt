@@ -31,9 +31,10 @@ std::string RowKey(uint32_t customer_id, uint32_t project_id,
                    uint32_t metric_id, uint32_t day_index, uint64_t random,
                    uint32_t hash);
 
-// Returns a 32-bit hash of |observation| appropriate for use as the <hash>
-// component of a row key.
-uint32_t HashObservation(const Observation& observation);
+// Returns a 32-bit hash of (|observation|, |metadata|) appropriate for use as
+// the <hash> component of a row key.
+uint32_t HashObservation(const Observation& observation,
+                         const ObservationMetadata metadata);
 
 // Returns the day_index encoded by |row_key|.
 uint32_t DayIndexFromRowKey(const std::string& row_key);
@@ -57,6 +58,9 @@ std::string GenerateNewRowKey(const ObservationMetadata& metadata,
 
 bool ParseEncryptedObservationPart(ObservationPart* observation_part,
                                    std::string bytes);
+
+bool ParseEncryptedSystemProfile(SystemProfile* system_profile,
+                                 std::string bytes);
 
 }  // namespace internal
 }  // namespace store

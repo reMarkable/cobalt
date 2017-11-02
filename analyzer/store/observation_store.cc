@@ -39,8 +39,17 @@ using crypto::hash::Hash;
 using internal::DayIndexFromRowKey;
 using internal::GenerateNewRowKey;
 using internal::ParseEncryptedObservationPart;
+using internal::ParseEncryptedSystemProfile;
 using internal::RangeLimitKey;
 using internal::RangeStartKey;
+
+namespace {
+// The name of the column in which we store the serialized SystemProfile
+// of each Observation. This column cannot be confused with a metric part
+// column because metric parts names are not allowed to begin with an
+// underscore.
+static const char kSystemProfileColumnName[] = "_CobaltSystemProfile";
+}  // namespace
 
 // The internal namespace contains private implementation functions that need
 // to be accessible to unit tests. The functions are declared in
@@ -110,11 +119,15 @@ std::string RowKey(uint32_t customer_id, uint32_t project_id,
   return out;
 }
 
-// Returns a 32-bit hash of |observation| appropriate for use as the <hash>
-// component of a row key. See comments on RowKey() above.
-uint32_t HashObservation(const Observation& observation) {
+// Returns a 32-bit hash of (|observation|, |metadata|) appropriate for use as
+// the <hash> component of a row key. See comments on RowKey() above.
+uint32_t HashObservation(const Observation& observation,
+                         const ObservationMetadata metadata) {
   std::string serialized_observation;
   observation.SerializeToString(&serialized_observation);
+  std::string serialized_metadta;
+  metadata.SerializeToString(&serialized_metadta);
+  serialized_observation += serialized_metadta;
   byte hash_bytes[DIGEST_SIZE];
   Hash(reinterpret_cast<const byte*>(serialized_observation.data()),
        serialized_observation.size(), hash_bytes);
@@ -189,13 +202,19 @@ std::string GenerateNewRowKey(const ObservationMetadata& metadata,
   }
   return RowKey(metadata.customer_id(), metadata.project_id(),
                 metadata.metric_id(), metadata.day_index(), random,
-                HashObservation(observation));
+                HashObservation(observation, metadata));
 }
 
 bool ParseEncryptedObservationPart(ObservationPart* observation_part,
                                    std::string bytes) {
   // TODO(rudominer) Arrange for ObservationParts to be encrypted.
   return observation_part->ParseFromString(bytes);
+}
+
+bool ParseEncryptedSystemProfile(SystemProfile* system_profile,
+                                 std::string bytes) {
+  // TODO(rudominer) Arrange for SystemProfiles to be encrypted.
+  return system_profile->ParseFromString(bytes);
 }
 
 }  // namespace internal
@@ -205,21 +224,18 @@ ObservationStore::ObservationStore(std::shared_ptr<DataStore> store)
 
 Status ObservationStore::AddObservation(const ObservationMetadata& metadata,
                                         const Observation& observation) {
-  DataStore::Row row;
-  row.key = GenerateNewRowKey(metadata, observation);
-  for (const auto& pair : observation.parts()) {
-    std::string serialized_observation_part;
-    pair.second.SerializeToString(&serialized_observation_part);
-    // TODO(rudominer) Consider ways to avoid having so many copies of the
-    // part names.
-    row.column_values[pair.first] = std::move(serialized_observation_part);
-  }
-  return store_->WriteRow(DataStore::kObservations, std::move(row));
+  std::vector<Observation> observations;
+  observations.emplace_back(observation);
+  return AddObservationBatch(metadata, observations);
 }
 
 Status ObservationStore::AddObservationBatch(
     const ObservationMetadata& metadata,
     const std::vector<Observation>& observations) {
+  std::string serialized_system_profile;
+  if (metadata.has_system_profile()) {
+    metadata.system_profile().SerializeToString(&serialized_system_profile);
+  }
   std::vector<DataStore::Row> rows;
   for (const Observation& observation : observations) {
     DataStore::Row row;
@@ -231,6 +247,9 @@ Status ObservationStore::AddObservationBatch(
       // part names.
       row.column_values[pair.first] = std::move(serialized_observation_part);
     }
+    if (!serialized_system_profile.empty()) {
+      row.column_values[kSystemProfileColumnName] = serialized_system_profile;
+    }
 
     rows.emplace_back(std::move(row));
   }
@@ -241,8 +260,8 @@ Status ObservationStore::AddObservationBatch(
 ObservationStore::QueryResponse ObservationStore::QueryObservations(
     uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
     uint32_t start_day_index, uint32_t end_day_index,
-    std::vector<std::string> parts, size_t max_results,
-    std::string pagination_token) {
+    std::vector<std::string> parts, bool include_system_profiles,
+    size_t max_results, std::string pagination_token) {
   ObservationStore::QueryResponse query_response;
   std::string start_row;
   bool inclusive = true;
@@ -269,6 +288,15 @@ ObservationStore::QueryResponse ObservationStore::QueryObservations(
     return query_response;
   }
 
+  if (!parts.empty() && include_system_profiles) {
+    // If parts is empty this will indicate to the underlying DataStore that
+    // we wish to retrieve all columns and so we don't want to append the
+    // column name for SystemProfile because this would change the meaning
+    // of the query to indicate that we want to retrieve that column
+    // *only*, which is not what we want.
+    parts.emplace_back(kSystemProfileColumnName);
+  }
+
   DataStore::ReadResponse read_response = store_->ReadRows(
       DataStore::kObservations, std::move(start_row), inclusive,
       std::move(limit_row), std::move(parts), max_results);
@@ -283,28 +311,42 @@ ObservationStore::QueryResponse ObservationStore::QueryObservations(
     // query_response.
     query_response.results.emplace_back();
     auto& query_result = query_response.results.back();
-    query_result.day_index = DayIndexFromRowKey(row.key);
+    query_result.metadata.set_customer_id(customer_id);
+    query_result.metadata.set_project_id(project_id);
+    query_result.metadata.set_metric_id(metric_id);
+    query_result.metadata.set_day_index(DayIndexFromRowKey(row.key));
 
     for (auto& pair : row.column_values) {
       const std::string& column_name = pair.first;
       const std::string& column_value = pair.second;
-      // For each column_value in the row we add an ObservationPart.
-      // The column_name is the part name and so the key to the map. The
-      // The insert_result is a pair of the form < <key, value>, bool> where
-      // the bool indicates whether or not the key was newly added to the map.
-      auto insert_result = query_result.observation.mutable_parts()->insert(
-          google::protobuf::Map<std::string, ObservationPart>::value_type(
-              column_name, ObservationPart()));
-      // The column names should all be unique so each insert should return
-      // true.
-      DCHECK(insert_result.second);
-      // The ObservationPart is the value and so the second element of the
-      // first element of insert_result.
-      auto& observation_part = insert_result.first->second;
-      // We deserialize the ObservationPart from the column value.
-      if (!ParseEncryptedObservationPart(&observation_part, column_value)) {
-        query_response.status = kOperationFailed;
-        return query_response;
+      if (column_name == kSystemProfileColumnName) {
+        if (include_system_profiles) {
+          if (!ParseEncryptedSystemProfile(
+                  query_result.metadata.mutable_system_profile(),
+                  column_value)) {
+            query_response.status = kOperationFailed;
+            return query_response;
+          }
+        }
+      } else {
+        // The column name is a metric part name so we add an ObservationPart
+        // with this metric part name as the key to the map.
+        // The insert_result is a pair of the form < <key, value>, bool> where
+        // the bool indicates whether or not the key was newly added to the map.
+        auto insert_result = query_result.observation.mutable_parts()->insert(
+            google::protobuf::Map<std::string, ObservationPart>::value_type(
+                column_name, ObservationPart()));
+        // The column names should all be unique so each insert should return
+        // true.
+        DCHECK(insert_result.second);
+        // The ObservationPart is the value and so the second element of the
+        // first element of insert_result.
+        auto& observation_part = insert_result.first->second;
+        // We deserialize the ObservationPart from the column value.
+        if (!ParseEncryptedObservationPart(&observation_part, column_value)) {
+          query_response.status = kOperationFailed;
+          return query_response;
+        }
       }
     }
   }

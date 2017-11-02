@@ -50,17 +50,23 @@ class ObservationStore {
     QueryResult() {}
 
     // Move constructor.
-    QueryResult(QueryResult&& other) : day_index(other.day_index) {
+    QueryResult(QueryResult&& other) {
       observation.Swap(&other.observation);
+      metadata.Swap(&other.metadata);
     }
-
-    // The day_index will be between the |start_day_index| and the
-    // |end_day_index| passed to QueryObservations().
-    uint32_t day_index;
 
     // The observation will only contain the parts requested in the
     // invocation of QueryObservations().
     Observation observation;
+
+    // The associated ObservationMetadata.
+    // The |day_index| field will be between the |start_day_index| and
+    // the |end_day_index| passed to QueryObservations().
+    // The |system_profile| field will only be populuated if
+    // |include_system_profile| was set to true when QueryObservations()
+    // was invoked, and if the encoder client sent the SystemProfile with the
+    // Observation.
+    ObservationMetadata metadata;
   };
 
   // A QueryResponse is returned from QueryObservations().
@@ -96,6 +102,12 @@ class ObservationStore {
   // the specified parts. If |parts| is empty there will be no restriction
   // on observation parts.
   //
+  // |include_system_profiles| Determines whether the SystemProfile associated
+  // with each Observation should be included in the result. The
+  // |system_profile| field within the |metadata| field of QueryResult may be
+  // NULL even if this parameter is true, if the encoder client did not send
+  // a SystemProfile with the Observation.
+  //
   // |max_results| must be positive and at most |max_results| will be returned.
   // The number of returned results may be less than |max_results| for
   // several reasons. The caller must look at whether or not the
@@ -117,6 +129,7 @@ class ObservationStore {
                                   uint32_t metric_id, uint32_t start_day_index,
                                   uint32_t end_day_index,
                                   std::vector<std::string> parts,
+                                  bool include_system_profiles,
                                   size_t max_results,
                                   std::string pagination_token);
 
