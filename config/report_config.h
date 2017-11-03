@@ -25,9 +25,11 @@ namespace config {
 // is used only on the Analyzer.
 typedef Registry<RegisteredReports> ReportRegistry;
 
+typedef ReportRegistry::RegistryIterator ReportIterator;
+
 // For ease of understanding we specify the interfaces below as if
 // ReportRegistry were not a template specialization but a
-// stand-alone classe.
+// stand-alone class.
 
 /*
 class ReportRegistry {
@@ -67,6 +69,10 @@ class ReportRegistry {
   const ReportConfig* const Get(uint32_t customer_id,
                                 uint32_t project_id,
                                 uint32_t id);
+
+  // Provide a mechansim to iterate through all reports.
+  ReportIterator begin();
+  ReportIterator end();
 };
 */
 

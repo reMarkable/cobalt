@@ -310,6 +310,13 @@ TEST(EncodingRegistryFromString, ValidString) {
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
   EXPECT_EQ(2u, registry->size());
+  // Test iteration.
+  int count = 0;
+  for (const EncodingConfig& encoding : *registry) {
+    EXPECT_EQ(1u, encoding.customer_id());
+    count++;
+  }
+  EXPECT_EQ(2, count);
 }
 
 const char* kMetricConfigText = R"(
@@ -348,6 +355,13 @@ TEST(MetricRegistryFromString, ValidString) {
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
   EXPECT_EQ(2u, registry->size());
+  // Test iteration.
+  int count = 0;
+  for (const Metric& metric : *registry) {
+    EXPECT_EQ(1u, metric.customer_id());
+    count++;
+  }
+  EXPECT_EQ(2, count);
 }
 
 }  // namespace config
