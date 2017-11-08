@@ -30,7 +30,20 @@ add_custom_command(OUTPUT ${YAMLPB_TEST_BIN}
 
 set(CONFIG_PARSER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list.go
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_config.go
+                      ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/git.go
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/config_reader.go)
+set(CONFIG_PARSER_BINARY ${CMAKE_BINARY_DIR}/config/config_parser_bin)
+add_custom_command(OUTPUT ${CONFIG_PARSER_BINARY}
+    # Compiles config_parser_main and all its dependencies.
+    COMMAND ${GO_BIN} build -o ${CONFIG_PARSER_BINARY} config_parser_main.go
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser_main.go
+    DEPENDS ${CONFIG_PARSER_SRC}
+    DEPENDS ${CONFIG_PB_GO_FILES}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+
+# Build tests
 set(CONFIG_PARSER_TEST_BIN ${GO_TESTS}/config_parser_test)
 set(CONFIG_PARSER_TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list_test.go
                             ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_config_test.go)
@@ -46,4 +59,5 @@ add_custom_command(OUTPUT ${CONFIG_PARSER_TEST_BIN}
 add_custom_target(build_config_parser ALL
     DEPENDS ${YAMLPB_TEST_BIN}
     DEPENDS ${CONFIG_PARSER_TEST_BIN}
+    DEPENDS ${CONFIG_PARSER_BINARY}
 )
