@@ -71,3 +71,12 @@
 [submodule "third_party/rapidjson"]
 	path = third_party/rapidjson
 	url = https://fuchsia.googlesource.com/third_party/rapidjson
+[submodule "third_party/curl"]
+	path = third_party/curl
+	url = https://fuchsia.googlesource.com/third_party/curl
+[submodule "third_party/jsoncpp"]
+	path = third_party/jsoncpp
+	url = https://cobalt-analytics.googlesource.com/third_party/jsoncpp
+[submodule "third_party/google-api-cpp-client"]
+	path = third_party/google-api-cpp-client
+	url = https://cobalt-analytics.googlesource.com/third_party/google-api-cpp-client

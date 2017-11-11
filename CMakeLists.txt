@@ -551,9 +551,9 @@ macro(add_cobalt_test_dependencies target_name test_dir)
       PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${test_dir})
 endmacro()
 
-# Third-party directories that we include using the simpler add_subdirectory method
-include_directories(BEFORE SYSTEM "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lossmin")
-add_subdirectory(third_party/lossmin/lossmin)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/lossmin)
+include_directories(${CMAKE_BINARY_DIR}/third_party/curl)
+include_directories(${CMAKE_SOURCE_DIR}/third_party/jsoncpp/include)
 
 # Project directories
 add_subdirectory(algorithms)
@@ -565,4 +565,35 @@ add_subdirectory(shuffler)
 add_subdirectory(tools)
 add_subdirectory(util)
 
+# Turn off extra warnings on third_party code we don't control.
+add_compile_options(-Wno-sign-compare
+                    -Wno-ignored-qualifiers
+                    -Wno-unused-local-typedef
+                    -Wno-deprecated-declarations
+                    -Wno-unused-private-field)
 
+# Set variables consumed by the CMakeLists.txt file for google-api-cpp-client.
+set(CURL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/third_party/curl/include)
+set(CURL_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/third_party/curl)
+set(GFLAGS_INCLUDE_DIRS ${GFLAGS_INCLUDE_DIR})
+set(GLOG_INCLUDE_DIRS ${GLOG_INCLUDE_DIR})
+set(GTEST_INCLUDE_DIRS ${GTEST_INCLUDE_DIR})
+set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
+set(OTHER_INCLUDE_DIRS ${BORINGSSL_INCLUDE_DIR})
+set(googleapis_build_samples false CACHE INTERNAL "" FORCE)
+set(googleapis_build_service_apis true CACHE INTERNAL "" FORCE)
+
+# Third-party directories that we include using the simpler add_subdirectory method
+add_subdirectory(third_party/lossmin/lossmin)
+add_subdirectory(third_party/curl)
+add_subdirectory(third_party/jsoncpp)
+add_subdirectory(third_party/google-api-cpp-client)
+
+
+# Ensure that our third party projects built above via the
+# ExternalProject_Add method are built before the targets in
+# the google-api-cpp-client project.
+add_dependencies(googleapis_http build_external_projects)
+add_dependencies(googleapis_internal build_external_projects)
+add_dependencies(googleapis_jsoncpp build_external_projects)
+add_dependencies(googleapis_utils build_external_projects)
