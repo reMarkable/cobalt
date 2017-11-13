@@ -13,6 +13,7 @@ import (
 	"flag"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+	"io/ioutil"
 	"os"
 )
 
@@ -60,8 +61,11 @@ func main() {
 
 	// By default we print the output to stdout.
 	w := os.Stdout
-	if *outFile == "" {
-		if w, err = os.OpenFile(*outFile, os.O_RDWR|os.O_CREATE, 0555); err != nil {
+
+	// If an output file is specified, we write to a temporary file and then rename
+	// the temporary file with the specified output file name.
+	if *outFile != "" {
+		if w, err = ioutil.TempFile("", "cobalt_config"); err != nil {
 			glog.Exit(err)
 		}
 		defer w.Close()
@@ -70,6 +74,12 @@ func main() {
 	_, err = w.Write(configBytes)
 	if err != nil {
 		glog.Exit(err)
+	}
+
+	if *outFile != "" {
+		if err := os.Rename(w.Name(), *outFile); err != nil {
+			glog.Exit(err)
+		}
 	}
 
 	os.Exit(0)
