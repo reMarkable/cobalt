@@ -269,6 +269,91 @@ ExternalProject_Add(googleapis_external_project
 include_directories(BEFORE SYSTEM ${GOOGLEAPIS_INCLUDE_DIR})
 link_directories(${GOOGLEAPIS_LIB_DIR})
 
+# Build jsoncpp as an external project.
+set(JSONCPP_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/jsoncpp)
+set(JSONCPP_INCLUDE_DIR ${JSONCPP_INSTALL_DIR}/include)
+set(JSONCPP_LIB_DIR ${JSONCPP_INSTALL_DIR}/lib)
+ExternalProject_Add(jsoncpp_external_project
+                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/jsoncpp
+                    PREFIX      ${JSONCPP_INSTALL_DIR}
+                    INSTALL_DIR ${JSONCPP_INSTALL_DIR}
+                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                                -DCMAKE_INSTALL_PREFIX:PATH=${JSONCPP_INSTALL_DIR}
+                                -Wno-sign-compare
+                                -Wno-ignored-qualifiers
+                                -Wno-deprecated-register
+                                -Wno-unused-function
+                                -Wno-unused-local-typedef
+                                -Wno-missing-field-initializers
+                                -Wno-enum-compare-switch
+                                -Wno-unused-local-typedef
+                   )
+include_directories(BEFORE SYSTEM ${JSONCPP_INCLUDE_DIR})
+link_directories(${JSONCPP_LIB_DIR})
+
+# Build curl as an external project.
+set(CURL_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/curl)
+ExternalProject_Add(curl_external_project
+                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/curl
+                    PREFIX      ${CURL_INSTALL_DIR}
+                    INSTALL_DIR ${CURL_INSTALL_DIR}
+                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                                -DCMAKE_INSTALL_PREFIX:PATH=${CURL_INSTALL_DIR}
+                                -Wno-sign-compare
+                                -Wno-ignored-qualifiers
+                                -Wno-deprecated-register
+                                -Wno-unused-function
+                                -Wno-unused-local-typedef
+                                -Wno-missing-field-initializers
+                                -Wno-enum-compare-switch
+                                -Wno-unused-local-typedef
+                    INSTALL_COMMAND ""
+                   )
+include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third_party/curl/include)
+include_directories(BEFORE SYSTEM ${CURL_INSTALL_DIR}/src/curl_external_project-build)
+link_directories(${CURL_INSTALL_DIR}/src/curl_external_project-build)
+
+# Build google_api_cpp_client as an external project.
+set(GOOGLE_API_CPP_CLIENT_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/google-api-cpp-client)
+set(GOOGLE_API_CPP_CLIENT_INCLUDE_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}/src/google_api_cpp_client_external_project-build/include)
+set(GOOGLE_API_CPP_CLIENT_LIB_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}/src/google_api_cpp_client_external_project-build/lib)
+ExternalProject_Add(google_api_cpp_client_external_project
+                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/google-api-cpp-client
+                    PREFIX      ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
+                    INSTALL_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
+                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                                -DCMAKE_INSTALL_PREFIX:PATH=${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
+                                -DCURL_INCLUDE_DIRS=${CMAKE_SOURCE_DIR}/third_party/curl/include
+                                -DCURL_INCLUDE_DIRS=${CURL_INSTALL_DIR}/src/curl_external_project-build
+                                -DGFLAGS_INCLUDE_DIRS=${GFLAGS_INCLUDE_DIR}
+                                -DGLOG_INCLUDE_DIRS=${GLOG_INCLUDE_DIR}
+                                -DGTEST_INCLUDE_DIRS=${GTEST_INCLUDE_DIR}
+                                -DJSONCPP_INCLUDE_DIRS=${JSONCPP_INCLUDE_DIR}
+                                -DOTHER_INCLUDE_DIRS=${BORINGSSL_INCLUDE_DIR}
+                                -Dgoogleapis_build_samples=OFF
+                                -Dgoogleapis_build_service_apis=ON
+                                -Wno-sign-compare
+                                -Wno-ignored-qualifiers
+                                -Wno-deprecated-register
+                                -Wno-unused-function
+                                -Wno-unused-local-typedef
+                                -Wno-missing-field-initializers
+                                -Wno-enum-compare-switch
+                                -Wno-unused-local-typedef
+                    DEPENDS     gflags_external_project
+                    DEPENDS     glog_external_project
+                    DEPENDS     gtest_external_project
+                    DEPENDS     jsoncpp_external_project
+                    DEPENDS     curl_external_project
+                   )
+include_directories(${GOOGLE_API_CPP_CLIENT_INCLUDE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/third_party/google-api-cpp-client/src)
+include_directories(${CMAKE_SOURCE_DIR}/third_party/google-api-cpp-client/service_apis/storage)
+link_directories(${GOOGLE_API_CPP_CLIENT_LIB_DIR})
+
 # A target to combine all of the external projects.
 add_custom_target(build_external_projects
                   DEPENDS gtest_external_project
@@ -277,7 +362,8 @@ add_custom_target(build_external_projects
                   DEPENDS boringssl_external_project
                   DEPENDS protobuf_external_project
                   DEPENDS grpc_external_project
-                  DEPENDS googleapis_external_project)
+                  DEPENDS googleapis_external_project
+                  DEPENDS google_api_cpp_client_external_project)
 
 # Applying this macro to a target does two things:
 # (i)  It causes build_external_projects to happen first before the target
@@ -552,8 +638,6 @@ macro(add_cobalt_test_dependencies target_name test_dir)
 endmacro()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/lossmin)
-include_directories(${CMAKE_BINARY_DIR}/third_party/curl)
-include_directories(${CMAKE_SOURCE_DIR}/third_party/jsoncpp/include)
 
 # Project directories
 add_subdirectory(algorithms)
@@ -572,28 +656,5 @@ add_compile_options(-Wno-sign-compare
                     -Wno-deprecated-declarations
                     -Wno-unused-private-field)
 
-# Set variables consumed by the CMakeLists.txt file for google-api-cpp-client.
-set(CURL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/third_party/curl/include)
-set(CURL_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/third_party/curl)
-set(GFLAGS_INCLUDE_DIRS ${GFLAGS_INCLUDE_DIR})
-set(GLOG_INCLUDE_DIRS ${GLOG_INCLUDE_DIR})
-set(GTEST_INCLUDE_DIRS ${GTEST_INCLUDE_DIR})
-set(JSONCPP_INCLUDE_DIRS ${JSONCPP_INCLUDE_DIR})
-set(OTHER_INCLUDE_DIRS ${BORINGSSL_INCLUDE_DIR})
-set(googleapis_build_samples false CACHE INTERNAL "" FORCE)
-set(googleapis_build_service_apis true CACHE INTERNAL "" FORCE)
-
 # Third-party directories that we include using the simpler add_subdirectory method
 add_subdirectory(third_party/lossmin/lossmin)
-add_subdirectory(third_party/curl)
-add_subdirectory(third_party/jsoncpp)
-add_subdirectory(third_party/google-api-cpp-client)
-
-
-# Ensure that our third party projects built above via the
-# ExternalProject_Add method are built before the targets in
-# the google-api-cpp-client project.
-add_dependencies(googleapis_http build_external_projects)
-add_dependencies(googleapis_internal build_external_projects)
-add_dependencies(googleapis_jsoncpp build_external_projects)
-add_dependencies(googleapis_utils build_external_projects)
