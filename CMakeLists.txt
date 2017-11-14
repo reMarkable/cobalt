@@ -299,8 +299,8 @@ ExternalProject_Add(curl_external_project
                     PREFIX      ${CURL_INSTALL_DIR}
                     INSTALL_DIR ${CURL_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${CURL_INSTALL_DIR}
+                                -DOPENSSL_INCLUDE_DIR=${BORINGSSL_INCLUDE_DIR}
                                 -Wno-sign-compare
                                 -Wno-ignored-qualifiers
                                 -Wno-deprecated-register
@@ -309,6 +309,7 @@ ExternalProject_Add(curl_external_project
                                 -Wno-missing-field-initializers
                                 -Wno-enum-compare-switch
                                 -Wno-unused-local-typedef
+                    DEPENDS     boringssl_external_project
                     INSTALL_COMMAND ""
                    )
 include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third_party/curl/include)
