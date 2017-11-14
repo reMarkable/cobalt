@@ -85,7 +85,7 @@ func UnmarshalString(s string, pb proto.Message) error {
 	// First, we unmarshal the yaml string into go types.
 	var m interface{}
 	if err := yaml.Unmarshal([]byte(s), &m); err != nil {
-		return err
+		return fmt.Errorf("Cannot unmarshal yaml string: %v", err)
 	}
 
 	// Then, we ensure that only JSON-compatible values are used since YAML

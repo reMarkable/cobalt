@@ -22,6 +22,7 @@ import (
 	"config"
 	"fmt"
 	"github.com/golang/glog"
+	"regexp"
 	"yamlpb"
 )
 
@@ -34,6 +35,8 @@ type projectConfig struct {
 	contact       string
 	projectConfig config.CobaltConfig
 }
+
+var validMetricPartName = regexp.MustCompile("^[a-zA-Z][_a-zA-Z0-9\\- ]+$")
 
 // Parse the configuration for one project from the yaml string provided into
 // the config field in projectConfig.
@@ -99,7 +102,7 @@ func validateMetric(m config.Metric) (err error) {
 			return fmt.Errorf("Metric part '%v' is null. This is not allowed.", name)
 		}
 
-		if !validNameRegexp.MatchString(name) {
+		if !validMetricPartName.MatchString(name) {
 			return fmt.Errorf("Metric part name '%v' is invalid. Metric part names must match the regular expression '%v'.", name, validNameRegexp)
 		}
 	}
