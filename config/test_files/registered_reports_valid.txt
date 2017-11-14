@@ -54,6 +54,13 @@ element {
   }
   aggregation_epoch_type: WEEK
   report_delay_days: 5
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "bucket-1"
+      folder_path: "a/folder"
+    }
+  }
 }
 
 #### ReportConfig (1, 1, 3)

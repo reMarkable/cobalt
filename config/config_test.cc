@@ -213,6 +213,7 @@ TEST(ReportRegistryFromFile, ValidFile) {
   // (1, 1, 2) Should be "Fuschsia Usage by Hour"
   report_config = registry->Get(1, 1, 2);
   EXPECT_EQ("Fuschsia Usage by Hour", report_config->name());
+  EXPECT_EQ("bucket-1", report_config->export_configs(0).gcs().bucket());
 
   // (1, 1, 3) Should be "Fuschsia Daily System Event Counts"
   report_config = registry->Get(1, 1, 3);
