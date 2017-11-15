@@ -72,8 +72,6 @@ spec:
           - '-logtostderr'
           - '-v=3'
           - '-googlers_only'
-          # TODO(azani): Remove when all customers are authenticating.
-          - '-authorization_log_only'
         ports:
           - containerPort: 7000
       volumes:
