@@ -126,17 +126,18 @@ class ReportStoreAbstractTest : public ::testing::Test {
     return report_store_->MakeMetadataRowKey(report_id);
   }
 
-  Status StartNewReport(bool one_off, ReportType report_type,
+  Status StartNewReport(bool one_off, const std::string export_name,
+                        ReportType report_type,
                         const std::vector<uint32_t>& variable_indices,
                         ReportId* report_id) {
-    return this->report_store_->StartNewReport(kFirstDayIndex, kLastDayIndex,
-                                               one_off, report_type,
-                                               variable_indices, report_id);
+    return this->report_store_->StartNewReport(
+        kFirstDayIndex, kLastDayIndex, one_off, export_name, report_type,
+        variable_indices, report_id);
   }
 
   // Starts a new report of type HISTOGRAM with variable_indices = {0}
   Status StartNewHistogramReport(bool one_off, ReportId* report_id) {
-    return StartNewReport(one_off, HISTOGRAM, {0}, report_id);
+    return StartNewReport(one_off, "", HISTOGRAM, {0}, report_id);
   }
 
   // Starts a new report with one_off=true, type=HISTOGRAM,
@@ -255,6 +256,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
             report_metadata.start_time_seconds());
   EXPECT_EQ(0, report_metadata.finish_time_seconds());
   EXPECT_EQ(0, report_metadata.info_messages_size());
+  EXPECT_EQ("", report_metadata.export_name());
 
   // Invoke EndReport() with success=true.
   bool success = true;
@@ -289,6 +291,24 @@ TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
   EXPECT_EQ(TERMINATED, report_metadata.state());
   EXPECT_EQ(2, report_metadata.info_messages_size());
   EXPECT_EQ("goodbye", report_metadata.info_messages(1).message());
+
+  // Start another report, this time with one_off = false and with a
+  // non-empty export_name.
+  one_off = false;
+  std::string export_name("an-export-name");
+  report_id = this->MakeReportId(1, 1);
+  // Invoke StartNewReport().
+  EXPECT_EQ(kOK, this->StartNewReport(one_off, export_name, HISTOGRAM, {0},
+                                      &report_id));
+
+  // Get the ReportMetatdata.
+  report_metadata.Clear();
+  EXPECT_EQ(kOK, this->report_store_->GetMetadata(report_id, &report_metadata));
+
+  // Check one_off and export_name
+  EXPECT_EQ(IN_PROGRESS, report_metadata.state());
+  EXPECT_FALSE(report_metadata.one_off());
+  EXPECT_EQ("an-export-name", report_metadata.export_name());
 }
 
 // Tests the functions CreateDependentReport() and StartDependentReport.
@@ -308,10 +328,10 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
   // Copy the new report_id
   ReportId report_id2(report_id1);
 
-  // Invoke CreateDependentReport() to create a report with sequence_num=2
+  // Invoke CreateDependentReport() to create a report with sequence_num=1
   // that analyzes variable 1.
-  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(1, HISTOGRAM, {1},
-                                                            &report_id2));
+  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(1, "", HISTOGRAM,
+                                                            {1}, &report_id2));
 
   // Check that report_id2 had its sequence_num set correctly.
   EXPECT_EQ(1u, report_id2.sequence_num());
@@ -331,6 +351,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
   EXPECT_EQ(one_off, report_metadata.one_off());
   ASSERT_EQ(1, report_metadata.variable_indices_size());
   EXPECT_EQ(1u, report_metadata.variable_indices(0));
+  EXPECT_EQ("", report_metadata.export_name());
 
   // start_time_seconds, finish_time_seconds and info_message should not have
   // been copied to this ReportMetadataLite.
@@ -352,6 +373,21 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
   // The report should now be started, but not finished.
   EXPECT_NE(0, report_metadata.start_time_seconds());
   EXPECT_EQ(0, report_metadata.finish_time_seconds());
+
+  // Create another dependent report, this time with a non-empty export_name.
+  std::string export_name("another-export-name");
+  // Invoke CreateDependentReport() to create a report with sequence_num=2
+  // that analyzes variable 2.
+  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(
+                     2, export_name, HISTOGRAM, {2}, &report_id2));
+
+  // Get the ReportMetatdata.
+  report_metadata.Clear();
+  EXPECT_EQ(kOK,
+            this->report_store_->GetMetadata(report_id2, &report_metadata));
+
+  // Check the export_name
+  EXPECT_EQ("another-export-name", report_metadata.export_name());
 }
 
 // Tests the functions AddReportRow and GetReport, using HistogramReportRows.
@@ -362,8 +398,8 @@ TYPED_TEST_P(ReportStoreAbstractTest, ReportRows) {
   // And report 2a which is an associated sub-report with report 2.
   ReportId report_id2a(report_id2);
   std::vector<uint32_t> variable_indices = {1};
-  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(1, HISTOGRAM, {1},
-                                                            &report_id2a));
+  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(1, "", HISTOGRAM,
+                                                            {1}, &report_id2a));
   EXPECT_EQ(kOK, this->report_store_->StartDependentReport(report_id2a));
 
   // Add rows to all three reports.

@@ -219,8 +219,8 @@ Status ReportStore::WriteBulkMetadata(
 
 Status ReportStore::StartNewReport(
     uint32_t first_day_index, uint32_t last_day_index, bool one_off,
-    ReportType report_type, const std::vector<uint32_t>& variable_indices,
-    ReportId* report_id) {
+    const std::string& export_name, ReportType report_type,
+    const std::vector<uint32_t>& variable_indices, ReportId* report_id) {
   CHECK(report_id);
   // Complete the report_id.
   report_id->set_creation_time_seconds(ToUnixSeconds(clock_->now()));
@@ -236,6 +236,7 @@ Status ReportStore::StartNewReport(
     metadata.add_variable_indices(index);
   }
   metadata.set_one_off(one_off);
+  metadata.set_export_name(export_name);
   // We are not just creating but also starting this report now.
   metadata.set_start_time_seconds(report_id->creation_time_seconds());
 
@@ -243,8 +244,9 @@ Status ReportStore::StartNewReport(
 }
 
 Status ReportStore::CreateDependentReport(
-    uint32_t sequence_number, ReportType report_type,
-    const std::vector<uint32_t>& variable_indices, ReportId* report_id) {
+    uint32_t sequence_number, const std::string& export_name,
+    ReportType report_type, const std::vector<uint32_t>& variable_indices,
+    ReportId* report_id) {
   ReportMetadataLite metadata;
   Status status = GetMetadata(*report_id, &metadata);
   if (status != kOK) {
@@ -260,7 +262,8 @@ Status ReportStore::CreateDependentReport(
   // Set the state to WAITING_TO_START
   metadata.set_state(WAITING_TO_START);
 
-  // Set the report_type and variable_indices
+  // Set the export_name, report_type and variable_indices
+  metadata.set_export_name(export_name);
   metadata.set_report_type(report_type);
   metadata.clear_variable_indices();
   for (auto index : variable_indices) {

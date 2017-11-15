@@ -248,7 +248,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     // [kDayIndex, kDayIndex].
     EXPECT_EQ(store::kOK,
               report_store_->StartNewReport(
-                  testing::kDayIndex, testing::kDayIndex, true, HISTOGRAM,
+                  testing::kDayIndex, testing::kDayIndex, true, "", HISTOGRAM,
                   {(uint32_t)variable_index}, &report_id_));
 
     // Generate the report

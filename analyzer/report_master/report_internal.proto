@@ -102,4 +102,28 @@ message ReportMetadataLite {
   // Any human-readable messages directed toward the report consumer that
   // were produced by the server during the generation of the report.
   repeated InfoMessage info_messages = 9;
+
+  // This field is set to a non-empty string just in case this report instance
+  // is be exported to an external system. This field specifies a relative
+  // location. The fully-qualified path for the export is determined by
+  // also considering the values specified in the |export_location| fields of
+  // of the ReportExportConfigs in the ReportConfig. For example if there is an
+  // associated GCSExportLocation with bucket = "my_bucket" and
+  // folder_path = "foo/bar/" and if the value of the |export_name| field is
+  // "reportA" then a serialized report instance will be written to a Google
+  // Cloud Storage object named "my_bucket/foo/bar/reportA".
+  //
+  // A report may be exported to multiple locations.
+  //
+  // In addition to a location, the ReportExportConfig also specifies an
+  // |export_serialization| that describes how to serialize the report for
+  // export. For example if a CSVSerializationConfig is specified then the
+  // report will be serialized to a CSV file, and in the example above, that
+  // CSV file will be written to "my_bucket/foo/bar/reportA".
+  //
+  // A non-empty value for this field indicates that the ReportMaster is
+  // intending to export the report. To determine whether or not the report was
+  // successfully exported examine the ReportState. Only if
+  // state = COMPLETED_SUCCESSFULLY is it known that the export was successful.
+  string export_name = 10;
 }
