@@ -30,7 +30,8 @@ namespace gcs {
 // that often times the first upload after the instance is created will fail
 // with a timeout. We do not understand why. Subsequent uploads succeed. One
 // workaround is to invoke the Ping() method prior to the first upload. This
-// appears to succeed. We do not understand why.
+// appears to succeed. We do not understand why. See
+// https://github.com/google/google-api-cpp-client/issues/48
 class GcsUtil {
  public:
   // Initializes this instance using default file paths for the CA root
