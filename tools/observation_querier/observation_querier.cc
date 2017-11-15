@@ -183,6 +183,59 @@ std::string ToString(const Observation& observation) {
   return stream.str();
 }
 
+std::string ToString(const SystemProfile::OS os) {
+  switch (os) {
+    case SystemProfile::UNKNOWN_OS:
+      return "unknown_os";
+
+    case SystemProfile::FUCHSIA:
+      return "fuchsia";
+
+    case SystemProfile::LINUX:
+      return "linux";
+
+    default:
+      return "unrecognized_os";
+  }
+}
+
+std::string ToString(const SystemProfile::ARCH arch) {
+  switch (arch) {
+    case SystemProfile::UNKNOWN_ARCH:
+      return "unknown_arc";
+
+    case SystemProfile::X86_64:
+      return "x86_64";
+
+    case SystemProfile::ARM_64:
+      return "arm_64";
+
+    default:
+      return "unrecognized_arch";
+  }
+}
+
+std::string ToString(const SystemProfile::CPU cpu) {
+  std::ostringstream stream;
+  stream << cpu.vendor_name() << " " << cpu.signature();
+  return stream.str();
+}
+
+std::string ToString(const SystemProfile& system_profile) {
+  std::ostringstream stream;
+  stream << "<" << ToString(system_profile.os()) << "|"
+         << ToString(system_profile.arch()) << "|"
+         << ToString(system_profile.cpu()) << ">";
+  return stream.str();
+}
+
+std::string ToString(const ObservationMetadata& metadata) {
+  if (metadata.has_system_profile()) {
+    return ToString(metadata.system_profile());
+  }
+  return "<NO SYSTEM PROFILE>";
+}
+
 }  // namespace
 
 std::unique_ptr<ObservationQuerier> ObservationQuerier::CreateFromFlagsOrDie() {
@@ -308,7 +361,8 @@ void ObservationQuerier::Query(const std::vector<std::string>& command) {
   }
 
   for (const auto& query_result : query_response.results) {
-    *ostream_ << ToString(query_result.observation) << std::endl;
+    *ostream_ << ToString(query_result.observation) << " "
+              << ToString(query_result.metadata) << std::endl;
   }
 }
 
