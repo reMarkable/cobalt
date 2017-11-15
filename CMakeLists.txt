@@ -317,6 +317,7 @@ include_directories(BEFORE SYSTEM ${CURL_INSTALL_DIR}/src/curl_external_project-
 link_directories(${CURL_INSTALL_DIR}/src/curl_external_project-build)
 
 # Build google_api_cpp_client as an external project.
+set(EXTERNAL_PROJECT_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedef -Wno-sign-compare -Wno-deprecated-declarations")
 set(GOOGLE_API_CPP_CLIENT_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/google-api-cpp-client)
 set(GOOGLE_API_CPP_CLIENT_INCLUDE_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}/src/google_api_cpp_client_external_project-build/include)
 set(GOOGLE_API_CPP_CLIENT_LIB_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}/src/google_api_cpp_client_external_project-build/lib)
@@ -325,10 +326,10 @@ ExternalProject_Add(google_api_cpp_client_external_project
                     PREFIX      ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
                     INSTALL_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
                                 -DCURL_INCLUDE_DIRS=${CMAKE_SOURCE_DIR}/third_party/curl/include
-                                -DCURL_INCLUDE_DIRS=${CURL_INSTALL_DIR}/src/curl_external_project-build
+                                -DMORE_CURL_INCLUDE_DIRS=${CURL_INSTALL_DIR}/src/curl_external_project-build
                                 -DGFLAGS_INCLUDE_DIRS=${GFLAGS_INCLUDE_DIR}
                                 -DGLOG_INCLUDE_DIRS=${GLOG_INCLUDE_DIR}
                                 -DGTEST_INCLUDE_DIRS=${GTEST_INCLUDE_DIR}
