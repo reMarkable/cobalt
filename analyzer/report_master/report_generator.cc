@@ -314,7 +314,7 @@ grpc::Status ReportGenerator::BuildVariableList(
   CHECK(variables);
   variables->clear();
   for (int index : metadata.variable_indices()) {
-    if (index > report_config.variable_size()) {
+    if (index >= report_config.variable_size()) {
       std::ostringstream stream;
       stream << "Invalid arguments: metadata.variable_indices contains "
              << "an out of range index: " << index << ". ReportConfig has only "

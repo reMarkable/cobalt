@@ -36,6 +36,11 @@ type projectConfig struct {
 	projectConfig config.CobaltConfig
 }
 
+// Note that when reports are serialized to CSV, the column headers used are
+// derived from metric part names. Consequently, if this regular expression
+// is modified then the code in the function
+// EscapeMetricPartNameForCSVColumHeader() in
+// //analyzer/report_master/report_serializer.cc must be modified.
 var validMetricPartName = regexp.MustCompile("^[a-zA-Z][_a-zA-Z0-9\\- ]+$")
 
 // Parse the configuration for one project from the yaml string provided into

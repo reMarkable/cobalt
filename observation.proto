@@ -34,7 +34,7 @@ message ValuePart {
     string string_value = 1;
 
     // An integer.
-    uint64 int_value = 2;
+    int64 int_value = 2;
 
     // An uninterpreted sequence of bytes.
     bytes blob_value = 3;
