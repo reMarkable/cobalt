@@ -62,14 +62,19 @@ class GcsUtil {
 
   // Uploads a blob to Google Cloud Storage. |num_bytes| from |data| are
   // uploaded to the given |path| within the given |bucket|. This will succeed
-  // only if the service account specified when this instance was initalized has
-  // write permission on the bucket. Returns true on success. On failure,
-  // logs an Error and returns false.
+  // only if the bucket already exists and the service account specified when
+  // this instance was initalized has write permission on the bucket.
+  // Returns true on success. On failure, logs an Error and returns false.
+  //
+  // |path| Will be used as the full path of the uploaded file. It must
+  // follow the Google Cloud Storage Object name requirements. For best
+  // results it should contain only letters, numbers, underscores, dashes
+  // and forward slashes.
   bool Upload(const std::string& bucket, const std::string& path,
               const std::string mime_type, const char* data, size_t num_bytes);
 
-  // Attempts to connect with Google Cloud Storage and query for the list
-  // of buckets in the specified project. This will succeed only if the service
+  // Attempts to connect with Google Cloud Storage and query for the metadata
+  // for the specified bucket. This will succeed only if the service
   // account specified when this instance was initialized has read permission
   // on the bucket. Returns true on success. On failure, logs an Error and
   // returns.
@@ -78,7 +83,7 @@ class GcsUtil {
   // necessary to perform a Ping() prior to the first Upload. In testing we
   // have observed that Upload will timeout unless at least one Ping() is
   // performed first. We do not understand why.
-  bool Ping(std::string project_id);
+  bool Ping(const std::string& bucket);
 
  private:
   struct Impl;

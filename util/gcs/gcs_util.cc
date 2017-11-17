@@ -25,7 +25,7 @@ using googleapis::client::HttpTransportLayerConfig;
 using googleapis::client::NewUnmanagedInMemoryDataReader;
 using googleapis::client::OAuth2Credential;
 using googleapis::client::OAuth2ServiceAccountFlow;
-using google_storage_api::BucketsResource_ListMethod;
+using google_storage_api::BucketsResource_GetMethod;
 using google_storage_api::ObjectsResource_InsertMethod;
 using google_storage_api::StorageService;
 
@@ -131,18 +131,18 @@ bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
   return false;
 }
 
-bool GcsUtil::Ping(std::string project_id) {
+bool GcsUtil::Ping(const std::string& bucket) {
   // Construct the request.
-  google_storage_api::BucketsResource_ListMethod request(
-      impl_->storage_service_.get(), &(impl_->oauth_credential_), project_id);
-  Json::Value value;
-  google_storage_api::Buckets buckets(&value);
+  std::unique_ptr<BucketsResource_GetMethod> request(
+      impl_->storage_service_->get_buckets().NewGetMethod(
+          &(impl_->oauth_credential_), bucket));
+
   // Execute the request.
-  auto status = request.ExecuteAndParseResponse(&buckets);
+  auto status = request->Execute();
   if (status.ok()) {
     return true;
   }
-  LOG(ERROR) << "Error attempting to list buckets: " << status.ToString();
+  LOG(ERROR) << "Error attempting to ping bucket: " << status.ToString();
   return false;
 }
 

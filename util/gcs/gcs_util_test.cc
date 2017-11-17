@@ -17,29 +17,33 @@ namespace gcs {
 
 // The guts of this test have been commented out so that on our CI and CQ
 // bots all we are doing is testing that GcsUtil compiles. A developer may
-// uncomment the guts of the test and set the two environment variables
+// uncomment the guts of the test and replace the three string tokens:
+//
+// <cobalt_root_dir>
+// <path to some service account key file>
+// <put real bucket name here>
+//
 // appropriately in order to test uploading. Since GcsUtil is a very thin
 // wrapper around google-api-cpp-client there is almost nothing we could
 // mock out for a unit test.
 TEST(GcUtilTest, SmokeTest) {
   GcsUtil gcs_util;
   /*
-   setenv("GRPC_DEFAULT_SSL_ROOTS_FILE_PATH",
-          "<cobalt_root_dir>/third_party/grpc/etc/roots.pem", 1);
-   setenv("GOOGLE_APPLICATION_CREDENTIALS",
-          "<path to some service account key file>",
-          1);
-   ASSERT_TRUE(gcs_util.InitFromDefaultPaths());
-   std::string data("Glory glory hallelulyah!");
-   //ASSERT_TRUE(gcs_util.Ping("fuchsia-cobalt-testing"));
-   ASSERT_TRUE(gcs_util.Upload("rudominer-cobalt-test-1", "glory", "text/plain",
-                               data.data(), data.size()));
-   ASSERT_TRUE(gcs_util.Upload("rudominer-cobalt-test-1", "glory2",
-   "text/plain",
-                               data.data(), data.size()));
-   ASSERT_TRUE(gcs_util.Ping("fuchsia-cobalt-testing"));
-   ASSERT_TRUE(gcs_util.Ping("fuchsia-cobalt-testing"));
-   */
+  setenv("GRPC_DEFAULT_SSL_ROOTS_FILE_PATH",
+         "<cobalt_root_dir>/third_party/grpc/etc/roots.pem", 1);
+  setenv("GOOGLE_APPLICATION_CREDENTIALS",
+         "<path to some service account key file>", 1);
+  std::string bucket_name = "<put real bucket name here>"
+  ASSERT_TRUE(gcs_util.InitFromDefaultPaths());
+  std::string data("Glory glory hallelulyah!");
+  ASSERT_TRUE(gcs_util.Ping(bucket_name));
+  ASSERT_TRUE(gcs_util.Upload(bucket_name, "glory", "text/plain",
+                              data.data(), data.size()));
+  ASSERT_TRUE(gcs_util.Upload(bucket_name, "glory2", "text/plain",
+                              data.data(), data.size()));
+  ASSERT_TRUE(gcs_util.Ping(bucket_name));
+  ASSERT_TRUE(gcs_util.Ping(bucket_name));
+  */
 }
 
 }  // namespace gcs
