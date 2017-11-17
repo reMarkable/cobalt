@@ -284,7 +284,6 @@ ExternalProject_Add(jsoncpp_external_project
                                 -Wno-ignored-qualifiers
                                 -Wno-deprecated-register
                                 -Wno-unused-function
-                                -Wno-unused-local-typedef
                                 -Wno-missing-field-initializers
                                 -Wno-enum-compare-switch
                                 -Wno-unused-local-typedef
@@ -305,7 +304,6 @@ ExternalProject_Add(curl_external_project
                                 -Wno-ignored-qualifiers
                                 -Wno-deprecated-register
                                 -Wno-unused-function
-                                -Wno-unused-local-typedef
                                 -Wno-missing-field-initializers
                                 -Wno-enum-compare-switch
                                 -Wno-unused-local-typedef

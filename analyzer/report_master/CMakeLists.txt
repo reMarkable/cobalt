@@ -40,6 +40,7 @@ add_library(analyzer_report_master_lib
             auth_enforcer.cc
             histogram_analysis_engine.cc
             report_executor.cc
+            report_exporter.cc
             report_generator.cc
             report_master_service.cc
             report_serializer.cc
@@ -48,6 +49,7 @@ target_link_libraries(analyzer_report_master_lib
                       analyzer_config
                       analyzer_store
                       cobalt_crypto
+                      gcs_util
                       pem_util
                       forculus_analyzer
                       rappor_analyzer
@@ -66,6 +68,7 @@ add_executable(analyzer_report_master_tests
                auth_enforcer_test.cc
                histogram_analysis_engine_test.cc
                report_executor_test.cc
+               report_exporter_test.cc
                report_generator_test.cc
                report_master_service_test.cc
                report_serializer_test.cc)
