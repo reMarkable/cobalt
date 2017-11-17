@@ -9,11 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "third_party/google-api-cpp-client/service_apis/storage/google/storage_api/storage_api.h"
-#include "third_party/google-api-cpp-client/src/googleapis/client/auth/oauth2_authorization.h"
-#include "third_party/google-api-cpp-client/src/googleapis/client/auth/oauth2_service_authorization.h"
-#include "third_party/google-api-cpp-client/src/googleapis/client/transport/http_transport.h"
-
 namespace cobalt {
 namespace util {
 namespace gcs {
@@ -34,12 +29,15 @@ namespace gcs {
 // https://github.com/google/google-api-cpp-client/issues/48
 class GcsUtil {
  public:
+  GcsUtil();
+  ~GcsUtil();
+
   // Initializes this instance using default file paths for the CA root
   // certificates and service account json.
   //
   // The path to the CA root cert file is read from the environment varialbe
   // "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH". The path to the service account
-  // json file is read from teh environment variable
+  // json file is read from the environment variable
   // "GOOGLE_APPLICATION_CREDENTIALS".
   //
   // Returns true on success. On failure, logs an Error and returns false.
@@ -63,8 +61,8 @@ class GcsUtil {
             const std::string& service_account_json_path);
 
   // Uploads a blob to Google Cloud Storage. |num_bytes| from |data| are
-  // uploaded at the given |path| in the given |bucket|. This will succeed only
-  // if the service account specified when this instance was initalized has
+  // uploaded to the given |path| within the given |bucket|. This will succeed
+  // only if the service account specified when this instance was initalized has
   // write permission on the bucket. Returns true on success. On failure,
   // logs an Error and returns false.
   bool Upload(const std::string& bucket, const std::string& path,
@@ -83,10 +81,8 @@ class GcsUtil {
   bool Ping(std::string project_id);
 
  private:
-  googleapis::client::OAuth2Credential oauth_credential_;
-  std::unique_ptr<google_storage_api::StorageService> storage_service_;
-  std::unique_ptr<googleapis::client::OAuth2ServiceAccountFlow> oauth_flow_;
-  std::unique_ptr<googleapis::client::HttpTransportLayerConfig> http_config_;
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
 };
 
 }  // namespace gcs
