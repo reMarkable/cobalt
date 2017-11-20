@@ -238,7 +238,7 @@ class ReportExecutorAbstractTest : public ::testing::Test {
 
     // Make a ReportGenerator
     std::unique_ptr<ReportGenerator> report_generator(new ReportGenerator(
-        analyzer_config, observation_store_, report_store_));
+        analyzer_config, observation_store_, report_store_, nullptr));
 
     // Make a ReportExecutor
     report_executor_.reset(

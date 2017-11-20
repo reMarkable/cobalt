@@ -35,12 +35,15 @@ class ReportMasterService final : public ReportMaster::Service {
  public:
   static std::unique_ptr<ReportMasterService> CreateFromFlagsOrDie();
 
+  // |report_exporter| is allowed to be NULL, in which case no exporting
+  // will occur.
   ReportMasterService(
       int port, std::shared_ptr<store::ObservationStore> observation_store,
       std::shared_ptr<store::ReportStore> report_store,
       std::shared_ptr<config::AnalyzerConfig> analyzer_config,
       std::shared_ptr<grpc::ServerCredentials> server_credentials,
-      std::shared_ptr<AuthEnforcer> auth_enforcer);
+      std::shared_ptr<AuthEnforcer> auth_enforcer,
+      std::unique_ptr<ReportExporter> report_exporter);
 
   // Starts the service
   void Start();

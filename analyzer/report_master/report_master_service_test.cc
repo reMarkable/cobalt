@@ -35,7 +35,7 @@ TEST(ReportMasterServiceFriendTest, AuthEnforcerTest) {
 
   ReportMasterService service(0, observation_store, report_store,
                               analyzer_config, server_credentials,
-                              auth_enforcer);
+                              auth_enforcer, nullptr);
 
   StartReportRequest start_request;
   StartReportResponse start_response;

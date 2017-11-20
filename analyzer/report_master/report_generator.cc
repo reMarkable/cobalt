@@ -88,10 +88,12 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
 ReportGenerator::ReportGenerator(
     std::shared_ptr<config::AnalyzerConfig> analyzer_config,
     std::shared_ptr<ObservationStore> observation_store,
-    std::shared_ptr<ReportStore> report_store)
+    std::shared_ptr<ReportStore> report_store,
+    std::unique_ptr<ReportExporter> report_exporter)
     : analyzer_config_(analyzer_config),
       observation_store_(observation_store),
-      report_store_(report_store) {}
+      report_store_(report_store),
+      report_exporter_(std::move(report_exporter)) {}
 
 grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   // Fetch ReportMetadata
@@ -168,18 +170,22 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     }
   }
 
+  std::vector<ReportRow> report_rows;
   switch (metadata.report_type()) {
-    case HISTOGRAM:
-      return GenerateHistogramReport(
+    case HISTOGRAM: {
+      status = GenerateHistogramReport(
           report_id, *report_config, *metric, std::move(variables),
-          metadata.first_day_index(), metadata.last_day_index());
+          metadata.first_day_index(), metadata.last_day_index(), &report_rows);
+      break;
+    }
     case JOINT: {
       std::ostringstream stream;
       stream << "Report type JOINT is not yet implemented "
              << ReportConfigIdString(report_id);
       std::string message = stream.str();
       LOG(ERROR) << message;
-      return grpc::Status(grpc::UNIMPLEMENTED, message);
+      status = grpc::Status(grpc::UNIMPLEMENTED, message);
+      break;
     }
     default: {
       std::ostringstream stream;
@@ -188,15 +194,27 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
              << " for report_id=" << ReportStore::ToString(report_id);
       std::string message = stream.str();
       LOG(ERROR) << message;
-      return grpc::Status(grpc::INVALID_ARGUMENT, message);
+      status = grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
   }
+
+  if (!status.ok()) {
+    return status;
+  }
+
+  if (!report_exporter_) {
+    VLOG(4) << "Not exporting report because no ReportExporter was provided.";
+    return grpc::Status::OK;
+  }
+
+  return report_exporter_->ExportReport(*report_config, metadata, report_rows);
 }
 
 grpc::Status ReportGenerator::GenerateHistogramReport(
     const ReportId& report_id, const ReportConfig& report_config,
     const Metric& metric, std::vector<Variable> variables,
-    uint32_t start_day_index, uint32_t end_day_index) {
+    uint32_t start_day_index, uint32_t end_day_index,
+    std::vector<ReportRow>* report_rows) {
   if (start_day_index > end_day_index) {
     std::ostringstream stream;
     stream << "Invalid arguments: start_day_index=" << start_day_index << ">"
@@ -271,16 +289,15 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
   } while (!query_response.pagination_token.empty());
 
   // Complete the analysis using the HistogramAnalysisEngine.
-  std::vector<ReportRow> report_rows;
-  grpc::Status status = analysis_engine.PerformAnalysis(&report_rows);
+  grpc::Status status = analysis_engine.PerformAnalysis(report_rows);
   if (!status.ok()) {
     return status;
   }
 
-  VLOG(4) << "Generated report with " << report_rows.size() << " rows.";
+  VLOG(4) << "Generated report with " << report_rows->size() << " rows.";
 
   // Write the report rows to the ReportStore.
-  auto store_status = report_store_->AddReportRows(report_id, report_rows);
+  auto store_status = report_store_->AddReportRows(report_id, *report_rows);
   switch (store_status) {
     case store::kOK:
       break;
@@ -314,7 +331,7 @@ grpc::Status ReportGenerator::BuildVariableList(
   CHECK(variables);
   variables->clear();
   for (int index : metadata.variable_indices()) {
-    if (index >= report_config.variable_size()) {
+    if (index > report_config.variable_size()) {
       std::ostringstream stream;
       stream << "Invalid arguments: metadata.variable_indices contains "
              << "an out of range index: " << index << ". ReportConfig has only "

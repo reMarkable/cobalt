@@ -24,6 +24,7 @@
 #include "./encrypted_message.pb.h"
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"
+#include "analyzer/report_master/report_exporter.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
 #include "config/analyzer_config.h"
@@ -41,15 +42,19 @@ namespace analyzer {
 // responsible for figuring out which interval of days a report should analyze.
 // Those things are the responsibility of the ReportMaster.
 //
-// The ReportGenerator uses the ObservationStore and the ReportStore for
-// its input and output. It reads ReportMetadata from the ReportStore,
-// reads Observations from the ObservationStore, and writes ReportRows
-// to the ReportStore.
+// The ReportGenerator uses the ObservationStore, the ReportStore and the
+// ReportExporter for its input and output. It reads ReportMetadata from the
+// ReportStore, reads Observations from the ObservationStore, writes ReportRows
+// to the ReportStore, and exports reports using the ReportExporter. The
+// AnalyzerConfig is used to look up report and metric configs.
 class ReportGenerator {
  public:
+  // report_exporter is allowed to be NULL, in which case no exporting will
+  // occur.
   ReportGenerator(std::shared_ptr<config::AnalyzerConfig> analyzer_config,
                   std::shared_ptr<store::ObservationStore> observation_store,
-                  std::shared_ptr<store::ReportStore> report_store);
+                  std::shared_ptr<store::ReportStore> report_store,
+                  std::unique_ptr<ReportExporter> report_exporter);
 
   // Requests that the ReportGenerator generate the report with the given
   // |report_id|. This method is invoked by the ReportMaster after
@@ -73,7 +78,7 @@ class ReportGenerator {
   //
   // The |sequence_num| field of the |report_id| specifies the position of this
   // report in its dependency chain. If |sequence_num| is greater than zero
-  // than all previous reports in the chain (that is reports with smaller
+  // then all previous reports in the chain (that is reports with smaller
   // sequence numbers) must already have been completed.
   //
   // The ReportGenerator will read the Observations to be analyzed from the
@@ -120,16 +125,20 @@ class ReportGenerator {
   // |report_config| must be the associated ReportConfig,
   // |metric| must be the associated Metric and |variables|
   // must be a vector of size 1 containing the single variable being analyzed.
+  // On success, the generated report will be saved to the ReportStore and also
+  // returned in the variable |report_rows|.
   grpc::Status GenerateHistogramReport(const ReportId& report_id,
                                        const ReportConfig& report_config,
                                        const Metric& metric,
                                        std::vector<Variable> variables,
                                        uint32_t start_day_index,
-                                       uint32_t end_day_index);
+                                       uint32_t end_day_index,
+                                       std::vector<ReportRow>* report_rows);
 
   std::shared_ptr<config::AnalyzerConfig> analyzer_config_;
   std::shared_ptr<store::ObservationStore> observation_store_;
   std::shared_ptr<store::ReportStore> report_store_;
+  std::unique_ptr<ReportExporter> report_exporter_;
 };
 
 }  // namespace analyzer

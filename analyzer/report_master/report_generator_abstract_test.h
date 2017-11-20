@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "./observation.pb.h"
+#include "analyzer/report_master/report_exporter.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
@@ -124,9 +125,38 @@ element {
   variable {
     metric_part: "Part2"
   }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "BUCKET-NAME"
+      folder_path: "report_exporter_test/fruit_counts"
+    }
+  }
 }
 
 )";
+
+// An implementation of GcsUploadInterface that saves its parameters and
+// returns OK.
+struct FakeGcsUploader : public GcsUploadInterface {
+  grpc::Status UploadToGCS(const std::string& bucket, const std::string& path,
+                           const std::string& mime_type,
+                           const std::string& serialized_report) override {
+    this->upload_was_invoked = true;
+    this->bucket = bucket;
+    this->path = path;
+    this->mime_type = mime_type;
+    this->serialized_report = serialized_report;
+    return grpc::Status::OK;
+  }
+
+  bool upload_was_invoked = false;
+  std::string bucket;
+  std::string path;
+  std::string mime_type;
+  std::string serialized_report;
+};
+
 }  // namespace testing
 
 // ReportGeneratorAbstractTest is templatized on the parameter
@@ -140,7 +170,8 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   ReportGeneratorAbstractTest()
       : data_store_(StoreFactoryClass::NewStore()),
         observation_store_(new store::ObservationStore(data_store_)),
-        report_store_(new store::ReportStore(data_store_)) {
+        report_store_(new store::ReportStore(data_store_)),
+        fake_uploader_(new testing::FakeGcsUploader()) {
     report_id_.set_customer_id(testing::kCustomerId);
     report_id_.set_project_id(testing::kProjectId);
     report_id_.set_report_config_id(testing::kReportConfigId);
@@ -186,8 +217,11 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
                                    report_config_registry));
 
     // Make the ReportGenerator
-    report_generator_.reset(new ReportGenerator(
-        analyzer_config, observation_store_, report_store_));
+    std::unique_ptr<ReportExporter> report_exporter(
+        new ReportExporter(fake_uploader_));
+    report_generator_.reset(
+        new ReportGenerator(analyzer_config, observation_store_, report_store_,
+                            std::move(report_exporter)));
   }
 
   // Makes an Observation with two string parts, both of which have the
@@ -240,16 +274,20 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // Uses the ReportGenerator to generate a HISTOGRAM report that analyzes the
   // specified variable of our two-variable test metric. |variable_index| must
   // be either 0 or 1. It will also be used for the sequence_num.
-  GeneratedReport GenerateHistogramReport(int variable_index) {
+  // If |export_report| is true then the report will be exported using
+  // our FakeGcsUploader.
+  GeneratedReport GenerateHistogramReport(int variable_index,
+                                          bool export_report) {
     // Complete the report_id by specifying the sequence_num.
     report_id_.set_sequence_num(variable_index);
 
     // Start a report for the specified variable, for the interval of days
     // [kDayIndex, kDayIndex].
+    std::string export_name = export_report ? "export_name" : "";
     EXPECT_EQ(store::kOK,
               report_store_->StartNewReport(
-                  testing::kDayIndex, testing::kDayIndex, true, "", HISTOGRAM,
-                  {(uint32_t)variable_index}, &report_id_));
+                  testing::kDayIndex, testing::kDayIndex, true, export_name,
+                  HISTOGRAM, {(uint32_t)variable_index}, &report_id_));
 
     // Generate the report
     EXPECT_TRUE(report_generator_->GenerateReport(report_id_).ok());
@@ -282,11 +320,20 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
                     testing::kForculusThreshold + 1);
   }
 
+  // This is the CSV that should be generated when the report for metric part 2
+  // is exported, when Forculus Observations are added, based on the
+  // Observations that are added in AddForculusObservations() above.
+  const char* const kExpectedPart2ForculusCSV = R"(Part2,count,err
+"hello",20.000,0
+"peace",21.000,0
+)";
+
   // This method should be invoked after invoking AddForculusObservations()
   // and then GenerateReport. It checks the generated Report to make sure
   // it is correct given the Observations that were added and the Forculus
   // config.
-  void CheckForculusReport(const GeneratedReport& report, uint variable_index) {
+  void CheckForculusReport(const GeneratedReport& report, uint variable_index,
+                           const std::string& expected_export_csv) {
     EXPECT_EQ(HISTOGRAM, report.metadata.report_type());
     EXPECT_EQ(1, report.metadata.variable_indices_size());
     EXPECT_EQ(variable_index, report.metadata.variable_indices(0));
@@ -310,6 +357,18 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
         default:
           FAIL();
       }
+    }
+    if (report.metadata.export_name() == "") {
+      EXPECT_FALSE(this->fake_uploader_->upload_was_invoked);
+    } else {
+      EXPECT_TRUE(this->fake_uploader_->upload_was_invoked);
+      // Reset for next time
+      this->fake_uploader_->upload_was_invoked = false;
+      EXPECT_EQ("BUCKET-NAME", fake_uploader_->bucket);
+      EXPECT_EQ("report_exporter_test/fruit_counts/export_name",
+                fake_uploader_->path);
+      EXPECT_EQ("text/csv", fake_uploader_->mime_type);
+      EXPECT_EQ(expected_export_csv, fake_uploader_->serialized_report);
     }
   }
 
@@ -349,6 +408,18 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
 
       EXPECT_GT(report_row.histogram().count_estimate(), 0);
     }
+    if (report.metadata.export_name() == "") {
+      EXPECT_FALSE(this->fake_uploader_->upload_was_invoked);
+    } else {
+      EXPECT_TRUE(this->fake_uploader_->upload_was_invoked);
+      // Reset for next time
+      this->fake_uploader_->upload_was_invoked = false;
+      EXPECT_EQ("BUCKET-NAME", fake_uploader_->bucket);
+      EXPECT_EQ("report_exporter_test/fruit_counts/export_name",
+                fake_uploader_->path);
+      EXPECT_EQ("text/csv", fake_uploader_->mime_type);
+      EXPECT_FALSE(fake_uploader_->serialized_report.empty());
+    }
   }
 
   ReportId report_id_;
@@ -357,12 +428,13 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   std::shared_ptr<store::ObservationStore> observation_store_;
   std::shared_ptr<store::ReportStore> report_store_;
   std::unique_ptr<ReportGenerator> report_generator_;
+  std::shared_ptr<testing::FakeGcsUploader> fake_uploader_;
 };
 
 TYPED_TEST_CASE_P(ReportGeneratorAbstractTest);
 
 // Tests that the ReportGenerator correctly generates a report for both
-// variables of our two-variable metric when the ObservationStroe has been
+// variables of our two-variable metric when the ObservationStore has been
 // filled with Observations of that metric that use our Forculus encoding.
 // Note that *joint* reports have not yet been implemented.
 TYPED_TEST_P(ReportGeneratorAbstractTest, Forculus) {
@@ -370,14 +442,17 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, Forculus) {
   {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
-    auto report = this->GenerateHistogramReport(variable_index);
-    this->CheckForculusReport(report, variable_index);
+    // Don't export the report.
+    auto report = this->GenerateHistogramReport(variable_index, false);
+    this->CheckForculusReport(report, variable_index, "");
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
-    auto report = this->GenerateHistogramReport(variable_index);
-    this->CheckForculusReport(report, variable_index);
+    // Do export the report.
+    auto report = this->GenerateHistogramReport(variable_index, true);
+    this->CheckForculusReport(report, variable_index,
+                              this->kExpectedPart2ForculusCSV);
   }
 }
 
@@ -390,13 +465,15 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, BasicRappor) {
   {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
-    auto report = this->GenerateHistogramReport(variable_index);
+    // Do exort the report.
+    auto report = this->GenerateHistogramReport(variable_index, true);
     this->CheckBasicRapporReport(report, variable_index);
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
-    auto report = this->GenerateHistogramReport(variable_index);
+    // Don't export the report.
+    auto report = this->GenerateHistogramReport(variable_index, false);
     this->CheckBasicRapporReport(report, variable_index);
   }
 }

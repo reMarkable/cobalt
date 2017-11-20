@@ -256,9 +256,15 @@ ReportMasterService::CreateFromFlagsOrDie() {
     server_credentials = grpc::InsecureServerCredentials();
   }
 
+  // We construct a ReportExporter that uses a GcsUploader in order to
+  // upload serialized reports to Google Cloud Storage.
+  std::shared_ptr<GcsUploader> gcs_uploader(new GcsUploader());
+  std::unique_ptr<ReportExporter> report_exporter(
+      new ReportExporter(gcs_uploader));
+
   return std::unique_ptr<ReportMasterService>(new ReportMasterService(
       FLAGS_port, observation_store, report_store, analyzer_config,
-      server_credentials, auth_enforcer));
+      server_credentials, auth_enforcer, std::move(report_exporter)));
 }
 
 ReportMasterService::ReportMasterService(
@@ -266,15 +272,16 @@ ReportMasterService::ReportMasterService(
     std::shared_ptr<store::ReportStore> report_store,
     std::shared_ptr<config::AnalyzerConfig> analyzer_config,
     std::shared_ptr<grpc::ServerCredentials> server_credentials,
-    std::shared_ptr<AuthEnforcer> auth_enforcer)
+    std::shared_ptr<AuthEnforcer> auth_enforcer,
+    std::unique_ptr<ReportExporter> report_exporter)
     : port_(port),
       observation_store_(observation_store),
       report_store_(report_store),
       analyzer_config_(analyzer_config),
       report_executor_(new ReportExecutor(
-          report_store_,
-          std::unique_ptr<ReportGenerator>(new ReportGenerator(
-              analyzer_config_, observation_store_, report_store_)))),
+          report_store_, std::unique_ptr<ReportGenerator>(new ReportGenerator(
+                             analyzer_config_, observation_store_,
+                             report_store_, std::move(report_exporter))))),
       server_credentials_(server_credentials),
       auth_enforcer_(auth_enforcer) {}
 
