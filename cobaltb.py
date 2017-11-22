@@ -103,7 +103,7 @@ def _compound_project_name(args):
 def _setup(args):
   subprocess.check_call(["git", "submodule", "init"])
   subprocess.check_call(["git", "submodule", "update"])
-  subprocess.check_call(["./setup.sh", "-d"])
+  subprocess.check_call(["./setup.sh"])
 
 def _build(args):
   ensureDir(OUT_DIR)
@@ -1541,9 +1541,10 @@ def main():
   global _vmodule
   _vmodule = args.vmodule
 
-  # Extend paths to include third-party dependencies
+  # Add bin dirs from sysroot to the front of the path.
   os.environ["PATH"] = \
       "%s/bin" % SYSROOT_DIR \
+      + os.pathsep + "%s/golang/bin" % SYSROOT_DIR \
       + os.pathsep + "%s/gcloud/google-cloud-sdk/bin" % SYSROOT_DIR \
       + os.pathsep + os.environ["PATH"]
   os.environ["LD_LIBRARY_PATH"] = "%s/lib" % SYSROOT_DIR

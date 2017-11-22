@@ -1,0 +1,21 @@
+# Copyright 2017 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# CMake
+infra/cmake/${platform} version:3.10.0
+
+# Clang
+fuchsia/clang/${platform} git_revision:597fe911c137f5d3ccd6678925a0848d2cc1455e
+
+# Ninja
+@Subdir bin
+infra/ninja/${platform} version:1.8.2
+
+# Go
+@Subdir golang
+infra/go/${platform} version:1.9.2
+
+# gcloud
+@Subdir gcloud/google-cloud-sdk
+infra/gcloud/${platform} version:180.0.1.chromium0

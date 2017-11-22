@@ -61,8 +61,7 @@ class HistogramAnalysisEngine {
   //
   // The |analyzer_config| is used to look up EncodingConfigs by their ID.
   HistogramAnalysisEngine(
-      const ReportId& report_id,
-      const ReportVariable* report_variable,
+      const ReportId& report_id, const ReportVariable* report_variable,
       std::shared_ptr<config::AnalyzerConfig> analyzer_config);
 
   // Process the given (day_index, ObservationPart) pair. The |day_index|
@@ -116,6 +115,8 @@ class HistogramAnalysisEngine {
 // algorithm.
 class DecoderAdapter {
  public:
+  virtual ~DecoderAdapter() = default;
+
   virtual bool ProcessObservationPart(uint32_t day_index,
                                       const ObservationPart& obs) = 0;
 

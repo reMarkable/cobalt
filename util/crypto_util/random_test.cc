@@ -14,6 +14,7 @@
 #include "util/crypto_util/random.h"
 
 #include <bitset>
+#include <cmath>
 #include <memory>
 #include <utility>
 #include <vector>

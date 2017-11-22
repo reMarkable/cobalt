@@ -215,6 +215,8 @@ std::shared_ptr<ProjectContext> GetTestProject() {
 // Envelope for inspection by a test.
 class FakeAnalyzerClient : public AnalyzerClientInterface {
  public:
+  virtual ~FakeAnalyzerClient() = default;
+
   void SendToAnalyzer(const Envelope& e) override {
     // Copy the EnvelopeMaker's Envelope.
     envelope = e;

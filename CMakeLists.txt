@@ -335,6 +335,7 @@ ExternalProject_Add(google_api_cpp_client_external_project
                                 -DGTEST_INCLUDE_DIRS=${GTEST_INCLUDE_DIR}
                                 -DJSONCPP_INCLUDE_DIRS=${JSONCPP_INCLUDE_DIR}
                                 -DOTHER_INCLUDE_DIRS=${BORINGSSL_INCLUDE_DIR}
+                                -DHAVE_OPENSSL=1
                                 -Dgoogleapis_build_samples=OFF
                                 -Dgoogleapis_build_service_apis=ON
                                 -Wno-sign-compare

@@ -119,7 +119,7 @@ const std::vector<CohortCounts>& BloomBitCounter::EstimateCounts() {
       // formulas we use for count_estimate and std_error.
       count_estimates[bit_index] = (Y - correction) / divisor;
       std_errors[bit_index] =
-          std::sqrt(Y * one_minus_q_plus_p + Npq) / abs_divisor;
+          sqrt(Y * one_minus_q_plus_p + Npq) / abs_divisor;
     }
   }
 

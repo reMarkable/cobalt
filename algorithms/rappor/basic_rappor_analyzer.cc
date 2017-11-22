@@ -80,7 +80,7 @@ BasicRapporAnalyzer::Analyze() {
   double Npq = N * p * q;
   double correction = p * N;
   double divisor = q - p;  // divisor != 0 because we don't allow q == p.
-  double abs_divisor = std::abs(divisor);
+  double abs_divisor = fabs(divisor);
   // Note(rudominer) When we support PRR then we need to modify the above
   // formulas as follows. Let f = prob_rr. Then let
   // p11        = q * (1 - f/2) + p * f / 2;
@@ -99,7 +99,7 @@ BasicRapporAnalyzer::Analyze() {
     // See go/cobalt-basic-rappor-analysis for an explanation of the
     // formulas we use for count_estimate and std_error.
     result.count_estimate = (Y - correction) / divisor;
-    result.std_error = std::sqrt(Y * one_minus_q_plus_p + Npq) / abs_divisor;
+    result.std_error = sqrt(Y * one_minus_q_plus_p + Npq) / abs_divisor;
     category_index++;
   }
 

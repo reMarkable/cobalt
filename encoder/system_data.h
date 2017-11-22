@@ -28,6 +28,8 @@ class SystemData : public SystemDataInterface {
   // of the actual running system.
   SystemData();
 
+  virtual ~SystemData() = default;
+
   // Returns the SystemProfile for the current system.
   const SystemProfile& system_profile() const override {
     return system_profile_;

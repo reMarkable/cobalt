@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <utility>
 #include <vector>
@@ -242,7 +243,7 @@ class BasicRapporAnalyzerTest : public ::testing::Test {
     double average_count_estimate = accumulated_count_estimate / kNumTrials;
     double std_error_estimate = accumulated_std_err_estimate / kNumTrials;
     double observed_variance = accumulated_actual_square_error / kNumTrials;
-    double observed_std_dev = std::sqrt(observed_variance);
+    double observed_std_dev = sqrt(observed_variance);
 
     // Check that the average count estimate is within 1.66 observed
     // standard deviations of the true count, y. We may think of this
@@ -252,7 +253,7 @@ class BasicRapporAnalyzerTest : public ::testing::Test {
     // freedom (because kNumTrials = 100). By using the number 1.66 we are
     // performing the test at the 0.1 significance level because
     // P(t > 1.66) ~= 0.05 where t ~ T(100).
-    double t_stat = std::abs(average_count_estimate - y) / observed_std_dev;
+    double t_stat = fabs(average_count_estimate - y) / observed_std_dev;
     EXPECT_TRUE(t_stat < 1.66) << t_stat;
 
     // We check that the ratio of the observed_std_dev to the std_error_estimate
@@ -496,7 +497,7 @@ TEST_F(BasicRapporAnalyzerTest, OneBitTestN1000P015Q085) {
   // This is the expected standard error for n=1000, p=0.15, q=0.85,
   // independent
   // of y.
-  double expected_std_err = std::sqrt(127.5) * 10.0 / 7.0;
+  double expected_std_err = sqrt(127.5) * 10.0 / 7.0;
 
   // Test with various values of y.
   for (int y : {0, 1, 71, 333, 444, 555, 666, 777, 888, 999, 1000}) {
@@ -519,7 +520,7 @@ TEST_F(BasicRapporAnalyzerTest, OneBitTestN5000P05Q09) {
   // This is the formula for computing expected_std_err when n=5000, p=0.5,
   // q=0.9.
   auto std_err = [](double y) {
-    return std::sqrt(y * -0.4 + 2250.0) * 5.0 / 2.0;
+    return sqrt(y * -0.4 + 2250.0) * 5.0 / 2.0;
   };
 
   // Test with various values of y.
@@ -542,7 +543,7 @@ TEST_F(BasicRapporAnalyzerTest, OneBitTestN5000P005Q05) {
 
   // This is the formula for computing expected_std_err when n=5000, p=0.05,
   // q=0.5.
-  auto std_err = [](double y) { return std::sqrt(y * 0.45 + 125.0) / 0.45; };
+  auto std_err = [](double y) { return sqrt(y * 0.45 + 125.0) / 0.45; };
 
   // Test with various values of y.
   for (int y : {0, 1, 49, 222, 1333, 2444, 3555, 4999, 5000}) {

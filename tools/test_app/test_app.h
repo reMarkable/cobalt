@@ -48,6 +48,7 @@ namespace cobalt {
 class AnalyzerClientInterface {
  public:
   virtual void SendToAnalyzer(const Envelope& envelope) = 0;
+  virtual ~AnalyzerClientInterface() = default;
 };
 
 // The Cobalt testing client application.

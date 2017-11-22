@@ -50,10 +50,10 @@ using encoder::ShippingManager;
 using encoder::ShufflerClient;
 using encoder::ShufflerClientInterface;
 using encoder::SystemData;
+using google::protobuf::Empty;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
-using google::protobuf::Empty;
 using shuffler::Shuffler;
 using util::PemUtil;
 
@@ -325,6 +325,8 @@ class AnalyzerClient : public AnalyzerClientInterface {
   AnalyzerClient(std::unique_ptr<analyzer::Analyzer::Stub> analyzer_stub,
                  TestApp::Mode mode)
       : analyzer_stub_(std::move(analyzer_stub)), mode_(mode) {}
+
+  virtual ~AnalyzerClient() = default;
 
  private:
   void SendToAnalyzer(const Envelope& envelope) {

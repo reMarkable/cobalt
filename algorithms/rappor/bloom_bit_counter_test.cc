@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <utility>
 #include <vector>
@@ -356,7 +357,7 @@ TEST_F(BloomBitCounterTest, OneBitTestN1000P015Q085) {
   // This is the expected standard error for n=1000, p=0.15, q=0.85,
   // independent
   // of y.
-  double expected_std_err = std::sqrt(127.5) * 10.0 / 7.0;
+  double expected_std_err = sqrt(127.5) * 10.0 / 7.0;
 
   // Test with various values of y.
   for (int y : {0, 1, 71, 333, 444, 555, 666, 777, 888, 999, 1000}) {
@@ -379,7 +380,7 @@ TEST_F(BloomBitCounterTest, OneBitTestN5000P05Q09) {
   // This is the formula for computing expected_std_err when n=5000, p=0.5,
   // q=0.9.
   auto std_err = [](double y) {
-    return std::sqrt(y * -0.4 + 2250.0) * 5.0 / 2.0;
+    return sqrt(y * -0.4 + 2250.0) * 5.0 / 2.0;
   };
 
   // Test with various values of y.
@@ -402,7 +403,7 @@ TEST_F(BloomBitCounterTest, OneBitTestN5000P005Q05) {
 
   // This is the formula for computing expected_std_err when n=5000, p=0.05,
   // q=0.5.
-  auto std_err = [](double y) { return std::sqrt(y * 0.45 + 125.0) / 0.45; };
+  auto std_err = [](double y) { return sqrt(y * 0.45 + 125.0) / 0.45; };
 
   // Test with various values of y.
   for (int y : {0, 1, 49, 222, 1333, 2444, 3555, 4999, 5000}) {
