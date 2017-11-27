@@ -128,6 +128,10 @@ uint32_t CalendarDateToDayIndex(const CalendarDate& calendar_date) {
   return era * kNumDaysPerEra + doe - kEpochOffset;
 }
 
+time_t MidnightUtcFromDayIndex(uint32_t day_index) {
+  return day_index * kNumUnixSecondsPerDay;
+}
+
 CalendarDate DayIndexToCalendarDate(uint32_t day_index) {
   // This function is an inverse to CalendarDateToDayIndex.
   // But because gmtime_r is a standard function unlike timegm, we

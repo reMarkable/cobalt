@@ -94,6 +94,10 @@ struct CalendarDate {
 // that is a number of Unix seconds since the Unix epoch.
 uint32_t TimeToDayIndex(time_t time, Metric::TimeZonePolicy time_zone);
 
+// Returns the Unix time for midnight of the day with the given |day_index|
+// in UTC.
+time_t MidnightUtcFromDayIndex(uint32_t day_index);
+
 // Converts the given CalendarDate to a Cobalt Day Index. If the fields of
 // calendar_date do not make sense as a real day of the calendar
 // (for example if month=13) then the result is undefined. If the
