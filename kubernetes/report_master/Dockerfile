@@ -22,5 +22,18 @@ COPY registered_encodings.txt /etc/cobalt/
 COPY registered_metrics.txt /etc/cobalt/
 COPY registered_reports.txt /etc/cobalt/
 
+# Install git which is needed by the config parser.
+RUN sudo apt-get update
+RUN sudo apt-get install -y git=1:1.9.1-1ubuntu0.7
+
+# Install the config parser.
+COPY config_parser_bin /usr/local/bin/
+
+# Grab the current version of the config.
+RUN mkdir -p /etc/cobalt
+RUN /usr/local/bin/config_parser_bin \
+      --repo_url https://cobalt-analytics.googlesource.com/config \
+      --output_file /etc/cobalt/config.proto
+
 ENTRYPOINT ["analyzer_report_master"]
 EXPOSE 7000

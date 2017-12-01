@@ -17,7 +17,7 @@ import (
 
 // Clones the specified repository to the specified destination.
 func cloneRepo(repoUrl string, destination string) error {
-	cmd := exec.Command("git",
+	cmd := exec.Command("git", "clone",
 		// Truncate the history to the latest commit.
 		"--depth", "1",
 		repoUrl, destination)
