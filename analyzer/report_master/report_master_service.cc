@@ -329,14 +329,18 @@ grpc::Status ReportMasterService::StartReport(ServerContext* context,
   bool one_off = true;
   // We do not export one-off reports to Google Cloud Storage.
   std::string export_name = "";
-  return StartReportNoAuth(request, one_off, export_name, response);
+  ReportId report_id_not_used;
+  return StartReportNoAuth(request, one_off, export_name, &report_id_not_used,
+                           response);
 }
 
 grpc::Status ReportMasterService::StartReportNoAuth(
     const StartReportRequest* request, bool one_off,
-    const std::string& export_name, StartReportResponse* response) {
+    const std::string& export_name, ReportId* report_id_out,
+    StartReportResponse* response) {
   CHECK(request);
   CHECK(response);
+  CHECK(report_id_out);
   response->Clear();
   uint32_t customer_id = request->customer_id();
   uint32_t project_id = request->project_id();
@@ -351,19 +355,19 @@ grpc::Status ReportMasterService::StartReportNoAuth(
   }
 
   // Set up the fields of the ReportId.
-  ReportId report_id;
-  report_id.set_customer_id(customer_id);
-  report_id.set_project_id(project_id);
-  report_id.set_report_config_id(report_config_id);
+  report_id_out->Clear();
+  report_id_out->set_customer_id(customer_id);
+  report_id_out->set_project_id(project_id);
+  report_id_out->set_report_config_id(report_config_id);
 
   switch (report_config->report_type()) {
     case HISTOGRAM:
-      return StartHistogramReport(*request, one_off, export_name, &report_id,
+      return StartHistogramReport(*request, one_off, export_name, report_id_out,
                                   response);
       break;
 
     case JOINT:
-      return StartJointReport(*request, one_off, export_name, &report_id,
+      return StartJointReport(*request, one_off, export_name, report_id_out,
                               response);
       break;
 

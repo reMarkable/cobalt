@@ -78,8 +78,14 @@ class ReportMasterService final : public ReportMaster::Service {
   //
   // |export_name| specifies the location to where this report will be exported.
   // See the comments on the |export_name| field of ReportMetadataLite.
+  //
+  // |report_id_out| This must be non null. The ReportId pointed to will be
+  // cleared and then populated with the internal version of the report id
+  // for the newly started report. Note that the external version of the
+  // report id is included in |response|.
   grpc::Status StartReportNoAuth(const StartReportRequest* request,
                                  bool one_off, const std::string& export_name,
+                                 ReportId* report_id_out,
                                  StartReportResponse* response);
 
   // GetReportNoAuth is identical to GetReports but authorization is not
