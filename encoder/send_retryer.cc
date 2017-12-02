@@ -169,7 +169,10 @@ grpc::Status SendRetryer::SendToShuffler(
 
     // Note: We invoke the real system clock here, not clock_->now().
     // This is because even in a test we want to use the real
-    // system clock to compute wakeup_time. This is because
+    // system clock to compute wakeup_time because
+    // std::condition_varaible::wait_until() always uses the real system clock.
+    // A test is able to control the sleep time by setting the value of
+    // initial_sleep_.
     auto wakeup_time =
         std::chrono::system_clock::now() + sleep_between_attempts;
 
