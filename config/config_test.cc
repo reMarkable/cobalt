@@ -365,5 +365,45 @@ TEST(MetricRegistryFromString, ValidString) {
   EXPECT_EQ(2, count);
 }
 
+//////////////  Tests of the FromProto() functions. //////////////
+// We reuse the strings used to test FromString.
+
+TEST(EncodingRegistryFromProto, ValidProto) {
+  RegisteredEncodings registered_encodings;
+  google::protobuf::TextFormat::Parser parser;
+  EXPECT_TRUE(
+      parser.ParseFromString(kEncodingConfigText, &registered_encodings));
+
+  auto result = EncodingRegistry::FromProto(registered_encodings, nullptr);
+  EXPECT_EQ(kOK, result.second);
+  auto& registry = result.first;
+  EXPECT_EQ(2u, registry->size());
+  // Test iteration.
+  int count = 0;
+  for (const EncodingConfig& encoding : *registry) {
+    EXPECT_EQ(1u, encoding.customer_id());
+    count++;
+  }
+  EXPECT_EQ(2, count);
+}
+
+TEST(MetricsRegistryFromProto, ValidProto) {
+  RegisteredMetrics registered_metrics;
+  google::protobuf::TextFormat::Parser parser;
+  EXPECT_TRUE(parser.ParseFromString(kMetricConfigText, &registered_metrics));
+
+  auto result = MetricRegistry::FromProto(registered_metrics, nullptr);
+  EXPECT_EQ(kOK, result.second);
+  auto& registry = result.first;
+  EXPECT_EQ(2u, registry->size());
+  // Test iteration.
+  int count = 0;
+  for (const Metric& metric : *registry) {
+    EXPECT_EQ(1u, metric.customer_id());
+    count++;
+  }
+  EXPECT_EQ(2, count);
+}
+
 }  // namespace config
 }  // namespace cobalt
