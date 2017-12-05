@@ -20,6 +20,7 @@ namespace {
 
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
+const uint32_t kSomeDayIndex = 123456;
 
 const char* kReportConfigText = R"(
 element {
@@ -53,6 +54,8 @@ ReportMetadataLite BuildHistogramMetadata(uint32_t variable_index) {
   ReportMetadataLite metadata;
   metadata.set_report_type(ReportType::HISTOGRAM);
   metadata.add_variable_indices(variable_index);
+  metadata.set_first_day_index(kSomeDayIndex);
+  metadata.set_last_day_index(kSomeDayIndex);
   return metadata;
 }
 
@@ -156,7 +159,7 @@ class ReportSerializerTest : public ::testing::Test {
 // report is a histogram report with zero rows added.
 TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVNoRows) {
   std::vector<ReportRow> report_rows;
-  const char* kExpectedCSV = R"(Fruit,count,err
+  const char* kExpectedCSV = R"(date,Fruit,count,err
 )";
   DoSerializeHistogramReportToCSVTest(1, 0, report_rows, kExpectedCSV);
 }
@@ -168,10 +171,10 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIntegerRows) {
   report_rows.push_back(HistogramReportIntValueRow(123, 456.7, 8.0));
   report_rows.push_back(HistogramReportIntValueRow(0, 77777, 0.000001));
   report_rows.push_back(HistogramReportIntValueRow(-1001, 0.019999999, 0.01));
-  const char* kExpectedCSV = R"(City,count,err
-123,456.700,8.000
-0,77777.000,0
--1001,0.020,0.010
+  const char* kExpectedCSV = R"(date,City,count,err
+2035-10-22,123,456.700,8.000
+2035-10-22,0,77777.000,0
+2035-10-22,-1001,0.020,0.010
 )";
   DoSerializeHistogramReportToCSVTest(1, 1, report_rows, kExpectedCSV);
 }
@@ -186,8 +189,7 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVStringRows) {
       HistogramReportStringValueRow("banana", -7.77777, -77.0000007));
   report_rows.push_back(
       HistogramReportStringValueRow("My \"favorite\" fruit!", 3, 0));
-  report_rows.push_back(HistogramReportStringValueRow(
-      "\n \r \t \v", 4, 0));
+  report_rows.push_back(HistogramReportStringValueRow("\n \r \t \v", 4, 0));
   report_rows.push_back(HistogramReportStringValueRow(
       "This string has length greater than 256 "
       "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -195,13 +197,13 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVStringRows) {
       "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
       0.019999999, 0.01));
-  const char* kExpectedCSV = R"(Fruit,count,err
-"",0,1.000
-"apple",0,0
-"banana",0,0
-"My %22favorite%22 fruit!",3.000,0
-"%0A %0D %09 %0B",4.000,0
-"This string has length greater than 256 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",0.020,0.010
+  const char* kExpectedCSV = R"(date,Fruit,count,err
+2035-10-22,"",0,1.000
+2035-10-22,"apple",0,0
+2035-10-22,"banana",0,0
+2035-10-22,"My %22favorite%22 fruit!",3.000,0
+2035-10-22,"%0A %0D %09 %0B",4.000,0
+2035-10-22,"This string has length greater than 256 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",0.020,0.010
 )";
   DoSerializeHistogramReportToCSVTest(1, 0, report_rows, kExpectedCSV);
 }
@@ -212,9 +214,9 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVBlobRows) {
   std::vector<ReportRow> report_rows;
   report_rows.push_back(HistogramReportBlobValueRow("blob a", 100, 0.1));
   report_rows.push_back(HistogramReportBlobValueRow("blob b", 50, 0));
-  const char* kExpectedCSV = R"(City,count,err
-bNJoxyQ/fmpYIi0JdGT62jdYZvZr1Qfh/3Ka+XHRPkc=,100.000,0.100
-2aOnR4wmTEA2+lCg37Ocv9A6UdTx5rUJ4okYcaVBZ5s=,50.000,0
+  const char* kExpectedCSV = R"(date,City,count,err
+2035-10-22,bNJoxyQ/fmpYIi0JdGT62jdYZvZr1Qfh/3Ka+XHRPkc=,100.000,0.100
+2035-10-22,2aOnR4wmTEA2+lCg37Ocv9A6UdTx5rUJ4okYcaVBZ5s=,50.000,0
 )";
   DoSerializeHistogramReportToCSVTest(1, 1, report_rows, kExpectedCSV);
 }
@@ -230,11 +232,11 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIndexRows) {
   report_rows.push_back(HistogramReportIndexValueRow(2, "", 51, 0));
   report_rows.push_back(HistogramReportIndexValueRow(3, "", 0, 0));
   report_rows.push_back(HistogramReportIndexValueRow(4, "plum", 52, 0));
-  const char* kExpectedCSV = R"(Fruit,count,err
-"apple",100.000,0.100
-"banana",50.000,0
-<index 2>,51.000,0
-"plum",52.000,0
+  const char* kExpectedCSV = R"(date,Fruit,count,err
+2035-10-22,"apple",100.000,0.100
+2035-10-22,"banana",50.000,0
+2035-10-22,<index 2>,51.000,0
+2035-10-22,"plum",52.000,0
 )";
   DoSerializeHistogramReportToCSVTest(1, 0, report_rows, kExpectedCSV);
 }
@@ -246,8 +248,8 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVInvalidValue) {
   ReportRow report_row;
   report_row.mutable_histogram();
   report_rows.push_back(report_row);
-  const char* kExpectedCSV = R"(City,count,err
-<Unrecognized value data type>,0,0
+  const char* kExpectedCSV = R"(date,City,count,err
+2035-10-22,<Unrecognized value data type>,0,0
 )";
   DoSerializeHistogramReportToCSVTest(1, 1, report_rows, kExpectedCSV);
 }

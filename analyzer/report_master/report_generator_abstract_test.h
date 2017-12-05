@@ -323,9 +323,9 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // This is the CSV that should be generated when the report for metric part 2
   // is exported, when Forculus Observations are added, based on the
   // Observations that are added in AddForculusObservations() above.
-  const char* const kExpectedPart2ForculusCSV = R"(Part2,count,err
-"hello",20.000,0
-"peace",21.000,0
+  const char* const kExpectedPart2ForculusCSV = R"(date,Part2,count,err
+2016-12-2,"hello",20.000,0
+2016-12-2,"peace",21.000,0
 )";
 
   // This method should be invoked after invoking AddForculusObservations()

@@ -95,10 +95,10 @@ std::string ReplaceBucketName(const std::string& bucket_name) {
 
 // This is the CSV that should be generated based on the rows that are
 // added to the report in ReportExporterTest::ExportReport().
-const char* const kExpectedCSV = R"(Fruit,count,err
-"apple",10.000,0
-"banana",15.000,0.100
-"cantaloup",7.100,0
+const char* const kExpectedCSV = R"(date,Fruit,count,err
+1970-1-1,"apple",10.000,0
+1970-1-1,"banana",15.000,0.100
+1970-1-1,"cantaloup",7.100,0
 )";
 
 // Builds a ReportMetadataLite of type HISTOGRAM with one variable for

@@ -12,6 +12,7 @@
 #include "glog/logging.h"
 #include "util/crypto_util/base64.h"
 #include "util/crypto_util/hash.h"
+#include "util/datetime_util.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -171,6 +172,13 @@ std::string IdString(const ReportConfig& report_config) {
   return stream.str();
 }
 
+std::string DayIndexToDateString(uint32_t day_index) {
+  util::CalendarDate cd = util::DayIndexToCalendarDate(day_index);
+  std::ostringstream stream;
+  stream << cd.year << "-" << cd.month << "-" << cd.day_of_month;
+  return stream.str();
+}
+
 }  // namespace
 
 grpc::Status ReportSerializer::SerializeReport(
@@ -242,14 +250,15 @@ grpc::Status ReportSerializer::SerializeReportToCSV(
   *mime_type_out = "text/csv";
   std::ostringstream stream;
   size_t num_columns;
-  auto status =
-      AppendCSVHeaderRow(report_config, metadata, &num_columns, &stream);
+  std::vector<std::string> fixed_leftmost_column_values;
+  auto status = AppendCSVHeaderRow(report_config, metadata, &num_columns,
+                                   &fixed_leftmost_column_values, &stream);
   if (!status.ok()) {
     return status;
   }
   for (const ReportRow& row : report_rows) {
-    auto status =
-        AppendCSVReportRow(report_config, metadata, row, num_columns, &stream);
+    auto status = AppendCSVReportRow(report_config, metadata, row, num_columns,
+                                     fixed_leftmost_column_values, &stream);
     if (!status.ok()) {
       return status;
     }
@@ -260,16 +269,19 @@ grpc::Status ReportSerializer::SerializeReportToCSV(
 
 grpc::Status ReportSerializer::AppendCSVHeaderRow(
     const ReportConfig& report_config, const ReportMetadataLite& metadata,
-    size_t* num_columns_out, std::ostringstream* stream) {
+    size_t* num_columns_out,
+    std::vector<std::string>* fixed_leftmost_column_values_out,
+    std::ostringstream* stream) {
   switch (metadata.report_type()) {
     case HISTOGRAM:
-      return AppendCSVHistogramHeaderRow(report_config, metadata,
-                                         num_columns_out, stream);
+      return AppendCSVHistogramHeaderRow(
+          report_config, metadata, num_columns_out,
+          fixed_leftmost_column_values_out, stream);
       break;
 
     case JOINT:
       return AppendCSVJointHeaderRow(report_config, metadata, num_columns_out,
-                                     stream);
+                                     fixed_leftmost_column_values_out, stream);
       break;
 
     default: {
@@ -284,7 +296,11 @@ grpc::Status ReportSerializer::AppendCSVHeaderRow(
 
 grpc::Status ReportSerializer::AppendCSVHistogramHeaderRow(
     const ReportConfig& report_config, const ReportMetadataLite& metadata,
-    size_t* num_columns_out, std::ostringstream* stream) {
+    size_t* num_columns_out,
+    std::vector<std::string>* fixed_leftmost_column_values_out,
+    std::ostringstream* stream) {
+  CHECK(fixed_leftmost_column_values_out);
+  fixed_leftmost_column_values_out->clear();
   if (metadata.variable_indices_size() != 1) {
     std::ostringstream error_stream;
     error_stream << "Invalid ReportMetadataLite: Histogram reports always "
@@ -296,6 +312,19 @@ grpc::Status ReportSerializer::AppendCSVHistogramHeaderRow(
     LOG(ERROR) << message;
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
+
+  fixed_leftmost_column_values_out->push_back(
+      DayIndexToDateString(metadata.first_day_index()));
+  if (metadata.first_day_index() == metadata.last_day_index()) {
+    (*stream) << "date" << kSeparator;
+    *num_columns_out = 4u;
+  } else {
+    (*stream) << "start_date" << kSeparator << "end_date" << kSeparator;
+    fixed_leftmost_column_values_out->push_back(
+        DayIndexToDateString(metadata.last_day_index()));
+    *num_columns_out = 5u;
+  }
+
   auto status =
       AppendCSVHeaderRowVariableNames(report_config, metadata, stream);
   if (!status.ok()) {
@@ -307,13 +336,14 @@ grpc::Status ReportSerializer::AppendCSVHistogramHeaderRow(
 
   // Append the "err" column header.
   (*stream) << kSeparator << "err" << std::endl;
-  *num_columns_out = 3u;
   return grpc::Status::OK;
 }
 
 grpc::Status ReportSerializer::AppendCSVJointHeaderRow(
     const ReportConfig& report_config, const ReportMetadataLite& metadata,
-    size_t* num_columns_out, std::ostringstream* stream) {
+    size_t* num_columns_out,
+    std::vector<std::string>* fixed_leftmost_column_values_out,
+    std::ostringstream* stream) {
   std::ostringstream error_stream;
   error_stream << "JOINT reports are not yet implemented. For ReportConfig"
                << IdString(report_config);
@@ -351,6 +381,7 @@ grpc::Status ReportSerializer::AppendCSVHeaderRowVariableNames(
 grpc::Status ReportSerializer::AppendCSVReportRow(
     const ReportConfig& report_config, const ReportMetadataLite& metadata,
     const ReportRow& report_row, size_t num_columns,
+    const std::vector<std::string>& fixed_leftmost_column_values,
     std::ostringstream* stream) {
   auto row_type = report_row.row_type_case();
   auto report_type = metadata.report_type();
@@ -365,7 +396,7 @@ grpc::Status ReportSerializer::AppendCSVReportRow(
         return grpc::Status(grpc::INTERNAL, message);
       }
       return AppendCSVHistogramReportRow(report_row.histogram(), num_columns,
-                                         stream);
+                                         fixed_leftmost_column_values, stream);
       break;
     }
 
@@ -378,7 +409,8 @@ grpc::Status ReportSerializer::AppendCSVReportRow(
         LOG(ERROR) << message;
         return grpc::Status(grpc::INTERNAL, message);
       }
-      return AppendCSVJointReportRow(report_row.joint(), num_columns, stream);
+      return AppendCSVJointReportRow(report_row.joint(), num_columns,
+                                     fixed_leftmost_column_values, stream);
       break;
     }
 
@@ -395,18 +427,23 @@ grpc::Status ReportSerializer::AppendCSVReportRow(
 
 grpc::Status ReportSerializer::AppendCSVHistogramReportRow(
     const HistogramReportRow& report_row, size_t num_columns,
+    const std::vector<std::string>& fixed_leftmost_column_values,
     std::ostringstream* stream) {
-  if (num_columns != 3) {
+  size_t num_fixed_values = fixed_leftmost_column_values.size();
+  if (num_columns != 3 + num_fixed_values) {
     std::ostringstream error_stream;
-    error_stream
-        << "Histogram reports always contain exactly 3 columns but num_columns="
-        << num_columns;
+    error_stream << "Histogram reports always contain 3 columns in addition to "
+                    "the fixed leftmost columns but num_columns="
+                 << num_columns << " and num_fixed_values=" << num_fixed_values;
     std::string message = error_stream.str();
     LOG(ERROR) << message;
     return grpc::Status(grpc::INTERNAL, message);
   }
   if (ShouldSkipRow(report_row)) {
     return grpc::Status::OK;
+  }
+  for (const std::string& v : fixed_leftmost_column_values) {
+    (*stream) << v << kSeparator;
   }
   if (!report_row.label().empty()) {
     (*stream) << ToCSVString(report_row.label());
@@ -421,6 +458,7 @@ grpc::Status ReportSerializer::AppendCSVHistogramReportRow(
 
 grpc::Status ReportSerializer::AppendCSVJointReportRow(
     const JointReportRow& report_row, size_t num_columns,
+    const std::vector<std::string>& fixed_leftmost_column_values,
     std::ostringstream* stream) {
   return grpc::Status(grpc::UNIMPLEMENTED,
                       "Joint reports are not implemented.");

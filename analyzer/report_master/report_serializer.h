@@ -64,38 +64,43 @@ class ReportSerializer {
                                     std::string* serialized_report_out,
                                     std::string* mime_type_out);
 
-  grpc::Status AppendCSVHeaderRow(const ReportConfig& report_config,
-                                  const ReportMetadataLite& metadata,
-                                  size_t* num_columns_out,
-                                  std::ostringstream* stream);
+  grpc::Status AppendCSVHeaderRow(
+      const ReportConfig& report_config, const ReportMetadataLite& metadata,
+      size_t* num_columns_out,
+      std::vector<std::string>* fixed_leftmost_column_values_out,
+      std::ostringstream* stream);
 
-  grpc::Status AppendCSVHistogramHeaderRow(const ReportConfig& report_config,
-                                           const ReportMetadataLite& metadata,
-                                           size_t* num_columns_out,
-                                           std::ostringstream* stream);
+  grpc::Status AppendCSVHistogramHeaderRow(
+      const ReportConfig& report_config, const ReportMetadataLite& metadata,
+      size_t* num_columns_out,
+      std::vector<std::string>* fixed_leftmost_column_values_out,
+      std::ostringstream* stream);
 
-  grpc::Status AppendCSVJointHeaderRow(const ReportConfig& report_config,
-                                       const ReportMetadataLite& metadata,
-                                       size_t* num_columns_out,
-                                       std::ostringstream* stream);
+  grpc::Status AppendCSVJointHeaderRow(
+      const ReportConfig& report_config, const ReportMetadataLite& metadata,
+      size_t* num_columns_out,
+      std::vector<std::string>* fixed_leftmost_column_values_out,
+      std::ostringstream* stream);
 
   grpc::Status AppendCSVHeaderRowVariableNames(
       const ReportConfig& report_config, const ReportMetadataLite& metadata,
       std::ostringstream* stream);
 
-  grpc::Status AppendCSVReportRow(const ReportConfig& report_config,
-                                  const ReportMetadataLite& metadata,
-                                  const ReportRow& report_row,
-                                  size_t num_columns,
-                                  std::ostringstream* stream);
+  grpc::Status AppendCSVReportRow(
+      const ReportConfig& report_config, const ReportMetadataLite& metadata,
+      const ReportRow& report_row, size_t num_columns,
+      const std::vector<std::string>& fixed_leftmost_column_values,
+      std::ostringstream* stream);
 
-  grpc::Status AppendCSVHistogramReportRow(const HistogramReportRow& report_row,
-                                           size_t num_columns,
-                                           std::ostringstream* stream);
+  grpc::Status AppendCSVHistogramReportRow(
+      const HistogramReportRow& report_row, size_t num_columns,
+      const std::vector<std::string>& fixed_leftmost_column_values,
+      std::ostringstream* stream);
 
-  grpc::Status AppendCSVJointReportRow(const JointReportRow& report_row,
-                                       size_t num_columns,
-                                       std::ostringstream* stream);
+  grpc::Status AppendCSVJointReportRow(
+      const JointReportRow& report_row, size_t num_columns,
+      const std::vector<std::string>& fixed_leftmost_column_values,
+      std::ostringstream* stream);
 };
 
 }  // namespace analyzer
