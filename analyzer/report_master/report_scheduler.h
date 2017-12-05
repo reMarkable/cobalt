@@ -31,6 +31,10 @@ class ReportStarterInterface {
   virtual ~ReportStarterInterface() = default;
 };
 
+// Forward declare ReportMasterService because report_master_serivce.h and
+// report_scheduler.h include each other.
+class ReportMasterService;
+
 // An implementation of ReportStarterInterface that delegates to an instance
 // of ReportMasterService. This is the implementation used in production.
 class ReportStarter : public ReportStarterInterface {
@@ -135,6 +139,10 @@ class ReportScheduler {
   // Starts the scheduler thread. Destruct this object to stop the thread.
   // This method must be invoked exactly once.
   void Start();
+
+  void SetClockForTesting(std::shared_ptr<util::ClockInterface> clock) {
+    clock_ = clock;
+  }
 
  private:
   friend class ReportSchedulerTest;

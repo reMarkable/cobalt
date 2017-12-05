@@ -194,6 +194,17 @@ element {
   variable {
     metric_part: "Part1"
   }
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "bucket.name.1"
+      folder_path: "folder/path"
+    }
+  }
 }
 
 # ReportConfig 2 specifies a report with 2 variables: Both parts of Metric 2.
@@ -234,6 +245,17 @@ element {
       }
     }
   }
+  scheduling {
+    # report_finalization_days will default to 0.
+    # aggregation_epoch_type will default to DAY.
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "bucket.name.3"
+      folder_path: "folder/path"
+    }
+  }
 }
 
 )";
@@ -250,6 +272,25 @@ class TestingQueryReportsResponseWriter
   }
 
   std::vector<QueryReportsResponse> responses;
+};
+
+// An implementation of GcsUploadInterface that saves its parameters and
+// returns OK.
+struct FakeGcsUploader : public GcsUploadInterface {
+  grpc::Status UploadToGCS(const std::string& bucket, const std::string& path,
+                           const std::string& mime_type,
+                           const std::string& serialized_report) override {
+    buckets.push_back(bucket);
+    paths.push_back(path);
+    mime_types.push_back(mime_type);
+    reports.push_back(serialized_report);
+    return grpc::Status::OK;
+  }
+
+  std::vector<std::string> buckets;
+  std::vector<std::string> paths;
+  std::vector<std::string> mime_types;
+  std::vector<std::string> reports;
 };
 
 // ReportMasterServiceAbstractTest is templatized on the parameter
@@ -299,6 +340,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     EXPECT_EQ(config::kOK, report_parse_result.second);
     std::shared_ptr<config::ReportRegistry> report_config_registry(
         report_parse_result.first.release());
+    report_config_registry_ = report_config_registry;
 
     // Make a ProjectContext
     project_.reset(new encoder::ProjectContext(
@@ -307,12 +349,18 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     // Make an AnalyzerConfig
     std::shared_ptr<config::AnalyzerConfig> analyzer_config(
         new config::AnalyzerConfig(encoding_config_registry, metric_registry,
-                                   report_config_registry));
+                                   report_config_registry_));
 
     std::shared_ptr<AuthEnforcer> auth_enforcer(new NullEnforcer());
+
+    fake_uploader_.reset(new FakeGcsUploader());
+    std::unique_ptr<ReportExporter> report_exporter(
+        new ReportExporter(fake_uploader_));
+
     report_master_service_.reset(new ReportMasterService(
         0, observation_store_, report_store_, analyzer_config,
-        grpc::InsecureServerCredentials(), auth_enforcer, nullptr));
+        grpc::InsecureServerCredentials(), auth_enforcer,
+        std::move(report_exporter)));
 
     report_master_service_->StartWorkerThread();
   }
@@ -371,7 +419,8 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
   // client.
   void AddObservations(std::string part1_value, int part2_value,
                        uint32_t metric_id, uint32_t encoding_config_id1,
-                       uint32_t encoding_config_id2, int num_clients) {
+                       uint32_t encoding_config_id2, int num_clients,
+                       uint32_t day_index) {
     std::vector<Observation> observations;
     for (int i = 0; i < num_clients; i++) {
       observations.emplace_back(*MakeObservation(part1_value, part2_value,
@@ -382,7 +431,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     metadata.set_customer_id(kCustomerId);
     metadata.set_project_id(kProjectId);
     metadata.set_metric_id(metric_id);
-    metadata.set_day_index(kDayIndex);
+    metadata.set_day_index(day_index);
     EXPECT_EQ(store::kOK,
               observation_store_->AddObservationBatch(metadata, observations));
   }
@@ -391,7 +440,8 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
   // value using the given metric and encoding. Each Observation is generated
   // as if from a different client.
   void AddIndexObservations(uint32_t index, uint32_t metric_id,
-                            uint32_t encoding_config_id1, int num_clients) {
+                            uint32_t encoding_config_id1, int num_clients,
+                            uint32_t day_index) {
     std::vector<Observation> observations;
     for (int i = 0; i < num_clients; i++) {
       observations.emplace_back(
@@ -401,7 +451,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     metadata.set_customer_id(kCustomerId);
     metadata.set_project_id(kProjectId);
     metadata.set_metric_id(metric_id);
-    metadata.set_day_index(kDayIndex);
+    metadata.set_day_index(day_index);
     EXPECT_EQ(store::kOK,
               observation_store_->AddObservationBatch(metadata, observations));
   }
@@ -602,12 +652,57 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     return string_report_ids;
   }
 
+  // Given a file_path of the form
+  //    "folder/path/report_1_1_<report_config_id>_<day_index>_<day_index>"
+  // returns day_index, or returns 0 if |file_path| does not have the expected
+  // form.
+  uint32_t ExtractDayIndexFromPath(const std::string& file_path,
+                                   uint32_t report_config_id) {
+    std::ostringstream stream;
+    stream << "folder/path/report_" << kCustomerId << "_" << kProjectId << "_"
+           << report_config_id << "_";
+    std::string expected_prefix = stream.str();
+    if (file_path.find(expected_prefix) != 0) {
+      ADD_FAILURE() << "file_path=" << file_path
+                    << " expected_prefix=" << expected_prefix;
+      return 0;
+    }
+    size_t left_index = expected_prefix.size();
+    size_t right_index = file_path.find("_", left_index);
+    if (right_index == std::string::npos) {
+      ADD_FAILURE() << "No next _ found";
+      return 0;
+    }
+    EXPECT_EQ(".csv", file_path.substr(file_path.size() - 4));
+    return std::stoi(file_path.substr(left_index, right_index - left_index));
+  }
+
+  // Replaces all occurrences of |date_token| within |report| with the string
+  // representation of the date given by |day_index|.
+  std::string ReplaceDateTokens(const std::string& report,
+                                const std::string& date_token,
+                                uint32_t day_index) {
+    util::CalendarDate cd = util::DayIndexToCalendarDate(day_index);
+    std::ostringstream stream;
+    stream << cd.year << "-" << cd.month << "-" << cd.day_of_month;
+    std::string date_string = stream.str();
+    std::string report_out = report;
+    size_t index = report_out.find(date_token);
+    while (index != std::string::npos) {
+      report_out = report_out.replace(index, date_token.size(), date_string);
+      index = report_out.find(date_token);
+    }
+    return report_out;
+  }
+
   std::shared_ptr<encoder::ProjectContext> project_;
   std::shared_ptr<store::DataStore> data_store_;
   std::shared_ptr<store::ObservationStore> observation_store_;
   std::shared_ptr<store::ReportStore> report_store_;
   std::unique_ptr<ReportMasterService> report_master_service_;
   std::shared_ptr<util::IncrementingClock> clock_;
+  std::shared_ptr<config::ReportRegistry> report_config_registry_;
+  std::shared_ptr<FakeGcsUploader> fake_uploader_;
 };
 
 TYPED_TEST_CASE_P(ReportMasterServiceAbstractTest);
@@ -625,7 +720,7 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
   // ("Apple", 20), ("Banana", 0), ("Cantaloupe", 0).
   this->AddObservations("Apple", 10, kMetricId1,
                         kBasicRapporStringEncodingConfigId,
-                        kBasicRapporIntEncodingConfigId, 20);
+                        kBasicRapporIntEncodingConfigId, 20, kDayIndex);
 
   // Add some observations for metric 2. We use Forculus for part 1
   // and BasicRappor for part 2. For the Forculus part there will be
@@ -636,13 +731,14 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
   // of |8|. Joint reports are not implemented yet so we will only be checking
   // the results of the two marginal reports.
   this->AddObservations("Apple", 10, kMetricId2, kForculusEncodingConfigId,
-                        kBasicRapporIntEncodingConfigId, kForculusThreshold);
+                        kBasicRapporIntEncodingConfigId, kForculusThreshold,
+                        kDayIndex);
   this->AddObservations("Banana", 9, kMetricId2, kForculusEncodingConfigId,
-                        kBasicRapporIntEncodingConfigId,
-                        kForculusThreshold - 1);
+                        kBasicRapporIntEncodingConfigId, kForculusThreshold - 1,
+                        kDayIndex);
   this->AddObservations("Cantaloupe", 8, kMetricId2, kForculusEncodingConfigId,
-                        kBasicRapporIntEncodingConfigId,
-                        kForculusThreshold + 1);
+                        kBasicRapporIntEncodingConfigId, kForculusThreshold + 1,
+                        kDayIndex);
 
   // Start the first report. This is a one-variable report of
   // part 1 of metric 1.
@@ -781,6 +877,9 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, StartAndGetReports) {
   EXPECT_EQ(21, second_marginal_results[8]);
   EXPECT_EQ(19, second_marginal_results[9]);
   EXPECT_EQ(20, second_marginal_results[10]);
+
+  // Expect that no exporting was perofrmed.
+  EXPECT_TRUE(this->fake_uploader_->reports.empty());
 }
 
 // Tests Cobalt analyzer end-to-end using a (metric, encoding, report) trio
@@ -790,7 +889,8 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, E2EWithIndexLabels) {
   for (int index = 0; index < 50; index++) {
     // Add |index| + 1 observations of |index|.
     this->AddIndexObservations(index, kMetricId3,
-                               kBasicRapporIndexEncodingConfigId, index + 1);
+                               kBasicRapporIndexEncodingConfigId, index + 1,
+                               kDayIndex);
   }
 
   // Start the report.
@@ -829,8 +929,8 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, E2EWithIndexLabels) {
     auto count = report.rows().rows(i).histogram().count_estimate();
     auto label = report.rows().rows(i).histogram().label();
     auto expected_count = (index < 50 ? index + 1 : 0);
-    EXPECT_EQ(expected_count, count) << "i=" << i << ", index=" << index
-                                     << ", count=" << count;
+    EXPECT_EQ(expected_count, count)
+        << "i=" << i << ", index=" << index << ", count=" << count;
     switch (index) {
       case 0:
         EXPECT_EQ("Event A", label);
@@ -848,6 +948,9 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, E2EWithIndexLabels) {
         EXPECT_EQ("", label);
     }
   }
+
+  // Expect that no exporting was perofrmed.
+  EXPECT_TRUE(this->fake_uploader_->reports.empty());
 }
 
 // Tests the method ReportMaster::QueryReports. We write into the ReportStore
@@ -903,8 +1006,145 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, QueryReportsTest) {
   }
 }
 
+// Tests the interaction of the ReportScheduler with the rest of the
+// ReportMaster pipeline, including report exporting. We simulate 10 days of
+// activity of the ReportScheduler and then we check the exported reports.
+TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
+  // First we populate the Observation Store with Observations so that the
+  // reports will have something to analyzer. This part of the simulation is
+  // unrealistic because we are going to add Observations for all of the days
+  // at the beginning of the test instead of allowing the Observations to arrive
+  // interspersed with the report generation. We add observations for metrics 1
+  // and 3 for each day in the interval [kDayIndex - 30, kDayIndex + 15].
+  // We don't bother adding Observations for metric 2 because report config
+  // 2 does not have a ShedulingConfig so it will never be scheduled.
+  for (uint32_t day_index = kDayIndex - 30; day_index < kDayIndex + 15;
+       day_index++) {
+    this->AddObservations("Apple", 1, kMetricId1,
+                          kBasicRapporStringEncodingConfigId,
+                          kBasicRapporIntEncodingConfigId, 20, day_index);
+    this->AddIndexObservations(0, kMetricId3, kBasicRapporIndexEncodingConfigId,
+                               5, day_index);
+  }
+
+  /// We construct a ReportScheduler that uses our ReportMasterService as
+  // its ReportStarter.
+  std::shared_ptr<ReportStarter> report_starter(
+      new ReportStarter(this->report_master_service_.get()));
+  std::unique_ptr<ReportScheduler> report_scheduler(
+      new ReportScheduler(this->report_config_registry_, this->report_store_,
+                          report_starter, std::chrono::milliseconds(1)));
+
+  // We arrange that the ReportScheduler loops every 1 ms and that each ms
+  // it simulates 4 hours of time passing.
+  std::shared_ptr<util::IncrementingClock> clock(new util::IncrementingClock());
+  std::chrono::system_clock::time_point start_time =
+      util::FromUnixSeconds(kSomeTimestamp);
+  clock->set_time(start_time);
+  clock->set_increment(std::chrono::seconds(60 * 60 * 4));
+  report_scheduler->SetClockForTesting(clock);
+
+  // We arrange for the scheduler thread to notify this thread after 10
+  // days of simulated time has occurred.
+  std::mutex mu;
+  std::condition_variable cv;
+  bool done = false;
+  std::chrono::system_clock::time_point stop_time =
+      start_time + std::chrono::hours(24 * 10);
+
+  clock->set_callback(
+      [&cv, &mu, &done,
+       stop_time](std::chrono::system_clock::time_point simulated_time) {
+        if (simulated_time > stop_time) {
+          std::lock_guard<std::mutex> lock(mu);
+          done = true;
+          cv.notify_all();
+        }
+      });
+
+  // Start the scheduler thread.
+  report_scheduler->Start();
+
+  // We wait for the scheduler thread to notify this thread that 10 days of
+  // simulated time has occurred.
+  {
+    std::unique_lock<std::mutex> lock(mu);
+    cv.wait(lock, [&done] { return done; });
+  }
+
+  // We delete the ReportScheduler, which stops the scheduler thread.
+  report_scheduler.reset();
+
+  // Now we wait for the ReportExecutor's worker thread to finish generating
+  // all of the reports.
+  this->WaitUntilIdle();
+
+  // Now we check the exported reports.
+
+  static const char kDateToken[] = "<DATE>";
+  static const char kExpectedReport1[] = R"(date,Part1,count,err
+<DATE>,"Apple",20.000,0
+<DATE>,"Banana",0,0
+<DATE>,"Cantaloupe",0,0
+)";
+
+  static const char kExpectedReport3[] = R"(date,Part1,count,err
+<DATE>,"Event A",5.000,0
+<DATE>,"Event B",0,0
+<DATE>,"Event Z",0,0
+)";
+
+  // The keys to these maps are day indices and the values are the number of
+  // reports found for that day.
+  std::map<uint32_t, size_t> day_counts_for_report_1;
+  std::map<uint32_t, size_t> day_counts_for_report_3;
+
+  size_t num_reports = this->fake_uploader_->buckets.size();
+  ASSERT_TRUE(num_reports >= 80) << num_reports;
+  ASSERT_EQ(num_reports, this->fake_uploader_->paths.size());
+  ASSERT_EQ(num_reports, this->fake_uploader_->reports.size());
+  ASSERT_EQ(num_reports, this->fake_uploader_->mime_types.size());
+
+  for (size_t i = 0; i < num_reports; i++) {
+    uint32_t report_config_id;
+    EXPECT_EQ("text/csv", this->fake_uploader_->mime_types[i]);
+    std::string expected_report;
+    std::map<uint32_t, size_t>* day_counts;
+    if (this->fake_uploader_->buckets[i] == "bucket.name.1") {
+      report_config_id = kReportConfigId1;
+      day_counts = &day_counts_for_report_1;
+      expected_report = std::string(kExpectedReport1);
+    } else if (this->fake_uploader_->buckets[i] == "bucket.name.3") {
+      report_config_id = kReportConfigId3;
+      day_counts = &day_counts_for_report_3;
+      expected_report = std::string(kExpectedReport3);
+    } else {
+      FAIL() << this->fake_uploader_->buckets[i];
+    }
+    uint32_t day_index = this->ExtractDayIndexFromPath(
+        this->fake_uploader_->paths[i], report_config_id);
+    ASSERT_GE(day_index, kDayIndex - 30);
+    ASSERT_LE(day_index, kDayIndex + 100);
+    EXPECT_EQ(this->ReplaceDateTokens(expected_report, kDateToken, day_index),
+              this->fake_uploader_->reports[i]);
+    (*day_counts)[day_index]++;
+  }
+
+  for (uint32_t day_index = kDayIndex - 30; day_index < kDayIndex - 3;
+       day_index++) {
+    EXPECT_EQ(1u, day_counts_for_report_1[day_index]) << day_index;
+    EXPECT_EQ(1u, day_counts_for_report_3[day_index]) << day_index;
+  }
+  for (uint32_t day_index = kDayIndex - 2; day_index <= kDayIndex + 9;
+       day_index++) {
+    EXPECT_TRUE(day_counts_for_report_1[day_index] >= 1) << day_index;
+    EXPECT_EQ(1u, day_counts_for_report_3[day_index]) << day_index;
+  }
+}
+
 REGISTER_TYPED_TEST_CASE_P(ReportMasterServiceAbstractTest, StartAndGetReports,
-                           E2EWithIndexLabels, QueryReportsTest);
+                           E2EWithIndexLabels, QueryReportsTest,
+                           EnableReportScheduling);
 
 }  // namespace analyzer
 }  // namespace cobalt

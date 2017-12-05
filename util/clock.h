@@ -27,10 +27,15 @@ class SystemClock : public ClockInterface {
 };
 
 // A clock that returns an incrementing sequence of tics each time it is called.
+// Optionally a callback may be set that will be invoked each time the
+// clock ticks.
 class IncrementingClock : public ClockInterface {
  public:
   std::chrono::system_clock::time_point now() override {
     time_ += increment_;
+    if (callback_) {
+      callback_(time_);
+    }
     return time_;
   }
 
@@ -41,8 +46,11 @@ class IncrementingClock : public ClockInterface {
     increment_ = increment;
   }
 
-  void set_time(std::chrono::system_clock::time_point t) {
-    time_ = t;
+  void set_time(std::chrono::system_clock::time_point t) { time_ = t; }
+
+  void set_callback(
+      std::function<void(std::chrono::system_clock::time_point)> c) {
+    callback_ = c;
   }
 
  private:
@@ -51,6 +59,7 @@ class IncrementingClock : public ClockInterface {
           std::chrono::system_clock::duration(0));
   std::chrono::system_clock::duration increment_ =
       std::chrono::system_clock::duration(1);
+  std::function<void(std::chrono::system_clock::time_point)> callback_;
 };
 
 }  // namespace util

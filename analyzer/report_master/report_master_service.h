@@ -21,7 +21,9 @@
 
 #include "analyzer/report_master/auth_enforcer.h"
 #include "analyzer/report_master/report_executor.h"
+#include "analyzer/report_master/report_exporter.h"
 #include "analyzer/report_master/report_master.grpc.pb.h"
+#include "analyzer/report_master/report_scheduler.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
 #include "config/analyzer_config.h"
@@ -30,6 +32,10 @@
 
 namespace cobalt {
 namespace analyzer {
+
+// Forward declare ReportScheduler because report_master_service.h and
+// report_scheduler.h include each other.
+class ReportScheduler;
 
 class ReportMasterService final : public ReportMaster::Service {
  public:
@@ -98,6 +104,13 @@ class ReportMasterService final : public ReportMaster::Service {
   grpc::Status QueryReportsNoAuth(
       const QueryReportsRequest* request,
       grpc::WriterInterface<QueryReportsResponse>* writer);
+
+  // If there is a ReportScheduler running and invoking StartReportNoAuth()
+  // on this instance of ReportMasterService, then invoke this method to
+  // give ownership of that ReportScheduler to the ReportMasterService.
+  void set_report_scheduler(std::unique_ptr<ReportScheduler> report_scheduler) {
+    report_scheduler_ = std::move(report_scheduler);
+  }
 
  private:
   // Makes all instantiations of ReportMasterServiceAbstractTest friends.
@@ -201,6 +214,13 @@ class ReportMasterService final : public ReportMaster::Service {
   std::shared_ptr<grpc::ServerCredentials> server_credentials_;
   std::unique_ptr<grpc::Server> server_;
   std::shared_ptr<AuthEnforcer> auth_enforcer_;
+  // The ReportScheduler contains a pointer back to this ReportMasterService.
+  // The ReportMasterService does not use the ReportScheduler, rather
+  // the ReportScheduler uses the ReportMasterService. But we want all objects
+  // to be owned by the ReportMasterService so that is why this
+  // pointer is here. This may be null if set_report_scheduler() was
+  // never invoked with a non-null ReportScheduler.
+  std::unique_ptr<ReportScheduler> report_scheduler_;
 };
 
 }  // namespace analyzer

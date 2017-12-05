@@ -61,6 +61,11 @@ class AnalyzerConfig {
   const ReportConfig* ReportConfig(uint32_t customer_id, uint32_t project_id,
                                    uint32_t report_config_id);
 
+  // Returns a shared pointer to the ReportRegistry.
+  std::shared_ptr<config::ReportRegistry> report_registry() {
+    return report_configs_;
+  }
+
  private:
   std::shared_ptr<config::EncodingRegistry> encoding_configs_;
   std::shared_ptr<config::MetricRegistry> metrics_;

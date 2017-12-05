@@ -108,6 +108,13 @@ void ReportScheduler::ProcessReports() {
 
 void ReportScheduler::ProcessOneReport(const ReportConfig& report_config,
                                        uint32_t current_day_index) {
+  VLOG(4) << "ReportScheduler processing report_config "
+          << IdString(report_config);
+  if (!report_config.has_scheduling()) {
+    VLOG(4) << "Skpping report_config " << IdString(report_config)
+            << " because it has no SchedulingConfig.";
+    return;
+  }
   switch (report_config.scheduling().aggregation_epoch_type()) {
     case DAY:
       ProcessDailyReport(report_config, current_day_index);
@@ -134,19 +141,35 @@ void ReportScheduler::ProcessDailyReport(const ReportConfig& report_config,
                                          uint32_t current_day_index) {
   // Look back a number of days equal to the maximum of daily_report_makeup_days
   // and report_finalization_days.
-  uint32_t lookback_days =
-      FLAGS_daily_report_makeup_days >=
-              report_config.scheduling().report_finalization_days()
-          ? FLAGS_daily_report_makeup_days
-          : report_config.scheduling().report_finalization_days();
-  for (uint32_t day_index = current_day_index - lookback_days;
-       day_index <= current_day_index; day_index++) {
+  auto scheduling = report_config.scheduling();
+  if (report_config.scheduling().report_finalization_days() > 20) {
+    LOG(ERROR) << "Invalid ReportConfig: " << IdString(report_config)
+               << " report_finalization_days too large: "
+               << report_config.scheduling().report_finalization_days();
+    return;
+  }
+
+  uint32_t finalization_days = scheduling.report_finalization_days();
+  uint32_t lookback_days = FLAGS_daily_report_makeup_days >= finalization_days
+                               ? FLAGS_daily_report_makeup_days
+                               : finalization_days;
+  uint32_t period_start =
+      (current_day_index >= lookback_days ? (current_day_index - lookback_days)
+                                          : 0u);
+  VLOG(4) << "ReportScheduler considering days in the interval ["
+          << period_start << ", " << current_day_index << "]";
+  for (uint32_t day_index = period_start; day_index <= current_day_index;
+       day_index++) {
     if (shut_down_) {
       return;
     }
     if (ShouldStartDailyReportNow(report_config, day_index,
                                   current_day_index)) {
       StartReportNow(report_config, day_index, day_index);
+    } else {
+      VLOG(4) << "ShouldStartDailyReportNow() returned false for report_config "
+              << IdString(report_config) << " day_index=" << day_index
+              << " current_day_index=" << current_day_index;
     }
   }
 }
@@ -176,12 +199,6 @@ bool ReportScheduler::ShouldStartDailyReportNow(
                << " for ReportConfig " << IdString(report_config);
     return false;
   }
-  if (report_config.scheduling().report_finalization_days() > 100) {
-    LOG(ERROR) << "Invalid ReportConfig: " << IdString(report_config)
-               << " report_finalization_days too large: "
-               << report_config.scheduling().report_finalization_days();
-    return false;
-  }
   if (day_index > current_day_index -
                       report_config.scheduling().report_finalization_days()) {
     // We want to generate the report repeatedly during the report finalization
@@ -200,6 +217,8 @@ bool ReportScheduler::ShouldStartDailyReportNow(
 void ReportScheduler::StartReportNow(const ReportConfig& report_config,
                                      uint32_t first_day_index,
                                      uint32_t last_day_index) {
+  VLOG(4) << "ReportScheduler starting report " << IdString(report_config)
+          << " [" << first_day_index << ", " << last_day_index << "]";
   const std::string export_name =
       ReportExportName(report_config, first_day_index, last_day_index);
   ReportId report_id;

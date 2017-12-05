@@ -53,8 +53,8 @@ namespace cobalt {
 namespace analyzer {
 namespace store {
 
-using crypto::RegexEncode;
 using crypto::RegexDecode;
+using crypto::RegexEncode;
 
 namespace {
 // We never request more than this many rows regardless of how many the user
@@ -277,7 +277,8 @@ Status BigtableStore::ReadRow(Table table,
   }
 
   DCHECK(read_response.rows.size() == 1) << read_response.rows.size();
-  DCHECK(read_response.rows[0].key == row->key);
+  DCHECK(read_response.rows[0].key == row->key)
+      << read_response.rows[0].key << " vs " << row->key;
 
   row->column_values.swap(read_response.rows[0].column_values);
 

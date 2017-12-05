@@ -58,6 +58,9 @@ DEFINE_string(tls_cert_file, "",
               "Path to a TLS server cert file to use if use_tls=true.");
 DEFINE_string(tls_key_file, "",
               "Path to a TLS server private key file to use if use_tls=true.");
+DEFINE_bool(
+    enable_report_scheduling, false,
+    "Should the ReportMaster run all reports automatically on a schedule.");
 
 namespace {
 // Builds the string form of a report_id used in the public ReportMasterService
@@ -262,9 +265,26 @@ ReportMasterService::CreateFromFlagsOrDie() {
   std::unique_ptr<ReportExporter> report_exporter(
       new ReportExporter(gcs_uploader));
 
-  return std::unique_ptr<ReportMasterService>(new ReportMasterService(
-      FLAGS_port, observation_store, report_store, analyzer_config,
-      server_credentials, auth_enforcer, std::move(report_exporter)));
+  auto report_master_service =
+      std::unique_ptr<ReportMasterService>(new ReportMasterService(
+          FLAGS_port, observation_store, report_store, analyzer_config,
+          server_credentials, auth_enforcer, std::move(report_exporter)));
+
+  if (FLAGS_enable_report_scheduling) {
+    // We will construct a new ReportScheduler, giving it a ReportStarter that
+    // delegates to our ReportMasterService. The ReportStarter does not take
+    // ownership of the ReportMasterService.
+    std::shared_ptr<ReportStarter> report_starter(
+        new ReportStarter(report_master_service.get()));
+    std::unique_ptr<ReportScheduler> report_scheduler(new ReportScheduler(
+        analyzer_config->report_registry(), report_store, report_starter));
+    // We start the scheduler thread.
+    report_scheduler->Start();
+    // We give ownership of the ReportScheduler to the ReportMaster.
+    report_master_service->set_report_scheduler(std::move(report_scheduler));
+  }
+
+  return report_master_service;
 }
 
 ReportMasterService::ReportMasterService(
