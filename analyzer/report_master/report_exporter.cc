@@ -16,6 +16,17 @@ namespace analyzer {
 
 using util::gcs::GcsUtil;
 
+namespace {
+
+std::string ExtensionForMimeType(const std::string& mime_type) {
+  if (mime_type == "text/csv") {
+    return "csv";
+  }
+  return "";
+}
+
+}  // namespace
+
 ReportExporter::ReportExporter(std::shared_ptr<GcsUploadInterface> uploader)
     : uploader_(uploader) {}
 
@@ -80,18 +91,25 @@ grpc::Status ReportExporter::ExportReportToGCS(
 
   return uploader_->UploadToGCS(
       location.bucket(),
-      FormFullPath(location.folder_path(), metadata.export_name()), mime_type,
-      serialized_report);
+      FormFullPath(location.folder_path(), metadata.export_name(), mime_type),
+      mime_type, serialized_report);
 }
 
 std::string ReportExporter::FormFullPath(const std::string& folder_path,
-                                         const std::string& file_name) {
+                                         const std::string& file_name,
+                                         const std::string& mime_type) {
   std::ostringstream stream;
   stream << folder_path;
   if (folder_path.back() != '/') {
     stream << "/";
   }
   stream << file_name;
+  if (file_name.find('.') == std::string::npos) {
+    std::string extension = ExtensionForMimeType(mime_type);
+    if (!extension.empty()) {
+      stream << "." << extension;
+    }
+  }
   return stream.str();
 }
 

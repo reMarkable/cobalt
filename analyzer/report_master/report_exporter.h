@@ -119,11 +119,14 @@ class ReportExporter {
                                  const std::string& mime_type,
                                  const std::string& serialized_report);
 
-  // Forms a full file name path by concatenating folder path with file_name,
+  // Forms a full file name path by concatenating folder_path with file_name,
   // adding a forward slash between them if folder_path does not end with
-  // a forward slash.
+  // a forward slash. Also possibly adds an appropriate dot extension to the
+  // filename based on the mime type, but only if the file_name does not
+  // already contain a dot.
   static std::string FormFullPath(const std::string& folder_path,
-                                  const std::string& file_name);
+                                  const std::string& file_name,
+                                  const std::string& mime_type);
 };
 
 }  // namespace analyzer

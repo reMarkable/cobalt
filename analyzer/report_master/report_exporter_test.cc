@@ -211,7 +211,7 @@ TEST_F(ReportExporterTest, OneExportLocation) {
   EXPECT_TRUE(status.ok()) << status.error_message();
   EXPECT_TRUE(fake_uploader_->upload_was_invoked);
   EXPECT_EQ("BUCKET-NAME-1", fake_uploader_->bucket);
-  EXPECT_EQ("report_exporter_test/fruit_counts/export_name",
+  EXPECT_EQ("report_exporter_test/fruit_counts/export_name.csv",
             fake_uploader_->path);
   EXPECT_EQ("text/csv", fake_uploader_->mime_type);
   EXPECT_EQ(kExpectedCSV, fake_uploader_->serialized_report);
@@ -225,7 +225,7 @@ TEST_F(ReportExporterTest, TwoExportLocations) {
   EXPECT_TRUE(fake_uploader_->upload_was_invoked);
   // Tests that BUCKET-NAME-2 was used after BUCKET-NAME-1.
   EXPECT_EQ("BUCKET-NAME-2", fake_uploader_->bucket);
-  EXPECT_EQ("report_exporter_test/fruit_counts/export_name",
+  EXPECT_EQ("report_exporter_test/fruit_counts/export_name.csv",
             fake_uploader_->path);
   EXPECT_EQ("text/csv", fake_uploader_->mime_type);
   EXPECT_EQ(kExpectedCSV, fake_uploader_->serialized_report);
