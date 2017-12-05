@@ -17,8 +17,10 @@ element {
   variable {
     metric_part: "rating"
   }
-  aggregation_epoch_type: DAY
-  report_delay_days: 1
+  scheduling {
+    report_finalization_days: 1
+    aggregation_epoch_type: DAY
+  }
 }
 
 element {
@@ -31,6 +33,8 @@ element {
   variable {
     metric_part: "hour"
   }
-  aggregation_epoch_type: WEEK
-  report_delay_days: 5
+  scheduling {
+    report_finalization_days: 5
+    aggregation_epoch_type: WEEK
+  }
 }

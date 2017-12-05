@@ -202,8 +202,10 @@ element {
   variable {
     metric_part: "url"
   }
-  aggregation_epoch_type: DAY
-  report_delay_days: 1
+  scheduling {
+    report_finalization_days: 1
+    aggregation_epoch_type: DAY
+  }
 }
 
 #### ReportConfig (1, 1, 2)
@@ -217,8 +219,10 @@ element {
   variable {
     metric_part: "hour"
   }
-  aggregation_epoch_type: WEEK
-  report_delay_days: 5
+  scheduling {
+    report_finalization_days: 5
+    aggregation_epoch_type: WEEK
+  }
 }
 
 #### ReportConfig (1, 1, 4)
@@ -259,8 +263,10 @@ element {
   variable {
     metric_part: "module"
   }
-  aggregation_epoch_type: DAY
-  report_delay_days: 1
+  scheduling {
+    report_finalization_days: 1
+    aggregation_epoch_type: DAY
+  }
 }
 
 #### ReportConfig (1, 1, 6)

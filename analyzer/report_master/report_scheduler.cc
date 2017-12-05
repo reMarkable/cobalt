@@ -43,7 +43,7 @@ std::string IdString(const ReportConfig& report_config) {
 ReportScheduler::ReportScheduler(
     std::shared_ptr<config::ReportRegistry> report_registry,
     std::shared_ptr<store::ReportStore> report_store,
-    ReportStarterInterface* report_starter,
+    std::shared_ptr<ReportStarterInterface> report_starter,
     std::chrono::milliseconds sleep_interval)
     : clock_(new SystemClock()),
       report_registry_(report_registry),
@@ -108,7 +108,7 @@ void ReportScheduler::ProcessReports() {
 
 void ReportScheduler::ProcessOneReport(const ReportConfig& report_config,
                                        uint32_t current_day_index) {
-  switch (report_config.aggregation_epoch_type()) {
+  switch (report_config.scheduling().aggregation_epoch_type()) {
     case DAY:
       ProcessDailyReport(report_config, current_day_index);
       return;
@@ -123,8 +123,8 @@ void ReportScheduler::ProcessOneReport(const ReportConfig& report_config,
 
     default: {
       LOG(ERROR) << "Unrecognized aggregatoin_epoch_type: "
-                 << report_config.aggregation_epoch_type() << "In ReportConfig "
-                 << IdString(report_config);
+                 << report_config.scheduling().aggregation_epoch_type()
+                 << "In ReportConfig " << IdString(report_config);
       return;
     }
   }
@@ -135,9 +135,10 @@ void ReportScheduler::ProcessDailyReport(const ReportConfig& report_config,
   // Look back a number of days equal to the maximum of daily_report_makeup_days
   // and report_finalization_days.
   uint32_t lookback_days =
-      FLAGS_daily_report_makeup_days >= report_config.report_delay_days()
+      FLAGS_daily_report_makeup_days >=
+              report_config.scheduling().report_finalization_days()
           ? FLAGS_daily_report_makeup_days
-          : report_config.report_delay_days();
+          : report_config.scheduling().report_finalization_days();
   for (uint32_t day_index = current_day_index - lookback_days;
        day_index <= current_day_index; day_index++) {
     if (shut_down_) {
@@ -175,13 +176,14 @@ bool ReportScheduler::ShouldStartDailyReportNow(
                << " for ReportConfig " << IdString(report_config);
     return false;
   }
-  if (report_config.report_delay_days() > 100) {
+  if (report_config.scheduling().report_finalization_days() > 100) {
     LOG(ERROR) << "Invalid ReportConfig: " << IdString(report_config)
-               << " report_delay_days too large: "
-               << report_config.report_delay_days();
+               << " report_finalization_days too large: "
+               << report_config.scheduling().report_finalization_days();
     return false;
   }
-  if (day_index > current_day_index - report_config.report_delay_days()) {
+  if (day_index > current_day_index -
+                      report_config.scheduling().report_finalization_days()) {
     // We want to generate the report repeatedly during the report finalization
     // period, but we don't want to start it again now if we previously started
     // it and that hasn't completed.

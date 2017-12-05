@@ -44,8 +44,6 @@ const uint32_t kReportConfigId = 42;
 const uint32_t kReportConfigId2 = 43;
 const uint32_t kReportConfigId3 = 44;
 const uint32_t kReportConfigId4 = 45;
-// "report_finalization_days" is the new name for the field whose current
-// name is "report_delay_days" in the ReportConfig proto message.
 const uint32_t kReportFinalizationDays = 3;
 const uint32_t kReportFinalizationDays2 = 2;
 const uint32_t kReportFinalizationDays3 = 1;
@@ -57,8 +55,10 @@ element {
   id: 42
   metric_id: 1
   report_type: HISTOGRAM
-  report_delay_days: 3
-  aggregation_epoch_type: DAY
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
 }
 
 element {
@@ -67,8 +67,10 @@ element {
   id: 43
   metric_id: 1
   report_type: HISTOGRAM
-  report_delay_days: 2
-  aggregation_epoch_type: DAY
+  scheduling {
+    report_finalization_days: 2
+    aggregation_epoch_type: DAY
+  }
 }
 
 element {
@@ -77,8 +79,10 @@ element {
   id: 44
   metric_id: 1
   report_type: HISTOGRAM
-  report_delay_days: 1
-  aggregation_epoch_type: DAY
+  scheduling {
+    report_finalization_days: 1
+    aggregation_epoch_type: DAY
+  }
 }
 
 element {
@@ -87,8 +91,10 @@ element {
   id: 45
   metric_id: 1
   report_type: HISTOGRAM
-  report_delay_days: 0
-  aggregation_epoch_type: DAY
+  scheduling {
+    report_finalization_days: 0
+    aggregation_epoch_type: DAY
+  }
 }
 
 )";
@@ -178,7 +184,7 @@ class ReportSchedulerTest : public ::testing::Test {
     report_store_.reset(new ReportStore(data_store_));
     report_starter_.reset(new FakeReportStarter(report_store_));
     scheduler_.reset(new ReportScheduler(report_registry_, report_store_,
-                                         report_starter_.get(),
+                                         report_starter_,
                                          std::chrono::milliseconds(1)));
     clock_.reset(new IncrementingClock());
     clock_->set_time(util::FromUnixSeconds(kStartingTimeSeconds));
@@ -327,7 +333,7 @@ class ReportSchedulerTest : public ::testing::Test {
   std::shared_ptr<DataStore> data_store_;
   std::shared_ptr<ReportStore> report_store_;
   std::shared_ptr<ReportRegistry> report_registry_;
-  std::unique_ptr<FakeReportStarter> report_starter_;
+  std::shared_ptr<FakeReportStarter> report_starter_;
   std::unique_ptr<ReportScheduler> scheduler_;
   std::shared_ptr<IncrementingClock> clock_;
 

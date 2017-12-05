@@ -49,9 +49,9 @@ class ReportStarter : public ReportStarterInterface {
 // ReportScheduler periodically runs reports according to their configured
 // schedules.
 //
-// A ReportConfig contains two fields that are relevant to report scheduling:
+// A ReportConfig contains a ReportSchedulingConfig that contains two fields
+// that influence report scheduling:
 // |aggreggation_epoch_type| and |report_finalization_days|.
-// TODO(rudominer) Rename |report_delay_days| to |report_finalization_days|.
 //
 // There are three aggregation epoch types: DAY, WEEK and MONTH. The DAY type
 // means that each report aggregates the set of Observations from a single day,
@@ -117,8 +117,6 @@ class ReportScheduler {
   // to determine whether a report needs to be run.
   //
   // |report_starter| is used to start the asynchronous generation of reports.
-  // ReportScheduler does not take ownership of report_starter, which must
-  // remain valid until after ReportScheduler is destructed.
   //
   // |sleep_interval| determines the frequency with which ReportScheduler
   // re-reads the registered reports in |analyzer_config| and checks
@@ -126,7 +124,7 @@ class ReportScheduler {
   // minutes.
   ReportScheduler(std::shared_ptr<config::ReportRegistry> report_registry,
                   std::shared_ptr<store::ReportStore> report_store,
-                  ReportStarterInterface* report_starter,
+                  std::shared_ptr<ReportStarterInterface> report_starter,
                   std::chrono::milliseconds sleep_interval =
                       std::chrono::milliseconds(1000 * 60 * 17));
 
@@ -200,7 +198,7 @@ class ReportScheduler {
   std::thread scheduler_thread_;
 
   std::shared_ptr<config::ReportRegistry> report_registry_;
-  ReportStarterInterface* report_starter_;  // not owned
+  std::shared_ptr<ReportStarterInterface> report_starter_;
   std::unique_ptr<ReportHistoryCache> report_history_;
 
   // How much time to sleep during the Sleep() method.
