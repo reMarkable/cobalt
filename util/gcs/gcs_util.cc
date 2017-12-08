@@ -20,14 +20,14 @@
 
 #include "util/pem_util.h"
 
+using google_storage_api::BucketsResource_GetMethod;
+using google_storage_api::ObjectsResource_InsertMethod;
+using google_storage_api::StorageService;
 using googleapis::client::CurlHttpTransportFactory;
 using googleapis::client::HttpTransportLayerConfig;
 using googleapis::client::NewUnmanagedInMemoryDataReader;
 using googleapis::client::OAuth2Credential;
 using googleapis::client::OAuth2ServiceAccountFlow;
-using google_storage_api::BucketsResource_GetMethod;
-using google_storage_api::ObjectsResource_InsertMethod;
-using google_storage_api::StorageService;
 
 namespace cobalt {
 namespace util {
@@ -45,6 +45,9 @@ GcsUtil::GcsUtil() : impl_(new Impl()) {}
 GcsUtil::~GcsUtil() {}
 
 bool GcsUtil::InitFromDefaultPaths() {
+  // When ReportMaster is deployed to Google Container Engine, the environment
+  // variable "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH" is set in the file
+  // //kubernetes/cobalt_common/Dockerfile
   char* p = std::getenv("GRPC_DEFAULT_SSL_ROOTS_FILE_PATH");
   if (!p) {
     LOG(ERROR) << "The environment variable GRPC_DEFAULT_SSL_ROOTS_FILE_PATH "
@@ -52,10 +55,14 @@ bool GcsUtil::InitFromDefaultPaths() {
     return false;
   }
   std::string ca_certs_path(p);
-  p = std::getenv("GOOGLE_APPLICATION_CREDENTIALS");
+
+  // When ReportMaster is deployed to Google Container Engine, the environment
+  // variable "COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS" is set in the
+  // file //kubernets/report_master/Dockerfile
+  p = std::getenv("COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS");
   if (!p) {
-    LOG(ERROR) << "The environment variable GOOGLE_APPLICATION_CREDENTIALS "
-                  "is not set.";
+    LOG(ERROR) << "The environment variable "
+                  "COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS is not set.";
     return false;
   }
   std::string service_account_json_path(p);

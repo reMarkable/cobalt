@@ -562,7 +562,8 @@ def _deploy_start(args):
         args.cloud_project_prefix, args.cloud_project_name,
         args.cluster_zone, args.cluster_name,
         args.bigtable_instance_name,
-        args.report_master_static_ip)
+        args.report_master_static_ip,
+        enable_report_scheduling=args.report_master_enable_scheduling)
   else:
     print('Unknown job "%s". I only know how to start "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
@@ -650,6 +651,11 @@ def _deploy_delete_certificate(args):
     print('Unknown job "%s". I only know how to delete certificates for the '
           '"report-master" or the "shuffler".' % args.job)
 
+def _deploy_upload_service_account_key(args):
+  container_util.create_report_master_gcs_service_account_secret(
+      args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone,
+      args.cluster_name, args.service_account_key_json)
+
 def _default_shuffler_config_file(cluster_settings):
   if cluster_settings['shuffler_config_file'] :
     return  os.path.join(THIS_DIR, cluster_settings['shuffler_config_file'])
@@ -659,6 +665,11 @@ def _default_cobalt_config_dir(cluster_settings):
   if cluster_settings['cobalt_config_dir'] :
     return os.path.join(THIS_DIR, cluster_settings['cobalt_config_dir'])
   return DEMO_CONFIG_DIR
+
+def _default_report_master_enable_scheduling(cluster_settings):
+  if cluster_settings['report_master_enable_scheduling']:
+    return cluster_settings['report_master_enable_scheduling']
+  return 'false'
 
 def _default_shuffler_use_memstore(cluster_settings):
   if cluster_settings['shuffler_use_memstore']:
@@ -785,23 +796,24 @@ def main():
 
   # cluster_settings contains the default values for many of the flags.
   cluster_settings = {
-    'cloud_project_prefix': '',
+    'analyzer_service_static_ip' : '',
+    'bigtable_instance_name': '',
     'cloud_project_name': '',
+    'cloud_project_prefix': '',
     'cluster_name': '',
     'cluster_zone': '',
-    'gce_pd_name': '',
-    'bigtable_instance_name': '',
-    'shuffler_static_ip' : '',
-    'report_master_static_ip' : '',
-    'analyzer_service_static_ip' : '',
-    'shuffler_config_file': '',
     'cobalt_config_dir': '',
-    'shuffler_use_memstore' : '',
-    'shuffler_preferred_address': '',
+    'gce_pd_name': '',
+    'report_master_enable_scheduling': '',
     'report_master_preferred_address': '',
-    'use_tls': '',
-    'shuffler_root_certs': '',
     'report_master_root_certs': '',
+    'report_master_static_ip' : '',
+    'shuffler_config_file': '',
+    'shuffler_preferred_address': '',
+    'shuffler_root_certs': '',
+    'shuffler_static_ip' : '',
+    'shuffler_use_memstore' : '',
+    'use_tls': '',
   }
   if production_cluster_json_file:
     _cluster_settings_from_json(cluster_settings, production_cluster_json_file)
@@ -1452,6 +1464,13 @@ def main():
            'Cloud project in which the Shuffler is being deployed. '
            'Default=%s' % cluster_settings['gce_pd_name'],
       default=cluster_settings['gce_pd_name'])
+  default_report_master_enable_scheduling = \
+      _default_report_master_enable_scheduling(cluster_settings)
+  sub_parser.add_argument('--report_master_enable_scheduling',
+      default=default_report_master_enable_scheduling,
+      help=('When starting the ReportMaster, should the ReportMaster run all '
+            'reports automatically on a schedule? Default=%s.' %
+            default_report_master_enable_scheduling))
   default_shuffler_use_memstore = _default_shuffler_use_memstore(
       cluster_settings)
   sub_parser.add_argument('--shuffler-use-memstore',
@@ -1533,6 +1552,23 @@ def main():
       help='The job whose certificate you wish to delete. Valid choices: '
            '"report-master", "shuffler". Required.')
   sub_parser.set_defaults(func=_deploy_delete_certificate)
+
+  sub_parser = deploy_subparsers.add_parser('upload_service_account_key',
+      parents=[parent_parser], help='Creates a |secret| object in the '
+      'cluster to store the private key for the ReportMaster\'s '
+      'service account. This is the credential that allows the ReportMaster '
+      'to export reports to Google Cloud Storage. The service account and '
+      'private key must first be created manually through the Google Cloud '
+      'console for the relevant project. The service account must separately '
+      'be granted write permission to any Google Cloud Storage bucket to '
+      'which Cobalt will export reports. Then the private key json file '
+      'should be temporarily downloaded to your machine. This command is used '
+      'to upload it as a Kubernetes secret. After it is uploaded the json '
+      'file should be deleted from your local machine.')
+  sub_parser.set_defaults(func=_deploy_upload_service_account_key)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--service_account_key_json',
+      help='Path to the private key json file to upload. Required.')
 
   args = parser.parse_args()
   global _verbose_count

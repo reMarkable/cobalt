@@ -50,8 +50,8 @@ spec:
           - containerPort: 443
         volumeMounts:
           - mountPath: /etc/nginx/ssl
-            # The name must match the volumes.name for
-            # report-master-certificate-storage.
+            # The name must match the volumes.name corresponding to the
+            # secret $$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$ below.
             name: report-master-certificate-storage
             readOnly: true
       - name: report-master
@@ -68,16 +68,31 @@ spec:
           # This path must match the path to where the config files are copied
           # in Dockerfile.
           - '/etc/cobalt'
-          # TODO(rudominer) Eventually remove this.
-          - '-logtostderr'
-          - '-v=3'
+          - '-enable_report_scheduling'
+          - $$REPORT_MASTER_ENABLE_REPORT_SCHEDULING$$
+          # This configures the AuthEnforcer.
           - '-googlers_only'
+          - '-logtostderr'
+          # TODO(rudominer) Eventually remove this.
+          - '-v=3'
         ports:
           - containerPort: 7000
+        volumeMounts:
+           # The mount path below must match the directory part of the
+           # path to which the environment variable
+           # COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS is set in the Dockerfile.
+         - mountPath: /var/lib/cobalt/gcskey
+           # The name must match the volumes.name corresponding to the
+           # secret $$REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME$$ below.
+           name: report-master-gcs-service-account-key-storage
+           readOnly: true
       volumes:
         - name: report-master-certificate-storage
           secret:
             secretName: $$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$
+        - name: report-master-gcs-service-account-key-storage
+          secret:
+            secretName: $$REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME$$
 ---
 # The defintion of the Service
 apiVersion: v1

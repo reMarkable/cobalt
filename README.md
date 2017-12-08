@@ -475,51 +475,74 @@ put it into a different zone in the same region.
 * Select "None (blank disk) for **Source Type**
 * Select **Create**
 
+#### Create a Google Cloud Storage Bucket to which to export serialized reports
+The ReportMaster can be configured to run reports automatically on a schedule
+and export the reports to CSV files stored in a GCS bucket. Create a bucket
+for this purpose. The bucket can either be in the same cloud project as
+you are using for your GKE cluster or a different cloud project. In production
+we use a different cloud project.
+
+####  Create a Service Account to allow the ReportMaster to acces the bucket
+Above we described the process of creating a service account for the purpose
+of allowing code running on your local machine to directly access Bigtable
+in your project. Following that same procedure, now create another service
+account named *report-master-gcs-writer*. This service account is used to
+allow the ReportMaster to write into the GCS bucket you created above.
+* Grant permission to the service account to write to the bucket. This is done
+by editing the bucket permissions and granting the *Storage Admin* role to the
+e-mail address associated with the service account.
+* Download a private key json file for the service account to your local
+computer. Below you will use the command
+`./cobaltb.py deploy upload_service_account_key` to upload this private
+key to a Kubernetes secret.
+
 #### Create a personal_cluster.json file
 Optionally create a new file in your Cobalt source root named exactly
 `personal_cluster.json`.
 This will save you having to type many command-line flags refering to your
 personal cluster.
-Its contents should be exactly the following
+The format of this file is as follows:
 
 ```
 {
-  "cloud_project_prefix": "<your-project-prefix (now deprecated)>",
+  "analyzer_service_static_ip" : "<optional-pre-allocated-static-ip>",
+  "bigtable_instance_name": "<your-bigtable-instance-name>",
+  "cobalt_config_dir" : "<optional-path-to-non-default-config-dir>",
   "cloud_project_name": "<your-project-name>",
   "cluster_name": "<your-cluster-name>",
   "cluster_zone": "<your-cluster-zone>",
   "gce_pd_name": "<your-persistent-disk-name>",
-  "bigtable_instance_name": "<your-bigtable-instance-name>"
-  "shuffler_static_ip" : "<optional-pre-allocated-static-ip>",
-  "report_master_static_ip" : "<optional-pre-allocated-static-ip>",
-  "analyzer_service_static_ip" : "<optional-pre-allocated-static-ip>"",
-  "shuffler_config_file" : "<optional-path-to-non-default-config-file>",
-  "cobalt_config_dir" : "<optional-path-to-non-default-config-dir>",
-  "shuffler_use_memstore" : "<specify true or false. Default false.>",
+  "report_master_enable_scheduling": "<specify true or false. Default false.>"
   "report_master_preferred_address": "<host:port>",
-  "shuffler_preferred_address": "<host:port>",
-  "use_tls": "<specify true or false. Default false.>",
-  "shuffler_root_certs": <path-to-cert-file>,
   "report_master_root_certs": "<path-to-cert-file>"
+  "report_master_static_ip" : "<optional-pre-allocated-static-ip>",
+  "shuffler_config_file" : "<optional-path-to-non-default-config-file>",
+  "shuffler_preferred_address": "<host:port>",
+  "shuffler_root_certs": <path-to-cert-file>,
+  "shuffler_static_ip" : "<optional-pre-allocated-static-ip>",
+  "shuffler_use_memstore" : "<specify true or false. Default false.>",
+  "use_tls": "<specify true or false. Default false.>",
 }
 ```
 
-For example:
+Not all of the fields need to be specified. For example:
 
 ```
 {
+  "bigtable_instance_name": "rudominer-cobalt-testing",
   "cloud_project_name": "fuchsia-cobalt-testing",
   "cluster_name": "rudominer-test-1",
   "cluster_zone": "us-central1-c",
-  "gce_pd_name": "rudominer-test-1",
-  "bigtable_instance_name": "rudominer-cobalt-testing",
-  "shuffler_config_file" : "shuffler/src/shuffler_config/config_demo.txt",
   "cobalt_config_dir" : "config/demo",
-  "shuffler_preferred_address" : "shuffler.endpoints.fuchsia-cobalt-testing.cloud.goog:443",
+  "gce_pd_name": "rudominer-test-1",
+  "report_master_enable_scheduling" : "true",
   "report_master_preferred_address" : "reportmaster.endpoints.fuchsia-cobalt-testing.cloud.goog:443",
-  "use_tls" : "true",
   "report_master_root_certs" : "/home/rudominer/cobalt/src/fuchsia_cobalt_testing_report_master.crt",
-  "shuffler_root_certs" : "/home/rudominer/cobalt/src/fuchsia_cobalt_testing_shuffler.crt"
+  "shuffler_config_file" : "shuffler/src/shuffler_config/config_demo.txt",
+  "shuffler_preferred_address" : "shuffler.endpoints.fuchsia-cobalt-testing.cloud.goog:443",
+  "shuffler_root_certs" : "/home/rudominer/cobalt/src/fuchsia_cobalt_testing_shuffler.crt",
+  "shuffler_use_memstore" : "false",
+  "use_tls" : "true"
 }
 ```
 
@@ -533,51 +556,53 @@ then when performing the steps described above in the section
 `--cloud_project_prefix`, `--cloud_project_name` or `--bigtable_instance_name`.
 
 Here is an explanation of each of the entries.
-* *cloud_project_prefix*: (This is now deprecated. New Google Cloud projects
-will not have a prefix.) This should be the empty string unless you created
-your Google cloud project in such a way that it is part of a custom domain in
-which case this should be the custom domain. The fully qualified name of your
-project will then be `<your-project-prefix>:<your-project-name>`
-* *cloud_project_name*: This should be the full name of your project if you
-used the empty string for *cloud_project_prefix* otherwise it should be the
-project name without the prefix and the colon.
-* *cluster_name*: The name of the GKE cluster you created
-* *cluster_zone*: The zone in which the GKE cluster was created
-* *gce_pd_name*: The name of the GCE persistent disk you created
+* *analyzer_service_static_ip*: If you have allocated a static IP address in
+  your Google Cloud Project you can assign it to the analyzer service by writing
+  it here. Otherwise the analyzer service will use a new dynamic IP address
+  every time it is deployed. WARNING: Google Cloud Platform has a quota on
+  static IP addresses. If you manually create static IP addresses and the
+  deployment of Cobalt fails  you may have hit this quota. It is possible to
+  request a quota increase.
 * *bigtable_instance_name*: The name of the Bigtable instance you created.
-* *shuffler_static_ip*: If you have allocated a static IP address in your
-  Google Cloud Project you can assign it to the shuffler by writing it here.
-  Otherwise the shuffler will use a new dynamic IP address every time it is
-  deployed. WARNING: Google Cloud Platform has a quota on static IP addresses.
-  If you manually create static IP addresses and the deployment of Cobalt fails
-  you may have hit this quota. It is possible to request a quota increase.
-* *report_master_static_ip*: Same as above for the Report Master
-* *analyzer_service_static_ip*: Same as above for the Analyzer Service.
-* shuffler_config_file: If not specified uses the *demo* configuration file.
-  If specified it should be a *source-root-relative* path to a Shuffler config
-  file.
-* cobalt_config_dir: If not specified uses the *demo* Cobalt config dir. If
+* *cobalt_config_dir*: If not specified uses the *demo* Cobalt config dir. If
   specified it should be a *source-root-relative* path to a directory containing
   the cobalt config files `registered_encodings.txt`, `registered_metrics.txt`,
   `registered_reports.txt`.
-* shuffler_use_memstore: If not specified defaults to false meaning that the
+* *cloud_project_name*: The full name of your cloud project.
+* *cluster_name*: The name of the GKE cluster you created
+* *cluster_zone*: The zone in which the GKE cluster was created
+* *gce_pd_name*: The name of the GCE persistent disk you created
+* *report_master_enable_scheduling*: Should the ReportMaster automatically run
+  reports on a schedule. Specify `"true"` or `"false"`. Defaults to false.
+* *report_master_preferred_address*: The preferred connection string for
+  targeting the ReportMaster, of the form <host>:<port>.  This has no effect on
+  the server deployment but rather acts as an instruction to clients regarding
+  which connection string to use when connecting to the server.
+* *report_master_root_certs*: This has no effect on the server deployment but
+  rather acts as an instruction to the report_client regarding which root CA
+  cert file to use when making a TLS connection to the ReportMaster. If this is
+  not specified then gRPC defaults will be used.
+* *report_master_static_ip*: If you have allocated a static IP address in your
+  Google Cloud Project you can assign it to the ReportMaster by writing it here.
+  Otherwise the ReportMaster will use a new dynamic IP address every time it is
+  deployed. WARNING: Google Cloud Platform has a quota on static IP addresses.
+  If you manually create static IP addresses and the deployment of Cobalt fails
+  you may have hit this quota. It is possible to request a quota increase.
+* *shuffler_config_file*: If not specified uses the *demo* configuration file.
+  If specified it should be a *source-root-relative* path to a Shuffler config
+  file.
+* *shuffler_preferred_address*: Similar to  *report_master_preferred_address*
+  but used for the test_app to connect to the Shuffler.
+* *shuffler_root_certs*: Similar to *report_master_root_certs* but used for
+  the test_app to connect to the Shuffler.
+* *shuffler_static_ip*: Same as *report_master_static_ip* but for the Shuffler.
+* *shuffler_use_memstore*: If not specified defaults to false meaning that the
   Shuffler will not use memstore but rather will use a persistent datastore.
   If specified it should be the string `true` or `false`.
-* shuffler_preferred_address: The preferred connection string for targeting the
-  Shuffler, of the form <host>:<port>.  This has no effect on the server
-  deployment but rather acts as an instruction to clients regarding which
-  connection string to use when connecting to the server.
-* report_master_preferred_address: Same as above for the Report Master.
-* use_tls: This has no effect on the server deployment but rather acts as
+* *use_tls*: This has no effect on the server deployment but rather acts as
   an instruction to clients regarding whether or not to use TLS when connecting
   to the Shuffler and ReportMaster. This should be set consistently with the
   values of *shuffler_preferred_address* and *report_master_preferred_address*.
-* shuffler_root_certs: This has no effect on the server deployment but rather
-  acts as an instruction to the test_app regarding which root CA cert
-  file to use when making a TLS connection to the Shuffler. If this is not
-  specified then gRPC defaults will be used.
-* report_master_root_certs: Same as above but used for the report_client
-  connecting to the ReportMaster.
 
 ### Deploying Cobalt to GKE
 
@@ -622,6 +647,10 @@ to use self-signed certificates you may first create them using the command
 To upload a different certificate, you must first delete the existing
 certificate if there is one:
 `./cobaltb.py deploy delete_certificate --job=<job-name>`
+
+`./cobaltb.py deploy upload_service_account_key --service_account_key_json=<path-to-file>`
+Run this one time to upload the service account private key json for
+the service account *report-master-gcs-writer* that you created above.
 
 `./cobaltb.py deploy build`
 Run this to build Docker containers for the Shuffler, Analyzer Service and

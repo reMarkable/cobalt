@@ -14,6 +14,10 @@
 
 FROM cobalt-common
 
+# Install git which is needed by the config parser.
+RUN sudo apt-get update
+RUN sudo apt-get install -y git=1:1.9.1-1ubuntu0.7
+
 COPY analyzer_report_master /usr/local/bin/
 
 # The path to where we are copying the config files must match the path
@@ -21,10 +25,6 @@ COPY analyzer_report_master /usr/local/bin/
 COPY registered_encodings.txt /etc/cobalt/
 COPY registered_metrics.txt /etc/cobalt/
 COPY registered_reports.txt /etc/cobalt/
-
-# Install git which is needed by the config parser.
-RUN sudo apt-get update
-RUN sudo apt-get install -y git=1:1.9.1-1ubuntu0.7
 
 # Install the config parser.
 COPY config_parser_bin /usr/local/bin/
@@ -34,6 +34,14 @@ RUN mkdir -p /etc/cobalt
 RUN /usr/local/bin/config_parser_bin \
       --repo_url https://cobalt-analytics.googlesource.com/config \
       --output_file /etc/cobalt/config.proto
+
+# The directory part of this path must match the mountPath entry
+# in report_master_deployment.yaml corresponding to the name
+# report-master-gcs-service-account-key-storage. The filename part must match
+# the variable REPORT_MASTER_GCS_SERVICE_ACCOUNT_JSON_FILE_NAME in the
+# file //util/container_util.py
+ENV COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS \
+    /var/lib/cobalt/gcskey/gcs_service_account.json
 
 ENTRYPOINT ["analyzer_report_master"]
 EXPOSE 7000

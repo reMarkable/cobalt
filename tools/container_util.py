@@ -132,10 +132,18 @@ ANALYZER_CONFIG_FILE_NAMES = [
     "registered_reports.txt"
 ]
 
+# The names of Kubernetes secrets.
 ANALYZER_PRIVATE_KEY_SECRET_NAME = "analyzer-private-key"
 SHUFFLER_PRIVATE_KEY_SECRET_NAME = "shuffler-private-key"
 SHUFFLER_CERTIFICATE_SECRET_NAME = "shuffler-certificate-secret"
 REPORT_MASTER_CERTIFICATE_SECRET_NAME = "report-master-certificate-secret"
+REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME = \
+    "report-master-gcs-service-account-secret"
+
+# This must match the file name that is set in the environment variable
+# COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS in the file
+# //kubernetes/report_master/Dockerfile
+REPORT_MASTER_GCS_SERVICE_ACCOUNT_JSON_FILE_NAME = "gcs_service_account.json"
 
 def _ensure_dir(dir_path):
   """Ensures that the directory at |dir_path| exists. If not it is created.
@@ -348,6 +356,15 @@ def delete_shuffler_private_key_secret(cloud_project_prefix,
       cluster_zone, cluster_name)
   _delete_secret(SHUFFLER_PRIVATE_KEY_SECRET_NAME, context)
 
+
+def create_report_master_gcs_service_account_secret(cloud_project_prefix,
+    cloud_project_name, cluster_zone, cluster_name, path_to_secret_json_file):
+  context = _form_context_name(cloud_project_prefix, cloud_project_name,
+      cluster_zone, cluster_name)
+  _create_secret_from_files(REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME,
+      {REPORT_MASTER_GCS_SERVICE_ACCOUNT_JSON_FILE_NAME:
+          path_to_secret_json_file}, context)
+
 def _start_gke_service(deployment_template_file, deployment_file,
                        token_substitutions, context):
   # Generate the kubernetes deployment file by performing token replacement.
@@ -452,16 +469,18 @@ def start_report_master(cloud_project_prefix,
                         cloud_project_name,
                         cluster_zone, cluster_name,
                         bigtable_instance_name,
-                        static_ip_address):
+                        static_ip_address,
+                        enable_report_scheduling=False):
   """ Starts the report-master deployment and service.
-  cloud_project_prefix {sring}: For example "google.com"
-  cloud_project_name {sring}: For example "shuffler-test". The prefix and
+  cloud_project_prefix {string}: For example "google.com"
+  cloud_project_name {string}: For example "shuffler-test". The prefix and
       name are used when forming the URI to the image in the registry and
       also the bigtable project name.
   bigtable_instance_name {string}: The name of the instance of Cloud Bigtable
       within the specified project to be used by the Report Master.
   static_ip_address {string}: A static IP address that has already been
       reserved on the GKE cluster.
+  enable_report_scheduling {bool}: Should report scheduling be enabled?
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   REPORT_MASTER_IMAGE_NAME)
@@ -485,6 +504,8 @@ def start_report_master(cloud_project_prefix,
   if not static_ip_address:
     static_ip_address = DELETE_LINE_INDICATOR
 
+  enable_scheduling_value = "'true'" if enable_report_scheduling else "'false'"
+
   # These are the token replacements that must be made inside the deployment
   # template file.
   token_substitutions = {
@@ -492,10 +513,13 @@ def start_report_master(cloud_project_prefix,
       '$$BIGTABLE_PROJECT_NAME$$': bigtable_project_name,
       '$$BIGTABLE_INSTANCE_NAME$$': bigtable_instance_name,
       '$$REPORT_MASTER_STATIC_IP_ADDRESS$$': static_ip_address,
+      '$$REPORT_MASTER_ENABLE_REPORT_SCHEDULING$$': enable_scheduling_value,
       '$$ENDPOINT_NAME$$': endpoint_name,
       '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
       '$$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$':
-      REPORT_MASTER_CERTIFICATE_SECRET_NAME}
+      REPORT_MASTER_CERTIFICATE_SECRET_NAME,
+      '$$REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME$$':
+      REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME}
   _start_gke_service(REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE,
                      REPORT_MASTER_DEPLOYMENT_FILE,
                      token_substitutions, context)
@@ -606,9 +630,9 @@ def display(cloud_project_prefix, cloud_project_name, cluster_zone,
    print "Kubernetes Services"
    print "-------------------"
    subprocess.check_call(["kubectl", "get", "services", "--context", context])
-   print "Google Cloud Endpoints"
-   print "----------------------"
-   subprocess.check_call(["gcloud", "service-management", "list", "--produced",
+   print "Google Cloud Endpoints Services"
+   print "-------------------------------"
+   subprocess.check_call(["gcloud", "endpoints", "services", "list",
      "--project",
      compound_project_name(cloud_project_prefix, cloud_project_name)])
 
