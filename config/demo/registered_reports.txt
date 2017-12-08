@@ -31,8 +31,15 @@ element {
     metric_part: "url"
   }
   scheduling {
-    report_finalization_days: 1
+    report_finalization_days: 3
     aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "fuchsia-cobalt-reports-test1-rudominer"
+      folder_path: "1_1_1"
+    }
   }
 }
 
@@ -46,10 +53,6 @@ element {
   metric_id: 2
   variable {
     metric_part: "hour"
-  }
-  scheduling {
-    report_finalization_days: 5
-    aggregation_epoch_type: WEEK
   }
 }
 
@@ -66,10 +69,6 @@ element {
   }
   variable {
     metric_part: "rating"
-  }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
   }
 }
 
@@ -110,10 +109,6 @@ element {
   metric_id: 5
   variable {
     metric_part: "module"
-  }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
   }
 }
 
@@ -165,10 +160,6 @@ element {
       candidates: "Module B"
     }
   }
-  scheduling {
-    report_finalization_days: 5
-    aggregation_epoch_type: MONTH
-  }
 }
 
 #### ReportConfig (2, 1, 2)
@@ -181,10 +172,6 @@ element {
   metric_id: 3
   variable {
     metric_part: "url"
-  }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
   }
 }
 

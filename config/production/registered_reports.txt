@@ -37,10 +37,6 @@ element {
   variable {
     metric_part: "Event name"
   }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
-  }
 }
 
 #####################################################################
@@ -84,10 +80,6 @@ element {
       }
     }
   }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
-  }
 }
 
 ##################### Project 101: Module Usage Tracking ######################
@@ -111,10 +103,6 @@ element {
   metric_id: 1
   variable {
     metric_part: "url"
-  }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
   }
 }
 
@@ -176,10 +164,6 @@ element {
   variable {
     metric_part: "rating"
   }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
-  }
 }
 
 #### ReportConfig (1, 1, 4)
@@ -219,10 +203,6 @@ element {
   metric_id: 5
   variable {
     metric_part: "module"
-  }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
   }
 }
 
@@ -273,10 +253,6 @@ element {
   variable {
     metric_part: "Event name"
   }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
-  }
 }
 
 #####################################################################
@@ -298,10 +274,6 @@ element {
   metric_id: 2
   variable {
     metric_part: "url"
-  }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
   }
 }
 
@@ -341,9 +313,5 @@ element {
         value: "commits received out-of-order: not-recovered"
       }
     }
-  }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
   }
 }
