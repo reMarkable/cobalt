@@ -108,11 +108,11 @@ void ReportScheduler::ProcessReports() {
 
 void ReportScheduler::ProcessOneReport(const ReportConfig& report_config,
                                        uint32_t current_day_index) {
-  VLOG(4) << "ReportScheduler processing report_config "
-          << IdString(report_config);
+  LOG(INFO) << "ReportScheduler processing report_config "
+            << IdString(report_config);
   if (!report_config.has_scheduling()) {
-    VLOG(4) << "Skpping report_config " << IdString(report_config)
-            << " because it has no SchedulingConfig.";
+    LOG(INFO) << "Skpping report_config " << IdString(report_config)
+              << " because it has no SchedulingConfig.";
     return;
   }
   switch (report_config.scheduling().aggregation_epoch_type()) {
@@ -217,11 +217,11 @@ bool ReportScheduler::ShouldStartDailyReportNow(
 void ReportScheduler::StartReportNow(const ReportConfig& report_config,
                                      uint32_t first_day_index,
                                      uint32_t last_day_index) {
-  VLOG(4) << "ReportScheduler starting report " << IdString(report_config)
-          << " [" << first_day_index << ", " << last_day_index << "]";
   const std::string export_name =
       ReportExportName(report_config, first_day_index, last_day_index);
   ReportId report_id;
+  LOG(INFO) << "ReportScheduler starting report " << IdString(report_config)
+            << " [" << first_day_index << ", " << last_day_index << "]";
   auto status = report_starter_->StartReport(
       report_config, first_day_index, last_day_index, export_name, &report_id);
   if (!status.ok()) {

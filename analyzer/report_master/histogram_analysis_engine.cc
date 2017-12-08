@@ -350,10 +350,10 @@ grpc::Status HistogramAnalysisEngine::PerformAnalysis(
 
   if (decoders_.size() == 0) {
     std::ostringstream stream;
-    stream << "Analysis failed. No valid observations were added. report_id="
+    stream << "Empty report. No valid observations found for report_id="
            << ReportStore::ToString(report_id_);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG(INFO) << message;
     return grpc::Status(grpc::FAILED_PRECONDITION, message);
   }
 

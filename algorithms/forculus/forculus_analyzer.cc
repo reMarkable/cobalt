@@ -98,7 +98,7 @@ bool ForculusAnalyzer::AddObservation(uint32_t day_index,
 
         // Delete the Decrypter object. It has done its job and we don't need
         // it anymore.
-        VLOG(3) << "Decryption succeeded: '" << recovered_text <<
+        VLOG(4) << "Decryption succeeded: '" << recovered_text <<
             "' Deleting Decrypter: day_index=" << day_index << " " <<
             ErrorString(obs);
         decrypter_result.decrypter.reset();

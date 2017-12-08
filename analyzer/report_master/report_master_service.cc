@@ -60,7 +60,7 @@ DEFINE_string(tls_key_file, "",
               "Path to a TLS server private key file to use if use_tls=true.");
 DEFINE_bool(
     enable_report_scheduling, false,
-    "Should the ReportMaster run all reports automatically on a schedule.");
+    "Should the ReportMaster run all reports automatically on a schedule?");
 
 namespace {
 // Builds the string form of a report_id used in the public ReportMasterService
@@ -271,6 +271,8 @@ ReportMasterService::CreateFromFlagsOrDie() {
           server_credentials, auth_enforcer, std::move(report_exporter)));
 
   if (FLAGS_enable_report_scheduling) {
+    LOG(INFO) << "Starting a Report Scheduler because "
+                 "-enable_report_scheduling=true.";
     // We will construct a new ReportScheduler, giving it a ReportStarter that
     // delegates to our ReportMasterService. The ReportStarter does not take
     // ownership of the ReportMasterService.
@@ -282,6 +284,9 @@ ReportMasterService::CreateFromFlagsOrDie() {
     report_scheduler->Start();
     // We give ownership of the ReportScheduler to the ReportMaster.
     report_master_service->set_report_scheduler(std::move(report_scheduler));
+  } else {
+    LOG(INFO) << "Not starting a Report Scheduler because "
+                 "-enable_report_scheduling=false.";
   }
 
   return report_master_service;
