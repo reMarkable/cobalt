@@ -135,6 +135,46 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromFlagsOrDie() {
       std::shared_ptr<config::ReportRegistry>(report_configs.first.release())));
 }
 
+std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
+    const CobaltConfig& config) {
+  LoggingErrorCollector error_collector;
+
+  RegisteredEncodings registered_encodings;
+  registered_encodings.mutable_element()->CopyFrom(config.encoding_configs());
+  auto encodings =
+      EncodingRegistry::FromProto(registered_encodings, &error_collector);
+  if (encodings.second != config::kOK) {
+    LOG(ERROR) << "Error getting EncodingConfigs from registry. "
+               << ErrorMessage(encodings.second);
+    return std::unique_ptr<AnalyzerConfig>(nullptr);
+  }
+
+  RegisteredMetrics registered_metrics;
+  registered_metrics.mutable_element()->CopyFrom(config.metric_configs());
+  auto metrics =
+      MetricRegistry::FromProto(registered_metrics, &error_collector);
+  if (metrics.second != config::kOK) {
+    LOG(ERROR) << "Error getting Metrics from registry. "
+               << ErrorMessage(metrics.second);
+    return std::unique_ptr<AnalyzerConfig>(nullptr);
+  }
+
+  RegisteredReports registered_reports;
+  registered_reports.mutable_element()->CopyFrom(config.report_configs());
+  auto reports =
+      ReportRegistry::FromProto(registered_reports, &error_collector);
+  if (reports.second != config::kOK) {
+    LOG(ERROR) << "Error getting ReportConfigs from registry. "
+               << ErrorMessage(reports.second);
+    return std::unique_ptr<AnalyzerConfig>(nullptr);
+  }
+
+  return std::unique_ptr<AnalyzerConfig>(new AnalyzerConfig(
+      std::shared_ptr<config::EncodingRegistry>(encodings.first.release()),
+      std::shared_ptr<config::MetricRegistry>(metrics.first.release()),
+      std::shared_ptr<config::ReportRegistry>(reports.first.release())));
+}
+
 AnalyzerConfig::AnalyzerConfig(
     std::shared_ptr<config::EncodingRegistry> encoding_configs,
     std::shared_ptr<config::MetricRegistry> metrics,

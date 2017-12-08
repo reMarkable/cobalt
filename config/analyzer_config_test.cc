@@ -72,5 +72,56 @@ TEST(AnalyzerConfigTest, DuplicateRegistrationDeathTest) {
                "Duplicate ID found in file");
 }
 
+TEST(AnalyzerConfigTest, ValidCobaltConfigProto) {
+  CobaltConfig cobalt_config;
+
+  EncodingConfig *encoding;
+  encoding = cobalt_config.add_encoding_configs();
+  encoding->set_customer_id(1);
+  encoding->set_project_id(1);
+  encoding->set_id(3);
+
+  encoding = cobalt_config.add_encoding_configs();
+  encoding->set_customer_id(1);
+  encoding->set_project_id(1);
+  encoding->set_id(4);
+
+  Metric *metric;
+  metric = cobalt_config.add_metric_configs();
+  metric->set_customer_id(2);
+  metric->set_project_id(1);
+  metric->set_id(2);
+
+  metric = cobalt_config.add_metric_configs();
+  metric->set_customer_id(2);
+  metric->set_project_id(1);
+  metric->set_id(3);
+
+  ReportConfig *report;
+  report = cobalt_config.add_report_configs();
+  report->set_customer_id(1);
+  report->set_project_id(1);
+  report->set_id(2);
+
+  report = cobalt_config.add_report_configs();
+  report->set_customer_id(1);
+  report->set_project_id(1);
+  report->set_id(3);
+
+  auto config = AnalyzerConfig::CreateFromCobaltConfigProto(cobalt_config);
+
+  EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 3));
+  EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 4));
+  EXPECT_EQ(nullptr, config->EncodingConfig(1, 1, 5));
+
+  EXPECT_NE(nullptr, config->Metric(2, 1, 2));
+  EXPECT_NE(nullptr, config->Metric(2, 1, 3));
+  EXPECT_EQ(nullptr, config->Metric(2, 1, 4));
+
+  EXPECT_NE(nullptr, config->ReportConfig(1, 1, 2));
+  EXPECT_NE(nullptr, config->ReportConfig(1, 1, 3));
+  EXPECT_EQ(nullptr, config->ReportConfig(1, 1, 4));
+}
+
 }  // namespace config
 }  // namespace cobalt

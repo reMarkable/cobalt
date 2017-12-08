@@ -19,6 +19,7 @@
 #include <string>
 #include <utility>
 
+#include "config/cobalt_config.pb.h"
 #include "config/encoding_config.h"
 #include "config/encodings.pb.h"
 #include "config/metric_config.h"
@@ -36,6 +37,11 @@ class AnalyzerConfig {
   // Constructs and returns an instance of AnalyzerConfig using information
   // from the flags to find the configuration data.
   static std::unique_ptr<AnalyzerConfig> CreateFromFlagsOrDie();
+
+  // Constructs and returns an instance of AnalyzerConfig using information
+  // in the CobaltConfig instance passed in.
+  static std::unique_ptr<AnalyzerConfig> CreateFromCobaltConfigProto(
+      const CobaltConfig& config);
 
   // Constructs an AnalyzerConfig that wraps the given registries.
   AnalyzerConfig(std::shared_ptr<config::EncodingRegistry> encoding_configs,
