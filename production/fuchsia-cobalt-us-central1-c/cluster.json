@@ -1,15 +1,16 @@
 {
+  "bigtable_instance_name": "cobalt",
+  "cobalt_config_dir" : "config/production",
   "cloud_project_name": "fuchsia-cobalt",
   "cluster_name": "cobalt",
   "cluster_zone": "us-central1-c",
   "gce_pd_name": "cobalt",
-  "bigtable_instance_name": "cobalt",
-  "shuffler_static_ip" : "130.211.188.46",
+  "report_master_enable_scheduling" : "true",
+  "report_master_preferred_address": "reportmaster.cobalt-api.fuchsia.com:443",
   "report_master_static_ip" : "104.197.76.143",
   "shuffler_config_file" : "shuffler/src/shuffler_config/config_v0.txt",
-  "cobalt_config_dir" : "config/production",
-  "shuffler_use_memstore" : "true",
   "shuffler_preferred_address": "shuffler.cobalt-api.fuchsia.com:443",
-  "report_master_preferred_address": "reportmaster.cobalt-api.fuchsia.com:443",
+  "shuffler_static_ip" : "130.211.188.46",
+  "shuffler_use_memstore" : "true",
   "use_tls": "true"
 }

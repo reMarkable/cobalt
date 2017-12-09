@@ -80,6 +80,17 @@ element {
       }
     }
   }
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "fuchsia-cobalt-reports-p100-ledger"
+      folder_path: "1_100_2"
+    }
+  }
 }
 
 ##################### Project 101: Module Usage Tracking ######################
@@ -104,6 +115,17 @@ element {
   variable {
     metric_part: "url"
   }
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "fuchsia-cobalt-reports-p101-mod-usage"
+      folder_path: "1_101_1"
+    }
+  }
 }
 
 
@@ -127,10 +149,6 @@ element {
   variable {
     metric_part: "url"
   }
-  scheduling {
-    report_finalization_days: 1
-    aggregation_epoch_type: DAY
-  }
 }
 
 #### ReportConfig (1, 1, 2)
@@ -143,10 +161,6 @@ element {
   metric_id: 2
   variable {
     metric_part: "hour"
-  }
-  scheduling {
-    report_finalization_days: 5
-    aggregation_epoch_type: WEEK
   }
 }
 
@@ -253,6 +267,17 @@ element {
   variable {
     metric_part: "Event name"
   }
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "fuchsia-cobalt-reports-p2-test-app"
+      folder_path: "1_2_1"
+    }
+  }
 }
 
 #####################################################################
@@ -274,6 +299,17 @@ element {
   metric_id: 2
   variable {
     metric_part: "url"
+  }
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "fuchsia-cobalt-reports-p2-test-app"
+      folder_path: "1_2_2"
+    }
   }
 }
 
@@ -312,6 +348,17 @@ element {
         key: 4;
         value: "commits received out-of-order: not-recovered"
       }
+    }
+  }
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "fuchsia-cobalt-reports-p2-test-app"
+      folder_path: "1_2_3"
     }
   }
 }
