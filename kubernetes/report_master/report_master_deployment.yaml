@@ -68,8 +68,7 @@ spec:
           # This path must match the path to where the config files are copied
           # in Dockerfile.
           - '/etc/cobalt'
-          - '-enable_report_scheduling'
-          - $$REPORT_MASTER_ENABLE_REPORT_SCHEDULING$$
+          - $$REPORT_MASTER_ENABLE_REPORT_SCHEDULING_FLAG$$
           # This configures the AuthEnforcer.
           - '-googlers_only'
           - '-logtostderr'

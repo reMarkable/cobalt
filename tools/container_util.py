@@ -414,7 +414,7 @@ def _get_endpoint_config_id(cloud_project_prefix, cloud_project_name,
   Returns
     {string}: The configuration id. For example "2017-08-21r2"
   """
-  config_json = subprocess.check_output(["gcloud", "service-management",
+  config_json = subprocess.check_output(["gcloud", "endpoints", "services",
     "describe", "--format", "json", endpoint_name, "--project",
     compound_project_name(cloud_project_prefix, cloud_project_name)])
   config = json.loads(config_json)
@@ -504,7 +504,8 @@ def start_report_master(cloud_project_prefix,
   if not static_ip_address:
     static_ip_address = DELETE_LINE_INDICATOR
 
-  enable_scheduling_value = "'true'" if enable_report_scheduling else "'false'"
+  enable_scheduling_flag = ("'-enable_report_scheduling'"
+      if enable_report_scheduling else DELETE_LINE_INDICATOR)
 
   # These are the token replacements that must be made inside the deployment
   # template file.
@@ -513,7 +514,8 @@ def start_report_master(cloud_project_prefix,
       '$$BIGTABLE_PROJECT_NAME$$': bigtable_project_name,
       '$$BIGTABLE_INSTANCE_NAME$$': bigtable_instance_name,
       '$$REPORT_MASTER_STATIC_IP_ADDRESS$$': static_ip_address,
-      '$$REPORT_MASTER_ENABLE_REPORT_SCHEDULING$$': enable_scheduling_value,
+      '$$REPORT_MASTER_ENABLE_REPORT_SCHEDULING_FLAG$$':
+      enable_scheduling_flag,
       '$$ENDPOINT_NAME$$': endpoint_name,
       '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
       '$$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$':

@@ -563,7 +563,8 @@ def _deploy_start(args):
         args.cluster_zone, args.cluster_name,
         args.bigtable_instance_name,
         args.report_master_static_ip,
-        enable_report_scheduling=args.report_master_enable_scheduling)
+        enable_report_scheduling=_parse_bool(
+            args.report_master_enable_scheduling))
   else:
     print('Unknown job "%s". I only know how to start "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
