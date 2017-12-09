@@ -126,11 +126,12 @@ class ReportScheduler {
   // re-reads the registered reports in |analyzer_config| and checks
   // to see if it is time to generate a report. Optional, defaults to 17
   // minutes.
-  ReportScheduler(std::shared_ptr<config::ReportRegistry> report_registry,
-                  std::shared_ptr<store::ReportStore> report_store,
-                  std::shared_ptr<ReportStarterInterface> report_starter,
-                  std::chrono::milliseconds sleep_interval =
-                      std::chrono::milliseconds(1000 * 60 * 17));
+  ReportScheduler(
+      std::shared_ptr<config::AnalyzerConfigManager> config_manager,
+      std::shared_ptr<store::ReportStore> report_store,
+      std::shared_ptr<ReportStarterInterface> report_starter,
+      std::chrono::milliseconds sleep_interval =
+          std::chrono::milliseconds(1000 * 60 * 17));
 
   // The destructor will stop the scheduler thread and wait for it to stop
   // before exiting.
@@ -205,7 +206,7 @@ class ReportScheduler {
   // The "Run()" method runs in this thread.
   std::thread scheduler_thread_;
 
-  std::shared_ptr<config::ReportRegistry> report_registry_;
+  std::shared_ptr<config::AnalyzerConfigManager> config_manager_;
   std::shared_ptr<ReportStarterInterface> report_starter_;
   std::unique_ptr<ReportHistoryCache> report_history_;
 

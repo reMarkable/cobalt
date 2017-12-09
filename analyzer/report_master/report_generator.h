@@ -28,6 +28,7 @@
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
 #include "config/analyzer_config.h"
+#include "config/analyzer_config_manager.h"
 #include "grpc++/grpc++.h"
 
 namespace cobalt {
@@ -51,10 +52,11 @@ class ReportGenerator {
  public:
   // report_exporter is allowed to be NULL, in which case no exporting will
   // occur.
-  ReportGenerator(std::shared_ptr<config::AnalyzerConfig> analyzer_config,
-                  std::shared_ptr<store::ObservationStore> observation_store,
-                  std::shared_ptr<store::ReportStore> report_store,
-                  std::unique_ptr<ReportExporter> report_exporter);
+  ReportGenerator(
+      std::shared_ptr<config::AnalyzerConfigManager> config_manager,
+      std::shared_ptr<store::ObservationStore> observation_store,
+      std::shared_ptr<store::ReportStore> report_store,
+      std::unique_ptr<ReportExporter> report_exporter);
 
   // Requests that the ReportGenerator generate the report with the given
   // |report_id|. This method is invoked by the ReportMaster after
@@ -135,7 +137,7 @@ class ReportGenerator {
                                        uint32_t end_day_index,
                                        std::vector<ReportRow>* report_rows);
 
-  std::shared_ptr<config::AnalyzerConfig> analyzer_config_;
+  std::shared_ptr<config::AnalyzerConfigManager> config_manager_;
   std::shared_ptr<store::ObservationStore> observation_store_;
   std::shared_ptr<store::ReportStore> report_store_;
   std::unique_ptr<ReportExporter> report_exporter_;

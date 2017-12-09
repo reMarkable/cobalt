@@ -235,10 +235,12 @@ class ReportExecutorAbstractTest : public ::testing::Test {
     std::shared_ptr<config::AnalyzerConfig> analyzer_config(
         new config::AnalyzerConfig(encoding_config_registry, metric_registry,
                                    report_config_registry));
+    std::shared_ptr<config::AnalyzerConfigManager> analyzer_config_manager(
+        new config::AnalyzerConfigManager(analyzer_config));
 
     // Make a ReportGenerator
     std::unique_ptr<ReportGenerator> report_generator(new ReportGenerator(
-        analyzer_config, observation_store_, report_store_, nullptr));
+        analyzer_config_manager, observation_store_, report_store_, nullptr));
 
     // Make a ReportExecutor
     report_executor_.reset(

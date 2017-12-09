@@ -30,6 +30,7 @@ cobalt_protobuf_generate_go(generate_config_pb_go_files
 # Build the analyzer_config library
 add_library(analyzer_config
             analyzer_config.cc
+            analyzer_config_manager.cc
             ${CONFIG_PROTO_HDRS})
 target_link_libraries(analyzer_config
     config_proto_lib)

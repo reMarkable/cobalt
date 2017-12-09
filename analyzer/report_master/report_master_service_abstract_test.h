@@ -351,6 +351,11 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
         new config::AnalyzerConfig(encoding_config_registry, metric_registry,
                                    report_config_registry_));
 
+    // Make an AnalyzerConfigManager
+    std::shared_ptr<config::AnalyzerConfigManager> config_manager(
+        new config::AnalyzerConfigManager(analyzer_config));
+    config_manager_ = config_manager;
+
     std::shared_ptr<AuthEnforcer> auth_enforcer(new NullEnforcer());
 
     fake_uploader_.reset(new FakeGcsUploader());
@@ -358,7 +363,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
         new ReportExporter(fake_uploader_));
 
     report_master_service_.reset(new ReportMasterService(
-        0, observation_store_, report_store_, analyzer_config,
+        0, observation_store_, report_store_, config_manager,
         grpc::InsecureServerCredentials(), auth_enforcer,
         std::move(report_exporter)));
 
@@ -702,6 +707,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
   std::unique_ptr<ReportMasterService> report_master_service_;
   std::shared_ptr<util::IncrementingClock> clock_;
   std::shared_ptr<config::ReportRegistry> report_config_registry_;
+  std::shared_ptr<config::AnalyzerConfigManager> config_manager_;
   std::shared_ptr<FakeGcsUploader> fake_uploader_;
 };
 
@@ -1032,7 +1038,7 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
   std::shared_ptr<ReportStarter> report_starter(
       new ReportStarter(this->report_master_service_.get()));
   std::unique_ptr<ReportScheduler> report_scheduler(
-      new ReportScheduler(this->report_config_registry_, this->report_store_,
+      new ReportScheduler(this->config_manager_, this->report_store_,
                           report_starter, std::chrono::milliseconds(1)));
 
   // We arrange that the ReportScheduler loops every 1 ms and that each ms

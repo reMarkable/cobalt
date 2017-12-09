@@ -215,13 +215,15 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     std::shared_ptr<config::AnalyzerConfig> analyzer_config(
         new config::AnalyzerConfig(encoding_config_registry, metric_registry,
                                    report_config_registry));
+    std::shared_ptr<config::AnalyzerConfigManager> analyzer_config_manager(
+        new config::AnalyzerConfigManager(analyzer_config));
 
     // Make the ReportGenerator
     std::unique_ptr<ReportExporter> report_exporter(
         new ReportExporter(fake_uploader_));
     report_generator_.reset(
-        new ReportGenerator(analyzer_config, observation_store_, report_store_,
-                            std::move(report_exporter)));
+        new ReportGenerator(analyzer_config_manager, observation_store_,
+                            report_store_, std::move(report_exporter)));
   }
 
   // Makes an Observation with two string parts, both of which have the

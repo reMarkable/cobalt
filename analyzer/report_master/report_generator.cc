@@ -86,11 +86,11 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
 }  // namespace
 
 ReportGenerator::ReportGenerator(
-    std::shared_ptr<config::AnalyzerConfig> analyzer_config,
+    std::shared_ptr<config::AnalyzerConfigManager> config_manager,
     std::shared_ptr<ObservationStore> observation_store,
     std::shared_ptr<ReportStore> report_store,
     std::unique_ptr<ReportExporter> report_exporter)
-    : analyzer_config_(analyzer_config),
+    : config_manager_(config_manager),
       observation_store_(observation_store),
       report_store_(report_store),
       report_exporter_(std::move(report_exporter)) {}
@@ -113,8 +113,10 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     return grpc::Status(grpc::FAILED_PRECONDITION, message);
   }
 
+  auto analyzer_config = config_manager_->GetCurrent();
+
   // Fetch ReportConfig
-  const ReportConfig* report_config = analyzer_config_->ReportConfig(
+  const ReportConfig* report_config = analyzer_config->ReportConfig(
       report_id.customer_id(), report_id.project_id(),
       report_id.report_config_id());
   if (!report_config) {
@@ -136,7 +138,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   }
 
   // Fetch the Metric.
-  const Metric* metric = analyzer_config_->Metric(report_config->customer_id(),
+  const Metric* metric = analyzer_config->Metric(report_config->customer_id(),
                                                   report_config->project_id(),
                                                   report_config->metric_id());
   if (!metric) {
@@ -237,9 +239,10 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
 
+  auto analyzer_config = config_manager_->GetCurrent();
   // Construct the HistogramAnalysisEngine.
   HistogramAnalysisEngine analysis_engine(
-      report_id, variables[0].report_variable, analyzer_config_);
+      report_id, variables[0].report_variable, analyzer_config);
 
   // We query the ObservationStore for the relevant ObservationParts.
   store::ObservationStore::QueryResponse query_response;

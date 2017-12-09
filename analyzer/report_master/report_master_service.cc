@@ -29,6 +29,7 @@
 #include "analyzer/store/bigtable_store.h"
 #include "analyzer/store/data_store.h"
 #include "config/analyzer_config.h"
+#include "config/analyzer_config_manager.h"
 #include "glog/logging.h"
 #include "util/crypto_util/base64.h"
 #include "util/pem_util.h"
@@ -37,6 +38,7 @@ namespace cobalt {
 namespace analyzer {
 
 using config::AnalyzerConfig;
+using config::AnalyzerConfigManager;
 using crypto::Base64Decode;
 using crypto::Base64Encode;
 using grpc::ServerContext;
@@ -227,8 +229,8 @@ ReportMasterService::CreateFromFlagsOrDie() {
       new ObservationStore(data_store));
   std::shared_ptr<ReportStore> report_store(new ReportStore(data_store));
 
-  std::shared_ptr<AnalyzerConfig> analyzer_config(
-      AnalyzerConfig::CreateFromFlagsOrDie().release());
+  std::shared_ptr<AnalyzerConfigManager> config_manager(
+      AnalyzerConfigManager::CreateFromFlagsOrDie());
 
   std::shared_ptr<AuthEnforcer> auth_enforcer =
       AuthEnforcer::CreateFromFlagsOrDie();
@@ -267,7 +269,7 @@ ReportMasterService::CreateFromFlagsOrDie() {
 
   auto report_master_service =
       std::unique_ptr<ReportMasterService>(new ReportMasterService(
-          FLAGS_port, observation_store, report_store, analyzer_config,
+          FLAGS_port, observation_store, report_store, config_manager,
           server_credentials, auth_enforcer, std::move(report_exporter)));
 
   if (FLAGS_enable_report_scheduling) {
@@ -279,7 +281,7 @@ ReportMasterService::CreateFromFlagsOrDie() {
     std::shared_ptr<ReportStarter> report_starter(
         new ReportStarter(report_master_service.get()));
     std::unique_ptr<ReportScheduler> report_scheduler(new ReportScheduler(
-        analyzer_config->report_registry(), report_store, report_starter));
+        config_manager, report_store, report_starter));
     // We start the scheduler thread.
     report_scheduler->Start();
     // We give ownership of the ReportScheduler to the ReportMaster.
@@ -295,17 +297,17 @@ ReportMasterService::CreateFromFlagsOrDie() {
 ReportMasterService::ReportMasterService(
     int port, std::shared_ptr<store::ObservationStore> observation_store,
     std::shared_ptr<store::ReportStore> report_store,
-    std::shared_ptr<config::AnalyzerConfig> analyzer_config,
+    std::shared_ptr<config::AnalyzerConfigManager> config_manager,
     std::shared_ptr<grpc::ServerCredentials> server_credentials,
     std::shared_ptr<AuthEnforcer> auth_enforcer,
     std::unique_ptr<ReportExporter> report_exporter)
     : port_(port),
       observation_store_(observation_store),
       report_store_(report_store),
-      analyzer_config_(analyzer_config),
+      config_manager_(config_manager),
       report_executor_(new ReportExecutor(
           report_store_, std::unique_ptr<ReportGenerator>(new ReportGenerator(
-                             analyzer_config_, observation_store_,
+                             config_manager_, observation_store_,
                              report_store_, std::move(report_exporter))))),
       server_credentials_(server_credentials),
       auth_enforcer_(auth_enforcer) {}
@@ -648,9 +650,10 @@ grpc::Status ReportMasterService::QueryReportsNoAuth(
 grpc::Status ReportMasterService::GetAndValidateReportConfig(
     uint32_t customer_id, uint32_t project_id, uint32_t report_config_id,
     const ReportConfig** report_config_out) {
+  auto analyzer_config = config_manager_->GetCurrent();
   // Fetch the ReportConfig from the registry.
   *report_config_out =
-      analyzer_config_->ReportConfig(customer_id, project_id, report_config_id);
+      analyzer_config->ReportConfig(customer_id, project_id, report_config_id);
   if (!*report_config_out) {
     std::ostringstream stream;
     stream << "No ReportConfig found with id=(" << customer_id << ", "

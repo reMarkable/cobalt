@@ -26,6 +26,8 @@ namespace analyzer {
 // will look for reports that were supposed to be run but were not.
 DECLARE_uint32(daily_report_makeup_days);
 
+using config::EncodingRegistry;
+using config::MetricRegistry;
 using config::ReportRegistry;
 using store::DataStore;
 using store::MemoryStore;
@@ -179,11 +181,31 @@ class ReportSchedulerTest : public ::testing::Test {
         ReportRegistry::FromString(kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
     report_registry_.reset((report_parse_result.first.release()));
+
+    auto encoding_parse_result = EncodingRegistry::FromString("", nullptr);
+    EXPECT_EQ(config::kOK, encoding_parse_result.second);
+    std::shared_ptr<config::EncodingRegistry> encoding_registry(
+        encoding_parse_result.first.release());
+
+    auto metric_parse_result = MetricRegistry::FromString("", nullptr);
+    EXPECT_EQ(config::kOK, metric_parse_result.second);
+    std::shared_ptr<config::MetricRegistry> metric_registry(
+        metric_parse_result.first.release());
+
+    // Make an AnalyzerConfig
+    std::shared_ptr<config::AnalyzerConfig> analyzer_config(
+        new config::AnalyzerConfig(encoding_registry, metric_registry,
+                                   report_registry_));
+
+    // Make an AnalyzerConfigManager
+    std::shared_ptr<config::AnalyzerConfigManager> analyzer_config_manager(
+        new config::AnalyzerConfigManager(analyzer_config));
+
     data_store_.reset(new MemoryStore());
     data_store_->DeleteAllRows(DataStore::kReportMetadata);
     report_store_.reset(new ReportStore(data_store_));
     report_starter_.reset(new FakeReportStarter(report_store_));
-    scheduler_.reset(new ReportScheduler(report_registry_, report_store_,
+    scheduler_.reset(new ReportScheduler(analyzer_config_manager, report_store_,
                                          report_starter_,
                                          std::chrono::milliseconds(1)));
     clock_.reset(new IncrementingClock());

@@ -41,12 +41,12 @@ std::string IdString(const ReportConfig& report_config) {
 }  // namespace
 
 ReportScheduler::ReportScheduler(
-    std::shared_ptr<config::ReportRegistry> report_registry,
+    std::shared_ptr<config::AnalyzerConfigManager> config_manager,
     std::shared_ptr<store::ReportStore> report_store,
     std::shared_ptr<ReportStarterInterface> report_starter,
     std::chrono::milliseconds sleep_interval)
     : clock_(new SystemClock()),
-      report_registry_(report_registry),
+      config_manager_(config_manager),
       report_starter_(report_starter),
       report_history_(new ReportHistoryCache(
           CurrentDayIndex() - FLAGS_daily_report_makeup_days, report_store)),
@@ -98,7 +98,9 @@ void ReportScheduler::Sleep() {
 
 void ReportScheduler::ProcessReports() {
   uint32_t current_day_index = CurrentDayIndex();
-  for (const ReportConfig& report_config : *report_registry_) {
+  std::shared_ptr<config::ReportRegistry> report_registry =
+      config_manager_->GetCurrent()->report_registry();
+  for (const ReportConfig& report_config : *report_registry) {
     if (shut_down_) {
       return;
     }

@@ -29,12 +29,12 @@ INSTANTIATE_TYPED_TEST_CASE_P(ReportMasterServiceTest,
 TEST(ReportMasterServiceFriendTest, AuthEnforcerTest) {
   std::shared_ptr<store::ObservationStore> observation_store;
   std::shared_ptr<store::ReportStore> report_store;
-  std::shared_ptr<config::AnalyzerConfig> analyzer_config;
+  std::shared_ptr<config::AnalyzerConfigManager> analyzer_config_manager;
   std::shared_ptr<grpc::ServerCredentials> server_credentials;
   std::shared_ptr<AuthEnforcer> auth_enforcer(new NegativeEnforcer());
 
   ReportMasterService service(0, observation_store, report_store,
-                              analyzer_config, server_credentials,
+                              analyzer_config_manager, server_credentials,
                               auth_enforcer, nullptr);
 
   StartReportRequest start_request;
