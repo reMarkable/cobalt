@@ -114,19 +114,18 @@ class ReportExporter {
                                 const ReportExportConfig& export_config,
                                 const std::vector<ReportRow>& report_rows);
 
-  grpc::Status ExportReportToGCS(const GCSExportLocation& location,
+  grpc::Status ExportReportToGCS(const ReportConfig& report_config,
+                                 const GCSExportLocation& location,
                                  const ReportMetadataLite& metadata,
                                  const std::string& mime_type,
                                  const std::string& serialized_report);
 
-  // Forms a full file name path by concatenating folder_path with file_name,
-  // adding a forward slash between them if folder_path does not end with
-  // a forward slash. Also possibly adds an appropriate dot extension to the
-  // filename based on the mime type, but only if the file_name does not
-  // already contain a dot.
-  static std::string FormFullPath(const std::string& folder_path,
-                                  const std::string& file_name,
-                                  const std::string& mime_type);
+  // Builds a file path for exporting to Google Cloud Storage by concatenating
+  // a folder path based on the report config id, the metadata export_name,
+  // and a dot extension based on the mime type.
+  static std::string GcsPath(const ReportConfig& report_config,
+                             const ReportMetadataLite& metadata,
+                             const std::string& mime_type);
 };
 
 }  // namespace analyzer

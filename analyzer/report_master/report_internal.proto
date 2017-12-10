@@ -107,11 +107,7 @@ message ReportMetadataLite {
   // is be exported to an external system. This field specifies a relative
   // location. The fully-qualified path for the export is determined by
   // also considering the values specified in the |export_location| fields of
-  // of the ReportExportConfigs in the ReportConfig. For example if there is an
-  // associated GCSExportLocation with bucket = "my_bucket" and
-  // folder_path = "foo/bar/" and if the value of the |export_name| field is
-  // "reportA" then a serialized report instance will be written to a Google
-  // Cloud Storage object named "my_bucket/foo/bar/reportA".
+  // of the ReportExportConfigs in the ReportConfig.
   //
   // A report may be exported to multiple locations.
   //

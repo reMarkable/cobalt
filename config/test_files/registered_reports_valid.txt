@@ -62,7 +62,6 @@ element {
     csv {}
     gcs {
       bucket: "bucket-1"
-      folder_path: "a/folder"
     }
   }
 }

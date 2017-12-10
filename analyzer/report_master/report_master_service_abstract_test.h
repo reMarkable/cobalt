@@ -47,6 +47,8 @@
 namespace cobalt {
 namespace analyzer {
 
+using util::CalendarDate;
+
 static const uint32_t kCustomerId = 1;
 static const uint32_t kProjectId = 1;
 static const uint32_t kMetricId1 = 1;
@@ -202,7 +204,6 @@ element {
     csv {}
     gcs {
       bucket: "bucket.name.1"
-      folder_path: "folder/path"
     }
   }
 }
@@ -253,7 +254,6 @@ element {
     csv {}
     gcs {
       bucket: "bucket.name.3"
-      folder_path: "folder/path"
     }
   }
 }
@@ -658,13 +658,15 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
   }
 
   // Given a file_path of the form
-  //    "folder/path/report_1_1_<report_config_id>_<day_index>_<day_index>"
-  // returns day_index, or returns 0 if |file_path| does not have the expected
-  // form.
+  //    "1_1_1/report_1_1_1_20090314.csv"
+  // returns the day_index corresponding to the calendar date encoded by the
+  // last 8 digits (20090314 in the example above), or returns 0 if |file_path|
+  // does not have the expected form.
   uint32_t ExtractDayIndexFromPath(const std::string& file_path,
                                    uint32_t report_config_id) {
     std::ostringstream stream;
-    stream << "folder/path/report_" << kCustomerId << "_" << kProjectId << "_"
+    stream << kCustomerId << "_" << kProjectId << "_" << report_config_id
+           << "/report_" << kCustomerId << "_" << kProjectId << "_"
            << report_config_id << "_";
     std::string expected_prefix = stream.str();
     if (file_path.find(expected_prefix) != 0) {
@@ -673,13 +675,14 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
       return 0;
     }
     size_t left_index = expected_prefix.size();
-    size_t right_index = file_path.find("_", left_index);
-    if (right_index == std::string::npos) {
-      ADD_FAILURE() << "No next _ found";
-      return 0;
-    }
-    EXPECT_EQ(".csv", file_path.substr(file_path.size() - 4));
-    return std::stoi(file_path.substr(left_index, right_index - left_index));
+    size_t index_of_dot = left_index + 8;
+    EXPECT_EQ(index_of_dot + 4, file_path.size()) << file_path;
+    EXPECT_EQ(".csv", file_path.substr(index_of_dot));
+    CalendarDate cd;
+    cd.year = std::stoi(file_path.substr(left_index, 4));
+    cd.month = std::stoi(file_path.substr(left_index + 4, 2));
+    cd.day_of_month = std::stoi(file_path.substr(left_index + 6, 2));
+    return CalendarDateToDayIndex(cd);
   }
 
   // Replaces all occurrences of |date_token| within |report| with the string

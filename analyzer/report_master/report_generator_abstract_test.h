@@ -129,7 +129,6 @@ element {
     csv {}
     gcs {
       bucket: "BUCKET-NAME"
-      folder_path: "report_exporter_test/fruit_counts"
     }
   }
 }
@@ -367,8 +366,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
       // Reset for next time
       this->fake_uploader_->upload_was_invoked = false;
       EXPECT_EQ("BUCKET-NAME", fake_uploader_->bucket);
-      EXPECT_EQ("report_exporter_test/fruit_counts/export_name.csv",
-                fake_uploader_->path);
+      EXPECT_EQ("1_1_1/export_name.csv", fake_uploader_->path);
       EXPECT_EQ("text/csv", fake_uploader_->mime_type);
       EXPECT_EQ(expected_export_csv, fake_uploader_->serialized_report);
     }
@@ -417,8 +415,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
       // Reset for next time
       this->fake_uploader_->upload_was_invoked = false;
       EXPECT_EQ("BUCKET-NAME", fake_uploader_->bucket);
-      EXPECT_EQ("report_exporter_test/fruit_counts/export_name.csv",
-                fake_uploader_->path);
+      EXPECT_EQ("1_1_1/export_name.csv", fake_uploader_->path);
       EXPECT_EQ("text/csv", fake_uploader_->mime_type);
       EXPECT_FALSE(fake_uploader_->serialized_report.empty());
     }

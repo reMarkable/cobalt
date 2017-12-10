@@ -235,8 +235,10 @@ class ReportSchedulerTest : public ::testing::Test {
     for (size_t i = 0; i < expected_num; i++) {
       uint32_t expected_day_index = expected_day_indices[i];
       std::ostringstream stream;
-      stream << "report_1_1_42_" << expected_day_index << "_"
-             << expected_day_index;
+      stream << "report_1_1_42_";
+      util::CalendarDate cd = util::DayIndexToCalendarDate(expected_day_index);
+      stream << cd.year << (cd.month / 10) << (cd.month % 10)
+             << (cd.day_of_month / 10) << (cd.day_of_month % 10);
       std::string expected_export_name = stream.str();
       EXPECT_EQ(expected_day_index, first_day_indices[i]);
       EXPECT_EQ(expected_day_index, last_day_indices[i]);

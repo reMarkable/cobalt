@@ -15,7 +15,7 @@
 
 #########################
 # Customer 1 (Fuchsia)
-########################
+#########################
 
 ## Project 1
 
@@ -38,7 +38,6 @@ element {
     csv {}
     gcs {
       bucket: "fuchsia-cobalt-reports-test1-rudominer"
-      folder_path: "1_1_1"
     }
   }
 }

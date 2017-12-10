@@ -66,8 +66,8 @@ grpc::Status ReportExporter::ExportReportOnce(
   auto location_case = export_config.export_location_case();
   switch (location_case) {
     case ReportExportConfig::kGcs:
-      return ExportReportToGCS(export_config.gcs(), metadata, mime_type,
-                               serialized_report);
+      return ExportReportToGCS(report_config, export_config.gcs(), metadata,
+                               mime_type, serialized_report);
       break;
 
     default: {
@@ -81,30 +81,27 @@ grpc::Status ReportExporter::ExportReportOnce(
 }
 
 grpc::Status ReportExporter::ExportReportToGCS(
-    const GCSExportLocation& location, const ReportMetadataLite& metadata,
-    const std::string& mime_type, const std::string& serialized_report) {
+    const ReportConfig& report_config, const GCSExportLocation& location,
+    const ReportMetadataLite& metadata, const std::string& mime_type,
+    const std::string& serialized_report) {
   if (location.bucket().empty()) {
     std::string message = "CSVExportLocation has empty |bucket|";
     LOG(ERROR) << message;
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
 
-  return uploader_->UploadToGCS(
-      location.bucket(),
-      FormFullPath(location.folder_path(), metadata.export_name(), mime_type),
-      mime_type, serialized_report);
+  return uploader_->UploadToGCS(location.bucket(),
+                                GcsPath(report_config, metadata, mime_type),
+                                mime_type, serialized_report);
 }
 
-std::string ReportExporter::FormFullPath(const std::string& folder_path,
-                                         const std::string& file_name,
-                                         const std::string& mime_type) {
+std::string ReportExporter::GcsPath(const ReportConfig& report_config,
+                                    const ReportMetadataLite& metadata,
+                                    const std::string& mime_type) {
   std::ostringstream stream;
-  stream << folder_path;
-  if (folder_path.back() != '/') {
-    stream << "/";
-  }
-  stream << file_name;
-  if (file_name.find('.') == std::string::npos) {
+  stream << report_config.customer_id() << "_" << report_config.project_id()
+         << "_" << report_config.id() << "/" << metadata.export_name();
+  if (metadata.export_name().find('.') == std::string::npos) {
     std::string extension = ExtensionForMimeType(mime_type);
     if (!extension.empty()) {
       stream << "." << extension;

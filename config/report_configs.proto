@@ -120,12 +120,6 @@ message CSVSerializationConfig {
 message GCSExportLocation {
   // The name of a GCS bucket
   string bucket = 1;
-  // A prefix to use for the generated object names within the bucket.
-  // This is optional. Often it is desirable to use a prefix that
-  // is like a folder path, i.e. foo/bar/baz/. If this is not empty, Cobalt
-  // will add a trailing forward slash "/" if the string does not end
-  // with a forward slash.
-  string folder_path = 2;
 }
 
 // A specification of how to schedule the execution of a report.

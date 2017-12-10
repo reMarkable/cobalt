@@ -88,7 +88,6 @@ element {
     csv {}
     gcs {
       bucket: "fuchsia-cobalt-reports-p100-ledger"
-      folder_path: "1_100_2"
     }
   }
 }
@@ -123,7 +122,6 @@ element {
     csv {}
     gcs {
       bucket: "fuchsia-cobalt-reports-p101-mod-usage"
-      folder_path: "1_101_1"
     }
   }
 }
@@ -275,7 +273,6 @@ element {
     csv {}
     gcs {
       bucket: "fuchsia-cobalt-reports-p2-test-app"
-      folder_path: "1_2_1"
     }
   }
 }
@@ -308,7 +305,6 @@ element {
     csv {}
     gcs {
       bucket: "fuchsia-cobalt-reports-p2-test-app"
-      folder_path: "1_2_2"
     }
   }
 }
@@ -358,7 +354,6 @@ element {
     csv {}
     gcs {
       bucket: "fuchsia-cobalt-reports-p2-test-app"
-      folder_path: "1_2_3"
     }
   }
 }

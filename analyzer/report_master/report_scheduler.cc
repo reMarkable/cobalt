@@ -4,6 +4,7 @@
 
 #include "analyzer/report_master/report_scheduler.h"
 
+#include <iomanip>
 #include <string>
 #include <utility>
 
@@ -35,6 +36,17 @@ std::string IdString(const ReportConfig& report_config) {
   std::ostringstream stream;
   stream << "(" << report_config.customer_id() << ","
          << report_config.project_id() << "," << report_config.id() << ")";
+  return stream.str();
+}
+
+// Builds a string of the form YYYYMMDD to represent the date corresponding to
+// the given day_index. This is the standard format used at Google for the
+// suffix of a file name for files containing data for dated tables.
+std::string DateSuffix(uint32_t day_index) {
+  util::CalendarDate cd = util::DayIndexToCalendarDate(day_index);
+  std::ostringstream stream;
+  stream << std::setfill('0') << std::setw(4) << cd.year << std::setw(2)
+         << cd.month << std::setw(2) << cd.day_of_month;
   return stream.str();
 }
 
@@ -245,7 +257,10 @@ std::string ReportScheduler::ReportExportName(const ReportConfig& report_config,
   std::ostringstream stream;
   stream << "report_" << report_config.customer_id() << "_"
          << report_config.project_id() << "_" << report_config.id() << "_"
-         << first_day_index << "_" << last_day_index;
+         << DateSuffix(first_day_index);
+  if (last_day_index != first_day_index) {
+    stream << "_" << DateSuffix(last_day_index);
+  }
   return stream.str();
 }
 
