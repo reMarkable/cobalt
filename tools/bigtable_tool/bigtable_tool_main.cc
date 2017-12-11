@@ -23,12 +23,23 @@
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 
+namespace cobalt {
+namespace analyzer {
+namespace store {
+DECLARE_string(bigtable_project_name);
+DECLARE_string(bigtable_instance_name);
+}  // namespace store
+}  // namespace analyzer
+}  // namespace cobalt
+
 using cobalt::analyzer::store::BigtableAdmin;
 using cobalt::analyzer::store::BigtableStore;
 using cobalt::analyzer::store::DataStore;
+using cobalt::analyzer::store::FLAGS_bigtable_instance_name;
+using cobalt::analyzer::store::FLAGS_bigtable_project_name;
+using cobalt::analyzer::store::kOK;
 using cobalt::analyzer::store::ObservationStore;
 using cobalt::analyzer::store::ReportStore;
-using cobalt::analyzer::store::kOK;
 
 DEFINE_string(
     command, "create_tables",
@@ -43,6 +54,10 @@ DEFINE_uint32(
 DEFINE_uint32(metric, 0, "Which metric to use for delete_observations.");
 DEFINE_uint32(report_config, 0,
               "Which report config to use for delete_reports.");
+DEFINE_bool(
+    danger_danger_delete_production_reports, false,
+    "Setting this flag to true will allow you to set project >= 100 "
+    "when the command is delete_reports, but only in interactive mode.");
 
 bool CreateTablesIfNecessary() {
   auto bigtable_admin = BigtableAdmin::CreateFromFlagsOrDie();
@@ -52,17 +67,15 @@ bool CreateTablesIfNecessary() {
 bool DeleteObservationsForMetric(uint32_t customer_id, uint32_t project_id,
                                  uint32_t metric_id) {
   ObservationStore observation_store(BigtableStore::CreateFromFlagsOrDie());
-  return kOK ==
-         observation_store.DeleteAllForMetric(customer_id, project_id,
-                                              metric_id);
+  return kOK == observation_store.DeleteAllForMetric(customer_id, project_id,
+                                                     metric_id);
 }
 
 bool DeleteReportsForConfig(uint32_t customer_id, uint32_t project_id,
                             uint32_t report_config_id) {
   ReportStore report_store(BigtableStore::CreateFromFlagsOrDie());
-  return kOK ==
-         report_store.DeleteAllForReportConfig(customer_id, project_id,
-                                               report_config_id);
+  return kOK == report_store.DeleteAllForReportConfig(customer_id, project_id,
+                                                      report_config_id);
 }
 
 int main(int argc, char* argv[]) {
@@ -116,11 +129,32 @@ int main(int argc, char* argv[]) {
       exit(1);
     }
     if (FLAGS_project >= 100) {
-      std::cout << "-project=" << FLAGS_project << " is not allowed. ";
-      std::cout << "Project ID must be less than 100.\n";
-      std::cout << "This tool is not intended to be used to delete real "
-                   "customer data.\n";
-      exit(1);
+      if (FLAGS_danger_danger_delete_production_reports) {
+        std::cout << std::endl
+                  << "Bigtable instance: " << FLAGS_bigtable_project_name << "/"
+                  << FLAGS_bigtable_instance_name << std::endl
+                  << std::endl;
+        std::cout << "*WARNING* Project " << FLAGS_project
+                  << " is a real production project, not a test project.\n";
+        std::cout
+            << "Are you sure you really want to permanently delete all of "
+               "its report data?\n";
+        std::cout << "Retype the project ID below to confirm. Anything else to "
+                     "quit.\n";
+        std::cout << "Project id: ";
+        std::string response_line;
+        getline(std::cin, response_line);
+        uint32_t response = std::stoi(response_line);
+        if (response != FLAGS_project) {
+          exit(1);
+        }
+      } else {
+        std::cout << "-project=" << FLAGS_project << " is not allowed. ";
+        std::cout << "Project ID must be less than 100.\n";
+        std::cout << "This tool is not intended to be used to delete real "
+                     "customer data.\n";
+        exit(1);
+      }
     }
     if (DeleteReportsForConfig(FLAGS_customer, FLAGS_project,
                                FLAGS_report_config)) {

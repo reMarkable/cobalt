@@ -490,6 +490,8 @@ def _invoke_bigtable_tool(args, command):
     cmd = cmd + ["-customer", str(args.customer_id),
                  "-project", str(args.project_id),
                  "-report_config", str(args.report_config_id)]
+    if args.danger_danger_delete_production_reports:
+      cmd = cmd + ["-danger_danger_delete_production_reports"]
   subprocess.check_call(cmd)
 
 def _provision_bigtable(args):
@@ -1393,6 +1395,10 @@ def main():
     help='Specify the Cobalt report config ID for which you wish to delete '
          'all report data. Required.',
     default=0)
+  sub_parser.add_argument('-danger_danger_delete_production_reports',
+    help='Overrides the default protection that prevents you from deleting '
+    'reports from production projects.',
+     action='store_true')
 
   ########################################################
   # deploy command
