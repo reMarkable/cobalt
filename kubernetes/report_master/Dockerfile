@@ -29,12 +29,6 @@ COPY registered_reports.txt /etc/cobalt/
 # Install the config parser.
 COPY config_parser_bin /usr/local/bin/
 
-# Grab the current version of the config.
-RUN mkdir -p /etc/cobalt
-RUN /usr/local/bin/config_parser_bin \
-      --repo_url https://cobalt-analytics.googlesource.com/config \
-      --output_file /etc/cobalt/config.proto
-
 # The directory part of this path must match the mountPath entry
 # in report_master_deployment.yaml corresponding to the name
 # report-master-gcs-service-account-key-storage. The filename part must match
