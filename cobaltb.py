@@ -59,6 +59,7 @@ BIGTABLE_TOOL_PATH = \
 OPEN_SSL_CONFIG_FILE = os.path.join(THIS_DIR, 'self-signed-with-ip.cnf')
 GRPC_PEM_ROOTS = os.path.join(THIS_DIR, "third_party", "grpc",
                               "etc", "roots.pem")
+CONFIG_SUBMODULE_PATH = os.path.join(THIS_DIR, "third_party", "config")
 
 _logger = logging.getLogger()
 _verbose_count = 0
@@ -104,6 +105,14 @@ def _setup(args):
   subprocess.check_call(["git", "submodule", "init"])
   subprocess.check_call(["git", "submodule", "update"])
   subprocess.check_call(["./setup.sh"])
+
+def _update_config(args):
+  savedDir = os.getcwd()
+  try:
+    os.chdir(CONFIG_SUBMODULE_PATH)
+    subprocess.check_call(["git", "pull", "origin", "master"])
+  finally:
+    os.chdir(savedDir)
 
 def _build(args):
   ensureDir(OUT_DIR)
@@ -518,6 +527,9 @@ def _deploy_build(args):
   container_util.build_all_docker_images(
       shuffler_config_file=args.shuffler_config_file,
       cobalt_config_dir=args.cobalt_config_dir)
+  if not _is_config_up_to_date():
+    print("Docker image was built using an older config. You can update the "
+          "config using the './cobaltb.py update_config' command.")
 
 def _deploy_push(args):
   if args.job == 'shuffler':
@@ -776,6 +788,18 @@ def _add_gke_deployment_args(parser, cluster_settings):
   _add_cloud_access_args(parser, cluster_settings)
   _add_static_ip_args(parser, cluster_settings)
 
+def _is_config_up_to_date():
+  savedDir = os.getcwd()
+  try:
+    os.chdir(CONFIG_SUBMODULE_PATH)
+    # Get the hash for the latest local revision.
+    local_hash = subprocess.check_output(['git', 'rev-parse', '@'])
+    # Get the hash for the latest remote revision.
+    remote_hash = subprocess.check_output(['git', 'rev-parse', 'origin/master'])
+    return (local_hash == remote_hash)
+  finally:
+    os.chdir(savedDir)
+
 def main():
   # We parse the command line flags twice. The first time we are looking
   # only for two particular flags, namely --production_dir and
@@ -914,6 +938,14 @@ def main():
   sub_parser = subparsers.add_parser('setup', parents=[parent_parser],
     help='Sets up the build environment.')
   sub_parser.set_defaults(func=_setup)
+
+  ########################################################
+  # update_config command
+  ########################################################
+  sub_parser = subparsers.add_parser('update_config',
+    parents=[parent_parser], help="Pulls the current version Cobalt's config "
+                                  "from its remote repo.")
+  sub_parser.set_defaults(func=_update_config)
 
   ########################################################
   # build command
