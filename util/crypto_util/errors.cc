@@ -16,7 +16,7 @@
 
 #include <string>
 
-#include "third_party/boringssl/include/openssl/err.h"
+#include <openssl/err.h>
 
 namespace cobalt {
 namespace crypto {

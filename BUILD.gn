@@ -19,4 +19,7 @@ proto_library("cobalt_proto") {
   import_dirs = [ "//third_party/protobuf/src" ]
   generate_python = false
   cc_generator_options = "lite"
+  deps = [
+    "//third_party/boringssl",
+  ]
 }

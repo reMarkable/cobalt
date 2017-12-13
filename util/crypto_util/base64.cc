@@ -16,7 +16,7 @@
 
 #include <algorithm>
 
-#include "third_party/boringssl/include/openssl/base64.h"
+#include <openssl/base64.h>
 
 namespace cobalt {
 namespace crypto {

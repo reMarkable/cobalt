@@ -19,16 +19,17 @@
 #include <string>
 #include <vector>
 
-#include "third_party/boringssl/include/openssl/aead.h"
-#include "third_party/boringssl/include/openssl/bio.h"
-#include "third_party/boringssl/include/openssl/bn.h"
-#include "third_party/boringssl/include/openssl/digest.h"
-#include "third_party/boringssl/include/openssl/ec.h"
-#include "third_party/boringssl/include/openssl/ecdh.h"
-#include "third_party/boringssl/include/openssl/evp.h"
-#include "third_party/boringssl/include/openssl/hkdf.h"
-#include "third_party/boringssl/include/openssl/pem.h"
-#include "third_party/boringssl/include/openssl/sha.h"
+#include <openssl/aead.h>
+#include <openssl/bio.h>
+#include <openssl/bn.h>
+#include <openssl/digest.h>
+#include <openssl/ec.h>
+#include <openssl/ecdh.h>
+#include <openssl/evp.h>
+#include <openssl/hkdf.h>
+#include <openssl/pem.h>
+#include <openssl/sha.h>
+
 #include "util/crypto_util/errors.h"
 #include "util/crypto_util/random.h"
 

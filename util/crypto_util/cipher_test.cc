@@ -16,10 +16,11 @@
 #include <string>
 #include <vector>
 
-#include "third_party/boringssl/include/openssl/bn.h"
-#include "third_party/boringssl/include/openssl/ec.h"
-#include "third_party/boringssl/include/openssl/evp.h"
-#include "third_party/googletest/googletest/include/gtest/gtest.h"
+#include <openssl/bn.h>
+#include <openssl/ec.h>
+#include <openssl/evp.h>
+#include <gtest/gtest.h>
+
 #include "util/crypto_util/cipher.h"
 #include "util/crypto_util/errors.h"
 #include "util/crypto_util/random.h"

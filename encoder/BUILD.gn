@@ -6,7 +6,6 @@ import("//third_party/protobuf/proto_library.gni")
 
 static_library("encoder") {
   sources = [
-    "clock.h",
     "encoder.cc",
     "encoder.h",
     "envelope_maker.cc",
@@ -34,6 +33,7 @@ static_library("encoder") {
     "//third_party/cobalt:cobalt_proto",
     "//third_party/cobalt/config:cobalt_config_proto",
     "//third_party/cobalt/shuffler:shuffler_service",
+    "//third_party/cobalt/util:clock",
     "//third_party/cobalt/util:encrypted_message_util",
     "//third_party/grpc:grpc++",
   ]
@@ -68,14 +68,11 @@ source_set("unittests") {
     ":encoder",
     "//third_party/gflags",
     "//third_party/gtest",
+
     # Note(rudominer) We need protobuf full here for deserializing ASCII
     # protos as part of the test.
     "//third_party/protobuf:protobuf_full",
   ]
 
-  configs += [
-    "//third_party/cobalt:cobalt_config",
-  ]
+  configs += [ "//third_party/cobalt:cobalt_config" ]
 }
-
-

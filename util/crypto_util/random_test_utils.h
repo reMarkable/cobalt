@@ -15,7 +15,8 @@
 #ifndef COBALT_UTIL_CRYPTO_UTIL_RANDOM_TEST_UTILS_H_
 #define COBALT_UTIL_CRYPTO_UTIL_RANDOM_TEST_UTILS_H_
 
-#include "third_party/boringssl/include/openssl/chacha.h"
+#include <openssl/chacha.h>
+
 #include "util/crypto_util/random.h"
 
 namespace cobalt {
