@@ -16,7 +16,7 @@ import (
 )
 
 // ReadConfigFromDir reads the whole configuration for Cobalt from a directory on the file system.
-// It is assumed that <rootDir>/customers.yaml contains the customer list. (see project_list.go)
+// It is assumed that <rootDir>/projects.yaml contains the customers and projects list. (see project_list.go)
 // It is assumed that <rootDir>/<customerName>/<projectName>/config.yaml
 // contains the configuration for a project. (see project_config.go)
 func ReadConfigFromDir(rootDir string) (c config.CobaltConfig, err error) {
@@ -65,8 +65,8 @@ func newConfigReaderForDir(configDir string) (r configReader, err error) {
 }
 
 func (r *configDirReader) Customers() (string, error) {
-	// The customer list is at <rootDir>/customers.yaml
-	customerList, err := ioutil.ReadFile(filepath.Join(r.configDir, "customers.yaml"))
+	// The customer and project list is at <rootDir>/projects.yaml
+	customerList, err := ioutil.ReadFile(filepath.Join(r.configDir, "projects.yaml"))
 	if err != nil {
 		return "", err
 	}
