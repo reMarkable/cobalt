@@ -14,10 +14,6 @@
 
 FROM cobalt-common
 
-# Install git which is needed by the config parser.
-RUN sudo apt-get update
-RUN sudo apt-get install -y git=1:1.9.1-1ubuntu0.7
-
 COPY analyzer_report_master /usr/local/bin/
 
 # The path to where we are copying the config files must match the path
@@ -25,9 +21,10 @@ COPY analyzer_report_master /usr/local/bin/
 COPY registered_encodings.txt /etc/cobalt/
 COPY registered_metrics.txt /etc/cobalt/
 COPY registered_reports.txt /etc/cobalt/
+COPY cobalt_config.binproto /etc/cobalt
 
 # Install the config parser.
-COPY config_parser_bin /usr/local/bin/
+COPY config_parser /usr/local/bin/
 
 # The directory part of this path must match the mountPath entry
 # in report_master_deployment.yaml corresponding to the name

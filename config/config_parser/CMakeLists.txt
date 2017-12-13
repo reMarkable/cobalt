@@ -32,7 +32,6 @@ set(CONFIG_PARSER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_config.go
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/git.go
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/config_reader.go)
-set(CONFIG_PARSER_BINARY ${CMAKE_BINARY_DIR}/config/config_parser_bin)
 add_custom_command(OUTPUT ${CONFIG_PARSER_BINARY}
     # Compiles config_parser_main and all its dependencies.
     COMMAND ${GO_BIN} build -o ${CONFIG_PARSER_BINARY} config_parser_main.go

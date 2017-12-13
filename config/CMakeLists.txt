@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set(CONFIG_PARSER_BINARY "${CMAKE_CURRENT_BINARY_DIR}/config_parser/config_parser")
 add_subdirectory(config_parser)
 
 # Generate the C++ bindings for the config .proto files.
@@ -48,3 +49,14 @@ add_executable(config_tests
 target_link_libraries(config_tests
                       analyzer_config)
 add_cobalt_test_dependencies(config_tests ${DIR_GTESTS})
+
+set(CONFIG_DIR "${CMAKE_SOURCE_DIR}/third_party/config")
+set(CONFIG_PROTO "${CMAKE_BINARY_DIR}/third_party/config/cobalt_config.binproto")
+add_custom_command(OUTPUT ${CONFIG_PROTO}
+    COMMAND ${CONFIG_PARSER_BINARY} --config_dir ${CONFIG_DIR} --output_file ${CONFIG_PROTO}
+    DEPENDS ${CONFIG_PARSER_BINARY}
+)
+
+add_custom_target(build_config_proto ALL
+    DEPENDS ${CONFIG_PROTO}
+)

@@ -56,7 +56,11 @@ SHUFFLER_DOCKER_FILE = os.path.join(KUBE_SRC_DIR, 'shuffler',
     'Dockerfile')
 
 # Binary of the config parser.
-CONFIG_PARSER_BINARY = os.path.join(OUT_DIR, 'config', 'config_parser_bin')
+CONFIG_PARSER_BINARY = os.path.join(OUT_DIR, 'config', 'config_parser',
+    'config_parser')
+
+CONFIG_BINARY_PROTO = os.path.join(OUT_DIR, 'third_party', 'config',
+    'cobalt_config.binproto')
 
 # Kubernetes deployment yaml template files with replaceable tokens.
 ANALYZER_SERVICE_DEPLOYMENT_YAML = 'analyzer_service_deployment.yaml'
@@ -176,7 +180,7 @@ def _build_analyzer_service_deploy_dir():
 
 def _build_report_master_deploy_dir(cobalt_config_dir):
   files_to_copy = [REPORT_MASTER_DOCKER_FILE, REPORT_MASTER_PATH,
-      CONFIG_PARSER_BINARY] + \
+      CONFIG_PARSER_BINARY, CONFIG_BINARY_PROTO] + \
       _build_analyzer_config_file_list(cobalt_config_dir)
   _set_contents_of_dir(REPORT_MASTER_DOCKER_BUILD_DIR, files_to_copy)
 
