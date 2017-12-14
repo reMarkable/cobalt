@@ -125,7 +125,7 @@ REPORT_MASTER_IMAGE_NAME = "report-master"
 SHUFFLER_IMAGE_NAME = "shuffler"
 
 COBALT_COMMON_SO_FILES = [os.path.join(SYS_ROOT_DIR, 'lib', f) for f in
-    ["libunwind.so.1"]]
+    ["libc++.so.1", "libc++abi.so.1", "libunwind.so.1"]]
 
 ROOTS_PEM = os.path.join(SRC_ROOT_DIR, 'third_party', 'grpc', 'etc',
                          'roots.pem')

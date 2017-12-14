@@ -17,6 +17,8 @@
 FROM ubuntu:14.04
 
 COPY libunwind.so.1 /usr/lib/
+COPY libc++.so.1 /usr/lib/
+COPY libc++abi.so.1 /usr/lib/
 COPY roots.pem /usr/share/grpc/
 
 ENV GRPC_DEFAULT_SSL_ROOTS_FILE_PATH /usr/share/grpc/roots.pem

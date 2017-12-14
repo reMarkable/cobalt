@@ -26,7 +26,7 @@ project(cobalt)
 
 include(ExternalProject)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wsign-compare -Wignored-qualifiers -std=c++11 -stdlib=libstdc++ -pthread -fcolor-diagnostics")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wsign-compare -Wignored-qualifiers -std=c++14 -stdlib=libc++ -pthread -fcolor-diagnostics")
 enable_language(C)
 enable_language(CXX)
 
@@ -63,6 +63,9 @@ include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_BINARY_DIR})
 include_directories(BEFORE SYSTEM ${DIR_SYSROOT}/include)
 
+# Build external projects
+set(EXTERNAL_PROJECT_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedef -Wno-sign-compare -Wno-deprecated-declarations -Wno-unused-private-field -Wno-ignored-qualifiers -Wno-deprecated-register -Wno-unused-function -Wno-unused-local-typedef -Wno-missing-field-initializers -Wno-enum-compare-switch -Wno-macro-redefined -Wno-implicit-function-declaration -Wunused-variable")
+
 # Build googletest as an external project.
 set(GTEST_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/googletest/googletest)
 set(GTEST_INCLUDE_DIR ${GTEST_INSTALL_DIR}/include)
@@ -73,7 +76,8 @@ ExternalProject_Add(gtest_external_project
                     INSTALL_DIR ${GTEST_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_INSTALL_PREFIX:PATH=${GTEST_INSTALL_DIR}
                                 -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                    )
 include_directories(BEFORE SYSTEM ${GTEST_INCLUDE_DIR})
 link_directories(${GTEST_LIB_DIR})
@@ -87,10 +91,9 @@ ExternalProject_Add(gflags_external_project
                     PREFIX      ${GFLAGS_INSTALL_DIR}
                     INSTALL_DIR ${GFLAGS_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GFLAGS_INSTALL_DIR}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
-                                -Wno-deprecated-register -Wno-unused-function
-                                -Wno-unused-local-typedef
                    )
 include_directories(BEFORE SYSTEM ${GFLAGS_INCLUDE_DIR})
 link_directories(${GFLAGS_LIB_DIR})
@@ -104,11 +107,10 @@ ExternalProject_Add(glog_external_project
                     PREFIX      ${GLOG_INSTALL_DIR}
                     INSTALL_DIR ${GLOG_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -Dgflags_DIR=${GFLAGS_INSTALL_DIR}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GLOG_INSTALL_DIR}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
-                                -Wno-deprecated-register -Wno-unused-function
-                                -Wno-unused-local-typedef
                     DEPENDS     gflags_external_project
                    )
 include_directories(BEFORE SYSTEM ${GLOG_INCLUDE_DIR})
@@ -124,10 +126,9 @@ ExternalProject_Add(boringssl_external_project
                     PREFIX      ${BORINGSSL_INSTALL_DIR}
                     INSTALL_DIR ${BORINGSSL_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${BORINGSSL_INSTALL_DIR}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
-                                -Wno-deprecated-register -Wno-unused-function
-                                -Wno-unused-local-typedef
                     DEPENDS     gflags_external_project
                     DEPENDS     glog_external_project
                     DEPENDS     gtest_external_project
@@ -147,13 +148,9 @@ ExternalProject_Add(protobuf_external_project
                     PREFIX      ${PROTOBUF_INSTALL_DIR}
                     INSTALL_DIR ${PROTOBUF_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${PROTOBUF_INSTALL_DIR}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
-                                -Wno-deprecated-register -Wno-unused-function
-                                -Wno-unused-local-typedef
-                                -Wno-missing-field-initializers
-                                -Wno-enum-compare-switch
                    )
 include_directories(BEFORE SYSTEM ${PROTOBUF_INCLUDE_DIR})
 link_directories(${PROTOBUF_LIB_DIR})
@@ -168,11 +165,9 @@ ExternalProject_Add(CARES_external_project
                     SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/cares
                     PREFIX      ${CARES_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${CARES_INSTALL_DIR}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
-                                -Wno-deprecated-register -Wno-unused-function
-                                -Wno-unused-local-typedef
-                                -Wno-macro-redefined
                     INSTALL_COMMAND ""
                    )
 include_directories(BEFORE SYSTEM ${CARES_INCLUDE_DIR})
@@ -186,11 +181,9 @@ ExternalProject_Add(ZLIB_external_project
                     SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/zlib
                     PREFIX      ${ZLIB_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${ZLIB_INSTALL_DIR}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
-                                -Wno-deprecated-register -Wno-unused-function
-                                -Wno-unused-local-typedef
-                                -Wno-macro-redefined
                     INSTALL_COMMAND ""
                    )
 include_directories(BEFORE SYSTEM ${ZLIB_INCLUDE_DIR})
@@ -206,6 +199,8 @@ ExternalProject_Add(grpc_external_project
                     PREFIX      ${GRPC_INSTALL_DIR}
                     INSTALL_DIR ${GRPC_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GRPC_INSTALL_DIR}
                                 -DgRPC_ZLIB_PROVIDER=explicit
                                 -DZLIB_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib
@@ -231,10 +226,6 @@ ExternalProject_Add(grpc_external_project
                                 -DgRPC_SSL_LIB_DIR=${SSL_LIB_DIR}
                                 -DgRPC_GFLAGS_PROVIDER=explicit
                                 -DgRPC_GFLAGS_LIB_DIR=${GFLAGS_LIB_DIR}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
-                                -Wno-deprecated-register -Wno-unused-function
-                                -Wno-unused-local-typedef
-                                -Wno-implicit-function-declaration
                     DEPENDS     protobuf_external_project
                     DEPENDS     boringssl_external_project
                    )
@@ -251,18 +242,14 @@ ExternalProject_Add(googleapis_external_project
                     PREFIX      ${GOOGLEAPIS_INSTALL_DIR}
                     INSTALL_DIR ${GOOGLEAPIS_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GOOGLEAPIS_INSTALL_DIR}
                                 -DPROTOC=${PROTOC}
                                 -DPROTOBUF_INCLUDE_DIR=${PROTOBUF_INCLUDE_DIR}
                                 -DGRPC_INCLUDE_DIR=${GRPC_INCLUDE_DIR}
                                 -DPROTOBUF_LIB_DIR=${PROTOBUF_LIB_DIR}
                                 -DGRPC_CPP_PLUGIN=${GRPC_CPP_PLUGIN}
-                                -Wno-sign-compare -Wno-ignored-qualifiers
-                                -Wno-deprecated-register -Wno-unused-function
-                                -Wno-unused-local-typedef
-                                -Wno-missing-field-initializers
-                                -Wno-enum-compare-switch
                     DEPENDS     protobuf_external_project
                     DEPENDS     grpc_external_project
                    )
@@ -278,15 +265,9 @@ ExternalProject_Add(jsoncpp_external_project
                     PREFIX      ${JSONCPP_INSTALL_DIR}
                     INSTALL_DIR ${JSONCPP_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${JSONCPP_INSTALL_DIR}
-                                -Wno-sign-compare
-                                -Wno-ignored-qualifiers
-                                -Wno-deprecated-register
-                                -Wno-unused-function
-                                -Wno-missing-field-initializers
-                                -Wno-enum-compare-switch
-                                -Wno-unused-local-typedef
                    )
 include_directories(BEFORE SYSTEM ${JSONCPP_INCLUDE_DIR})
 link_directories(${JSONCPP_LIB_DIR})
@@ -298,15 +279,10 @@ ExternalProject_Add(curl_external_project
                     PREFIX      ${CURL_INSTALL_DIR}
                     INSTALL_DIR ${CURL_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${CURL_INSTALL_DIR}
                                 -DOPENSSL_INCLUDE_DIR=${BORINGSSL_INCLUDE_DIR}
-                                -Wno-sign-compare
-                                -Wno-ignored-qualifiers
-                                -Wno-deprecated-register
-                                -Wno-unused-function
-                                -Wno-missing-field-initializers
-                                -Wno-enum-compare-switch
-                                -Wno-unused-local-typedef
                     DEPENDS     boringssl_external_project
                     INSTALL_COMMAND ""
                    )
@@ -315,7 +291,6 @@ include_directories(BEFORE SYSTEM ${CURL_INSTALL_DIR}/src/curl_external_project-
 link_directories(${CURL_INSTALL_DIR}/src/curl_external_project-build)
 
 # Build google_api_cpp_client as an external project.
-set(EXTERNAL_PROJECT_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedef -Wno-sign-compare -Wno-deprecated-declarations")
 set(GOOGLE_API_CPP_CLIENT_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/google-api-cpp-client)
 set(GOOGLE_API_CPP_CLIENT_INCLUDE_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}/src/google_api_cpp_client_external_project-build/include)
 set(GOOGLE_API_CPP_CLIENT_LIB_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}/src/google_api_cpp_client_external_project-build/lib)
@@ -324,6 +299,7 @@ ExternalProject_Add(google_api_cpp_client_external_project
                     PREFIX      ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
                     INSTALL_DIR ${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                                 -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
                                 -DCURL_INCLUDE_DIRS=${CMAKE_SOURCE_DIR}/third_party/curl/include
@@ -336,14 +312,6 @@ ExternalProject_Add(google_api_cpp_client_external_project
                                 -DHAVE_OPENSSL=1
                                 -Dgoogleapis_build_samples=OFF
                                 -Dgoogleapis_build_service_apis=ON
-                                -Wno-sign-compare
-                                -Wno-ignored-qualifiers
-                                -Wno-deprecated-register
-                                -Wno-unused-function
-                                -Wno-unused-local-typedef
-                                -Wno-missing-field-initializers
-                                -Wno-enum-compare-switch
-                                -Wno-unused-local-typedef
                     DEPENDS     gflags_external_project
                     DEPENDS     glog_external_project
                     DEPENDS     gtest_external_project
