@@ -196,6 +196,16 @@ def _test(args):
       ]
       bigtable_project_name = bigtable_project_name_from_args
       bigtable_instance_name = args.bigtable_instance_name
+    if (test_dir == 'gtests_btemulator' and args.tests != 'btemulator'):
+      # TODO(rudominer) At the moment the EnableReportScheduling test case is
+      # flaky so I am disabling it. If my analysis is correct the flakiness is
+      # due to a bug in the bigtable emulator.
+      # https://github.com/GoogleCloudPlatform/google-cloud-go/issues/826
+      # We disalbe the flaky test in all cases except when explicitly running
+      # only the bt emulator tests as requested via the flag --tests=btemulator.
+      test_args = [
+        "--gtest_filter=-*EnableReportScheduling*"
+      ]
     if (test_dir == 'e2e_tests'):
       analyzer_pk_pem_file=E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
       analyzer_uri = "localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT
