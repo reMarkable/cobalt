@@ -64,7 +64,7 @@ include_directories(${CMAKE_BINARY_DIR})
 include_directories(BEFORE SYSTEM ${DIR_SYSROOT}/include)
 
 # Build external projects
-set(EXTERNAL_PROJECT_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedef -Wno-sign-compare -Wno-deprecated-declarations -Wno-unused-private-field -Wno-ignored-qualifiers -Wno-deprecated-register -Wno-unused-function -Wno-unused-local-typedef -Wno-missing-field-initializers -Wno-enum-compare-switch -Wno-macro-redefined -Wno-implicit-function-declaration -Wunused-variable")
+set(EXTERNAL_PROJECT_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedef -Wno-sign-compare -Wno-deprecated-declarations -Wno-unused-private-field -Wno-ignored-qualifiers -Wno-deprecated-register -Wno-unused-function -Wno-unused-local-typedef -Wno-missing-field-initializers -Wno-enum-compare-switch -Wno-macro-redefined -Wno-implicit-function-declaration -Wno-unused-variable")
 
 # Build googletest as an external project.
 set(GTEST_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/googletest/googletest)
@@ -283,6 +283,7 @@ ExternalProject_Add(curl_external_project
                                 -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${CURL_INSTALL_DIR}
                                 -DOPENSSL_INCLUDE_DIR=${BORINGSSL_INCLUDE_DIR}
+                                -DZLIB_INCLUDE_DIR=${ZLIB_INCLUDE_DIR}
                     DEPENDS     boringssl_external_project
                     INSTALL_COMMAND ""
                    )
