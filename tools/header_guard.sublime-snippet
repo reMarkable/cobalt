@@ -13,10 +13,10 @@ for a C++ header file for Cobalt.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef COBALT_${TM_FILEPATH/(.*\/src\/)|([^a-zA-z1-9])|(.)/(?1:)(?2:_)(?3:\U$3)/g}_
-#define COBALT_${TM_FILEPATH/(.*\/src\/)|([^a-zA-z1-9])|(.)/(?1:)(?2:_)(?3:\U$3)/g}_
+#ifndef COBALT_${TM_FILEPATH/(.*\/cobalt\/)|([^a-zA-z1-9])|(.)/(?1:)(?2:_)(?3:\U$3)/g}_
+#define COBALT_${TM_FILEPATH/(.*\/cobalt\/)|([^a-zA-z1-9])|(.)/(?1:)(?2:_)(?3:\U$3)/g}_
 
-#endif // COBALT_${TM_FILEPATH/(.*\/src\/)|([^a-zA-z1-9])|(.)/(?1:)(?2:_)(?3:\U$3)/g}_
+#endif // COBALT_${TM_FILEPATH/(.*\/cobalt\/)|([^a-zA-z1-9])|(.)/(?1:)(?2:_)(?3:\U$3)/g}_
 
 ]]>
 </content>
