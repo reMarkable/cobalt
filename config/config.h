@@ -52,7 +52,8 @@ enum Status {
 // EncodingConfig, ReportConfig, Metric.
 //
 // A Registry<RT> is then a container for all of the |T|s registered in Cobalt.
-template<class RT> class Registry {
+template <class RT>
+class Registry {
  public:
   // This is some template meta-programming magic that has the effect of
   // defining |T| to be the type of the objects contained in a registry
@@ -98,9 +99,9 @@ template<class RT> class Registry {
   //
   // If |error_collector| is not null then it will be notified of any parsing
   // errors or warnings.
-  static std::pair<std::unique_ptr<Registry<RT>>, Status>
-      FromFile(const std::string& file_path,
-               google::protobuf::io::ErrorCollector* error_collector);
+  static std::pair<std::unique_ptr<Registry<RT>>, Status> FromFile(
+      const std::string& file_path,
+      google::protobuf::io::ErrorCollector* error_collector);
 
   // Populates a new instance of Registry<T> by reading and parsing the
   // specified string. Returns a pair consisting of a pointer to the result and
@@ -111,14 +112,13 @@ template<class RT> class Registry {
   //
   // If |error_collector| is not null then it will be notified of any parsing
   // errors or warnings.
-  static std::pair<std::unique_ptr<Registry<RT>>, Status>
-      FromString(const std::string& contents,
-                 google::protobuf::io::ErrorCollector* error_collector);
+  static std::pair<std::unique_ptr<Registry<RT>>, Status> FromString(
+      const std::string& contents,
+      google::protobuf::io::ErrorCollector* error_collector);
 
-
-  // Populates a new instance of Registry<T> by ingesting the specified
-  // protobuf of type RT. Returns a pair consisting of a pointer to the result
-  // and a Status.
+  // Populates a new instance of Registry<T> by swapping the contents out of
+  // of |registered_configs|. Returns a pair consisting of a pointer to the
+  // result and a Status.
   //
   // If the operation is successful then the status is kOK. Otherwise the
   // Status indicates the error.
@@ -126,7 +126,7 @@ template<class RT> class Registry {
   // If |error_collector| is not null then it will be notified of any parsing
   // errors or warnings.
   static std::pair<std::unique_ptr<Registry<RT>>, Status> FromProto(
-      RT& contents, google::protobuf::io::ErrorCollector* error_collector);
+      RT* contents, google::protobuf::io::ErrorCollector* error_collector);
 
   // Returns the number of |T| in this registry.
   size_t size();
@@ -134,9 +134,7 @@ template<class RT> class Registry {
   // Returns the |T| with the given ID triple, or nullptr if there is
   // no such |T|. The caller does not take ownership of the returned
   // pointer.
-  const T* const Get(uint32_t customer_id,
-                     uint32_t project_id,
-                     uint32_t id) {
+  const T* const Get(uint32_t customer_id, uint32_t project_id, uint32_t id) {
     auto iterator = map_.find(MakeKey(customer_id, project_id, id));
     if (iterator == map_.end()) {
       return nullptr;
@@ -165,30 +163,30 @@ template<class RT> class Registry {
 /// IMPLEMENTATION BELOW
 //////////////////////////////////////////////////////////////////
 
-template<class RT>
+template <class RT>
 std::string Registry<RT>::MakeKey(uint32_t customer_id, uint32_t project_id,
-                                     uint32_t id) {
+                                  uint32_t id) {
   // Three 32-bit positive ints (at most 10 digits each) plus 3 colons plus a
   // trailing null is <= 34 bytes.
   char out[34];
-  int size = snprintf(out, sizeof(out), "%u:%u:%u",
-                      customer_id, project_id, id);
+  int size =
+      snprintf(out, sizeof(out), "%u:%u:%u", customer_id, project_id, id);
   if (size <= 0) {
     return "";
   }
   return std::string(out, size);
 }
 
-template<class RT>
+template <class RT>
 std::string Registry<RT>::MakeKey(const T& config_proto) {
   return MakeKey(config_proto.customer_id(), config_proto.project_id(),
                  config_proto.id());
 }
 
-template<class RT>
-std::pair<std::unique_ptr<Registry<RT>>, Status>
-    Registry<RT>::FromFile(const std::string& file_path,
-        google::protobuf::io::ErrorCollector* error_collector) {
+template <class RT>
+std::pair<std::unique_ptr<Registry<RT>>, Status> Registry<RT>::FromFile(
+    const std::string& file_path,
+    google::protobuf::io::ErrorCollector* error_collector) {
   // Make an empty registry to return;
   std::unique_ptr<Registry<RT>> registry(new Registry<RT>());
 
@@ -211,13 +209,13 @@ std::pair<std::unique_ptr<Registry<RT>>, Status>
     return std::make_pair(std::move(registry), kParsingError);
   }
 
-  return FromProto(registered_configs, error_collector);
+  return FromProto(&registered_configs, error_collector);
 }
 
-template<class RT>
-std::pair<std::unique_ptr<Registry<RT>>, Status>
-    Registry<RT>::FromString(const std::string& input,
-        google::protobuf::io::ErrorCollector* error_collector) {
+template <class RT>
+std::pair<std::unique_ptr<Registry<RT>>, Status> Registry<RT>::FromString(
+    const std::string& input,
+    google::protobuf::io::ErrorCollector* error_collector) {
   // Make an empty registry to return;
   std::unique_ptr<Registry<RT>> registry(new Registry<RT>());
 
@@ -232,25 +230,25 @@ std::pair<std::unique_ptr<Registry<RT>>, Status>
     return std::make_pair(std::move(registry), kParsingError);
   }
 
-  return FromProto(registered_configs, error_collector);
+  return FromProto(&registered_configs, error_collector);
 }
 
 template <class RT>
 std::pair<std::unique_ptr<Registry<RT>>, Status> Registry<RT>::FromProto(
-    RT& registered_configs,
+    RT* registered_configs,
     google::protobuf::io::ErrorCollector* error_collector) {
   // Make an empty registry to return;
   std::unique_ptr<Registry<RT>> registry(new Registry<RT>());
 
   // Put all of the T's into the map, ensuring that the id triples
   // are unique.
-  int num_configs = registered_configs.element_size();
+  int num_configs = registered_configs->element_size();
   for (int i = 0; i < num_configs; i++) {
-    T* config_proto = registered_configs.mutable_element(i);
+    T* config_proto = registered_configs->mutable_element(i);
     // First build the key and insert an empty Tg into the map
     // at that key.
-    auto pair = registry->map_.insert(std::make_pair(MakeKey(*config_proto),
-        std::unique_ptr<T>(new T())));
+    auto pair = registry->map_.insert(
+        std::make_pair(MakeKey(*config_proto), std::unique_ptr<T>(new T())));
     const bool& success = pair.second;
     auto& inserted_pair = pair.first;
     if (!success) {
@@ -262,7 +260,7 @@ std::pair<std::unique_ptr<Registry<RT>>, Status> Registry<RT>::FromProto(
   return std::make_pair(std::move(registry), kOK);
 }
 
-template<class RT>
+template <class RT>
 size_t Registry<RT>::size() {
   return map_.size();
 }

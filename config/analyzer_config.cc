@@ -136,13 +136,14 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromFlagsOrDie() {
 }
 
 std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
-    const CobaltConfig& config) {
+    CobaltConfig* config) {
   LoggingErrorCollector error_collector;
 
   RegisteredEncodings registered_encodings;
-  registered_encodings.mutable_element()->CopyFrom(config.encoding_configs());
+  registered_encodings.mutable_element()->Swap(
+      config->mutable_encoding_configs());
   auto encodings =
-      EncodingRegistry::FromProto(registered_encodings, &error_collector);
+      EncodingRegistry::FromProto(&registered_encodings, &error_collector);
   if (encodings.second != config::kOK) {
     LOG(ERROR) << "Error getting EncodingConfigs from registry. "
                << ErrorMessage(encodings.second);
@@ -150,9 +151,9 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
   }
 
   RegisteredMetrics registered_metrics;
-  registered_metrics.mutable_element()->CopyFrom(config.metric_configs());
+  registered_metrics.mutable_element()->Swap(config->mutable_metric_configs());
   auto metrics =
-      MetricRegistry::FromProto(registered_metrics, &error_collector);
+      MetricRegistry::FromProto(&registered_metrics, &error_collector);
   if (metrics.second != config::kOK) {
     LOG(ERROR) << "Error getting Metrics from registry. "
                << ErrorMessage(metrics.second);
@@ -160,9 +161,9 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
   }
 
   RegisteredReports registered_reports;
-  registered_reports.mutable_element()->CopyFrom(config.report_configs());
+  registered_reports.mutable_element()->Swap(config->mutable_report_configs());
   auto reports =
-      ReportRegistry::FromProto(registered_reports, &error_collector);
+      ReportRegistry::FromProto(&registered_reports, &error_collector);
   if (reports.second != config::kOK) {
     LOG(ERROR) << "Error getting ReportConfigs from registry. "
                << ErrorMessage(reports.second);

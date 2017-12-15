@@ -22,7 +22,7 @@ class AnalyzerConfigManager {
 
   static std::shared_ptr<AnalyzerConfigManager> CreateFromFlagsOrDie();
 
-  AnalyzerConfigManager(std::shared_ptr<AnalyzerConfig> config);
+  explicit AnalyzerConfigManager(std::shared_ptr<AnalyzerConfig> config);
 
  private:
   std::shared_ptr<AnalyzerConfig> ptr_;

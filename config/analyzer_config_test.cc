@@ -108,7 +108,7 @@ TEST(AnalyzerConfigTest, ValidCobaltConfigProto) {
   report->set_project_id(1);
   report->set_id(3);
 
-  auto config = AnalyzerConfig::CreateFromCobaltConfigProto(cobalt_config);
+  auto config = AnalyzerConfig::CreateFromCobaltConfigProto(&cobalt_config);
 
   EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 3));
   EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 4));

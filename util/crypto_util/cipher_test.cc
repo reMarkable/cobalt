@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <limits.h>
-#include <string>
-#include <vector>
-
+#include <gtest/gtest.h>
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 #include <openssl/evp.h>
-#include <gtest/gtest.h>
+
+#include <limits.h>
+#include <string>
+#include <vector>
 
 #include "util/crypto_util/cipher.h"
 #include "util/crypto_util/errors.h"

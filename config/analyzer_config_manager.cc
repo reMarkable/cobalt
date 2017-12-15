@@ -6,6 +6,7 @@
 
 #include <fstream>
 #include <memory>
+#include <utility>
 
 #include "config/analyzer_config.h"
 #include "config/cobalt_config.pb.h"
@@ -51,7 +52,7 @@ AnalyzerConfigManager::CreateFromFlagsOrDie() {
                << FLAGS_cobalt_config_proto_path;
   }
 
-  auto config = AnalyzerConfig::CreateFromCobaltConfigProto(cobalt_config);
+  auto config = AnalyzerConfig::CreateFromCobaltConfigProto(&cobalt_config);
   if (!config) {
     LOG(FATAL) << "Error creating the initial AnalyzerConfig: "
                << FLAGS_cobalt_config_proto_path;

@@ -374,7 +374,7 @@ TEST(EncodingRegistryFromProto, ValidProto) {
   EXPECT_TRUE(
       parser.ParseFromString(kEncodingConfigText, &registered_encodings));
 
-  auto result = EncodingRegistry::FromProto(registered_encodings, nullptr);
+  auto result = EncodingRegistry::FromProto(&registered_encodings, nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
   EXPECT_EQ(2u, registry->size());
@@ -392,7 +392,7 @@ TEST(MetricsRegistryFromProto, ValidProto) {
   google::protobuf::TextFormat::Parser parser;
   EXPECT_TRUE(parser.ParseFromString(kMetricConfigText, &registered_metrics));
 
-  auto result = MetricRegistry::FromProto(registered_metrics, nullptr);
+  auto result = MetricRegistry::FromProto(&registered_metrics, nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
   EXPECT_EQ(2u, registry->size());
