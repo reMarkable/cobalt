@@ -1,0 +1,54 @@
+# Copyright 2017 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/go/go_binary.gni")
+import("//build/host.gni")
+
+go_binary("config_parser") {
+  gopackage = "config_parser"
+  go_dependencies = [
+    {
+      package = "config_parser"
+      source = "//third_party/cobalt/config/config_parser/src/config_parser"
+    },
+    {
+      package = "yamlpb"
+      source = "//third_party/cobalt/config/config_parser/src/yamlpb"
+    },
+    {
+      package = "github.com/golang/glog"
+      source = "//third_party/golibs/github.com/golang/glog"
+    },
+    {
+      package = "github.com/golang/protobuf/jsonpb"
+      source = "//third_party/golibs/github.com/golang/protobuf/jsonpb"
+    },
+    {
+      package = "github.com/golang/protobuf/proto"
+      source = "//third_party/golibs/github.com/golang/protobuf/proto"
+    },
+    {
+      package = "github.com/go-yaml/yaml"
+      source = "//third_party/golibs/github.com/go-yaml/yaml"
+    },
+    {
+      package = "config"
+      # Location of the generated go bindings for the config protobufs.
+      source = "$root_gen_dir/go-proto-gen/src/third_party/cobalt/config"
+    },
+  ]
+
+  deps = [
+    "//third_party/cobalt/config:cobalt_config_proto",
+  ]
+}
+
+install_host_tools("host") {
+  deps = [
+    ":config_parser",
+  ]
+  outputs = [
+    "config_parser",
+  ]
+}

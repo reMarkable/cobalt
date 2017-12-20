@@ -7,12 +7,14 @@ import("//third_party/protobuf/proto_library.gni")
 proto_library("cobalt_config_proto") {
   proto_in_dir = "//third_party/cobalt"
   sources = [
+    "cobalt_config.proto",
     "encodings.proto",
     "metrics.proto",
     "report_configs.proto",
   ]
   import_dirs = [ "//third_party/protobuf/src" ]
   generate_python = false
+  generate_go = (current_toolchain == host_toolchain)
 
   # TODO(rudominer) Uncomment this line so that we can use Protobuf Lite
   # in Fuchsia. In order to do this we need to replace the use of
