@@ -111,6 +111,8 @@ std::string ToString(const ValuePart& value) {
     case ValuePart::kIntValue:
       stream << value.int_value();
       break;
+    case ValuePart::kDoubleValue:
+      stream << value.double_value();
     case ValuePart::kIndexValue:
       stream << value.index_value();
       break;

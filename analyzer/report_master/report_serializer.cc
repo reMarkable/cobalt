@@ -106,6 +106,17 @@ std::string ToCSVString(const std::string& in) {
   return out;
 }
 
+std::string FloatToString(float x) {
+  int sz = std::snprintf(nullptr, 0, "%.3f", x);
+  std::vector<char> buf(sz + 1);  // note +1 for null terminator
+  std::snprintf(&buf[0], buf.size(), "%.3f", x);
+  std::string s = std::string(&buf[0]);
+  if (s == "0.000") {
+    return "0";
+  }
+  return s;
+}
+
 std::string ValueToString(const ValuePart& value) {
   switch (value.data_case()) {
     case ValuePart::kStringValue:
@@ -113,6 +124,9 @@ std::string ValueToString(const ValuePart& value) {
 
     case ValuePart::kIntValue:
       return std::to_string(value.int_value());
+
+    case ValuePart::kDoubleValue:
+      return FloatToString(value.double_value());
 
     case ValuePart::kBlobValue: {
       // Build the Sha256 hash of the blob.
@@ -134,17 +148,6 @@ std::string ValueToString(const ValuePart& value) {
     default:
       return "<Unrecognized value data type>";
   }
-}
-
-std::string FloatToString(float x) {
-  int sz = std::snprintf(nullptr, 0, "%.3f", x);
-  std::vector<char> buf(sz + 1);  // note +1 for null terminator
-  std::snprintf(&buf[0], buf.size(), "%.3f", x);
-  std::string s = std::string(&buf[0]);
-  if (s == "0.000") {
-    return "0";
-  }
-  return s;
 }
 
 std::string CountEstimateToString(float count_estimate) {

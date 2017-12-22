@@ -255,6 +255,8 @@ class NoOpAdapter : public DecoderAdapter {
         case ValuePart::kIndexValue:
           str << "index=" << value.index_value();
           break;
+        case ValuePart::kDoubleValue:
+          str<< value.double_value();
         default:
           str << "[UNKNOWN DATA TYPE]";
       }

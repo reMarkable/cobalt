@@ -43,6 +43,9 @@ message ValuePart {
     // of Cobalt's configuration. See comments on the INDEX DataType in
     // metrics.proto for more about this.
     uint32 index_value = 4;
+
+    // A double-precision floating point value.
+    double double_value = 5;
   }
 }
 

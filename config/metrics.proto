@@ -51,6 +51,11 @@ message MetricPart {
     //
     // A |ValuePart| for this MetricPart must have its |index_value| set.
     INDEX = 3;
+
+    // Values for this MetricPart are double-precision floating point numbers.
+    // A |ValuePart| encoded for this MetricPart must have its |double_value|
+    // set.
+    DOUBLE = 4;
   }
 
   // A human-readable description of this MetricPart. This should include

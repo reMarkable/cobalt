@@ -41,12 +41,13 @@ namespace encoder {
 // metrics that have multiple parts.
 //
 // The raw values that are inputs to an encoding are typed. We currently handle
-// four different types:
+// five different types:
 // (a) UTF8, human-readable strings
 // (b) Signed 64-bit integers
-// (c) Non-negative integers that are considered to be *indexes* into an
+// (c) 64-bit floating point numbers
+// (d) Non-negative integers that are considered to be *indexes* into an
 //     enumerated set that is specified outside of Cobalt's configuration.
-// (d) Uninterpretted blobs of bytes
+// (e) Uninterpretted blobs of bytes
 //
 // Each call to any of the Encode*() methods specifies a metric and (implicitly
 // or explicitly) a metric part name. Each metric part has a type and the type
@@ -65,8 +66,9 @@ namespace encoder {
 // following combinatations are supported:
 // (a) UTF8, human-readable strings are compatible with all encoding types.
 // (b) Integers are compatible with Basic RAPPOR and NoOp only.
-// (c) Indexes are compatible with Basic RAPPOR and NoOp only.
-// (d) Blobs are compatible with Forculus and NoOp only.
+// (c) Floating point numbers are only compatible with the NoOp encoding.
+// (d) Indexes are compatible with Basic RAPPOR and NoOp only.
+// (e) Blobs are compatible with Forculus and NoOp only.
 class Encoder {
  public:
   // Constructs an Encoder for the given project.
@@ -134,6 +136,13 @@ class Encoder {
   Result EncodeInt(uint32_t metric_id, uint32_t encoding_config_id,
                    int64_t value);
 
+  // Encodes the double |value| using the specified encoding for the specified
+  // metric. Use this method if the type of the metric's sole part is DOUBLE. On
+  // success the result contains kOK and an Observation with its metadata.
+  // Otherwise the result contains an error status.
+  Result EncodeDouble(uint32_t metric_id, uint32_t encoding_config_id,
+                      double value);
+
   // Encodes the given |index| using the specified encoding for the specified
   // metric. Use this method if the type of the metric's sole part is INDEX.
   // On success the result contains kOK and an Observation with its metadata.
@@ -177,6 +186,13 @@ class Encoder {
     // Use this method if the type of the MetricPart is INT.
     void AddIntPart(uint32_t encoding_config_id, const std::string& part_name,
                     int64_t value);
+
+    // Adds the double |value| to this multi-part Value, associates
+    // it with the metric part named |part_name| and requests that it be
+    // encoded using the configuration specified by |encoding_config_id|.
+    // Use this method if the type of the MetricPart is DOUBLE
+    void AddDoublePart(uint32_t encoding_config_id,
+                       const std::string& part_name, double value);
 
     // Adds the given |index| value to this multi-part Value, associates
     // it with the metric part named |part_name| and requests that it be

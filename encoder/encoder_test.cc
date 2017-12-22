@@ -115,7 +115,7 @@ element {
   }
 }
 
-# Metric 6 has in INDEX part.
+# Metric 6 has an INDEX part.
 element {
   customer_id: 1
   project_id: 1
@@ -125,6 +125,20 @@ element {
     key: "Part1"
     value {
       data_type: INDEX
+    }
+  }
+}
+
+# Metric 7 has a DOUBLE part.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 7
+  time_zone_policy: UTC
+  parts {
+    key: "Part1"
+    value {
+      data_type: DOUBLE
     }
   }
 }
@@ -369,6 +383,41 @@ Observation DoEncodeIntTest(
   return *result.observation;
 }
 
+// Tests the EncodeDouble() method using the given |value| and the given
+// metric and encoding. The metric is expected to have a single part named
+// "Part1".
+//
+// If expectOK is true then we verify that there are no errors and that the
+// produced Observation has the |expected_type| and is non-empty. Otherwise
+// we verify that kInvalidArguments is returned.
+Observation DoEncodeDoubleTest(
+    bool expectOK, double value, uint32_t metric_id,
+    uint32_t encoding_config_id, bool expect_utc,
+    const ObservationPart::ValueCase& expected_encoding) {
+  // Build the ProjectContext encapsulating our test config data.
+  std::shared_ptr<ProjectContext> project = GetTestProject();
+
+  // Construct the Encoder.
+  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  // Set a static current time so we can test the day_index computation.
+  encoder.set_current_time(kSomeTimestamp);
+
+  // Encode an observation for the given metric and encoding. The metric is
+  // expected to have a single part.
+  Encoder::Result result =
+      encoder.EncodeDouble(metric_id, encoding_config_id, value);
+
+  if (expectOK) {
+    CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
+                          expected_encoding);
+  } else {
+    EXPECT_EQ(Encoder::kInvalidArguments, result.status)
+        << "encoding_config_id=" << encoding_config_id;
+  }
+
+  return *result.observation;
+}
+
 // Tests the EncodeIndex() method using the given |index| and the given
 // metric and encoding. The metric is expected to have a single part named
 // "Part1".
@@ -512,6 +561,10 @@ TEST(EncoderTest, EncodeIndex) {
   DoEncodeIndexTest(expect_ok, index, 3, 8, expect_utc,
                     ObservationPart::kBasicRappor);
 
+  // Now we switch to metric 7 which has one double part. That should fail.
+  DoEncodeIndexTest(expect_ok, index, 7, 8, expect_utc,
+                    ObservationPart::kBasicRappor);
+
   // Reset to metric 6 just to confirm it still succeeds.
   expect_ok = true;
   DoEncodeIndexTest(expect_ok, index, 6, 8, expect_utc,
@@ -540,6 +593,54 @@ TEST(EncoderTest, EncodeIndex) {
   expect_ok = true;
   DoEncodeIndexTest(expect_ok, index, 6, 7, expect_utc,
                     ObservationPart::kUnencoded);
+}
+
+// Tests the EncodeDouble() method with both valid and invalid inputs.
+TEST(EncoderTest, EncodeDouble) {
+  // Metric 7 has a single part of type DOUBLE.
+  // EncodingConfig 7 is NoOp.
+  bool expect_ok = true;
+  double value = 3.14159;
+  bool expect_utc = true;
+  DoEncodeDoubleTest(expect_ok, value, 7, 7, expect_utc,
+                     ObservationPart::kUnencoded);
+
+  // Now we switch to metric 1 which has one string part. That should fail.
+  expect_ok = false;
+  DoEncodeDoubleTest(expect_ok, value, 1, 7, expect_utc,
+                     ObservationPart::kUnencoded);
+
+  // Now we switch to metric 2 which has one int part. That should fail.
+  DoEncodeDoubleTest(expect_ok, value, 2, 7, expect_utc,
+                     ObservationPart::kUnencoded);
+
+  // Now we switch to metric 3 which has one blob part. That should fail.
+  DoEncodeDoubleTest(expect_ok, value, 3, 7, expect_utc,
+                     ObservationPart::kUnencoded);
+
+  // Reset to metric 7 just to confirm it still succeeds.
+  expect_ok = true;
+  DoEncodeDoubleTest(expect_ok, value, 7, 7, expect_utc,
+                     ObservationPart::kUnencoded);
+
+  // Now we switch to encoding 1 which is Forculus. That should fail.
+  expect_ok = false;
+  DoEncodeDoubleTest(expect_ok, value, 7, 1, expect_utc,
+                     ObservationPart::kForculus);
+
+  // Now we switch to encoding 2 which is String RAPPOR. That should fail.
+  DoEncodeDoubleTest(expect_ok, value, 7, 2, expect_utc,
+                     ObservationPart::kRappor);
+
+  // Now we switch to encoding 3 which is Basic RAPPOR with string categories.
+  // That should fail.
+  DoEncodeDoubleTest(expect_ok, value, 7, 3, expect_utc,
+                     ObservationPart::kBasicRappor);
+
+  // Now we switch to encoding 4 which is Basic RAPPOR with int categories.
+  // That should fail.
+  DoEncodeDoubleTest(expect_ok, value, 7, 4, expect_utc,
+                     ObservationPart::kBasicRappor);
 }
 
 // Tests EncodeInt() with NoOp encoding as the specified encoding.

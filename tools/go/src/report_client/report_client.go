@@ -243,6 +243,9 @@ func valuePartToString(val *cobalt.ValuePart) string {
 	if x, ok := val.GetData().(*cobalt.ValuePart_IntValue); ok {
 		return fmt.Sprintf("%v", x.IntValue)
 	}
+	if x, ok := val.GetData().(*cobalt.ValuePart_DoubleValue); ok {
+		return fmt.Sprintf("%.5f", x.DoubleValue)
+	}
 	if x, ok := val.GetData().(*cobalt.ValuePart_IndexValue); ok {
 		return fmt.Sprintf("<index %v>", x.IndexValue)
 	}

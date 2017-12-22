@@ -51,6 +51,11 @@ Encoder::Status Encoder::EncodeForculus(
                  << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
+    case MetricPart::DOUBLE: {
+      LOG(ERROR) << "Forculus doesn't support DOUBLEs: (" << customer_id_
+                 << ", " << project_id_ << ", " << encoding_config_id << ")";
+      return kInvalidArguments;
+    }
     case MetricPart::INDEX: {
       LOG(ERROR) << "Forculus doesn't support INDEXes: (" << customer_id_
                  << ", " << project_id_ << ", " << encoding_config_id << ")";
@@ -93,6 +98,11 @@ Encoder::Status Encoder::EncodeRappor(uint32_t metric_id,
                  << project_id_ << ", " << encoding_config_id << ")";
       return kInvalidArguments;
     }
+    case MetricPart::DOUBLE: {
+      LOG(ERROR) << "RAPPOR doesn't support DOUBLEs: (" << customer_id_ << ", "
+                 << project_id_ << ", " << encoding_config_id << ")";
+      return kInvalidArguments;
+    }
     case MetricPart::INDEX: {
       LOG(ERROR) << "RAPPOR doesn't support INDEXes: (" << customer_id_ << ", "
                  << project_id_ << ", " << encoding_config_id << ")";
@@ -129,6 +139,11 @@ Encoder::Status Encoder::EncodeBasicRappor(
     const EncodingConfig* encoding_config, const std::string& part_name,
     ObservationPart* observation_part) {
   switch (data_type) {
+    case MetricPart::DOUBLE: {
+      LOG(ERROR) << "Basic RAPPOR doesn't support DOUBLEs: (" << customer_id_
+                 << ", " << project_id_ << ", " << encoding_config_id << ")";
+      return kInvalidArguments;
+    }
     case MetricPart::BLOB: {
       LOG(ERROR) << "Basic RAPPOR doesn't support Blobs: (" << customer_id_
                  << ", " << project_id_ << ", " << encoding_config_id << ")";
@@ -184,6 +199,16 @@ Encoder::Result Encoder::EncodeInt(uint32_t metric_id,
   // An empty part name is a signal to the function Encoder::Encode() that the
   // metric has only a single part.
   value.AddIntPart(encoding_config_id, "", int_value);
+  return Encode(metric_id, value);
+}
+
+Encoder::Result Encoder::EncodeDouble(uint32_t metric_id,
+                                      uint32_t encoding_config_id,
+                                      double double_value) {
+  Value value;
+  // An empty part name is a signal to the function Encoder::Encode() that the
+  // metric has only a single part.
+  value.AddDoublePart(encoding_config_id, "", double_value);
   return Encode(metric_id, value);
 }
 
@@ -383,6 +408,12 @@ void Encoder::Value::AddStringPart(uint32_t encoding_config_id,
 void Encoder::Value::AddIntPart(uint32_t encoding_config_id,
                                 const std::string& part_name, int64_t value) {
   AddPart(encoding_config_id, part_name, MetricPart::INT).set_int_value(value);
+}
+
+void Encoder::Value::AddDoublePart(uint32_t encoding_config_id,
+                                   const std::string& part_name, double value) {
+  AddPart(encoding_config_id, part_name, MetricPart::DOUBLE)
+      .set_double_value(value);
 }
 
 void Encoder::Value::AddIndexPart(uint32_t encoding_config_id,
