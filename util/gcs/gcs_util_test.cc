@@ -31,16 +31,28 @@ TEST(GcUtilTest, SmokeTest) {
   /*
   setenv("GRPC_DEFAULT_SSL_ROOTS_FILE_PATH",
          "<cobalt_root_dir>/third_party/grpc/etc/roots.pem", 1);
-  setenv("GOOGLE_APPLICATION_CREDENTIALS",
-         "<path to some service account key file>", 1);
-  std::string bucket_name = "<put real bucket name here>"
+  setenv("COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS",
+         "<path to some service account key file>",
+         1);
   ASSERT_TRUE(gcs_util.InitFromDefaultPaths());
-  std::string data("Glory glory hallelulyah!");
+
+  // Start with a ping.
+  std::string bucket_name = "<put real bucket name here>";
   ASSERT_TRUE(gcs_util.Ping(bucket_name));
-  ASSERT_TRUE(gcs_util.Upload(bucket_name, "glory", "text/plain",
+
+  // Upload using the string method.
+  std::string data(
+      "It is a far, far better thing that I do, than I have ever done;");
+  ASSERT_TRUE(gcs_util.Upload(bucket_name, "tale2citiesA", "text/plain",
                               data.data(), data.size()));
-  ASSERT_TRUE(gcs_util.Upload(bucket_name, "glory2", "text/plain",
-                              data.data(), data.size()));
+
+  // Upload using the stream method.
+  std::istringstream stream(
+      "it is a far, far better rest that I go to than I have ever known.");
+  ASSERT_TRUE(
+      gcs_util.Upload(bucket_name, "tale2citiesB", "text/plain", &stream));
+
+  // More pings.
   ASSERT_TRUE(gcs_util.Ping(bucket_name));
   ASSERT_TRUE(gcs_util.Ping(bucket_name));
   */

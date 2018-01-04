@@ -73,6 +73,20 @@ class GcsUtil {
   bool Upload(const std::string& bucket, const std::string& path,
               const std::string mime_type, const char* data, size_t num_bytes);
 
+  // Uploads a blob to Google Cloud Storage. Bytes will be read from |stream|
+  // until EOF. The bytes are uploaded to the given |path| within the given
+  // |bucket|. This will succeed only if the bucket already exists and the
+  // service account specified when this instance was initalized has write
+  // permission on the bucket. Returns true on success. On failure, logs an
+  // Error and returns false.
+  //
+  // |path| Will be used as the full path of the uploaded file. It must
+  // follow the Google Cloud Storage Object name requirements. For best
+  // results it should contain only letters, numbers, underscores, dashes
+  // and forward slashes.
+  bool Upload(const std::string& bucket, const std::string& path,
+              const std::string mime_type, std::istream* stream);
+
   // Attempts to connect with Google Cloud Storage and query for the metadata
   // for the specified bucket. This will succeed only if the service
   // account specified when this instance was initialized has read permission
@@ -86,6 +100,15 @@ class GcsUtil {
   bool Ping(const std::string& bucket);
 
  private:
+  // This is a helper function for the two public Upload() methods. The runtime
+  // type of |data_reader| must be googleapis::client::DataReader*. It is
+  // declared void* here in order to avoid #including
+  // //third_party/google-api-cpp-client in this header file.
+  //
+  // This method takes ownership of |data_reader|.
+  bool Upload(const std::string& bucket, const std::string& path,
+              const std::string mime_type, void* data_reader);
+
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

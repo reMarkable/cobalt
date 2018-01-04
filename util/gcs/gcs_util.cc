@@ -24,8 +24,10 @@ using google_storage_api::BucketsResource_GetMethod;
 using google_storage_api::ObjectsResource_InsertMethod;
 using google_storage_api::StorageService;
 using googleapis::client::CurlHttpTransportFactory;
+using googleapis::client::DataReader;
 using googleapis::client::HttpTransportLayerConfig;
 using googleapis::client::NewUnmanagedInMemoryDataReader;
+using googleapis::client::NewUnmanagedIstreamDataReader;
 using googleapis::client::OAuth2Credential;
 using googleapis::client::OAuth2ServiceAccountFlow;
 
@@ -118,13 +120,27 @@ bool GcsUtil::Init(const std::string ca_certs_path,
 bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
                      const std::string mime_type, const char* data,
                      size_t num_bytes) {
-  // Build the request.
   googleapis::StringPiece str;
   str.set(data, num_bytes);
+  return Upload(bucket, path, mime_type, NewUnmanagedInMemoryDataReader(str));
+}
+
+bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
+                     const std::string mime_type, std::istream* stream) {
+  return Upload(bucket, path, mime_type, NewUnmanagedIstreamDataReader(stream));
+}
+
+bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
+                     const std::string mime_type, void* data_reader) {
+  // Build the request.
+  // Note that according to the comments on the method
+  // MediaUploader::set_media_content_reader() in //third_party/ \
+  //     google-api-cpp-client/src/googleapis/client/service/media_uploader.h
+  // this takes ownership of |data_reader|.
   std::unique_ptr<ObjectsResource_InsertMethod> request(
       impl_->storage_service_->get_objects().NewInsertMethod(
           &(impl_->oauth_credential_), bucket, nullptr, mime_type.c_str(),
-          NewUnmanagedInMemoryDataReader(str)));
+          reinterpret_cast<DataReader*>(data_reader)));
   request->set_name(path);
 
   // Execute the request.
