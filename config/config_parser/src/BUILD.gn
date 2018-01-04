@@ -3,11 +3,15 @@
 # found in the LICENSE file.
 
 import("//build/go/go_binary.gni")
-import("//build/host.gni")
 
-go_binary("config_parser") {
-  gopackage = "config_parser"
+go_binary("bin") {
+  gopackage = "config_parser_bin"
+  output_name = "config_parser"
   go_dependencies = [
+    {
+      package = "config_parser_bin"
+      source = "//third_party/cobalt/config/config_parser/src"
+    },
     {
       package = "config_parser"
       source = "//third_party/cobalt/config/config_parser/src/config_parser"
@@ -41,14 +45,5 @@ go_binary("config_parser") {
 
   deps = [
     "//third_party/cobalt/config:cobalt_config_proto",
-  ]
-}
-
-install_host_tools("host") {
-  deps = [
-    ":config_parser",
-  ]
-  outputs = [
-    "config_parser",
   ]
 }
