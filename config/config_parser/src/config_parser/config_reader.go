@@ -95,8 +95,9 @@ func readConfig(r configReader, l *[]projectConfig) (err error) {
 	}
 
 	// Then, based on the customer list, we read and parse all the project configs.
-	for _, c := range *l {
-		if err = readProjectConfig(r, &c); err != nil {
+	for i, _ := range *l {
+		c := &((*l)[i])
+		if err = readProjectConfig(r, c); err != nil {
 			return fmt.Errorf("Error reading config for %v %v: %v", c.customerName, c.projectName, err)
 		}
 	}
