@@ -63,11 +63,13 @@ grpc::Status ReportExporter::ExportReportOnce(
     return status;
   }
 
+  std::istringstream report_stream(serialized_report);
+
   auto location_case = export_config.export_location_case();
   switch (location_case) {
     case ReportExportConfig::kGcs:
       return ExportReportToGCS(report_config, export_config.gcs(), metadata,
-                               mime_type, serialized_report);
+                               mime_type, &report_stream);
       break;
 
     default: {
@@ -83,7 +85,7 @@ grpc::Status ReportExporter::ExportReportOnce(
 grpc::Status ReportExporter::ExportReportToGCS(
     const ReportConfig& report_config, const GCSExportLocation& location,
     const ReportMetadataLite& metadata, const std::string& mime_type,
-    const std::string& serialized_report) {
+    std::istream* report_stream) {
   if (location.bucket().empty()) {
     std::string message = "CSVExportLocation has empty |bucket|";
     LOG(ERROR) << message;
@@ -92,7 +94,7 @@ grpc::Status ReportExporter::ExportReportToGCS(
 
   return uploader_->UploadToGCS(location.bucket(),
                                 GcsPath(report_config, metadata, mime_type),
-                                mime_type, serialized_report);
+                                mime_type, report_stream);
 }
 
 std::string ReportExporter::GcsPath(const ReportConfig& report_config,
@@ -113,7 +115,7 @@ std::string ReportExporter::GcsPath(const ReportConfig& report_config,
 grpc::Status GcsUploader::UploadToGCS(const std::string& bucket,
                                       const std::string& path,
                                       const std::string& mime_type,
-                                      const std::string& serialized_report) {
+                                      std::istream* report_stream) {
   if (!gcs_util_) {
     gcs_util_.reset(new GcsUtil());
     if (!gcs_util_->InitFromDefaultPaths()) {
@@ -130,8 +132,7 @@ grpc::Status GcsUploader::UploadToGCS(const std::string& bucket,
   }
   int seconds_to_sleep = 1;
   for (int i = 0; i < 5; i++) {
-    if (gcs_util_->Upload(bucket, path, mime_type, serialized_report.data(),
-                          serialized_report.size())) {
+    if (gcs_util_->Upload(bucket, path, mime_type, report_stream)) {
       return grpc::Status::OK;
     }
     if (i < 4) {

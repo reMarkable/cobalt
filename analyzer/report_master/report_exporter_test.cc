@@ -123,12 +123,13 @@ ReportRow HistogramReportStringValueRow(const std::string& value,
 struct FakeGcsUploader : public GcsUploadInterface {
   grpc::Status UploadToGCS(const std::string& bucket, const std::string& path,
                            const std::string& mime_type,
-                           const std::string& serialized_report) override {
+                           std::istream* report_stream) override {
     this->upload_was_invoked = true;
     this->bucket = bucket;
     this->path = path;
     this->mime_type = mime_type;
-    this->serialized_report = serialized_report;
+    this->serialized_report =
+        std::string(std::istreambuf_iterator<char>(*report_stream), {});
     return grpc::Status::OK;
   }
 
@@ -208,8 +209,7 @@ TEST_F(ReportExporterTest, OneExportLocation) {
   EXPECT_TRUE(status.ok()) << status.error_message();
   EXPECT_TRUE(fake_uploader_->upload_was_invoked);
   EXPECT_EQ("BUCKET-NAME-1", fake_uploader_->bucket);
-  EXPECT_EQ("1_1_1/export_name.csv",
-            fake_uploader_->path);
+  EXPECT_EQ("1_1_1/export_name.csv", fake_uploader_->path);
   EXPECT_EQ("text/csv", fake_uploader_->mime_type);
   EXPECT_EQ(kExpectedCSV, fake_uploader_->serialized_report);
 }
@@ -222,8 +222,7 @@ TEST_F(ReportExporterTest, TwoExportLocations) {
   EXPECT_TRUE(fake_uploader_->upload_was_invoked);
   // Tests that BUCKET-NAME-2 was used after BUCKET-NAME-1.
   EXPECT_EQ("BUCKET-NAME-2", fake_uploader_->bucket);
-  EXPECT_EQ("1_1_3/export_name.csv",
-            fake_uploader_->path);
+  EXPECT_EQ("1_1_3/export_name.csv", fake_uploader_->path);
   EXPECT_EQ("text/csv", fake_uploader_->mime_type);
   EXPECT_EQ(kExpectedCSV, fake_uploader_->serialized_report);
 }

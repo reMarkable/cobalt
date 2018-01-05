@@ -279,10 +279,12 @@ class TestingQueryReportsResponseWriter
 struct FakeGcsUploader : public GcsUploadInterface {
   grpc::Status UploadToGCS(const std::string& bucket, const std::string& path,
                            const std::string& mime_type,
-                           const std::string& serialized_report) override {
+                           std::istream* report_stream) override {
     buckets.push_back(bucket);
     paths.push_back(path);
     mime_types.push_back(mime_type);
+    std::string serialized_report(
+        std::istreambuf_iterator<char>(*report_stream), {});
     reports.push_back(serialized_report);
     return grpc::Status::OK;
   }

@@ -26,7 +26,7 @@ class GcsUploadInterface {
   virtual grpc::Status UploadToGCS(const std::string& bucket,
                                    const std::string& path,
                                    const std::string& mime_type,
-                                   const std::string& serialized_report) = 0;
+                                   std::istream* report_stream) = 0;
 };
 
 // An implementation of GcsUploadInterface that actually uploads files to
@@ -37,7 +37,7 @@ class GcsUploader : public GcsUploadInterface {
 
   grpc::Status UploadToGCS(const std::string& bucket, const std::string& path,
                            const std::string& mime_type,
-                           const std::string& serialized_report) override;
+                           std::istream* report_stream) override;
 
  private:
   grpc::Status PingBucket(const std::string& bucket);
@@ -118,7 +118,7 @@ class ReportExporter {
                                  const GCSExportLocation& location,
                                  const ReportMetadataLite& metadata,
                                  const std::string& mime_type,
-                                 const std::string& serialized_report);
+                                 std::istream* report_stream);
 
   // Builds a file path for exporting to Google Cloud Storage by concatenating
   // a folder path based on the report config id, the metadata export_name,
