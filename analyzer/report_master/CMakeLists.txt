@@ -44,6 +44,7 @@ add_library(analyzer_report_master_lib
             report_generator.cc
             report_history_cache.cc
             report_master_service.cc
+            report_rows.cc
             report_scheduler.cc
             report_serializer.cc
             ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS} ${REPORT_PROTO_HDRS} )
@@ -73,6 +74,7 @@ add_executable(analyzer_report_master_tests
                report_exporter_test.cc
                report_generator_test.cc
                report_history_cache_test.cc
+               report_rows_test.cc
                report_scheduler_test.cc
                report_master_service_test.cc
                report_serializer_test.cc)
