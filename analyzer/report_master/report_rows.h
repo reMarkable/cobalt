@@ -29,7 +29,10 @@ class ReportRowIterator {
   //   return. In this case the state of |*row| is undefined.
   // - INVALID_ARGUMENT if |row| is NULL.
   // - Some other status if any other error occurs.
-  virtual grpc::Status NextRow(ReportRow** row) = 0;
+  virtual grpc::Status NextRow(const ReportRow** row) = 0;
+
+  // Returns whether or not the iterator has more rows to return.
+  virtual bool HasMoreRows() = 0;
 };
 
 // An implementation of ReportRowIterator that wraps a vector.
@@ -37,17 +40,19 @@ class ReportRowVectorIterator : public ReportRowIterator {
  public:
   // Constructs a ReportRowVectorIterator that wraps the given vector.
   // Does not take ownership of |rows|.
-  explicit ReportRowVectorIterator(std::vector<ReportRow>* rows);
+  explicit ReportRowVectorIterator(const std::vector<ReportRow>* rows);
 
   virtual ~ReportRowVectorIterator() = default;
 
   grpc::Status Reset() override;
 
-  grpc::Status NextRow(ReportRow** row) override;
+  grpc::Status NextRow(const ReportRow** row) override;
+
+  bool HasMoreRows() override;
 
  private:
-  std::vector<ReportRow>* rows_;  // not owned
-  std::vector<ReportRow>::iterator pos_;
+  const std::vector<ReportRow>* rows_;  // not owned
+  std::vector<ReportRow>::const_iterator pos_;
 };
 
 }  // namespace analyzer

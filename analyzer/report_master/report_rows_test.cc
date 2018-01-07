@@ -38,7 +38,8 @@ TEST(ReportRowVectorIteratorTest, EmptyVector) {
   // Test it.
   EXPECT_EQ(grpc::OK, iter.Reset().error_code());
   EXPECT_EQ(grpc::INVALID_ARGUMENT, iter.NextRow(nullptr).error_code());
-  ReportRow* next_row;
+  EXPECT_FALSE(iter.HasMoreRows());
+  const ReportRow* next_row;
   EXPECT_EQ(grpc::NOT_FOUND, iter.NextRow(&next_row).error_code());
 }
 
@@ -52,12 +53,15 @@ TEST(ReportRowVectorIteratorTest, SizeOne) {
   ReportRowVectorIterator iter(&report_rows);
 
   // Test it.
-  ReportRow* next_row;
+  const ReportRow* next_row;
+  EXPECT_TRUE(iter.HasMoreRows());
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   ASSERT_NE(nullptr, next_row);
   EXPECT_EQ("apple", next_row->histogram().value().string_value());
+  EXPECT_FALSE(iter.HasMoreRows());
   EXPECT_EQ(grpc::NOT_FOUND, iter.NextRow(&next_row).error_code());
   EXPECT_EQ(grpc::OK, iter.Reset().error_code());
+  EXPECT_TRUE(iter.HasMoreRows());
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   ASSERT_NE(nullptr, next_row);
   EXPECT_EQ("apple", next_row->histogram().value().string_value());
@@ -75,15 +79,20 @@ TEST(ReportRowVectorIteratorTest, SizeThree) {
   ReportRowVectorIterator iter(&report_rows);
 
   // Test it.
-  ReportRow* next_row;
+  const ReportRow* next_row;
+  EXPECT_TRUE(iter.HasMoreRows());
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   EXPECT_EQ("apple", next_row->histogram().value().string_value());
+  EXPECT_TRUE(iter.HasMoreRows());
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   EXPECT_EQ("banana", next_row->histogram().value().string_value());
+  EXPECT_TRUE(iter.HasMoreRows());
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   EXPECT_EQ("cantaloupe", next_row->histogram().value().string_value());
+  EXPECT_FALSE(iter.HasMoreRows());
   EXPECT_EQ(grpc::NOT_FOUND, iter.NextRow(&next_row).error_code());
   EXPECT_EQ(grpc::OK, iter.Reset().error_code());
+  EXPECT_TRUE(iter.HasMoreRows());
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   EXPECT_EQ("apple", next_row->histogram().value().string_value());
 }

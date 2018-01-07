@@ -8,7 +8,8 @@
 namespace cobalt {
 namespace analyzer {
 
-ReportRowVectorIterator::ReportRowVectorIterator(std::vector<ReportRow>* rows)
+ReportRowVectorIterator::ReportRowVectorIterator(
+    const std::vector<ReportRow>* rows)
     : rows_(rows) {
   CHECK(rows);
   pos_ = rows_->begin();
@@ -19,7 +20,7 @@ grpc::Status ReportRowVectorIterator::Reset() {
   return grpc::Status::OK;
 }
 
-grpc::Status ReportRowVectorIterator::NextRow(ReportRow** row) {
+grpc::Status ReportRowVectorIterator::NextRow(const ReportRow** row) {
   if (!row) {
     return grpc::Status(grpc::INVALID_ARGUMENT, "row is NULL");
   }
@@ -29,6 +30,8 @@ grpc::Status ReportRowVectorIterator::NextRow(ReportRow** row) {
   *row = &(*pos_++);
   return grpc::Status::OK;
 }
+
+bool ReportRowVectorIterator::HasMoreRows() { return pos_ != rows_->end(); }
 
 }  // namespace analyzer
 }  // namespace cobalt
