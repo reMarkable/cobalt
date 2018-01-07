@@ -114,7 +114,7 @@ class ReportSerializerTest : public ::testing::Test {
     report_registry_.reset((report_parse_result.first.release()));
   }
 
-  grpc::Status SerializeHistogramReportToCSV(
+  grpc::Status SerializeHistogramReport(
       uint32_t report_config_id, uint32_t variable_index,
       const std::vector<ReportRow>& report_rows,
       std::string* serialized_report_out, std::string* mime_type_out) {
@@ -126,17 +126,67 @@ class ReportSerializerTest : public ::testing::Test {
                            serialized_report_out, mime_type_out);
   }
 
-  void DoSerializeHistogramReportToCSVTest(
+  void DoSerializeHistogramReportTest(
       uint32_t report_config_id, uint32_t variable_index,
       const std::vector<ReportRow>& report_rows,
-      const std::string& expected_csv) {
+      const std::string expected_mime_type,
+      const std::string& expected_serialization) {
     std::string mime_type;
     std::string report;
-    auto status = SerializeHistogramReportToCSV(
-        report_config_id, variable_index, report_rows, &report, &mime_type);
+
+    // Test firt using the method SerializeReport().
+    auto status = SerializeHistogramReport(report_config_id, variable_index,
+                                           report_rows, &report, &mime_type);
     EXPECT_TRUE(status.ok()) << status.error_message() << " ";
-    EXPECT_EQ("text/csv", mime_type);
-    EXPECT_EQ(expected_csv, report);
+    EXPECT_EQ(expected_mime_type, mime_type);
+    EXPECT_EQ(expected_serialization, report);
+
+    // Test again using the methods StartSerializingReport() and AppendRows().
+    auto metadata = BuildHistogramMetadata(variable_index);
+    auto report_config =
+        report_registry_->Get(kCustomerId, kProjectId, report_config_id);
+    ReportSerializer serializer(report_config, &metadata,
+                                &(report_config->export_configs(0)));
+    std::ostringstream stream;
+    status = serializer.StartSerializingReport(&stream);
+    EXPECT_TRUE(status.ok()) << status.error_message() << " ";
+    EXPECT_EQ(expected_mime_type, serializer.mime_type());
+
+    // Break the expected serialization into lines
+    std::stringstream expected_stream(expected_serialization);
+    std::vector<std::string> expected_lines;
+    std::string line;
+    while (std::getline(expected_stream, line)) {
+      expected_lines.push_back(line + "\n");
+    }
+
+    // Check that StartSerializingReport() wrote the header line.
+    EXPECT_FALSE(expected_lines.empty());
+    CHECK_GT(expected_lines.size(), 0);
+    EXPECT_EQ(expected_lines[0], stream.str());
+
+    // Test AppendRows() in a mode where we we append a single row at a time.
+    // We set max_num_bytes = 1 to ensure that this happens.
+    ReportRowVectorIterator row_iterator(&report_rows);
+    size_t max_num_bytes = 1;
+    for (size_t row_num = 1; row_num < expected_lines.size(); row_num++) {
+      std::ostringstream stream;
+      status = serializer.AppendRows(max_num_bytes, &row_iterator, &stream);
+      EXPECT_TRUE(status.ok()) << status.error_message() << " ";
+      EXPECT_GT(expected_lines.size(), row_num);
+      CHECK_GT(expected_lines.size(), row_num);
+      EXPECT_EQ(expected_lines[row_num], stream.str());
+    }
+
+    // Test AppendRows() in a mode where it appends all of the rows at once.
+    // We set max_num_bytes to 1MB to ensure that this happens. We use the
+    // same |stream| that we used above so that it already contains the header
+    // row.
+    row_iterator.Reset();
+    max_num_bytes = 1024 * 1024;
+    status = serializer.AppendRows(max_num_bytes, &row_iterator, &stream);
+    EXPECT_TRUE(status.ok()) << status.error_message() << " ";
+    EXPECT_EQ(expected_serialization, stream.str());
   }
 
  protected:
@@ -145,27 +195,28 @@ class ReportSerializerTest : public ::testing::Test {
                                const std::vector<ReportRow>& report_rows,
                                std::string* serialized_report_out,
                                std::string* mime_type_out) {
-    ReportSerializer serializer;
+    ReportSerializer serializer(&report_config, &metadata,
+                                &report_config.export_configs(0));
     CHECK_EQ(report_config.export_configs_size(), 1);
-    return serializer.SerializeReport(
-        report_config, metadata, report_config.export_configs(0), report_rows,
-        serialized_report_out, mime_type_out);
+    return serializer.SerializeReport(report_rows, serialized_report_out,
+                                      mime_type_out);
   }
 
   std::shared_ptr<ReportRegistry> report_registry_;
 };
 
-// Tests the function SerializeReportToCSV in the case that the
+// Tests the function SerializeReport in the case that the
 // report is a histogram report with zero rows added.
 TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVNoRows) {
   std::vector<ReportRow> report_rows;
   const char* kExpectedCSV = R"(date,Fruit,count,err
 )";
-  DoSerializeHistogramReportToCSVTest(1, 0, report_rows, kExpectedCSV);
+  DoSerializeHistogramReportTest(1, 0, report_rows, "text/csv", kExpectedCSV);
 }
 
-// Tests the function SerializeReportToCSV in the case that the
-// report is a histogram report with rows added whose values are integers.
+// Tests the function SerializeReport in the case that the
+// report is a histogram report with rows added whose values are integers,
+// and the export is to csv.
 TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIntegerRows) {
   std::vector<ReportRow> report_rows;
   report_rows.push_back(HistogramReportIntValueRow(123, 456.7, 8.0));
@@ -176,11 +227,12 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIntegerRows) {
 2035-10-22,0,77777.000,0
 2035-10-22,-1001,0.020,0.010
 )";
-  DoSerializeHistogramReportToCSVTest(1, 1, report_rows, kExpectedCSV);
+  DoSerializeHistogramReportTest(1, 1, report_rows, "text/csv", kExpectedCSV);
 }
 
-// Tests the function SerializeReportToCSV in the case that the
-// report is a histogram report with rows added whose values are strings.
+// Tests the function SerializeReport in the case that the
+// report is a histogram report with rows added whose values are strings,
+// and the export is to csv.
 TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVStringRows) {
   std::vector<ReportRow> report_rows;
   report_rows.push_back(HistogramReportStringValueRow("", 0.000001, 1.000001));
@@ -205,11 +257,12 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVStringRows) {
 2035-10-22,"%0A %0D %09 %0B",4.000,0
 2035-10-22,"This string has length greater than 256 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",0.020,0.010
 )";
-  DoSerializeHistogramReportToCSVTest(1, 0, report_rows, kExpectedCSV);
+  DoSerializeHistogramReportTest(1, 0, report_rows, "text/csv", kExpectedCSV);
 }
 
-// Tests the function SerializeReportToCSV in the case that the
-// report is a histogram report with rows added whose values are blobs.
+// Tests the function SerializeReport in the case that the
+// report is a histogram report with rows added whose values are blobs,
+// and the export is to csv.
 TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVBlobRows) {
   std::vector<ReportRow> report_rows;
   report_rows.push_back(HistogramReportBlobValueRow("blob a", 100, 0.1));
@@ -218,11 +271,12 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVBlobRows) {
 2035-10-22,bNJoxyQ/fmpYIi0JdGT62jdYZvZr1Qfh/3Ka+XHRPkc=,100.000,0.100
 2035-10-22,2aOnR4wmTEA2+lCg37Ocv9A6UdTx5rUJ4okYcaVBZ5s=,50.000,0
 )";
-  DoSerializeHistogramReportToCSVTest(1, 1, report_rows, kExpectedCSV);
+  DoSerializeHistogramReportTest(1, 1, report_rows, "text/csv", kExpectedCSV);
 }
 
-// Tests the function SerializeReportToCSV in the case that the
-// report is a histogram report with rows added whose values are indices.
+// Tests the function SerializeReport in the case that the
+// report is a histogram report with rows added whose values are indices,
+// and the export is to csv.
 // Note that when a row with an index has no label and a zero value it
 // should be skipped.
 TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIndexRows) {
@@ -238,11 +292,12 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIndexRows) {
 2035-10-22,<index 2>,51.000,0
 2035-10-22,"plum",52.000,0
 )";
-  DoSerializeHistogramReportToCSVTest(1, 0, report_rows, kExpectedCSV);
+  DoSerializeHistogramReportTest(1, 0, report_rows, "text/csv", kExpectedCSV);
 }
 
-// Tests the function SerializeReportToCSV in the case that the
-// report is a histogram report with one histogram row with an invalid value.
+// Tests the function SerializeReport in the case that the
+// report is a histogram report with one histogram row with an invalid value,
+// and the export is to csv.
 TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVInvalidValue) {
   std::vector<ReportRow> report_rows;
   ReportRow report_row;
@@ -251,7 +306,7 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVInvalidValue) {
   const char* kExpectedCSV = R"(date,City,count,err
 2035-10-22,<Unrecognized value data type>,0,0
 )";
-  DoSerializeHistogramReportToCSVTest(1, 1, report_rows, kExpectedCSV);
+  DoSerializeHistogramReportTest(1, 1, report_rows, "text/csv", kExpectedCSV);
 }
 
 // Tests that if we use ReportExportConfig 2, which is invalid, that
@@ -261,7 +316,7 @@ TEST_F(ReportSerializerTest, InvalidReportExportConfig) {
   std::string report;
   std::vector<ReportRow> report_rows;
   auto status =
-      SerializeHistogramReportToCSV(2, 0, report_rows, &report, &mime_type);
+      SerializeHistogramReport(2, 0, report_rows, &report, &mime_type);
   EXPECT_EQ(grpc::INVALID_ARGUMENT, status.error_code());
 }
 
@@ -326,7 +381,7 @@ TEST_F(ReportSerializerTest, InvalidMetadataUnimplementedReportType) {
   EXPECT_EQ(grpc::UNIMPLEMENTED, status.error_code());
 }
 
-// Tests the function SerializeReportToCSV in the case that the
+// Tests the function SerializeReport in the case that the
 // report is a histogram report with one row of the wrong row type.
 TEST_F(ReportSerializerTest, InvalidRowNonMatchingRowType) {
   std::string mime_type;
@@ -342,7 +397,7 @@ TEST_F(ReportSerializerTest, InvalidRowNonMatchingRowType) {
   EXPECT_EQ(grpc::INTERNAL, status.error_code());
 }
 
-// Tests the function SerializeReportToCSV in the case that the
+// Tests the function SerializeReport in the case that the
 // report is a histogram report with one row with no row type set.
 TEST_F(ReportSerializerTest, InvalidRowNoRowType) {
   std::string mime_type;

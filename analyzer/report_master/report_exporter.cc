@@ -55,10 +55,9 @@ grpc::Status ReportExporter::ExportReportOnce(
     const std::vector<ReportRow>& report_rows) {
   std::string serialized_report;
   std::string mime_type;
-  ReportSerializer serializer;
+  ReportSerializer serializer(&report_config, &metadata, &export_config);
   auto status =
-      serializer.SerializeReport(report_config, metadata, export_config,
-                                 report_rows, &serialized_report, &mime_type);
+      serializer.SerializeReport(report_rows, &serialized_report, &mime_type);
   if (!status.ok()) {
     return status;
   }
