@@ -123,7 +123,7 @@ ReportRow HistogramReportStringValueRow(const std::string& value,
 struct FakeGcsUploader : public GcsUploadInterface {
   grpc::Status UploadToGCS(const std::string& bucket, const std::string& path,
                            const std::string& mime_type,
-                           std::istream* report_stream) override {
+                           ReportStream* report_stream) override {
     this->upload_was_invoked = true;
     this->bucket = bucket;
     this->path = path;
@@ -138,6 +138,31 @@ struct FakeGcsUploader : public GcsUploadInterface {
   std::string path;
   std::string mime_type;
   std::string serialized_report;
+};
+
+// A FakeReportRowIterator is a ReportRowIterator that will return the fixed
+// |report_row|, |num_rows| times.
+struct FakeReportRowIterator : public ReportRowIterator {
+  size_t num_rows;
+  ReportRow report_row;
+
+  grpc::Status Reset() override {
+    index_ = 0;
+    return grpc::Status::OK;
+  }
+
+  grpc::Status NextRow(const ReportRow** row) override {
+    if (index_++ >= num_rows) {
+      return grpc::Status(grpc::NOT_FOUND, "EOF");
+    }
+    *row = &report_row;
+    return grpc::Status::OK;
+  }
+
+  bool HasMoreRows() override { return (index_ < num_rows); }
+
+ private:
+  size_t index_ = 0;
 };
 
 }  // namespace
@@ -167,8 +192,9 @@ class ReportExporterTest : public ::testing::Test {
     report_rows.push_back(HistogramReportStringValueRow("banana", 15, 0.1));
     report_rows.push_back(HistogramReportStringValueRow("cantaloup", 7.1, 0));
     auto metadata = BuildHistogramMetadata(export_name);
+    ReportRowVectorIterator row_iterator(&report_rows);
     return report_exporter_->ExportReport(*report_config, metadata,
-                                          report_rows);
+                                          &row_iterator);
   }
 
  protected:
@@ -236,16 +262,19 @@ TEST_F(ReportExporterTest, InvalidReportConfig) {
   EXPECT_FALSE(fake_uploader_->upload_was_invoked);
 }
 
-// Tests actually doing a real upload to Google Cloud Storage.
+// Tests actually doing a real very large upload to Google Cloud Storage.
 //
-// The guts of this test have been commented-out so that they do not executed on
-// our CI and CQ bots. A developer may uncomment this and replace the
-// three string tokens:
+// This test has been disabled so that it does not executed on our CI and CQ
+// bots. A developer may enable this test by removing the DISALBED_ prefix
+// from its name and then replacing the three string tokens:
 // <put-your-real-bucket-name-here>
 // <cobalt-source-root-dir>
 // <path-to-your-real-service-acount-key-file-here>
 // in order to run the test locally.
-TEST_F(ReportExporterTest, RealUploadToGCS) {
+//
+// Note(rudominer) Setting num_rows to 10 million, I find that I can upload
+// a 0.5GB report in 5 minutes.
+TEST_F(ReportExporterTest, DISABLED_RealVeryLargeUploadToGCS) {
   // Parse the report config string
   auto report_parse_result = ReportRegistry::FromString(
       ReplaceBucketName("<put-your-real-bucket-name-here>"), nullptr);
@@ -254,10 +283,9 @@ TEST_F(ReportExporterTest, RealUploadToGCS) {
 
   setenv("GRPC_DEFAULT_SSL_ROOTS_FILE_PATH",
          "<cobalt-source-root-dir>/third_party/grpc/etc/roots.pem", 1);
-  setenv("GOOGLE_APPLICATION_CREDENTIALS",
-         "<path-to-your-real-service-acount-key-file-here>", 1);
-
-  /*
+  setenv("COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS",
+         "<path-to-your-real-service-acount-key-file-here>",
+         1);
 
   // Instantiate a ReportExporter using a non-mock GcsUploader.
   ReportExporter report_exporter(
@@ -265,15 +293,14 @@ TEST_F(ReportExporterTest, RealUploadToGCS) {
 
   const auto* report_config = report_registry_->Get(kCustomerId, kProjectId, 1);
   CHECK(report_config);
-  auto metadata = BuildHistogramMetadata("export_name");
-  std::vector<ReportRow> report_rows;
-  report_rows.push_back(HistogramReportStringValueRow("apple", 10, 0));
-  report_rows.push_back(HistogramReportStringValueRow("banana", 15, 0.1));
-  report_rows.push_back(HistogramReportStringValueRow("cantaloup", 7.1, 0));
+  auto metadata = BuildHistogramMetadata("large_report_1");
+  FakeReportRowIterator row_iterator;
+  row_iterator.report_row = HistogramReportStringValueRow(
+      "Supercalifragilisticexpialidocious", 3.14159, 0.012);
+  row_iterator.num_rows = 10000000;
   auto status =
-      report_exporter.ExportReport(*report_config, metadata, report_rows);
+      report_exporter.ExportReport(*report_config, metadata, &row_iterator);
   EXPECT_TRUE(status.ok()) << status.error_message();
-*/
 }
 
 }  // namespace analyzer

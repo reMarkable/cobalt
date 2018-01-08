@@ -11,6 +11,8 @@
 #include <vector>
 
 #include "analyzer/report_master/report_internal.pb.h"
+#include "analyzer/report_master/report_rows.h"
+#include "analyzer/report_master/report_stream.h"
 #include "config/report_configs.pb.h"
 #include "grpc++/grpc++.h"
 #include "util/gcs/gcs_util.h"
@@ -26,7 +28,7 @@ class GcsUploadInterface {
   virtual grpc::Status UploadToGCS(const std::string& bucket,
                                    const std::string& path,
                                    const std::string& mime_type,
-                                   std::istream* report_stream) = 0;
+                                   ReportStream* report_stream) = 0;
 };
 
 // An implementation of GcsUploadInterface that actually uploads files to
@@ -37,7 +39,7 @@ class GcsUploader : public GcsUploadInterface {
 
   grpc::Status UploadToGCS(const std::string& bucket, const std::string& path,
                            const std::string& mime_type,
-                           std::istream* report_stream) override;
+                           ReportStream* report_stream) override;
 
  private:
   grpc::Status PingBucket(const std::string& bucket);
@@ -95,14 +97,15 @@ class ReportExporter {
   // |variable_indices| from here determines which ReportVariables from
   // |report_config| are used, and their order.
   //
-  // report_rows: The actual row data to be serialized and exported. The type
-  // of the rows must correspond to the |report_type| from |metadata|.
+  // row_iterator: An iterator that will yield the actual row data to be
+  // serialized and exported. The type of the rows must correspond to the
+  // |report_type| from |metadata|.
   //
   // Returns grpc::OK if either no exporter was done, or if all exporting
   // was successful. Otherwise logs an error and returns some other status.
   grpc::Status ExportReport(const ReportConfig& report_config,
                             const ReportMetadataLite& metadata,
-                            const std::vector<ReportRow>& report_rows);
+                            ReportRowIterator* row_iterator);
 
  private:
   friend class ReportExporterTest;
@@ -112,13 +115,13 @@ class ReportExporter {
   grpc::Status ExportReportOnce(const ReportConfig& report_config,
                                 const ReportMetadataLite& metadata,
                                 const ReportExportConfig& export_config,
-                                const std::vector<ReportRow>& report_rows);
+                                ReportRowIterator* row_iterator);
 
   grpc::Status ExportReportToGCS(const ReportConfig& report_config,
                                  const GCSExportLocation& location,
                                  const ReportMetadataLite& metadata,
                                  const std::string& mime_type,
-                                 std::istream* report_stream);
+                                 ReportStream* report_stream);
 
   // Builds a file path for exporting to Google Cloud Storage by concatenating
   // a folder path based on the report config id, the metadata export_name,

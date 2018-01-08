@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "analyzer/report_master/report_serializer.h"
+#include "analyzer/report_master/report_stream.h"
 #include "glog/logging.h"
 
 namespace cobalt {
@@ -30,18 +31,27 @@ std::string ExtensionForMimeType(const std::string& mime_type) {
 ReportExporter::ReportExporter(std::shared_ptr<GcsUploadInterface> uploader)
     : uploader_(uploader) {}
 
-grpc::Status ReportExporter::ExportReport(
-    const ReportConfig& report_config, const ReportMetadataLite& metadata,
-    const std::vector<ReportRow>& report_rows) {
+grpc::Status ReportExporter::ExportReport(const ReportConfig& report_config,
+                                          const ReportMetadataLite& metadata,
+                                          ReportRowIterator* row_iterator) {
   if (metadata.export_name().empty()) {
     // If we were not told to export this report, there is nothing to do.
     return grpc::Status::OK;
   }
 
   grpc::Status overall_status = grpc::Status::OK;
+  bool first_export = true;
   for (const auto& export_config : report_config.export_configs()) {
+    if (first_export) {
+      first_export = false;
+    } else {
+      auto status = row_iterator->Reset();
+      if (!status.ok()) {
+        return status;
+      }
+    }
     auto status =
-        ExportReportOnce(report_config, metadata, export_config, report_rows);
+        ExportReportOnce(report_config, metadata, export_config, row_iterator);
     if (!status.ok()) {
       overall_status = status;
     }
@@ -51,24 +61,18 @@ grpc::Status ReportExporter::ExportReport(
 
 grpc::Status ReportExporter::ExportReportOnce(
     const ReportConfig& report_config, const ReportMetadataLite& metadata,
-    const ReportExportConfig& export_config,
-    const std::vector<ReportRow>& report_rows) {
-  std::string serialized_report;
-  std::string mime_type;
+    const ReportExportConfig& export_config, ReportRowIterator* row_iterator) {
   ReportSerializer serializer(&report_config, &metadata, &export_config);
-  auto status =
-      serializer.SerializeReport(report_rows, &serialized_report, &mime_type);
+  ReportStream report_stream(&serializer, row_iterator);
+  auto status = report_stream.Start();
   if (!status.ok()) {
     return status;
   }
-
-  std::istringstream report_stream(serialized_report);
-
   auto location_case = export_config.export_location_case();
   switch (location_case) {
     case ReportExportConfig::kGcs:
       return ExportReportToGCS(report_config, export_config.gcs(), metadata,
-                               mime_type, &report_stream);
+                               report_stream.mime_type(), &report_stream);
       break;
 
     default: {
@@ -84,7 +88,7 @@ grpc::Status ReportExporter::ExportReportOnce(
 grpc::Status ReportExporter::ExportReportToGCS(
     const ReportConfig& report_config, const GCSExportLocation& location,
     const ReportMetadataLite& metadata, const std::string& mime_type,
-    std::istream* report_stream) {
+    ReportStream* report_stream) {
   if (location.bucket().empty()) {
     std::string message = "CSVExportLocation has empty |bucket|";
     LOG(ERROR) << message;
@@ -114,7 +118,7 @@ std::string ReportExporter::GcsPath(const ReportConfig& report_config,
 grpc::Status GcsUploader::UploadToGCS(const std::string& bucket,
                                       const std::string& path,
                                       const std::string& mime_type,
-                                      std::istream* report_stream) {
+                                      ReportStream* report_stream) {
   if (!gcs_util_) {
     gcs_util_.reset(new GcsUtil());
     if (!gcs_util_->InitFromDefaultPaths()) {
@@ -134,7 +138,8 @@ grpc::Status GcsUploader::UploadToGCS(const std::string& bucket,
     // We will allow up to 15 minutes to upload a single report to GCS.
     static const uint32_t kReportUploadTimeoutSeconds = 60 * 15;
     if (gcs_util_->Upload(bucket, path, mime_type, report_stream,
-                          kReportUploadTimeoutSeconds)) {
+                          kReportUploadTimeoutSeconds) &&
+        report_stream->status().ok()) {
       return grpc::Status::OK;
     }
     if (i < 4) {

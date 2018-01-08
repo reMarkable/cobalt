@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "analyzer/report_master/histogram_analysis_engine.h"
+#include "analyzer/report_master/report_rows.h"
 #include "glog/logging.h"
 
 namespace cobalt {
@@ -139,8 +140,8 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
 
   // Fetch the Metric.
   const Metric* metric = analyzer_config->Metric(report_config->customer_id(),
-                                                  report_config->project_id(),
-                                                  report_config->metric_id());
+                                                 report_config->project_id(),
+                                                 report_config->metric_id());
   if (!metric) {
     std::ostringstream stream;
     stream << "Not found: " << MetricIdString(*report_config);
@@ -209,7 +210,9 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     return grpc::Status::OK;
   }
 
-  return report_exporter_->ExportReport(*report_config, metadata, report_rows);
+  ReportRowVectorIterator row_iterator(&report_rows);
+  return report_exporter_->ExportReport(*report_config, metadata,
+                                        &row_iterator);
 }
 
 grpc::Status ReportGenerator::GenerateHistogramReport(

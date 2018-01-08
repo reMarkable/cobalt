@@ -140,7 +140,7 @@ element {
 struct FakeGcsUploader : public GcsUploadInterface {
   grpc::Status UploadToGCS(const std::string& bucket, const std::string& path,
                            const std::string& mime_type,
-                           std::istream* report_stream) override {
+                           ReportStream* report_stream) override {
     this->upload_was_invoked = true;
     this->bucket = bucket;
     this->path = path;
