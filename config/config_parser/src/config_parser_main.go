@@ -54,6 +54,11 @@ func main() {
 		glog.Exit(err)
 	}
 
+	// Check that the output file is not empty.
+	if len(configBytes) == 0 {
+		glog.Exit("Output file is empty.")
+	}
+
 	// If no errors have occured yet and checkOnly was set, we are done.
 	if *checkOnly {
 		os.Exit(0)
