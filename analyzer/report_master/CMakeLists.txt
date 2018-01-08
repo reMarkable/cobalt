@@ -47,6 +47,7 @@ add_library(analyzer_report_master_lib
             report_rows.cc
             report_scheduler.cc
             report_serializer.cc
+            report_stream.cc
             ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS} ${REPORT_PROTO_HDRS} )
 target_link_libraries(analyzer_report_master_lib
                       analyzer_config
@@ -77,7 +78,8 @@ add_executable(analyzer_report_master_tests
                report_rows_test.cc
                report_scheduler_test.cc
                report_master_service_test.cc
-               report_serializer_test.cc)
+               report_serializer_test.cc
+               report_stream_test.cc)
 target_link_libraries(analyzer_report_master_tests
                       analyzer_report_master_lib
                       encoder

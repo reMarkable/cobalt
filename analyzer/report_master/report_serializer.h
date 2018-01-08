@@ -26,6 +26,8 @@ namespace analyzer {
 // the whole report at once to a string, or else invoke StartSerializingReport()
 // followed by multiple invocations of AppendRows() in order to serialize the
 // report incrementally.
+//
+// See also ReportStream in report_stream.h.
 class ReportSerializer {
  public:
   // Constructor
