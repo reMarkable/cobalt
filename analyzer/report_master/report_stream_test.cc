@@ -145,6 +145,11 @@ class ReportStreamTest : public ::testing::Test {
         << status.error_message() << " ";
     EXPECT_EQ(expected_mime_type, report_stream.mime_type());
 
+    if (status.ok()) {
+      // Test that before reading from the stream, tellg() returns zero.
+      EXPECT_EQ(0, report_stream.tellg());
+    }
+
     // Read the entire serialized report from the ReportStream into a string.
     std::string serialized_report(std::istreambuf_iterator<char>(report_stream),
                                   {});
@@ -157,6 +162,11 @@ class ReportStreamTest : public ::testing::Test {
     status = report_stream.status();
     EXPECT_EQ(expected_end_status, status.error_code())
         << status.error_message() << " ";
+
+    if (!report_stream.status().ok()) {
+      EXPECT_TRUE(report_stream.fail());
+      EXPECT_TRUE(report_stream.bad());
+    }
   }
 
   // Invokes DoStreamTestWithBufferSize() four times with buffer sizes

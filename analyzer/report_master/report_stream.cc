@@ -44,7 +44,12 @@ class ReportStream::ReportStreambuf : public std::streambuf {
 
   // Start should be invoked once before any other method. Returns OK on
   // success or an error status otherwise.
-  grpc::Status Start();
+  //
+  // |owning_istream| should be a back pointer to the ReportStream that was
+  // constructed using this streambuf. It will be used to set the fail and
+  // error bits when an error is returned by the ReportRowIterator or
+  // ReportSerializer.
+  grpc::Status Start(ReportStream* owning_istream);
 
   // Returns the most recent Status of an underlying operation that returns
   // a Status.
@@ -67,6 +72,7 @@ class ReportStream::ReportStreambuf : public std::streambuf {
   size_t max_size_;
   ReportSerializer* report_serializer_;  // not owned
   ReportRowIterator* row_iterator_;      // not owned
+  ReportStream* owning_istream_;  // not owned. Set via the Start() method.
   grpc::Status status_;
 };
 
@@ -86,17 +92,30 @@ ReportStream::ReportStreambuf::ReportStreambuf(
   setp(buffer_.data(), buffer_.data() + buffer_.size());
 }
 
-grpc::Status ReportStream::ReportStreambuf::Start() {
+grpc::Status ReportStream::ReportStreambuf::Start(
+    ReportStream* owning_istream) {
+  CHECK(owning_istream);
+  owning_istream_ = owning_istream;
+
   // Make a temporary ostream to wrap this buffer.
   std::ostream ostream(this);
   // Give this ostream to ReportSerializer so it will write into this buffer.
   // Ask the ReportSerializer to write the header row.
   status_ = report_serializer_->StartSerializingReport(&ostream);
   if (!status_.ok()) {
+    owning_istream_->setstate(std::ios_base::failbit);
+    owning_istream_->setstate(std::ios_base::badbit);
     return status_;
   }
   // Ask the ReportSerializer to wite some of the report rows, up to max_size_.
   status_ = report_serializer_->AppendRows(max_size_, row_iterator_, &ostream);
+  if (!status_.ok()) {
+    owning_istream_->setstate(std::ios_base::failbit);
+    owning_istream_->setstate(std::ios_base::badbit);
+    // Note that we don't return here because even though there was an error
+    // it is convenient to allow a reader to read the data that was written
+    // before the error.
+  }
 
   // Tell any readers where the underlying read buffer is. pptr() is the next
   // position in the write buffer and so in our case it is one past the end
@@ -138,6 +157,15 @@ int ReportStream::ReportStreambuf::underflow() {
   // Ask the ReportSerializer to wite more of the report rows, up to max_size_,
   // into the ostream and so into this buffer.
   status_ = report_serializer_->AppendRows(max_size_, row_iterator_, &ostream);
+
+  if (!status_.ok()) {
+    owning_istream_->setstate(std::ios_base::failbit);
+    owning_istream_->setstate(std::ios_base::badbit);
+    // Note that we don't return here because even though there was an error
+    // it is convenient to allow a reader to read the data that was written
+    // before the error.
+  }
+
   // If any new data was written to this buffer then tell the reader about
   // the new data available to read.
   if (pptr() > buffer_.data()) {
@@ -166,8 +194,13 @@ ReportStream::ReportStreambuf::pos_type ReportStream::ReportStreambuf::seekoff(
     off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   if (off == 0 && dir == std::ios_base::cur && which == std::ios_base::out) {
     // We are in the case of tellp() so return the current position of the
-    // write pointer pptr().
+    // put pointer pptr().
     return pptr() - buffer_.data();
+  }
+  if (off == 0 && dir == std::ios_base::cur && which == std::ios_base::in) {
+    // We are in the case of tellg() so return the current position of the
+    // get pointer gptr().
+    return gptr() - buffer_.data();
   }
   // We are not in the case of tellp() so do what the base class impl does.
   return pos_type(-1);
@@ -184,7 +217,7 @@ ReportStream::ReportStream(ReportSerializer* report_serializer,
 
 ReportStream::~ReportStream() {}
 
-grpc::Status ReportStream::Start() { return report_stream_buf_->Start(); }
+grpc::Status ReportStream::Start() { return report_stream_buf_->Start(this); }
 
 grpc::Status ReportStream::status() { return report_stream_buf_->status(); }
 
