@@ -13,17 +13,38 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"time"
 )
 
 // Clones the specified repository to the specified destination.
-func cloneRepo(repoUrl string, destination string) error {
+func cloneRepo(repoUrl string, destination string, gitTimeout time.Duration) error {
 	cmd := exec.Command("git", "clone",
 		// Truncate the history to the latest commit.
 		"--depth", "1",
 		repoUrl, destination)
+
 	// *exec.ExitError is the documented return type of Cmd.Run().
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
 		return err
+	}
+
+	// We implement a timeout running cmd.
+	done := make(chan error)
+	// In a separate goroutine, we wait on cmd to return. When that happens,
+	// the result of cmd.Wait is sent via the "done" channel serving as a signal
+	// that we are done waiting.
+	go func() { done <- cmd.Wait() }()
+
+	// Here, we select on channels. In effect, we wait to see whether a value is
+	// sent through "done" first (indicating the command is done running) or
+	// if the time.After timer fires first. If the latter occurs, we kill the
+	// process started by cmd and return an error.
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(gitTimeout):
+		cmd.Process.Kill()
+		return fmt.Errorf("git took too long to run.")
 	}
 
 	return nil
@@ -46,7 +67,8 @@ func checkUrl(repoUrl string) (err error) {
 // ReadConfigFromRepo clones repoUrl into a temporary directory and reads the
 // configuration from it. For the organization expected of the repository, see
 // ReadConfigFromDir in config_reader.go.
-func ReadConfigFromRepo(repoUrl string) (c config.CobaltConfig, err error) {
+// gitTimeout is the maximum amount of time to wait for a git command to finish.
+func ReadConfigFromRepo(repoUrl string, gitTimeout time.Duration) (c config.CobaltConfig, err error) {
 	if err = checkUrl(repoUrl); err != nil {
 		return c, err
 	}
@@ -58,7 +80,7 @@ func ReadConfigFromRepo(repoUrl string) (c config.CobaltConfig, err error) {
 
 	defer os.RemoveAll(repoPath)
 
-	if err := cloneRepo(repoUrl, repoPath); err != nil {
+	if err := cloneRepo(repoUrl, repoPath, gitTimeout); err != nil {
 		return c, fmt.Errorf("Error cloning repository (%v): %v", repoUrl, err)
 	}
 

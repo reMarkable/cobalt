@@ -15,13 +15,15 @@ import (
 	"github.com/golang/protobuf/proto"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
 var (
-	repoUrl   = flag.String("repo_url", "", "URL of the repository containing the config. Exactly one of 'repo_url' or 'config_dir' must be specified.")
-	configDir = flag.String("config_dir", "", "Directory containing the config. Exactly one of 'repo_url' or 'config_dir' must be specified.")
-	outFile   = flag.String("output_file", "", "File to which the serialized config should be written. Defaults to stdout.")
-	checkOnly = flag.Bool("check_only", false, "Only check that the configuration is valid.")
+	repoUrl       = flag.String("repo_url", "", "URL of the repository containing the config. Exactly one of 'repo_url' or 'config_dir' must be specified.")
+	configDir     = flag.String("config_dir", "", "Directory containing the config. Exactly one of 'repo_url' or 'config_dir' must be specified.")
+	outFile       = flag.String("output_file", "", "File to which the serialized config should be written. Defaults to stdout.")
+	checkOnly     = flag.Bool("check_only", false, "Only check that the configuration is valid.")
+	gitTimeoutSec = flag.Int64("git_timeout", 60, "How many seconds should I wait on git commands?")
 )
 
 func main() {
@@ -39,7 +41,8 @@ func main() {
 	var c config.CobaltConfig
 	var err error
 	if *repoUrl != "" {
-		c, err = config_parser.ReadConfigFromRepo(*repoUrl)
+		gitTimeout := time.Duration(*gitTimeoutSec) * time.Second
+		c, err = config_parser.ReadConfigFromRepo(*repoUrl, gitTimeout)
 	} else {
 		c, err = config_parser.ReadConfigFromDir(*configDir)
 	}
