@@ -131,7 +131,10 @@ grpc::Status GcsUploader::UploadToGCS(const std::string& bucket,
   }
   int seconds_to_sleep = 1;
   for (int i = 0; i < 5; i++) {
-    if (gcs_util_->Upload(bucket, path, mime_type, report_stream)) {
+    // We will allow up to 15 minutes to upload a single report to GCS.
+    static const uint32_t kReportUploadTimeoutSeconds = 60 * 15;
+    if (gcs_util_->Upload(bucket, path, mime_type, report_stream,
+                          kReportUploadTimeoutSeconds)) {
       return grpc::Status::OK;
     }
     if (i < 4) {

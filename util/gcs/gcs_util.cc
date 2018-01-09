@@ -119,19 +119,23 @@ bool GcsUtil::Init(const std::string ca_certs_path,
 
 bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
                      const std::string mime_type, const char* data,
-                     size_t num_bytes) {
+                     size_t num_bytes, uint32_t timeout_seconds) {
   googleapis::StringPiece str;
   str.set(data, num_bytes);
-  return Upload(bucket, path, mime_type, NewUnmanagedInMemoryDataReader(str));
+  return Upload(bucket, path, mime_type, NewUnmanagedInMemoryDataReader(str),
+                timeout_seconds);
 }
 
 bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
-                     const std::string mime_type, std::istream* stream) {
-  return Upload(bucket, path, mime_type, NewUnmanagedIstreamDataReader(stream));
+                     const std::string mime_type, std::istream* stream,
+                     uint32_t timeout_seconds) {
+  return Upload(bucket, path, mime_type, NewUnmanagedIstreamDataReader(stream),
+                timeout_seconds);
 }
 
 bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
-                     const std::string mime_type, void* data_reader) {
+                     const std::string mime_type, void* data_reader,
+                     uint32_t timeout_seconds) {
   // Build the request.
   // Note that according to the comments on the method
   // MediaUploader::set_media_content_reader() in //third_party/ \
@@ -142,6 +146,9 @@ bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
           &(impl_->oauth_credential_), bucket, nullptr, mime_type.c_str(),
           reinterpret_cast<DataReader*>(data_reader)));
   request->set_name(path);
+
+  request->mutable_http_request()->mutable_options()->set_timeout_ms(
+      1000 * timeout_seconds);
 
   // Execute the request.
   Json::Value value;

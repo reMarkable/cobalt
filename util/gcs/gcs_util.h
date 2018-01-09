@@ -70,8 +70,11 @@ class GcsUtil {
   // follow the Google Cloud Storage Object name requirements. For best
   // results it should contain only letters, numbers, underscores, dashes
   // and forward slashes.
+  //
+  // |timeout_seconds| is used as the HTTP request timeout.
   bool Upload(const std::string& bucket, const std::string& path,
-              const std::string mime_type, const char* data, size_t num_bytes);
+              const std::string mime_type, const char* data, size_t num_bytes,
+              uint32_t timeout_seconds);
 
   // Uploads a blob to Google Cloud Storage. Bytes will be read from |stream|
   // until EOF. The bytes are uploaded to the given |path| within the given
@@ -84,8 +87,11 @@ class GcsUtil {
   // follow the Google Cloud Storage Object name requirements. For best
   // results it should contain only letters, numbers, underscores, dashes
   // and forward slashes.
+  //
+  // |timeout_seconds| is used as the HTTP request timeout.
   bool Upload(const std::string& bucket, const std::string& path,
-              const std::string mime_type, std::istream* stream);
+              const std::string mime_type, std::istream* stream,
+              uint32_t timeout_seconds);
 
   // Attempts to connect with Google Cloud Storage and query for the metadata
   // for the specified bucket. This will succeed only if the service
@@ -107,7 +113,8 @@ class GcsUtil {
   //
   // This method takes ownership of |data_reader|.
   bool Upload(const std::string& bucket, const std::string& path,
-              const std::string mime_type, void* data_reader);
+              const std::string mime_type, void* data_reader,
+              uint32_t timeout_seconds);
 
   struct Impl;
   std::unique_ptr<Impl> impl_;
