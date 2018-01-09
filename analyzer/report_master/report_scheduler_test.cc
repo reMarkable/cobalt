@@ -114,7 +114,7 @@ class FakeReportStarter : public ReportStarterInterface {
 
   grpc::Status StartReport(const ReportConfig& report_config,
                            uint32_t first_day_index, uint32_t last_day_index,
-                           const std::string& export_name,
+                           const std::string& export_name, bool in_store,
                            ReportId* report_id_out) override {
     report_id_out->Clear();
     report_id_out->set_customer_id(kCustomerId);
@@ -122,7 +122,7 @@ class FakeReportStarter : public ReportStarterInterface {
     report_id_out->set_report_config_id(report_config.id());
     EXPECT_EQ(store::kOK,
               report_store_->StartNewReport(
-                  first_day_index, last_day_index, false, export_name,
+                  first_day_index, last_day_index, false, export_name, in_store,
                   report_config.report_type(), {0}, report_id_out));
     if (should_complete_reports_) {
       EXPECT_EQ(store::kOK, report_store_->EndReport(*report_id_out, true, ""));

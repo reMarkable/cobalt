@@ -219,7 +219,7 @@ Status ReportStore::WriteBulkMetadata(
 
 Status ReportStore::StartNewReport(
     uint32_t first_day_index, uint32_t last_day_index, bool one_off,
-    const std::string& export_name, ReportType report_type,
+    const std::string& export_name, bool in_store, ReportType report_type,
     const std::vector<uint32_t>& variable_indices, ReportId* report_id) {
   CHECK(report_id);
   // Complete the report_id.
@@ -237,6 +237,8 @@ Status ReportStore::StartNewReport(
   }
   metadata.set_one_off(one_off);
   metadata.set_export_name(export_name);
+  metadata.set_in_store(in_store);
+
   // We are not just creating but also starting this report now.
   metadata.set_start_time_seconds(report_id->creation_time_seconds());
 
@@ -244,7 +246,7 @@ Status ReportStore::StartNewReport(
 }
 
 Status ReportStore::CreateDependentReport(
-    uint32_t sequence_number, const std::string& export_name,
+    uint32_t sequence_number, const std::string& export_name, bool in_store,
     ReportType report_type, const std::vector<uint32_t>& variable_indices,
     ReportId* report_id) {
   ReportMetadataLite metadata;
@@ -262,9 +264,10 @@ Status ReportStore::CreateDependentReport(
   // Set the state to WAITING_TO_START
   metadata.set_state(WAITING_TO_START);
 
-  // Set the export_name, report_type and variable_indices
+  // Set the export_name, report_type, in_store and variable_indices
   metadata.set_export_name(export_name);
   metadata.set_report_type(report_type);
+  metadata.set_in_store(in_store);
   metadata.clear_variable_indices();
   for (auto index : variable_indices) {
     metadata.add_variable_indices(index);
@@ -335,6 +338,13 @@ Status ReportStore::AddReportRows(const ReportId& report_id,
     LOG(ERROR) << "Failed to get metadata for report_id: "
                << ToString(report_id);
     return status;
+  }
+
+  if (!metadata.in_store()) {
+    LOG(ERROR)
+        << "Cannot add report rows for a report for which in_store is false."
+        << " report_id: " << ToString(report_id);
+    return kInvalidArguments;
   }
 
   if (metadata.state() != IN_PROGRESS) {

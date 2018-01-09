@@ -341,22 +341,22 @@ TYPED_TEST_P(ReportExecutorAbstractTest, EnqueueReportGeneration) {
 
   // Register the start of report 1, sequence_num 0, variable 0.
   ReportId report_id11 = this->report_id1_;
-  this->report_store_->StartNewReport(kDayIndex, kDayIndex, true, "", HISTOGRAM,
-                                      {0}, &report_id11);
+  this->report_store_->StartNewReport(kDayIndex, kDayIndex, true, "", true,
+                                      HISTOGRAM, {0}, &report_id11);
 
   // Register the creation of report1, sequence_num 1, variable 1.
   ReportId report_id12 = report_id11;
-  this->report_store_->CreateDependentReport(1, "", HISTOGRAM, {1},
+  this->report_store_->CreateDependentReport(1, "", true, HISTOGRAM, {1},
                                              &report_id12);
 
   // Register the start of report2, sequence_num 0, variable 0.
   ReportId report_id21 = this->report_id2_;
-  this->report_store_->StartNewReport(kDayIndex, kDayIndex, true, "", HISTOGRAM,
-                                      {0}, &report_id21);
+  this->report_store_->StartNewReport(kDayIndex, kDayIndex, true, "", true,
+                                      HISTOGRAM, {0}, &report_id21);
 
   // Register the creation of report2, sequence_num 1, variable 1.
   ReportId report_id22 = report_id21;
-  this->report_store_->CreateDependentReport(1, "", HISTOGRAM, {1},
+  this->report_store_->CreateDependentReport(1, "", true, HISTOGRAM, {1},
                                              &report_id22);
 
   // Create two dependency chains of reports. We have the variable 1 report

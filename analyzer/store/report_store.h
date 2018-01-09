@@ -58,6 +58,10 @@ class ReportStore {
   // |export_name| specifies the location to where this report will be exported.
   // See the comments on the |export_name| field of ReportMetadataLite.
   //
+  // |in_store| specifies whether or not the rows of this report will be
+  // stored in the ReportStore. See the comments on the |in_store| field of
+  // ReportMetadataLite.
+  //
   // |report_type| indicates which type of report is being started. The
   // associated ReportConfig already specifies a ReportType. This |report_type|
   // should be the same as that ReportType if the report being started is the
@@ -81,7 +85,7 @@ class ReportStore {
   // report in its dependency group to be started.
   Status StartNewReport(uint32_t first_day_index, uint32_t last_day_index,
                         bool one_off, const std::string& export_name,
-                        ReportType report_type,
+                        bool in_store, ReportType report_type,
                         const std::vector<uint32_t>& variable_indices,
                         ReportId* report_id);
 
@@ -103,6 +107,10 @@ class ReportStore {
   //
   // |export_name| specifies the location to where this report will be exported.
   // See the comments on the |export_name| field of ReportMetadataLite.
+  //
+  // |in_store| specifies whether or not the rows of this report will be
+  // stored in the ReportStore. See the comments on the |in_store| field of
+  // ReportMetadataLite.
   //
   // |report_type| indicates which type of report is being created. Note that
   // different reports in a dependency group may have different ReportTypes.
@@ -129,7 +137,7 @@ class ReportStore {
   // report with an ID of the new value of report_id obtained by setting the
   // |sequence_number| field to the given |sequence_number|.
   Status CreateDependentReport(uint32_t sequence_number,
-                               const std::string& export_name,
+                               const std::string& export_name, bool in_store,
                                ReportType report_type,
                                const std::vector<uint32_t>& variable_indices,
                                ReportId* report_id);
@@ -171,6 +179,10 @@ class ReportStore {
   // of StartNewReport or CreateDependentReport. The values specified in
   // |report_rows| must be for the appropriate list of variables.  Returns
   // kInvalidArguments if not.
+  //
+  // This method should only be invoked on a report for which |in_store| was
+  // set true when the metadata was created via StartNewReport or
+  // StartDependentReport. Otherwise INVALID_ARGUMENT is returned.
   Status AddReportRows(const ReportId& report_id,
                        const std::vector<ReportRow>& report_rows);
 
@@ -178,7 +190,9 @@ class ReportStore {
   Status GetMetadata(const ReportId& report_id,
                      ReportMetadataLite* metadata_out);
 
-  // Gets the Report with the specified id.
+  // Gets the Report with the specified id. If this method is invoked on a
+  // report for which |in_store| is not true then |report_out| will contain
+  // zero rows.
   // TODO(rudominer) Consider not assuming a report fits in memory.
   Status GetReport(const ReportId& report_id, ReportMetadataLite* metadata_out,
                    ReportRows* report_out);

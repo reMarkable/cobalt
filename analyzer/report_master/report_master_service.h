@@ -77,13 +77,17 @@ class ReportMasterService final : public ReportMaster::Service {
   // |export_name| specifies the location to where this report will be exported.
   // See the comments on the |export_name| field of ReportMetadataLite.
   //
+  // |in_store| specifies whether or not the rows of this report will be
+  // stored in the ReportStore. See the comments on the |in_store| field of
+  // ReportMetadataLite.
+  //
   // |report_id_out| This must be non null. The ReportId pointed to will be
   // cleared and then populated with the internal version of the report id
   // for the newly started report. Note that the external version of the
   // report id is included in |response|.
   grpc::Status StartReportNoAuth(const StartReportRequest* request,
                                  bool one_off, const std::string& export_name,
-                                 ReportId* report_id_out,
+                                 bool in_store, ReportId* report_id_out,
                                  StartReportResponse* response);
 
   // GetReportNoAuth is identical to GetReports but authorization is not
@@ -129,7 +133,7 @@ class ReportMasterService final : public ReportMaster::Service {
   grpc::Status StartHistogramReport(const StartReportRequest& request,
                                     bool one_off,
                                     const std::string& export_name,
-                                    ReportId* report_id,
+                                    bool in_store, ReportId* report_id,
                                     StartReportResponse* response);
 
   // Encapsulates the logic for starting a JOINT report. Invoked by
@@ -155,14 +159,14 @@ class ReportMasterService final : public ReportMaster::Service {
   // thereby forming a new unique ReportId for the newly started HISTOGRAM
   // report. On exit the |sequence_num| field will be set to 2.
   grpc::Status StartJointReport(const StartReportRequest& request, bool one_off,
-                                const std::string& export_name,
+                                const std::string& export_name, bool in_store,
                                 ReportId* report_id,
                                 StartReportResponse* response);
 
   // Invokes ReportStore::StartNewReport().
   // Does Log(ERROR) and returns an error status on error.
   grpc::Status StartNewReport(const StartReportRequest& request, bool one_off,
-                              const std::string& export_name,
+                              const std::string& export_name, bool in_store,
                               ReportType report_type,
                               const std::vector<uint32_t>& variable_indices,
                               ReportId* report_id);
@@ -170,7 +174,7 @@ class ReportMasterService final : public ReportMaster::Service {
   // Invokes ReportStore::CreateDependentReport().
   // Does Log(ERROR) and returns an error status on error.
   grpc::Status CreateDependentReport(
-      uint32_t sequence_number, const std::string& export_name,
+      uint32_t sequence_number, const std::string& export_name, bool in_store,
       ReportType report_type, const std::vector<uint32_t>& variable_indices,
       ReportId* report_id);
 

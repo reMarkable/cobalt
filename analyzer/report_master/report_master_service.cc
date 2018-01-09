@@ -280,8 +280,8 @@ ReportMasterService::CreateFromFlagsOrDie() {
     // ownership of the ReportMasterService.
     std::shared_ptr<ReportStarter> report_starter(
         new ReportStarter(report_master_service.get()));
-    std::unique_ptr<ReportScheduler> report_scheduler(new ReportScheduler(
-        config_manager, report_store, report_starter));
+    std::unique_ptr<ReportScheduler> report_scheduler(
+        new ReportScheduler(config_manager, report_store, report_starter));
     // We start the scheduler thread.
     report_scheduler->Start();
     // We give ownership of the ReportScheduler to the ReportMaster.
@@ -307,8 +307,8 @@ ReportMasterService::ReportMasterService(
       config_manager_(config_manager),
       report_executor_(new ReportExecutor(
           report_store_, std::unique_ptr<ReportGenerator>(new ReportGenerator(
-                             config_manager_, observation_store_,
-                             report_store_, std::move(report_exporter))))),
+                             config_manager_, observation_store_, report_store_,
+                             std::move(report_exporter))))),
       server_credentials_(server_credentials),
       auth_enforcer_(auth_enforcer) {}
 
@@ -356,14 +356,16 @@ grpc::Status ReportMasterService::StartReport(ServerContext* context,
   bool one_off = true;
   // We do not export one-off reports to Google Cloud Storage.
   std::string export_name = "";
+  // We do store one-off reports in the ReportStore.
+  bool in_store = true;
   ReportId report_id_not_used;
-  return StartReportNoAuth(request, one_off, export_name, &report_id_not_used,
-                           response);
+  return StartReportNoAuth(request, one_off, export_name, in_store,
+                           &report_id_not_used, response);
 }
 
 grpc::Status ReportMasterService::StartReportNoAuth(
     const StartReportRequest* request, bool one_off,
-    const std::string& export_name, ReportId* report_id_out,
+    const std::string& export_name, bool in_store, ReportId* report_id_out,
     StartReportResponse* response) {
   CHECK(request);
   CHECK(response);
@@ -389,13 +391,13 @@ grpc::Status ReportMasterService::StartReportNoAuth(
 
   switch (report_config->report_type()) {
     case HISTOGRAM:
-      return StartHistogramReport(*request, one_off, export_name, report_id_out,
-                                  response);
+      return StartHistogramReport(*request, one_off, export_name, in_store,
+                                  report_id_out, response);
       break;
 
     case JOINT:
-      return StartJointReport(*request, one_off, export_name, report_id_out,
-                              response);
+      return StartJointReport(*request, one_off, export_name, in_store,
+                              report_id_out, response);
       break;
 
     default:
@@ -410,13 +412,13 @@ grpc::Status ReportMasterService::StartReportNoAuth(
 
 grpc::Status ReportMasterService::StartHistogramReport(
     const StartReportRequest& request, bool one_off,
-    const std::string& export_name, ReportId* report_id,
+    const std::string& export_name, bool in_store, ReportId* report_id,
     StartReportResponse* response) {
   // We will be creating and starting one report only.
   report_id->set_sequence_num(0);
   std::vector<uint32_t> variable_indices = {0};
-  auto status = StartNewReport(request, one_off, export_name, HISTOGRAM,
-                               variable_indices, report_id);
+  auto status = StartNewReport(request, one_off, export_name, in_store,
+                               HISTOGRAM, variable_indices, report_id);
   if (!status.ok()) {
     return status;
   }
@@ -435,7 +437,7 @@ grpc::Status ReportMasterService::StartHistogramReport(
 
 grpc::Status ReportMasterService::StartJointReport(
     const StartReportRequest& request, bool one_off,
-    const std::string& export_name, ReportId* report_id,
+    const std::string& export_name, bool in_store, ReportId* report_id,
     StartReportResponse* response) {
   // We will be creating three reports all together and starting the first one.
   std::vector<ReportId> report_chain(3);
@@ -444,7 +446,7 @@ grpc::Status ReportMasterService::StartJointReport(
   report_id->set_sequence_num(0);
   std::vector<uint32_t> variable_indices = {0};  // Specify the first variable.
   // We do not export the marginal reports, so export_name is set to "".
-  auto status = StartNewReport(request, one_off, "", HISTOGRAM,
+  auto status = StartNewReport(request, one_off, "", in_store, HISTOGRAM,
                                variable_indices, report_id);
   if (!status.ok()) {
     return status;
@@ -457,7 +459,7 @@ grpc::Status ReportMasterService::StartJointReport(
   size_t sequence_number = 1;
   // This call will modify report_id to specify the new sequence_number.
   // We do not export the marginal reports, so export_name is set to "".
-  status = CreateDependentReport(sequence_number, "", HISTOGRAM,
+  status = CreateDependentReport(sequence_number, "", in_store, HISTOGRAM,
                                  variable_indices, report_id);
   if (!status.ok()) {
     return status;
@@ -468,7 +470,7 @@ grpc::Status ReportMasterService::StartJointReport(
   variable_indices = {0, 1};  // Specify both variables.
   sequence_number = 2;
   // This call will modify report_id to specify the new sequence_number.
-  status = CreateDependentReport(sequence_number, export_name, JOINT,
+  status = CreateDependentReport(sequence_number, export_name, in_store, JOINT,
                                  variable_indices, report_id);
   if (!status.ok()) {
     return status;
@@ -681,12 +683,12 @@ grpc::Status ReportMasterService::GetAndValidateReportConfig(
 
 grpc::Status ReportMasterService::StartNewReport(
     const StartReportRequest& request, bool one_off,
-    const std::string& export_name, ReportType report_type,
+    const std::string& export_name, bool in_store, ReportType report_type,
     const std::vector<uint32_t>& variable_indices, ReportId* report_id) {
   // Invoke ReportStore::StartNewReport().
   auto store_status = report_store_->StartNewReport(
       request.first_day_index(), request.last_day_index(), one_off, export_name,
-      report_type, variable_indices, report_id);
+      in_store, report_type, variable_indices, report_id);
 
   // Log(ERROR) if not OK.
   if (store_status != store::kOK) {
@@ -701,11 +703,12 @@ grpc::Status ReportMasterService::StartNewReport(
 }
 
 grpc::Status ReportMasterService::CreateDependentReport(
-    uint32_t sequence_number, const std::string& export_name,
+    uint32_t sequence_number, const std::string& export_name, bool in_store,
     ReportType report_type, const std::vector<uint32_t>& variable_indices,
     ReportId* report_id) {
   auto store_status = report_store_->CreateDependentReport(
-      sequence_number, export_name, report_type, variable_indices, report_id);
+      sequence_number, export_name, in_store, report_type, variable_indices,
+      report_id);
 
   // LOG(ERROR) if not OK.
   if (store_status != store::kOK) {

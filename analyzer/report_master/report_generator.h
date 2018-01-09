@@ -127,14 +127,20 @@ class ReportGenerator {
   // |report_config| must be the associated ReportConfig,
   // |metric| must be the associated Metric and |variables|
   // must be a vector of size 1 containing the single variable being analyzed.
-  // On success, the generated report will be saved to the ReportStore and also
-  // returned in the variable |report_rows|.
+  //
+  // |in_store| specifies whether or not to save the generated report to the
+  // ReportStore.
+  //
+  // On success, the generated report will be returned in the variable
+  // |report_rows|. If |in_store| is true it will also be saved to the
+  // ReportStore.
   grpc::Status GenerateHistogramReport(const ReportId& report_id,
                                        const ReportConfig& report_config,
                                        const Metric& metric,
                                        std::vector<Variable> variables,
                                        uint32_t start_day_index,
                                        uint32_t end_day_index,
+                                       bool in_store,
                                        std::vector<ReportRow>* report_rows);
 
   std::shared_ptr<config::AnalyzerConfigManager> config_manager_;

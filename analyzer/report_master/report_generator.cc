@@ -178,7 +178,8 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     case HISTOGRAM: {
       status = GenerateHistogramReport(
           report_id, *report_config, *metric, std::move(variables),
-          metadata.first_day_index(), metadata.last_day_index(), &report_rows);
+          metadata.first_day_index(), metadata.last_day_index(),
+          metadata.in_store(), &report_rows);
       break;
     }
     case JOINT: {
@@ -218,7 +219,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
 grpc::Status ReportGenerator::GenerateHistogramReport(
     const ReportId& report_id, const ReportConfig& report_config,
     const Metric& metric, std::vector<Variable> variables,
-    uint32_t start_day_index, uint32_t end_day_index,
+    uint32_t start_day_index, uint32_t end_day_index, bool in_store,
     std::vector<ReportRow>* report_rows) {
   if (start_day_index > end_day_index) {
     std::ostringstream stream;
@@ -302,30 +303,36 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
 
   VLOG(4) << "Generated report with " << report_rows->size() << " rows.";
 
-  // Write the report rows to the ReportStore.
-  auto store_status = report_store_->AddReportRows(report_id, *report_rows);
-  switch (store_status) {
-    case store::kOK:
-      break;
+  // If in_store is true then write the report rows to the ReportStore.
+  if (in_store) {
+    VLOG(4) << "Storing report in the ReportStore because in_store = true.";
+    auto store_status = report_store_->AddReportRows(report_id, *report_rows);
+    switch (store_status) {
+      case store::kOK:
+        break;
 
-    case store::kInvalidArguments: {
-      std::ostringstream stream;
-      stream << "Internal error. ReportStore returned kInvalidArguments for "
-                "report_id="
-             << ReportStore::ToString(report_id);
-      std::string message = stream.str();
-      LOG(ERROR) << message;
-      return grpc::Status(grpc::INTERNAL, message);
-    }
+      case store::kInvalidArguments: {
+        std::ostringstream stream;
+        stream << "Internal error. ReportStore returned kInvalidArguments for "
+                  "report_id="
+               << ReportStore::ToString(report_id);
+        std::string message = stream.str();
+        LOG(ERROR) << message;
+        return grpc::Status(grpc::INTERNAL, message);
+      }
 
-    default: {
-      std::ostringstream stream;
-      stream << "AddReportRows failed with status=" << store_status
-             << " for report_id=" << ReportStore::ToString(report_id);
-      std::string message = stream.str();
-      LOG(ERROR) << message;
-      return grpc::Status(grpc::ABORTED, message);
+      default: {
+        std::ostringstream stream;
+        stream << "AddReportRows failed with status=" << store_status
+               << " for report_id=" << ReportStore::ToString(report_id);
+        std::string message = stream.str();
+        LOG(ERROR) << message;
+        return grpc::Status(grpc::ABORTED, message);
+      }
     }
+  } else {
+    VLOG(4)
+        << "Not storing report in the ReportStore because in_store = false.";
   }
 
   return grpc::Status::OK;

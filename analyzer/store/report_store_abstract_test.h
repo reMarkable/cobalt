@@ -127,17 +127,17 @@ class ReportStoreAbstractTest : public ::testing::Test {
   }
 
   Status StartNewReport(bool one_off, const std::string export_name,
-                        ReportType report_type,
+                        bool in_store, ReportType report_type,
                         const std::vector<uint32_t>& variable_indices,
                         ReportId* report_id) {
     return this->report_store_->StartNewReport(
-        kFirstDayIndex, kLastDayIndex, one_off, export_name, report_type,
-        variable_indices, report_id);
+        kFirstDayIndex, kLastDayIndex, one_off, export_name, in_store,
+        report_type, variable_indices, report_id);
   }
 
   // Starts a new report of type HISTOGRAM with variable_indices = {0}
   Status StartNewHistogramReport(bool one_off, ReportId* report_id) {
-    return StartNewReport(one_off, "", HISTOGRAM, {0}, report_id);
+    return StartNewReport(one_off, "", true, HISTOGRAM, {0}, report_id);
   }
 
   // Starts a new report with one_off=true, type=HISTOGRAM,
@@ -298,8 +298,8 @@ TYPED_TEST_P(ReportStoreAbstractTest, SetAndGetMetadata) {
   std::string export_name("an-export-name");
   report_id = this->MakeReportId(1, 1);
   // Invoke StartNewReport().
-  EXPECT_EQ(kOK, this->StartNewReport(one_off, export_name, HISTOGRAM, {0},
-                                      &report_id));
+  EXPECT_EQ(kOK, this->StartNewReport(one_off, export_name, true, HISTOGRAM,
+                                      {0}, &report_id));
 
   // Get the ReportMetatdata.
   report_metadata.Clear();
@@ -330,8 +330,8 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
 
   // Invoke CreateDependentReport() to create a report with sequence_num=1
   // that analyzes variable 1.
-  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(1, "", HISTOGRAM,
-                                                            {1}, &report_id2));
+  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(
+                     1, "", true, HISTOGRAM, {1}, &report_id2));
 
   // Check that report_id2 had its sequence_num set correctly.
   EXPECT_EQ(1u, report_id2.sequence_num());
@@ -379,7 +379,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, CreateAndStartDependentReport) {
   // Invoke CreateDependentReport() to create a report with sequence_num=2
   // that analyzes variable 2.
   EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(
-                     2, export_name, HISTOGRAM, {2}, &report_id2));
+                     2, export_name, true, HISTOGRAM, {2}, &report_id2));
 
   // Get the ReportMetatdata.
   report_metadata.Clear();
@@ -398,8 +398,8 @@ TYPED_TEST_P(ReportStoreAbstractTest, ReportRows) {
   // And report 2a which is an associated sub-report with report 2.
   ReportId report_id2a(report_id2);
   std::vector<uint32_t> variable_indices = {1};
-  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(1, "", HISTOGRAM,
-                                                            {1}, &report_id2a));
+  EXPECT_EQ(kOK, this->report_store_->CreateDependentReport(
+                     1, "", true, HISTOGRAM, {1}, &report_id2a));
   EXPECT_EQ(kOK, this->report_store_->StartDependentReport(report_id2a));
 
   // Add rows to all three reports.
@@ -420,6 +420,54 @@ TYPED_TEST_P(ReportStoreAbstractTest, ReportRows) {
 
   // Fetch report 2a and check it.
   this->GetReportAndCheck(report_id2a, 300);
+}
+
+// Tests the use of the parameter |in_store|.
+TYPED_TEST_P(ReportStoreAbstractTest, InStore) {
+  // Start two new reports, one with in_store = true and one with it false.
+  ReportId report_id1 = this->MakeReportId(0, 0);
+  bool in_store = true;
+  this->StartNewReport(true, "", in_store, HISTOGRAM, {0}, &report_id1);
+
+  ReportId report_id2 = this->MakeReportId(0, 0);
+  in_store = false;
+  this->StartNewReport(true, "", in_store, HISTOGRAM, {0}, &report_id2);
+
+  // Fetch the two metadata and make sure the first one has in_store true
+  // and the second one has it false.
+  ReportMetadataLite md1;
+  EXPECT_EQ(kOK, this->report_store_->GetMetadata(report_id1, &md1));
+  EXPECT_TRUE(md1.in_store());
+
+  ReportMetadataLite md2;
+  EXPECT_EQ(kOK, this->report_store_->GetMetadata(report_id2, &md2));
+  EXPECT_FALSE(md2.in_store());
+
+  // Check that we can add rows to the first report but not the second;
+  EXPECT_EQ(kOK, this->AddHistogramReportRows(report_id1, 1));
+  EXPECT_EQ(kInvalidArguments, this->AddHistogramReportRows(report_id2, 1));
+
+  // Start two dependent reports, one with in_store = true and one with it
+  // false.
+  ReportId report_id1d(report_id1);
+  in_store = true;
+  this->report_store_->CreateDependentReport(1, "", in_store, HISTOGRAM, {1},
+                                             &report_id1d);
+
+  ReportId report_id2d(report_id2);
+  in_store = false;
+  this->report_store_->CreateDependentReport(1, "", in_store, HISTOGRAM, {1},
+                                             &report_id2d);
+
+  // Fetch the two metadata and make sure the first one has in_store true
+  // and the second one has it false.
+  ReportMetadataLite md1d;
+  EXPECT_EQ(kOK, this->report_store_->GetMetadata(report_id1d, &md1d));
+  EXPECT_TRUE(md1d.in_store());
+
+  ReportMetadataLite md2d;
+  EXPECT_EQ(kOK, this->report_store_->GetMetadata(report_id2d, &md2d));
+  EXPECT_FALSE(md2d.in_store());
 }
 
 // Tests the function QueryReports
@@ -493,7 +541,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, QueryReports) {
   }
 }
 
-// Tests the function DeleteAllForReportConfi
+// Tests the function DeleteAllForReportConfig
 TYPED_TEST_P(ReportStoreAbstractTest, TestDeleteAllForReportConfig) {
   // We start four reports: two using our standard report config ID..
   auto report_id_1_a = this->StartNewHistogramReport();
@@ -567,7 +615,7 @@ TYPED_TEST_P(ReportStoreAbstractTest, TestDeleteAllForReportConfig) {
 }
 
 REGISTER_TYPED_TEST_CASE_P(ReportStoreAbstractTest, SetAndGetMetadata,
-                           CreateAndStartDependentReport, ReportRows,
+                           CreateAndStartDependentReport, ReportRows, InStore,
                            QueryReports, TestDeleteAllForReportConfig);
 
 }  // namespace store

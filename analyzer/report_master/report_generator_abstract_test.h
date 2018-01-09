@@ -277,19 +277,20 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // specified variable of our two-variable test metric. |variable_index| must
   // be either 0 or 1. It will also be used for the sequence_num.
   // If |export_report| is true then the report will be exported using
-  // our FakeGcsUploader.
+  // our FakeGcsUploader. If |in_store| is true the report will be saved
+  // to the ReportStore.
   GeneratedReport GenerateHistogramReport(int variable_index,
-                                          bool export_report) {
+                                          bool export_report, bool in_store) {
     // Complete the report_id by specifying the sequence_num.
     report_id_.set_sequence_num(variable_index);
 
     // Start a report for the specified variable, for the interval of days
     // [kDayIndex, kDayIndex].
     std::string export_name = export_report ? "export_name" : "";
-    EXPECT_EQ(store::kOK,
-              report_store_->StartNewReport(
-                  testing::kDayIndex, testing::kDayIndex, true, export_name,
-                  HISTOGRAM, {(uint32_t)variable_index}, &report_id_));
+    EXPECT_EQ(store::kOK, report_store_->StartNewReport(
+                              testing::kDayIndex, testing::kDayIndex, true,
+                              export_name, in_store, HISTOGRAM,
+                              {(uint32_t)variable_index}, &report_id_));
 
     // Generate the report
     EXPECT_TRUE(report_generator_->GenerateReport(report_id_).ok());
@@ -339,26 +340,30 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     EXPECT_EQ(HISTOGRAM, report.metadata.report_type());
     EXPECT_EQ(1, report.metadata.variable_indices_size());
     EXPECT_EQ(variable_index, report.metadata.variable_indices(0));
-    EXPECT_EQ(2, report.rows.rows_size());
-    for (const auto& report_row : report.rows.rows()) {
-      EXPECT_EQ(0, report_row.histogram().std_error());
-      ValuePart recovered_value;
-      EXPECT_TRUE(report_row.histogram().has_value());
-      recovered_value = report_row.histogram().value();
+    if (report.metadata.in_store()) {
+      EXPECT_EQ(2, report.rows.rows_size());
+      for (const auto& report_row : report.rows.rows()) {
+        EXPECT_EQ(0, report_row.histogram().std_error());
+        ValuePart recovered_value;
+        EXPECT_TRUE(report_row.histogram().has_value());
+        recovered_value = report_row.histogram().value();
 
-      EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
-      std::string string_value = recovered_value.string_value();
-      int count_estimate = report_row.histogram().count_estimate();
-      switch (count_estimate) {
-        case 20:
-          EXPECT_EQ("hello", string_value);
-          break;
-        case 21:
-          EXPECT_EQ("peace", string_value);
-          break;
-        default:
-          FAIL();
+        EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
+        std::string string_value = recovered_value.string_value();
+        int count_estimate = report_row.histogram().count_estimate();
+        switch (count_estimate) {
+          case 20:
+            EXPECT_EQ("hello", string_value);
+            break;
+          case 21:
+            EXPECT_EQ("peace", string_value);
+            break;
+          default:
+            FAIL();
+        }
       }
+    } else {
+      EXPECT_EQ(0, report.rows.rows_size());
     }
     if (report.metadata.export_name() == "") {
       EXPECT_FALSE(this->fake_uploader_->upload_was_invoked);
@@ -394,20 +399,24 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     EXPECT_EQ(HISTOGRAM, report.metadata.report_type());
     EXPECT_EQ(1, report.metadata.variable_indices_size());
     EXPECT_EQ(variable_index, report.metadata.variable_indices(0));
-    EXPECT_EQ(3, report.rows.rows_size());
-    for (const auto& report_row : report.rows.rows()) {
-      EXPECT_NE(0, report_row.histogram().std_error());
-      ValuePart recovered_value;
-      EXPECT_TRUE(report_row.histogram().has_value());
-      recovered_value = report_row.histogram().value();
-      break;
+    if (report.metadata.in_store()) {
+      EXPECT_EQ(3, report.rows.rows_size());
+      for (const auto& report_row : report.rows.rows()) {
+        EXPECT_NE(0, report_row.histogram().std_error());
+        ValuePart recovered_value;
+        EXPECT_TRUE(report_row.histogram().has_value());
+        recovered_value = report_row.histogram().value();
+        break;
 
-      EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
-      std::string string_value = recovered_value.string_value();
-      EXPECT_TRUE(string_value == "Apple" || string_value == "Banana" ||
-                  string_value == "Cantaloupe");
+        EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
+        std::string string_value = recovered_value.string_value();
+        EXPECT_TRUE(string_value == "Apple" || string_value == "Banana" ||
+                    string_value == "Cantaloupe");
 
-      EXPECT_GT(report_row.histogram().count_estimate(), 0);
+        EXPECT_GT(report_row.histogram().count_estimate(), 0);
+      }
+    } else {
+      EXPECT_EQ(0, report.rows.rows_size());
     }
     if (report.metadata.export_name() == "") {
       EXPECT_FALSE(this->fake_uploader_->upload_was_invoked);
@@ -442,22 +451,43 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, Forculus) {
   {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
-    // Don't export the report.
-    auto report = this->GenerateHistogramReport(variable_index, false);
+    // Don't export the report. Do store it to the store.
+    bool in_store = true;
+    auto report =
+        this->GenerateHistogramReport(variable_index, false, in_store);
     this->CheckForculusReport(report, variable_index, "");
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
-    // Do export the report.
-    auto report = this->GenerateHistogramReport(variable_index, true);
+    // Do export the report. Do store it to the store.
+    bool in_store = true;
+    auto report = this->GenerateHistogramReport(variable_index, true, in_store);
+    this->CheckForculusReport(report, variable_index,
+                              this->kExpectedPart2ForculusCSV);
+  }
+  {
+    SCOPED_TRACE("variable_index = 0");
+    int variable_index = 0;
+    // Don't export the report. Don't store it to the store.
+    bool in_store = false;
+    auto report =
+        this->GenerateHistogramReport(variable_index, false, in_store);
+    this->CheckForculusReport(report, variable_index, "");
+  }
+  {
+    SCOPED_TRACE("variable_index = 1");
+    int variable_index = 1;
+    // Do export the report. Don't store it to the store.
+    bool in_store = false;
+    auto report = this->GenerateHistogramReport(variable_index, true, in_store);
     this->CheckForculusReport(report, variable_index,
                               this->kExpectedPart2ForculusCSV);
   }
 }
 
 // Tests that the ReportGenerator correctly generates a report for both
-// variables of our two-variable metric when the ObservationStroe has been
+// variables of our two-variable metric when the ObservationStore has been
 // filled with Observations of that metric that use our Basic RAPPOR encoding.
 // Note that *joint* reports have not yet been implemented.
 TYPED_TEST_P(ReportGeneratorAbstractTest, BasicRappor) {
@@ -465,15 +495,18 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, BasicRappor) {
   {
     SCOPED_TRACE("variable_index = 0");
     int variable_index = 0;
-    // Do exort the report.
-    auto report = this->GenerateHistogramReport(variable_index, true);
+    // Do exort the report. Do store it to the store.
+    bool in_store = true;
+    auto report = this->GenerateHistogramReport(variable_index, true, in_store);
     this->CheckBasicRapporReport(report, variable_index);
   }
   {
     SCOPED_TRACE("variable_index = 1");
     int variable_index = 1;
-    // Don't export the report.
-    auto report = this->GenerateHistogramReport(variable_index, false);
+    // Don't export the report. Do store it to the store.
+    bool in_store = true;
+    auto report =
+        this->GenerateHistogramReport(variable_index, false, in_store);
     this->CheckBasicRapporReport(report, variable_index);
   }
 }

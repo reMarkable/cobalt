@@ -162,6 +162,12 @@ message ReportMetadata {
   // Any human-readable messages directed toward the report consumer that
   // were produced by the server during the generation of the report.
   repeated InfoMessage info_messages = 15;
+
+  // Are the rows of this report stored in the ReportStore? In some cases
+  // the ReportMaster will generate a report soley for the purpose of
+  // serializing and exporting the report rows and will not store the
+  // report rows in the Report Store.
+  bool in_store = 16;
 }
 
 // The request message for QueryReports.
@@ -197,7 +203,7 @@ message ReportRow {
   }
 }
 
-// A single row of a Histogram report.
+// A single row of a HISTOGRAM report.
 message HistogramReportRow {
   // The value for this row.
   ValuePart value = 1;
@@ -222,11 +228,10 @@ message HistogramReportRow {
   float std_error = 3;
 }
 
-// A single row of a Joint report.
+// A single row of a JOINT report.
 message JointReportRow {
   // TODO(rudominer) Implement Joint reports.
 }
-
 
 // What state is the report generation in?
 enum ReportState {

@@ -63,8 +63,9 @@ class ReportHistoryCacheTest : public ::testing::Test {
 
     // Start a report for report_config 1.
     ReportId report_id = MakeReportId(1);
-    report_store_->StartNewReport(day_index, day_index, false, "", HISTOGRAM,
-                                  std::vector<uint32_t>{}, &report_id);
+    report_store_->StartNewReport(day_index, day_index, false, "", true,
+                                  HISTOGRAM, std::vector<uint32_t>{},
+                                  &report_id);
 
     // The cache does not know that any reports are in progress.
     EXPECT_FALSE(cache_->InProgress(report_config_1_, day_index, day_index));
@@ -100,8 +101,9 @@ class ReportHistoryCacheTest : public ::testing::Test {
 
     // Start a non-one-off report for report_config 1.
     ReportId report_id = MakeReportId(1);
-    report_store_->StartNewReport(day_index, day_index, false, "", HISTOGRAM,
-                                  std::vector<uint32_t>{}, &report_id);
+    report_store_->StartNewReport(day_index, day_index, false, "", true,
+                                  HISTOGRAM, std::vector<uint32_t>{},
+                                  &report_id);
 
     // The cache does not know that a report is in progress. But if it is
     // known that a report completed successfully that doesn't matter.
@@ -146,20 +148,23 @@ class ReportHistoryCacheTest : public ::testing::Test {
     // Insert a record into the ReportStore for a completed report for
     // report_config_1.
     ReportId report_id = MakeReportId(1);
-    report_store_->StartNewReport(day_index, day_index, one_off, "", HISTOGRAM,
-                                  std::vector<uint32_t>{}, &report_id);
+    report_store_->StartNewReport(day_index, day_index, one_off, "", true,
+                                  HISTOGRAM, std::vector<uint32_t>{},
+                                  &report_id);
     report_store_->EndReport(report_id, initial_success, "");
 
     // Also insert records for report_configs 2 and 3. These should have
     // no affect. Report 2 will still be in progress and report 3 will be
     // completed.
     ReportId report_id2 = MakeReportId(2);
-    report_store_->StartNewReport(day_index, day_index, one_off, "", HISTOGRAM,
-                                  std::vector<uint32_t>{}, &report_id2);
+    report_store_->StartNewReport(day_index, day_index, one_off, "", true,
+                                  HISTOGRAM, std::vector<uint32_t>{},
+                                  &report_id2);
     cache_->RecordStart(report_config_2_, day_index, day_index, report_id2);
     ReportId report_id3 = MakeReportId(3);
-    report_store_->StartNewReport(day_index, day_index, false, "", HISTOGRAM,
-                                  std::vector<uint32_t>{}, &report_id3);
+    report_store_->StartNewReport(day_index, day_index, false, "", true,
+                                  HISTOGRAM, std::vector<uint32_t>{},
+                                  &report_id3);
     cache_->RecordStart(report_config_3_, day_index, day_index, report_id3);
     report_store_->EndReport(report_id3, initial_success, "");
 

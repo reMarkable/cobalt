@@ -122,4 +122,15 @@ message ReportMetadataLite {
   // successfully exported examine the ReportState. Only if
   // state = COMPLETED_SUCCESSFULLY is it known that the export was successful.
   string export_name = 10;
+
+  // Are the rows of this report stored in the ReportStore? In some cases
+  // the ReportMaster will generate a report soley for the purpose of
+  // serializing and exporting the report rows and will not store the
+  // report rows in the Report Store. If this field is false then |export_name|
+  // should be non-empty or else the generated report will not be stored
+  // anywhere. Note that a value of true indicates only that the ReportMaster
+  // is intending to store the rows of this report in the ReportStore. Only if
+  // state = COMPLETED_SUCCESSFULLY is it known that rows were successfully
+  // stored.
+  bool in_store = 11;
 }

@@ -233,11 +233,15 @@ void ReportScheduler::StartReportNow(const ReportConfig& report_config,
                                      uint32_t last_day_index) {
   const std::string export_name =
       ReportExportName(report_config, first_day_index, last_day_index);
+  // TODO(rudominer) When we introduce RAW_DUMP reports, in_store should be
+  // set false for them.
+  bool in_store = true;
   ReportId report_id;
   LOG(INFO) << "ReportScheduler starting report " << IdString(report_config)
             << " [" << first_day_index << ", " << last_day_index << "]";
-  auto status = report_starter_->StartReport(
-      report_config, first_day_index, last_day_index, export_name, &report_id);
+  auto status = report_starter_->StartReport(report_config, first_day_index,
+                                             last_day_index, export_name,
+                                             in_store, &report_id);
   if (!status.ok()) {
     LOG(ERROR)
         << "ReportScheduler was unable to start a report for ReportConfig "
@@ -278,6 +282,7 @@ grpc::Status ReportStarter::StartReport(const ReportConfig& report_config,
                                         uint32_t first_day_index,
                                         uint32_t last_day_index,
                                         const std::string& export_name,
+                                        bool in_store,
                                         ReportId* report_id_out) {
   StartReportRequest start_request;
   start_request.set_customer_id(report_config.customer_id());
@@ -289,7 +294,8 @@ grpc::Status ReportStarter::StartReport(const ReportConfig& report_config,
   // This is not a one-off report generation. Rather it is scheduled.
   bool one_off = false;
   return report_master_service_->StartReportNoAuth(
-      &start_request, one_off, export_name, report_id_out, &response_not_used);
+      &start_request, one_off, export_name, in_store, report_id_out,
+      &response_not_used);
 }
 
 }  // namespace analyzer

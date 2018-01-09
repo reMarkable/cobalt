@@ -26,7 +26,7 @@ class ReportStarterInterface {
                                    uint32_t first_day_index,
                                    uint32_t last_day_index,
                                    const std::string& export_name,
-                                   ReportId* report_id_out) = 0;
+                                   bool in_store, ReportId* report_id_out) = 0;
 
   virtual ~ReportStarterInterface() = default;
 };
@@ -43,7 +43,7 @@ class ReportStarter : public ReportStarterInterface {
   virtual ~ReportStarter() = default;
   grpc::Status StartReport(const ReportConfig& report_config,
                            uint32_t first_day_index, uint32_t last_day_index,
-                           const std::string& export_name,
+                           const std::string& export_name, bool in_store,
                            ReportId* report_id_out) override;
 
  private:
@@ -126,12 +126,11 @@ class ReportScheduler {
   // re-reads the registered reports in |analyzer_config| and checks
   // to see if it is time to generate a report. Optional, defaults to 17
   // minutes.
-  ReportScheduler(
-      std::shared_ptr<config::AnalyzerConfigManager> config_manager,
-      std::shared_ptr<store::ReportStore> report_store,
-      std::shared_ptr<ReportStarterInterface> report_starter,
-      std::chrono::milliseconds sleep_interval =
-          std::chrono::milliseconds(1000 * 60 * 17));
+  ReportScheduler(std::shared_ptr<config::AnalyzerConfigManager> config_manager,
+                  std::shared_ptr<store::ReportStore> report_store,
+                  std::shared_ptr<ReportStarterInterface> report_starter,
+                  std::chrono::milliseconds sleep_interval =
+                      std::chrono::milliseconds(1000 * 60 * 17));
 
   // The destructor will stop the scheduler thread and wait for it to stop
   // before exiting.
