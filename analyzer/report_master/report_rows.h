@@ -42,6 +42,9 @@ class ReportRowVectorIterator : public ReportRowIterator {
   // Does not take ownership of |rows|.
   explicit ReportRowVectorIterator(const std::vector<ReportRow>* rows);
 
+  // Constructs a ReportRowVectorIterator that wraps the given vector.
+  explicit ReportRowVectorIterator(std::vector<ReportRow> rows);
+
   virtual ~ReportRowVectorIterator() = default;
 
   grpc::Status Reset() override;
@@ -51,6 +54,12 @@ class ReportRowVectorIterator : public ReportRowIterator {
   bool HasMoreRows() override;
 
  private:
+  // Depending on which constructor was used this object may or may not
+  // own the underlying vector. This member may or may not have been initialized
+  // and the pointer |rows_| may or may not point to this vector. This member
+  // should not be accssed directory, instead always use |rows_|.
+  const std::vector<ReportRow> owned_rows_;
+
   const std::vector<ReportRow>* rows_;  // not owned
   std::vector<ReportRow>::const_iterator pos_;
 };

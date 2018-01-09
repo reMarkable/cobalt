@@ -15,6 +15,10 @@ ReportRowVectorIterator::ReportRowVectorIterator(
   pos_ = rows_->begin();
 }
 
+ReportRowVectorIterator::ReportRowVectorIterator(
+    const std::vector<ReportRow> rows)
+    : owned_rows_(std::move(rows)), rows_(&owned_rows_), pos_(rows_->begin()) {}
+
 grpc::Status ReportRowVectorIterator::Reset() {
   pos_ = rows_->begin();
   return grpc::Status::OK;

@@ -356,7 +356,10 @@ grpc::Status ReportMasterService::StartReport(ServerContext* context,
   bool one_off = true;
   // We do not export one-off reports to Google Cloud Storage.
   std::string export_name = "";
-  // We do store one-off reports in the ReportStore.
+  // We do store one-off reports in the ReportStore. Note that if the
+  // ReportType is RAW_DUMP then this will later fail because we do not
+  // currently support storing RAW_DUMP reports in the ReportStore. Thus
+  // we do not currently support one-off RAW_DUMP reports.
   bool in_store = true;
   ReportId report_id_not_used;
   return StartReportNoAuth(request, one_off, export_name, in_store,

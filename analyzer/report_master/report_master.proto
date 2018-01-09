@@ -37,7 +37,8 @@ service ReportMaster {
 
   // Requests that the ReportMaster start to generate a new one-off report. The
   // |report_id| returned in the response may be used to query the progress
-  // and results.
+  // and results. Note: This method may not be used to start a RAW_DUMP
+  // report. Those may only be started via Cobalt's Report Scheduler.
   rpc StartReport (StartReportRequest) returns
       (StartReportResponse) {}
 
@@ -200,6 +201,7 @@ message ReportRow {
   oneof row_type {
     HistogramReportRow histogram = 1;
     JointReportRow joint = 2;
+    RawDumpReportRow raw_dump = 999999;
   }
 }
 
@@ -232,6 +234,17 @@ message HistogramReportRow {
 message JointReportRow {
   // TODO(rudominer) Implement Joint reports.
 }
+
+// A single row of a RAW_DUMP report. It contains a copy of some of the
+// unencoded values from an input Observation.
+message RawDumpReportRow {
+  // Each of these values is a copy of the ValuePart from one of the
+  // ObservationParts of one of the input Observations. The ObservationPart must
+  // have used the NoOp encoding. The order of the values here corresponds to
+  // the order of the |variable|s in the ReportConfig.
+  repeated ValuePart values = 1;
+}
+
 
 // What state is the report generation in?
 enum ReportState {

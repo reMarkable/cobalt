@@ -238,6 +238,10 @@ Status ReportStore::StartNewReport(
   metadata.set_one_off(one_off);
   metadata.set_export_name(export_name);
   metadata.set_in_store(in_store);
+  if (in_store && report_type == RAW_DUMP) {
+    LOG(ERROR) << "A RAW_DUMP report may not be stored in the ReportStore.";
+    return kInvalidArguments;
+  }
 
   // We are not just creating but also starting this report now.
   metadata.set_start_time_seconds(report_id->creation_time_seconds());
@@ -268,6 +272,11 @@ Status ReportStore::CreateDependentReport(
   metadata.set_export_name(export_name);
   metadata.set_report_type(report_type);
   metadata.set_in_store(in_store);
+  if (in_store && report_type == RAW_DUMP) {
+    LOG(ERROR) << "A RAW_DUMP report may not be stored in the ReportStore.";
+    return kInvalidArguments;
+  }
+
   metadata.clear_variable_indices();
   for (auto index : variable_indices) {
     metadata.add_variable_indices(index);

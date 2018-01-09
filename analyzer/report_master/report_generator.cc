@@ -173,13 +173,13 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     }
   }
 
-  std::vector<ReportRow> report_rows;
+  std::unique_ptr<ReportRowIterator> row_iterator;
   switch (metadata.report_type()) {
     case HISTOGRAM: {
       status = GenerateHistogramReport(
           report_id, *report_config, *metric, std::move(variables),
           metadata.first_day_index(), metadata.last_day_index(),
-          metadata.in_store(), &report_rows);
+          metadata.in_store(), &row_iterator);
       break;
     }
     case JOINT: {
@@ -189,6 +189,13 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
       std::string message = stream.str();
       LOG(ERROR) << message;
       status = grpc::Status(grpc::UNIMPLEMENTED, message);
+      break;
+    }
+    case RAW_DUMP: {
+      status = GenerateRawDumpReport(
+          report_id, *report_config, *metric, std::move(variables),
+          metadata.first_day_index(), metadata.last_day_index(),
+          metadata.in_store(), &row_iterator);
       break;
     }
     default: {
@@ -211,16 +218,15 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     return grpc::Status::OK;
   }
 
-  ReportRowVectorIterator row_iterator(&report_rows);
   return report_exporter_->ExportReport(*report_config, metadata,
-                                        &row_iterator);
+                                        row_iterator.get());
 }
 
 grpc::Status ReportGenerator::GenerateHistogramReport(
     const ReportId& report_id, const ReportConfig& report_config,
     const Metric& metric, std::vector<Variable> variables,
     uint32_t start_day_index, uint32_t end_day_index, bool in_store,
-    std::vector<ReportRow>* report_rows) {
+    std::unique_ptr<ReportRowIterator>* row_iterator) {
   if (start_day_index > end_day_index) {
     std::ostringstream stream;
     stream << "Invalid arguments: start_day_index=" << start_day_index << ">"
@@ -295,18 +301,20 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
     }
   } while (!query_response.pagination_token.empty());
 
-  // Complete the analysis using the HistogramAnalysisEngine.
-  grpc::Status status = analysis_engine.PerformAnalysis(report_rows);
+  // Complete the analysis using the HistogramAnalysisEngine. We assume
+  // that a Histogram report can fit in memory.
+  std::vector<ReportRow> report_rows;
+  grpc::Status status = analysis_engine.PerformAnalysis(&report_rows);
   if (!status.ok()) {
     return status;
   }
 
-  VLOG(4) << "Generated report with " << report_rows->size() << " rows.";
+  VLOG(4) << "Generated report with " << report_rows.size() << " rows.";
 
   // If in_store is true then write the report rows to the ReportStore.
   if (in_store) {
     VLOG(4) << "Storing report in the ReportStore because in_store = true.";
-    auto store_status = report_store_->AddReportRows(report_id, *report_rows);
+    auto store_status = report_store_->AddReportRows(report_id, report_rows);
     switch (store_status) {
       case store::kOK:
         break;
@@ -335,7 +343,25 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
         << "Not storing report in the ReportStore because in_store = false.";
   }
 
+  CHECK(row_iterator);
+  row_iterator->reset(new ReportRowVectorIterator(std::move(report_rows)));
   return grpc::Status::OK;
+}
+
+grpc::Status ReportGenerator::GenerateRawDumpReport(
+    const ReportId& report_id, const ReportConfig& report_config,
+    const Metric& metric, std::vector<Variable> variables,
+    uint32_t start_day_index, uint32_t end_day_index, bool in_store,
+    std::unique_ptr<ReportRowIterator>* row_iterator) {
+  if (in_store) {
+    return grpc::Status(
+        grpc::FAILED_PRECONDITION,
+        "Cobalt does not support storing RAW_DUMP reports in the ReportStore.");
+  }
+
+  // TODO(rudominer) Implement this.
+  return grpc::Status(grpc::UNIMPLEMENTED,
+                      "Raw Dump reports are not yet implemented.");
 }
 
 grpc::Status ReportGenerator::BuildVariableList(

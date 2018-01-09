@@ -60,7 +60,8 @@ class ReportStore {
   //
   // |in_store| specifies whether or not the rows of this report will be
   // stored in the ReportStore. See the comments on the |in_store| field of
-  // ReportMetadataLite.
+  // ReportMetadataLite. Note that if |report_type| is RAW_DUMP then this
+  // value must be false or kInvalidArguments, will be returned.
   //
   // |report_type| indicates which type of report is being started. The
   // associated ReportConfig already specifies a ReportType. This |report_type|
@@ -110,7 +111,8 @@ class ReportStore {
   //
   // |in_store| specifies whether or not the rows of this report will be
   // stored in the ReportStore. See the comments on the |in_store| field of
-  // ReportMetadataLite.
+  // ReportMetadataLite.  Note that if |report_type| is RAW_DUMP then this
+  // value must be false or kInvalidArguments will be returned.
   //
   // |report_type| indicates which type of report is being created. Note that
   // different reports in a dependency group may have different ReportTypes.

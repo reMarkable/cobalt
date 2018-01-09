@@ -94,6 +94,29 @@ enum ReportType {
   //
   // Only the String RAPPOR and Basic RAPPOR encoding types are supported.
   JOINT = 1;
+
+  // A raw dump of the input observations. No aggregation, analysis or
+  // differentially private release will be performed. The report rows will
+  // not be stored in the ReportStore so they may not be retrieved later
+  // via a GetReport() operation. At report generation time the raw dump will
+  // be serialized and exported to an external system if one or more
+  // ReportExportConfigs are specified in the ReportConfig. The external system
+  // may then be used to perform aggregation and analysis.
+  //
+  // Raw Dump reports should be used in Cobalt only as a last resort if none
+  // of Cobalt's built-in report types will serve your purpose. As Raw Dump
+  // reports provide the ability to perform arbitrary, ad hoc, ex post facto
+  // aggregation and querying, they may also be a good solution for temporary
+  // exploration with an eye towards eventually replacing the Raw Dump report
+  // with one of Cobalt's built-in report types.
+  //
+  // In more detail, a raw dump report is a report on any number of variables
+  // in which each input ObservationPart must use the NoOp encoding so that it
+  // contains an unencoded ValuePart. There will be one output report row for
+  // each input observation and each output report row will contain a copy of
+  // the ValueParts from the input ObservationParts, in the order specified by
+  // the |variable|s in the ReportConfig.
+  RAW_DUMP = -1;
 }
 
 // A specification of how and where to export a Cobalt report to some external

@@ -233,9 +233,9 @@ void ReportScheduler::StartReportNow(const ReportConfig& report_config,
                                      uint32_t last_day_index) {
   const std::string export_name =
       ReportExportName(report_config, first_day_index, last_day_index);
-  // TODO(rudominer) When we introduce RAW_DUMP reports, in_store should be
-  // set false for them.
-  bool in_store = true;
+  // We want to store the rows of the report in the report store in all cases
+  // except when it is a RAW_DUMP report.
+  bool in_store = (report_config.report_type() != RAW_DUMP);
   ReportId report_id;
   LOG(INFO) << "ReportScheduler starting report " << IdString(report_config)
             << " [" << first_day_index << ", " << last_day_index << "]";

@@ -25,6 +25,7 @@
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"
 #include "analyzer/report_master/report_exporter.h"
+#include "analyzer/report_master/report_rows.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
 #include "config/analyzer_config.h"
@@ -52,11 +53,10 @@ class ReportGenerator {
  public:
   // report_exporter is allowed to be NULL, in which case no exporting will
   // occur.
-  ReportGenerator(
-      std::shared_ptr<config::AnalyzerConfigManager> config_manager,
-      std::shared_ptr<store::ObservationStore> observation_store,
-      std::shared_ptr<store::ReportStore> report_store,
-      std::unique_ptr<ReportExporter> report_exporter);
+  ReportGenerator(std::shared_ptr<config::AnalyzerConfigManager> config_manager,
+                  std::shared_ptr<store::ObservationStore> observation_store,
+                  std::shared_ptr<store::ReportStore> report_store,
+                  std::unique_ptr<ReportExporter> report_exporter);
 
   // Requests that the ReportGenerator generate the report with the given
   // |report_id|. This method is invoked by the ReportMaster after
@@ -131,17 +131,36 @@ class ReportGenerator {
   // |in_store| specifies whether or not to save the generated report to the
   // ReportStore.
   //
-  // On success, the generated report will be returned in the variable
-  // |report_rows|. If |in_store| is true it will also be saved to the
-  // ReportStore.
-  grpc::Status GenerateHistogramReport(const ReportId& report_id,
-                                       const ReportConfig& report_config,
-                                       const Metric& metric,
-                                       std::vector<Variable> variables,
-                                       uint32_t start_day_index,
-                                       uint32_t end_day_index,
-                                       bool in_store,
-                                       std::vector<ReportRow>* report_rows);
+  // On success, |*row_iterator| will point to an iterator that will yield
+  // the rows of the histogram report. If |in_store| is true the rows will also
+  // be saved to the ReportStore.
+  grpc::Status GenerateHistogramReport(
+      const ReportId& report_id, const ReportConfig& report_config,
+      const Metric& metric, std::vector<Variable> variables,
+      uint32_t start_day_index, uint32_t end_day_index, bool in_store,
+      std::unique_ptr<ReportRowIterator>* row_iterator);
+
+  // This is a helper function for GenerateReport().
+  //
+  // Generates the raw dump report with the given |report_id|, copying from the
+  // set of Observations from the period [first_day_index, last_day_index].
+  // |report_config| must be the associated ReportConfig,
+  // |metric| must be the associated Metric and |variables|
+  // must be a vector of size >=1 containing the variables to be dumped. Each
+  // of the ObservationParts for these variables must have been encoded using
+  // the NoOp encoding.
+  //
+  // On success, |*row_iterator| will point to an iterator that will yield
+  // the rows of the dump report.
+  //
+  // Note that we do not support storing a raw dump report in the ReportStore
+  // so the parameter |in_store| must be false or FAILED_PRECONDITION will be
+  // returned.
+  grpc::Status GenerateRawDumpReport(
+      const ReportId& report_id, const ReportConfig& report_config,
+      const Metric& metric, std::vector<Variable> variables,
+      uint32_t start_day_index, uint32_t end_day_index, bool in_store,
+      std::unique_ptr<ReportRowIterator>* row_iterator);
 
   std::shared_ptr<config::AnalyzerConfigManager> config_manager_;
   std::shared_ptr<store::ObservationStore> observation_store_;
