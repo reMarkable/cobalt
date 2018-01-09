@@ -6,6 +6,7 @@
 #define COBALT_CONFIG_ANALYZER_CONFIG_MANAGER_H_
 
 #include <memory>
+#include <mutex>
 
 #include "config/analyzer_config.h"
 
@@ -20,12 +21,44 @@ class AnalyzerConfigManager {
   // Get a pointer to the current analyzer config. Do not cache.
   std::shared_ptr<AnalyzerConfig> GetCurrent();
 
+  // Updates the cached configuration from the external Git repository specified
+  // in the constructor. This may block for up to |timeout_seconds| seconds.
+  // Returns true if the update operation succeeded. Otherwise the previous
+  // cached configuration is maintained.
+  bool Update(unsigned int timeout_seconds);
+
   static std::shared_ptr<AnalyzerConfigManager> CreateFromFlagsOrDie();
 
+  // This constructor is to be used when parameters related to updating the
+  // configuration are unnecessary because you don't intend to update the
+  // config. (such as in tests.)
   explicit AnalyzerConfigManager(std::shared_ptr<AnalyzerConfig> config);
 
  private:
+  // Constructor.
+  // |config| is the initial configuration to be held.
+  // |cobalt_config_proto_path| is the path on disk where the serialized
+  // CobaltConfig is to be stored.
+  // |config_update_repository_url| is the url for a git repository containing
+  // cobalt configuration information. It is parsed using config_parser. See
+  // the documentation for config_parser to understand the format of the repo.
+  // |config_parser_bin_path| is the path to the config_parser binary.
+  AnalyzerConfigManager(std::shared_ptr<AnalyzerConfig> config,
+                        std::string cobalt_config_proto_path,
+                        std::string config_update_repository_url,
+                        std::string config_parser_bin_path);
+
+  // Reads the configuration from a file containing a serialized CobaltConfig.
+  static std::unique_ptr<AnalyzerConfig>
+  ReadConfigFromSerializedCobaltConfigFile(std::string config_path);
+
   std::shared_ptr<AnalyzerConfig> ptr_;
+  // This mutex protects ptr_. A thread dereferencing or updating ptr_ should
+  // grab a lock on m_ first.
+  std::mutex m_;
+  const std::string cobalt_config_proto_path_;
+  const std::string update_repository_path_;
+  const std::string config_parser_bin_path_;
 };
 
 }  // namespace config

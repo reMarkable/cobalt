@@ -109,6 +109,8 @@ void ReportScheduler::Sleep() {
 }
 
 void ReportScheduler::ProcessReports() {
+  static const int kTimeoutSeconds = 60;
+  config_manager_->Update(kTimeoutSeconds);
   uint32_t current_day_index = CurrentDayIndex();
   std::shared_ptr<config::ReportRegistry> report_registry =
       config_manager_->GetCurrent()->report_registry();

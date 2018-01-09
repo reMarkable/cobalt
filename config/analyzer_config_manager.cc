@@ -4,8 +4,13 @@
 
 #include "config/analyzer_config_manager.h"
 
+#include <errno.h>
+#include <spawn.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include "config/analyzer_config.h"
@@ -19,6 +24,25 @@ namespace config {
 DEFINE_string(cobalt_config_proto_path, "",
               "Location on disk of the serialized CobaltConfig proto from "
               "which the Report Master's configuration is to be read.");
+DEFINE_string(config_update_repository_url, "",
+              "URL to a git repository containing a cobalt configuration in "
+              "its master branch. If this flag is set, the configuration of "
+              "report master will be updated by pulling from the specified "
+              "repository before scheduled reports are run. "
+              "(e.g. \"https://cobalt-analytics.googlesource.com/config/\")");
+DEFINE_string(config_parser_bin_path, "/usr/local/bin/config_parser",
+              "Location on disk of the configuration parser.");
+
+AnalyzerConfigManager::AnalyzerConfigManager(
+    std::shared_ptr<AnalyzerConfig> config,
+    std::string cobalt_config_proto_path,
+    std::string config_update_repository_url,
+    std::string config_parser_bin_path)
+    : cobalt_config_proto_path_(cobalt_config_proto_path),
+      update_repository_path_(config_update_repository_url),
+      config_parser_bin_path_(config_parser_bin_path) {
+  ptr_ = config;
+}
 
 AnalyzerConfigManager::AnalyzerConfigManager(
     std::shared_ptr<AnalyzerConfig> config) {
@@ -26,6 +50,7 @@ AnalyzerConfigManager::AnalyzerConfigManager(
 }
 
 std::shared_ptr<AnalyzerConfig> AnalyzerConfigManager::GetCurrent() {
+  std::lock_guard<std::mutex> lock(m_);
   return ptr_;
 }
 
@@ -39,26 +64,103 @@ AnalyzerConfigManager::CreateFromFlagsOrDie() {
 
   // If a file containing a serialized CobaltConfig is specified, we load the
   // initial configuration from that file.
+  auto config = ReadConfigFromSerializedCobaltConfigFile(FLAGS_cobalt_config_proto_path);
+  if (!config) {
+    LOG(FATAL) << "Could not load the initial configuration.";
+  }
+  LOG(INFO) << "Initial configuration loaded.";
+
+  auto manager =
+      std::shared_ptr<AnalyzerConfigManager>(new AnalyzerConfigManager(
+          std::move(config), FLAGS_cobalt_config_proto_path,
+          FLAGS_config_update_repository_url, FLAGS_config_parser_bin_path));
+  return manager;
+}
+
+bool AnalyzerConfigManager::Update(unsigned int timeout_seconds) {
+  // If no repository to get updates from was specified, skip the update.
+  if (update_repository_path_.empty()) {
+    return false;
+  }
+
+  LOG(INFO) << "Updating configuration from " << update_repository_path_;
+
+  const char* argv[] = {
+      config_parser_bin_path_.c_str(),         "-repo_url",
+      update_repository_path_.c_str(),         "-output_file",
+      cobalt_config_proto_path_.c_str(),       "-git_timeout",
+      std::to_string(timeout_seconds).c_str(), nullptr,
+  };
+  char* env[] = {};
+  pid_t pid;
+  posix_spawnattr_t spawnattr;
+  posix_spawnattr_init(&spawnattr);
+
+  int status = posix_spawn(&pid, config_parser_bin_path_.c_str(), nullptr,
+                           &spawnattr, const_cast<char* const*>(argv), env);
+
+  if (0 != status) {
+    LOG(ERROR) << "Error spawning config_parser at " << config_parser_bin_path_;
+    return false;
+  }
+  LOG(INFO) << "Spawned " << config_parser_bin_path_;
+
+  // Catch state changes of config_parser process until it terminates.
+  errno = 0;
+  if (waitpid(pid, &status, WUNTRACED) != pid) {
+    LOG(ERROR) << "Error waiting for config_parser: " << strerror(errno);
+    return false;
+  }
+
+  if (!WIFEXITED(status) || 0 != WEXITSTATUS(status)) {
+    if (WIFSIGNALED(status)) {
+      LOG(ERROR) << "config_parser terminated by signal " << WTERMSIG(status);
+      return false;
+    } else if (WIFEXITED(status)) {
+      LOG(ERROR) << "config_parser exited with signal " << WEXITSTATUS(status);
+      return false;
+    } else if (WIFSTOPPED(status)) {
+      LOG(ERROR) << "config_parser was stopped by signal " << WSTOPSIG(status);
+      return false;
+    } else {
+      LOG(ERROR) << "Error while waiting for config_parser.";
+      return false;
+    }
+  }
+  LOG(INFO) << "Done getting updated configuration from "
+            << update_repository_path_;
+
+  auto config = ReadConfigFromSerializedCobaltConfigFile(cobalt_config_proto_path_);
+  std::lock_guard<std::mutex> lock(m_);
+  ptr_.reset(config.release());
+
+  LOG(INFO) << "Configuration updated.";
+  return true;
+}
+
+std::unique_ptr<AnalyzerConfig>
+AnalyzerConfigManager::ReadConfigFromSerializedCobaltConfigFile(
+    std::string config_path) {
   std::ifstream config_file_stream;
-  config_file_stream.open(FLAGS_cobalt_config_proto_path);
+  config_file_stream.open(config_path);
   if (!config_file_stream) {
-    LOG(FATAL) << "Could not open initial config proto: "
-               << FLAGS_cobalt_config_proto_path;
+    LOG(ERROR) << "Could not open config proto: " << config_path;
+    return nullptr;
   }
 
   CobaltConfig cobalt_config;
   if (!cobalt_config.ParseFromIstream(&config_file_stream)) {
-    LOG(FATAL) << "Could not parse the initial config proto: "
-               << FLAGS_cobalt_config_proto_path;
+    LOG(ERROR) << "Could not parse config proto: " << config_path;
+    return nullptr;
   }
 
   auto config = AnalyzerConfig::CreateFromCobaltConfigProto(&cobalt_config);
   if (!config) {
-    LOG(FATAL) << "Error creating the initial AnalyzerConfig: "
-               << FLAGS_cobalt_config_proto_path;
+    LOG(ERROR) << "Error creating AnalyzerConfig: " << config_path;
+    return nullptr;
   }
-  return std::shared_ptr<AnalyzerConfigManager>(
-      new AnalyzerConfigManager(std::move(config)));
+
+  return config;
 }
 
 }  // namespace config
