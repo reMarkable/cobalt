@@ -657,6 +657,11 @@ Run this to build Docker containers for the Shuffler, Analyzer Service and
 Report Master. Run it any time the Cobalt code changes. The generated
 containers are stored on your computer.
 
+*Troubleshooting*: If the command fails, you may have to update the Docker
+configuration. Edit `/etc/default/docker` and uncomment the line:
+`DOCKER_OPTS="--dns 8.8.8.8 --dns 8.8.4.4"`.
+Then, restart the Docker service: `sudo service docker restart`.
+
 `./cobaltb.py deploy push --job=shuffler`
 
 `./cobaltb.py deploy push --job=analyzer-service`

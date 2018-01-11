@@ -14,6 +14,10 @@
 
 FROM cobalt-common
 
+# If this fails, look for troubleshooting information in the README.
+RUN apt-get update
+RUN apt-get install -y git=1:2.11.0-3+deb9u2
+
 COPY analyzer_report_master /usr/local/bin/
 
 # The path to where we are copying the config files must match the path
