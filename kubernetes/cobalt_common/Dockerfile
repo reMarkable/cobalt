@@ -14,7 +14,7 @@
 
 # Base cobalt image.  It's an Ubuntu system with a couple of extra bits.
 
-FROM ubuntu:14.04
+FROM debian:stable
 
 COPY libunwind.so.1 /usr/lib/
 COPY libc++.so.1 /usr/lib/
