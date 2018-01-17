@@ -43,6 +43,13 @@ class AnalyzerConfig {
   static std::unique_ptr<AnalyzerConfig> CreateFromCobaltConfigProto(
       CobaltConfig* config);
 
+  // Constructs and returns an instance of AnalyzerConfig by first parsing
+  // a CobaltConfig proto message from cobalt_config_proto_text which should
+  // contain an ASCII text representation of a CobaltConfigProto, and then
+  // invoking CreateFromCobaltconfigProto.
+  static std::unique_ptr<AnalyzerConfig> CreateFromCobaltConfigProtoText(
+      std::string cobalt_config_proto_text);
+
   // Constructs an AnalyzerConfig that wraps the given registries.
   AnalyzerConfig(std::shared_ptr<config::EncodingRegistry> encoding_configs,
                  std::shared_ptr<config::MetricRegistry> metrics,

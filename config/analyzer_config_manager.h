@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string>
 
 #include "config/analyzer_config.h"
 

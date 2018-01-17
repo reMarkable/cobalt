@@ -11,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <utility>
 
 #include "config/analyzer_config.h"
@@ -64,7 +65,8 @@ AnalyzerConfigManager::CreateFromFlagsOrDie() {
 
   // If a file containing a serialized CobaltConfig is specified, we load the
   // initial configuration from that file.
-  auto config = ReadConfigFromSerializedCobaltConfigFile(FLAGS_cobalt_config_proto_path);
+  auto config =
+      ReadConfigFromSerializedCobaltConfigFile(FLAGS_cobalt_config_proto_path);
   if (!config) {
     LOG(FATAL) << "Could not load the initial configuration.";
   }
@@ -130,7 +132,8 @@ bool AnalyzerConfigManager::Update(unsigned int timeout_seconds) {
   LOG(INFO) << "Done getting updated configuration from "
             << update_repository_path_;
 
-  auto config = ReadConfigFromSerializedCobaltConfigFile(cobalt_config_proto_path_);
+  auto config =
+      ReadConfigFromSerializedCobaltConfigFile(cobalt_config_proto_path_);
   std::lock_guard<std::mutex> lock(m_);
   ptr_.reset(config.release());
 

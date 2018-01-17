@@ -176,6 +176,17 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
       std::shared_ptr<config::ReportRegistry>(reports.first.release())));
 }
 
+std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProtoText(
+    std::string cobalt_config_proto_text) {
+  CobaltConfig cobalt_config;
+  google::protobuf::TextFormat::Parser parser;
+  if (!parser.ParseFromString(cobalt_config_proto_text, &cobalt_config)) {
+    LOG(ERROR) << "Error while parsing a CobaltConfig ASCII proto string.";
+    return std::unique_ptr<AnalyzerConfig>(nullptr);
+  }
+  return CreateFromCobaltConfigProto(&cobalt_config);
+}
+
 AnalyzerConfig::AnalyzerConfig(
     std::shared_ptr<config::EncodingRegistry> encoding_configs,
     std::shared_ptr<config::MetricRegistry> metrics,
