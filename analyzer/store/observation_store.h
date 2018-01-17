@@ -76,7 +76,8 @@ class ObservationStore {
     // should be ignored.
     Status status;
 
-    // If status is kOK then this is the list of results.
+    // If status is kOK then this is the list of results. If pagination_token
+    // is non-empty, then there is guaranteed to be at least one result.
     std::vector<QueryResult> results;
 
     // If status is kOK and pagination_token is not empty, it indicates that
@@ -85,7 +86,8 @@ class ObservationStore {
     // of QueryObservations() in order to obtain the next batch of results.
     // Note that it is possible for pagination_token to be non-empty even if the
     // number of results returned is fewer than the |max_results| specified in
-    // the query.
+    // the query. However if pagination_token is non-empty there is guaranteed
+    // to be at least one result.
     std::string pagination_token;
   };
 

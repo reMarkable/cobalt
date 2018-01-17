@@ -351,7 +351,7 @@ ObservationStore::QueryResponse ObservationStore::QueryObservations(
     }
   }
   if (read_response.more_available) {
-    // If the underling store says that there are more rows available, then
+    // If the underlying store says that there are more rows available, then
     // we return the row key of the last row as the pagination_token.
     if (read_response.rows.empty()) {
       // There Read operation indicated that there were more rows available yet
