@@ -104,6 +104,32 @@ class MemoryStore : public DataStore {
   }
 };
 
+namespace test {
+// A MemoryStore that can be told to return an error from ReadRows. By default
+// it is just a regular MemoryStore. Invoke reset_num_to_succeed() to inject
+// a fault into ReadRows().
+class FaultInjectableMemoryStore : public MemoryStore {
+ public:
+  ReadResponse ReadRows(Table table, std::string start_row_key, bool inclusive,
+                        std::string limit_row_key,
+                        const std::vector<std::string>& column_names,
+                        size_t max_rows) override;
+
+  // After invoking this method, ReadRows() will work correctly for |num|
+  // additional invocations but upon the next invocation it will return
+  // a ReadResponse that contains an error status.
+  void reset_num_to_succeed(size_t num) {
+    num_to_succeed_ = num;
+    num_times_invoked_ = 0;
+  }
+
+ private:
+  size_t num_to_succeed_ = -1;
+  size_t num_times_invoked_ = 0;
+};
+
+}  // namespace test
+
 }  // namespace store
 }  // namespace analyzer
 }  // namespace cobalt

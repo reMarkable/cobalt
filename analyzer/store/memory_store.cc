@@ -191,6 +191,23 @@ Status MemoryStoreSingleton::DeleteAllRows(Table table) {
   return kOK;
 }
 
+namespace test {
+DataStore::ReadResponse FaultInjectableMemoryStore::ReadRows(
+    Table table, std::string start_row_key, bool inclusive,
+    std::string limit_row_key, const std::vector<std::string>& column_names,
+    size_t max_rows) {
+  if (num_times_invoked_++ < num_to_succeed_) {
+    return MemoryStore::ReadRows(table, start_row_key, inclusive, limit_row_key,
+                                 column_names, max_rows);
+  }
+  ReadResponse read_response;
+  read_response.status = kOperationFailed;
+  return read_response;
+}
+
+};  // namespace test
+
 }  // namespace store
+
 }  // namespace analyzer
 }  // namespace cobalt
