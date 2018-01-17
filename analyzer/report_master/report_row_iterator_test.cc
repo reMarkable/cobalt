@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "analyzer/report_master/report_rows.h"
+#include "analyzer/report_master/report_row_iterator.h"
 
 #include <memory>
 #include <string>
@@ -38,7 +38,9 @@ TEST(ReportRowVectorIteratorTest, EmptyVector) {
   // Test it.
   EXPECT_EQ(grpc::OK, iter.Reset().error_code());
   EXPECT_EQ(grpc::INVALID_ARGUMENT, iter.NextRow(nullptr).error_code());
-  EXPECT_FALSE(iter.HasMoreRows());
+  bool has_more_rows;
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_FALSE(has_more_rows);
   const ReportRow* next_row;
   EXPECT_EQ(grpc::NOT_FOUND, iter.NextRow(&next_row).error_code());
 }
@@ -54,14 +56,18 @@ TEST(ReportRowVectorIteratorTest, SizeOne) {
 
   // Test it.
   const ReportRow* next_row;
-  EXPECT_TRUE(iter.HasMoreRows());
+  bool has_more_rows;
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_TRUE(has_more_rows);
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   ASSERT_NE(nullptr, next_row);
   EXPECT_EQ("apple", next_row->histogram().value().string_value());
-  EXPECT_FALSE(iter.HasMoreRows());
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_FALSE(has_more_rows);
   EXPECT_EQ(grpc::NOT_FOUND, iter.NextRow(&next_row).error_code());
   EXPECT_EQ(grpc::OK, iter.Reset().error_code());
-  EXPECT_TRUE(iter.HasMoreRows());
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_TRUE(has_more_rows);
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   ASSERT_NE(nullptr, next_row);
   EXPECT_EQ("apple", next_row->histogram().value().string_value());
@@ -80,19 +86,25 @@ TEST(ReportRowVectorIteratorTest, SizeThree) {
 
   // Test it.
   const ReportRow* next_row;
-  EXPECT_TRUE(iter.HasMoreRows());
+  bool has_more_rows;
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_TRUE(has_more_rows);
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   EXPECT_EQ("apple", next_row->histogram().value().string_value());
-  EXPECT_TRUE(iter.HasMoreRows());
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_TRUE(has_more_rows);
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   EXPECT_EQ("banana", next_row->histogram().value().string_value());
-  EXPECT_TRUE(iter.HasMoreRows());
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_TRUE(has_more_rows);
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   EXPECT_EQ("cantaloupe", next_row->histogram().value().string_value());
-  EXPECT_FALSE(iter.HasMoreRows());
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_FALSE(has_more_rows);
   EXPECT_EQ(grpc::NOT_FOUND, iter.NextRow(&next_row).error_code());
   EXPECT_EQ(grpc::OK, iter.Reset().error_code());
-  EXPECT_TRUE(iter.HasMoreRows());
+  ASSERT_TRUE(iter.HasMoreRows(&has_more_rows).ok());
+  EXPECT_TRUE(has_more_rows);
   EXPECT_EQ(grpc::OK, iter.NextRow(&next_row).error_code());
   EXPECT_EQ("apple", next_row->histogram().value().string_value());
 }

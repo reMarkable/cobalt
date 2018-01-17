@@ -91,8 +91,10 @@ struct FakeReportRowIterator : public ReportRowIterator {
     }
   }
 
-  bool HasMoreRows() override {
-    return (index_ < num_success_first + num_success_second + 1);
+  grpc::Status HasMoreRows(bool* b) override {
+    CHECK(b);
+    *b = (index_ < num_success_first + num_success_second + 1);
+    return grpc::Status::OK;
   }
 
  private:

@@ -25,7 +25,7 @@
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"
 #include "analyzer/report_master/report_exporter.h"
-#include "analyzer/report_master/report_rows.h"
+#include "analyzer/report_master/report_row_iterator.h"
 #include "analyzer/store/observation_store.h"
 #include "analyzer/store/report_store.h"
 #include "config/analyzer_config.h"

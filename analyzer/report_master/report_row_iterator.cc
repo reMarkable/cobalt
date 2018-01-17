@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "analyzer/report_master/report_rows.h"
+#include "analyzer/report_master/report_row_iterator.h"
+
+#include <utility>
+
 #include "glog/logging.h"
 
 namespace cobalt {
@@ -35,7 +38,11 @@ grpc::Status ReportRowVectorIterator::NextRow(const ReportRow** row) {
   return grpc::Status::OK;
 }
 
-bool ReportRowVectorIterator::HasMoreRows() { return pos_ != rows_->end(); }
+grpc::Status ReportRowVectorIterator::HasMoreRows(bool* b) {
+  CHECK(b);
+  *b = (pos_ != rows_->end());
+  return grpc::Status::OK;
+}
 
 }  // namespace analyzer
 }  // namespace cobalt

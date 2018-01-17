@@ -145,7 +145,18 @@ int ReportStream::ReportStreambuf::overflow(int value) {
 // we run out of data to read. In this case we serialize more of the report
 // into the buffer, or return EOF.
 int ReportStream::ReportStreambuf::underflow() {
-  if (!status_.ok() || !row_iterator_->HasMoreRows()) {
+  if (!status_.ok()) {
+    // Tell the reader there is no more data.
+    setg(0, 0, 0);
+    return traits_type::eof();
+  }
+  bool has_more_rows;
+  status_ = row_iterator_->HasMoreRows(&has_more_rows);
+  if (!status_.ok()) {
+    owning_istream_->setstate(std::ios_base::failbit);
+    owning_istream_->setstate(std::ios_base::badbit);
+  }
+  if (!status_.ok() || !has_more_rows) {
     // Tell the reader there is no more data.
     setg(0, 0, 0);
     return traits_type::eof();

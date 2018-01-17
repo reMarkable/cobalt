@@ -21,14 +21,12 @@
 #include <vector>
 
 #include "analyzer/report_master/histogram_analysis_engine.h"
-#include "analyzer/report_master/report_rows.h"
+#include "analyzer/report_master/report_row_iterator.h"
 #include "glog/logging.h"
 
 namespace cobalt {
 namespace analyzer {
 
-using config::MetricRegistry;
-using config::ReportRegistry;
 using forculus::ForculusAnalyzer;
 using store::ObservationStore;
 using store::ReportStore;

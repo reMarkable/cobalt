@@ -10,7 +10,7 @@
 #include <string>
 #include <utility>
 
-#include "analyzer/report_master/report_rows.h"
+#include "analyzer/report_master/report_row_iterator.h"
 #include "analyzer/report_master/report_serializer.h"
 #include "grpc++/grpc++.h"
 

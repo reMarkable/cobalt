@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef COBALT_ANALYZER_REPORT_MASTER_REPORT_ROWS_H_
-#define COBALT_ANALYZER_REPORT_MASTER_REPORT_ROWS_H_
+#ifndef COBALT_ANALYZER_REPORT_MASTER_REPORT_ROW_ITERATOR_H_
+#define COBALT_ANALYZER_REPORT_MASTER_REPORT_ROW_ITERATOR_H_
 
 #include <vector>
 
@@ -29,10 +29,17 @@ class ReportRowIterator {
   //   return. In this case the state of |*row| is undefined.
   // - INVALID_ARGUMENT if |row| is NULL.
   // - Some other status if any other error occurs.
+  //
+  // If OK is returned then |*row| is valid only until NextRow() is invoked
+  // again, or this object is destroyed. If the caller wishes to access the
+  // returned ReportRow after that then it must be copied.
   virtual grpc::Status NextRow(const ReportRow** row) = 0;
 
-  // Returns whether or not the iterator has more rows to return.
-  virtual bool HasMoreRows() = 0;
+  // If OK is returned then *b will contain the result of
+  // whether or not the iterator has more rows to return.
+  // Otherwise an error occurred in determining whether or not
+  // there are more rows.
+  virtual grpc::Status HasMoreRows(bool* b) = 0;
 };
 
 // An implementation of ReportRowIterator that wraps a vector.
@@ -51,7 +58,7 @@ class ReportRowVectorIterator : public ReportRowIterator {
 
   grpc::Status NextRow(const ReportRow** row) override;
 
-  bool HasMoreRows() override;
+  grpc::Status HasMoreRows(bool* b) override;
 
  private:
   // Depending on which constructor was used this object may or may not
@@ -67,4 +74,4 @@ class ReportRowVectorIterator : public ReportRowIterator {
 }  // namespace analyzer
 }  // namespace cobalt
 
-#endif  // COBALT_ANALYZER_REPORT_MASTER_REPORT_ROWS_H_
+#endif  // COBALT_ANALYZER_REPORT_MASTER_REPORT_ROW_ITERATOR_H_

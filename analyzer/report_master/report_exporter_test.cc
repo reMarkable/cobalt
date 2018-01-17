@@ -159,7 +159,11 @@ struct FakeReportRowIterator : public ReportRowIterator {
     return grpc::Status::OK;
   }
 
-  bool HasMoreRows() override { return (index_ < num_rows); }
+  grpc::Status HasMoreRows(bool* b) override {
+    CHECK(b);
+    *b = (index_ < num_rows);
+    return grpc::Status::OK;
+  }
 
  private:
   size_t index_ = 0;
@@ -284,8 +288,7 @@ TEST_F(ReportExporterTest, DISABLED_RealVeryLargeUploadToGCS) {
   setenv("GRPC_DEFAULT_SSL_ROOTS_FILE_PATH",
          "<cobalt-source-root-dir>/third_party/grpc/etc/roots.pem", 1);
   setenv("COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS",
-         "<path-to-your-real-service-acount-key-file-here>",
-         1);
+         "<path-to-your-real-service-acount-key-file-here>", 1);
 
   // Instantiate a ReportExporter using a non-mock GcsUploader.
   ReportExporter report_exporter(

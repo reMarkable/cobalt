@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "analyzer/report_master/report_internal.pb.h"
-#include "analyzer/report_master/report_rows.h"
+#include "analyzer/report_master/report_row_iterator.h"
 #include "analyzer/report_master/report_stream.h"
 #include "config/report_configs.pb.h"
 #include "grpc++/grpc++.h"
