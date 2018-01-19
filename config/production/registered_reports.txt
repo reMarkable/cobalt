@@ -126,6 +126,29 @@ element {
   }
 }
 
+######################### Project 102: System Metrics ##########################
+element {
+  customer_id: 1
+  project_id: 102
+  id: 1
+  name: "Fuchsia Uptime"
+  description: "A daily report of how long Fuchsia instances have been running."
+  metric_id: 1
+  report_type: HISTOGRAM
+  variable {
+    metric_part: "system_uptime_minutes"
+  }
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "fuchsia-cobalt-reports-default"
+    }
+  }
+}
 
 
 ################################################################################

@@ -88,6 +88,21 @@ element {
   }
 }
 
+######################### Project 102: System Metrics ##########################
+
+#####################################################################
+# EncodingConfig(1, 102, 1)
+# Name:  NoOp encoding
+# Description:  Observations are sent unencoded.
+######################################################################
+element {
+  customer_id: 1
+  project_id: 102
+  id: 1
+  no_op_encoding {
+  }
+}
+
 
 ################################################################################
 #      ***  NOTICE: Below this line are testing-only projects. ***
