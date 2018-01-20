@@ -266,6 +266,8 @@ def _test(args):
             "-report_master_root_certs=%s" % args.report_master_root_certs,
             "-shuffler_root_certs=%s" % args.shuffler_root_certs
         ]
+        if (not (args.cobalt_on_personal_cluster or args.production_dir)):
+            test_args += ["-skip_oauth"]
       if (args.use_cloud_bt or args.cobalt_on_personal_cluster or
           args.production_dir):
         bigtable_project_name_from_args = _compound_project_name(args)
