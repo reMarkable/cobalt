@@ -89,8 +89,11 @@ The code for the end-to-end test is written in Go and is in the
 
 ## Contributing
 Cobalt uses the Gerrit code review tool. See the
-[contributing](https://fuchsia.googlesource.com/docs/+/master/CONTRIBUTING.md)
-documentation for Fuchsia for more info.
+[submitting-changes](https://fuchsia.googlesource.com/docs/+/master/CONTRIBUTING.md#submitting-changes)
+section of the Fuchsia contributing doc for more info about using Gerrit.
+But note that the stand-alone Cobalt build currently does not use Jiri.
+Use the command `git push origin HEAD:refs/for/master`. Also the other sections
+of that document are not relevant to stand-alone Cobalt.
 
 ## Source Layout
 The source layout is related to Cobalt's process architecture. Here we
