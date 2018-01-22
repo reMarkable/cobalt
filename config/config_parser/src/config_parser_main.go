@@ -13,6 +13,7 @@ import (
 	"flag"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
+	"io"
 	"io/ioutil"
 	"os"
 	"time"
@@ -86,7 +87,24 @@ func main() {
 
 	if *outFile != "" {
 		if err := os.Rename(w.Name(), *outFile); err != nil {
-			glog.Exit(err)
+			// Rename doesn't work if /tmp is in a different partition. Attempting to copy.
+			// TODO(azani): Look into doing this atomically.
+			in, err := os.Open(w.Name())
+			if err != nil {
+				glog.Exit(err)
+			}
+			defer in.Close()
+
+			out, err := os.Create(*outFile)
+			if err != nil {
+				glog.Exit(err)
+			}
+			defer out.Close()
+
+			_, err = io.Copy(out, in)
+			if err != nil {
+				glog.Exit(err)
+			}
 		}
 	}
 
