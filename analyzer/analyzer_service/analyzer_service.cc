@@ -39,7 +39,6 @@ using util::MessageDecrypter;
 using util::PemUtil;
 
 DEFINE_int32(port, 0, "The port that the Analyzer Service should listen on.");
-DEFINE_string(tls_info, "", "TBD: Some info about TLS.");
 DEFINE_string(
     private_key_pem_file, "",
     "Path to a file containing a PEM encoding of the private key of "
@@ -54,15 +53,11 @@ AnalyzerServiceImpl::CreateFromFlagsOrDie() {
       new ObservationStore(data_store));
   CHECK(FLAGS_port) << "--port is a mandatory flag";
   std::shared_ptr<grpc::ServerCredentials> server_credentials;
-  if (FLAGS_tls_info.empty()) {
-    LOG(WARNING) << "WARNING: Using insecure server credentials. Pass "
-                    "-tls_info to enable TLS.";
-    server_credentials = grpc::InsecureServerCredentials();
-  } else {
-    grpc::SslServerCredentialsOptions options;
-    // TODO(rudominer) Set up options based on FLAGS_tls_info.
-    server_credentials = grpc::SslServerCredentials(options);
-  }
+  // TODO(rudominer) Currently there is not a compelling reason to protect the
+  // analyzer gRPC endpoint using TLS because we do not expose the endpoint
+  // to the internet. If we chose to so protect it then see
+  // report_master_service.cc for an example of how to do it.
+  server_credentials = grpc::InsecureServerCredentials();
   std::string private_key_pem;
   PemUtil::ReadTextFile(FLAGS_private_key_pem_file, &private_key_pem);
   if (private_key_pem.empty()) {
