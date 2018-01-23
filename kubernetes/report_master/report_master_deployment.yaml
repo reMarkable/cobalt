@@ -62,8 +62,8 @@ spec:
           - '7000'
           - '-bigtable_project_name'
           - $$BIGTABLE_PROJECT_NAME$$
-          - '-bigtable_instance_name'
-          - $$BIGTABLE_INSTANCE_NAME$$
+          - '-bigtable_instance_id'
+          - $$BIGTABLE_INSTANCE_ID$$
           - '-cobalt_config_dir'
           # This path must match the path to where the config files are copied
           # in Dockerfile.

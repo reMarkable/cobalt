@@ -427,14 +427,14 @@ def _get_endpoint_config_id(cloud_project_prefix, cloud_project_name,
 def start_analyzer_service(cloud_project_prefix,
                            cloud_project_name,
                            cluster_zone, cluster_name,
-                           bigtable_instance_name,
+                           bigtable_instance_id,
                            static_ip_address):
   """ Starts the analyzer-service deployment and service.
   cloud_project_prefix {sring}: For example "google.com"
   cloud_project_name {sring}: For example "shuffler-test". The prefix and
       name are used when forming the URI to the image in the registry and
       also the bigtable project name.
-  bigtable_instance_name {string}: The name of the instance of Cloud Bigtable
+  bigtable_instance_id {string}: The name of the instance of Cloud Bigtable
       within the specified project to be used by the Analyzer Service.
   static_ip_address {string}: A static IP address that has already been
      reserved on the GKE cluster.
@@ -461,7 +461,7 @@ def start_analyzer_service(cloud_project_prefix,
   token_substitutions = {
       '$$ANALYZER_SERVICE_IMAGE_URI$$' : image_uri,
       '$$BIGTABLE_PROJECT_NAME$$' : bigtable_project_name,
-      '$$BIGTABLE_INSTANCE_NAME$$' :bigtable_instance_name,
+      '$$BIGTABLE_INSTANCE_ID$$' :bigtable_instance_id,
       '$$ANALYZER_PRIVATE_PEM_NAME$$' : ANALYZER_PRIVATE_KEY_PEM_NAME,
       '$$ANALYZER_PRIVATE_KEY_SECRET_NAME$$' : ANALYZER_PRIVATE_KEY_SECRET_NAME,
       '$$ANALYZER_STATIC_IP_ADDRESS$$' : static_ip_address}
@@ -472,7 +472,7 @@ def start_analyzer_service(cloud_project_prefix,
 def start_report_master(cloud_project_prefix,
                         cloud_project_name,
                         cluster_zone, cluster_name,
-                        bigtable_instance_name,
+                        bigtable_instance_id,
                         static_ip_address,
                         enable_report_scheduling=False):
   """ Starts the report-master deployment and service.
@@ -480,7 +480,7 @@ def start_report_master(cloud_project_prefix,
   cloud_project_name {string}: For example "shuffler-test". The prefix and
       name are used when forming the URI to the image in the registry and
       also the bigtable project name.
-  bigtable_instance_name {string}: The name of the instance of Cloud Bigtable
+  bigtable_instance_id {string}: The name of the instance of Cloud Bigtable
       within the specified project to be used by the Report Master.
   static_ip_address {string}: A static IP address that has already been
       reserved on the GKE cluster.
@@ -516,7 +516,7 @@ def start_report_master(cloud_project_prefix,
   token_substitutions = {
       '$$REPORT_MASTER_IMAGE_URI$$': image_uri,
       '$$BIGTABLE_PROJECT_NAME$$': bigtable_project_name,
-      '$$BIGTABLE_INSTANCE_NAME$$': bigtable_instance_name,
+      '$$BIGTABLE_INSTANCE_ID$$': bigtable_instance_id,
       '$$REPORT_MASTER_STATIC_IP_ADDRESS$$': static_ip_address,
       '$$REPORT_MASTER_ENABLE_REPORT_SCHEDULING_FLAG$$':
       enable_scheduling_flag,

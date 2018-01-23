@@ -27,7 +27,7 @@ namespace cobalt {
 namespace analyzer {
 namespace store {
 DECLARE_string(bigtable_project_name);
-DECLARE_string(bigtable_instance_name);
+DECLARE_string(bigtable_instance_id);
 }  // namespace store
 }  // namespace analyzer
 }  // namespace cobalt
@@ -35,7 +35,7 @@ DECLARE_string(bigtable_instance_name);
 using cobalt::analyzer::store::BigtableAdmin;
 using cobalt::analyzer::store::BigtableStore;
 using cobalt::analyzer::store::DataStore;
-using cobalt::analyzer::store::FLAGS_bigtable_instance_name;
+using cobalt::analyzer::store::FLAGS_bigtable_instance_id;
 using cobalt::analyzer::store::FLAGS_bigtable_project_name;
 using cobalt::analyzer::store::kOK;
 using cobalt::analyzer::store::ObservationStore;
@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
       "A tool to facilitate working with Cobalt's BigTables in production.\n"
       "usage:\n"
       "bigtable_tool -command=<command> -bigtable_project_name=<name> "
-      "-bigtable_instance_name=<name>\n [-customer=<customer_id> "
+      "-bigtable_instance_id=<name>\n [-customer=<customer_id> "
       "-project=<project_id> "
       "{-metric=<metric_id>, -report_config=<report_config_id>}]\n"
       "commands are:\n"
@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
       if (FLAGS_danger_danger_delete_production_reports) {
         std::cout << std::endl
                   << "Bigtable instance: " << FLAGS_bigtable_project_name << "/"
-                  << FLAGS_bigtable_instance_name << std::endl
+                  << FLAGS_bigtable_instance_id << std::endl
                   << std::endl;
         std::cout << "*WARNING* Project " << FLAGS_project
                   << " is a real production project, not a test project.\n";

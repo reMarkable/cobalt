@@ -156,7 +156,7 @@ def start_shuffler(port=DEFAULT_SHUFFLER_PORT,
 ANALYZER_SERVICE_PATH = os.path.abspath(os.path.join(OUT_DIR, 'analyzer',
     'analyzer_service', 'analyzer_service'))
 def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
-    bigtable_project_name='', bigtable_instance_name='',
+    bigtable_project_name='', bigtable_instance_id='',
     private_key_pem_file=DEFAULT_ANALYZER_PRIVATE_KEY_PEM,
     verbose_count=0, vmodule=None,
     wait=True):
@@ -167,12 +167,12 @@ def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
       "-port", str(port),
       "-private_key_pem_file", private_key_pem_file,
       "-logtostderr"]
-  if bigtable_project_name != '' and bigtable_instance_name != '':
+  if bigtable_project_name != '' and bigtable_instance_id != '':
     cmd = cmd + [
       "-bigtable_project_name",
       bigtable_project_name,
-      "-bigtable_instance_name",
-      bigtable_instance_name,
+      "-bigtable_instance_id",
+      bigtable_instance_id,
     ]
   else:
     print "Will connect to a local Bigtable Emulator instance."
@@ -186,7 +186,7 @@ def start_analyzer_service(port=DEFAULT_ANALYZER_SERVICE_PORT,
 REPORT_MASTER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'analyzer',
     'report_master', 'analyzer_report_master'))
 def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
-                        bigtable_project_name='', bigtable_instance_name='',
+                        bigtable_project_name='', bigtable_instance_id='',
                         cobalt_config_dir=DEMO_CONFIG_DIR,
                         use_tls=False,
                         tls_cert_file=LOCALHOST_TLS_CERT_FILE,
@@ -204,12 +204,12 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
     cmd.append("-use_tls")
     cmd.append("-tls_cert_file=%s"%tls_cert_file)
     cmd.append("-tls_key_file=%s"%tls_key_file)
-  if bigtable_project_name != '' and bigtable_instance_name != '':
+  if bigtable_project_name != '' and bigtable_instance_id != '':
     cmd = cmd + [
       "-bigtable_project_name",
       bigtable_project_name,
-      "-bigtable_instance_name",
-      bigtable_instance_name,
+      "-bigtable_instance_id",
+      bigtable_instance_id,
     ]
   else:
     print "Will connect to a local Bigtable Emulator instance."
@@ -269,15 +269,15 @@ OBSERVATION_QUERIER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'tools',
                                            'observation_querier',
                                            'query_observations'))
 def start_observation_querier(bigtable_project_name='',
-                              bigtable_instance_name='',
+                              bigtable_instance_id='',
                               verbose_count=0):
   cmd = [OBSERVATION_QUERIER_PATH,
       "-logtostderr"]
-  if not bigtable_project_name or not bigtable_instance_name:
+  if not bigtable_project_name or not bigtable_instance_id:
     cmd.append("-for_testing_only_use_bigtable_emulator")
   else:
     cmd = cmd + ["-bigtable_project_name", bigtable_project_name,
-                 "-bigtable_instance_name", bigtable_instance_name]
+                 "-bigtable_instance_id", bigtable_instance_id]
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
   return execute_command(cmd, wait=True)

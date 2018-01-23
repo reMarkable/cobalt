@@ -370,9 +370,9 @@ var (
 	subProcessVerbosity = flag.Int("sub_process_v", 0, "-v verbosity level to pass to sub-processes")
 
 	bigtableProjectName = flag.String("bigtable_project_name", "", "If specified use an instance Cloud Bigtable from this project instead of "+
-		"a local Bigtable Emulator. -bigtable_instance_name must also be specified.")
+		"a local Bigtable Emulator. -bigtable_instance_id must also be specified.")
 
-	bigtableInstanceName = flag.String("bigtable_instance_name", "", "If specified use this instance of Cloud Bigtable instead of a local "+
+	bigtableInstanceId = flag.String("bigtable_instance_id", "", "If specified use this instance of Cloud Bigtable instead of a local "+
 		"Bigtable Emulator. -bigtable_project_name must also be specified.")
 
 	doShufflerThresholdTest = flag.Bool("do_shuffler_threshold_test", true, "By defalt this test assumes that the Shuffler is configured "+
@@ -397,7 +397,7 @@ func printWarningAndWait() {
 	fmt.Println("              W A R N I N G\n")
 	fmt.Println("In 10 seconds I will permanently delete data from Bigtable.")
 	fmt.Println()
-	fmt.Printf("\x1b[31;1m%s  %s.\x1b[0m\n", *bigtableProjectName, *bigtableInstanceName)
+	fmt.Printf("\x1b[31;1m%s  %s.\x1b[0m\n", *bigtableProjectName, *bigtableInstanceId)
 	fmt.Println()
 	fmt.Printf("\x1b[31;1mcustomer: %d,  project: %d\x1b[0m\n", customerId, projectId)
 	fmt.Println()
@@ -433,14 +433,14 @@ func init() {
 		// to cancel if something horrible has gone wrong.
 		printWarningAndWait()
 		fmt.Printf("*** Deleting observations from the Observation Store at %s;%s for project (%d, %d), metrics %d, %d, %d, %d and %d.\n",
-			*bigtableProjectName, *bigtableInstanceName, customerId, projectId, urlMetricId, hourMetricId, eventMetricId, moduleMetricId, deviceMetricId)
+			*bigtableProjectName, *bigtableInstanceId, customerId, projectId, urlMetricId, hourMetricId, eventMetricId, moduleMetricId, deviceMetricId)
 		for _, metricId := range []int{urlMetricId, hourMetricId, eventMetricId, moduleMetricId, deviceMetricId} {
 			if err := invokeBigtableTool("delete_observations", metricId, 0); err != nil {
 				panic(fmt.Sprintf("Error deleting observations for metric [%v].", err))
 			}
 		}
 		fmt.Printf("*** Deleting reports from the Report Store at %s;%s for project (%d, %d), report configs %d, %d, %d, %d and %d.\n",
-			*bigtableProjectName, *bigtableInstanceName, customerId, projectId,
+			*bigtableProjectName, *bigtableInstanceId, customerId, projectId,
 			urlReportConfigId, hourReportConfigId, eventReportConfigId, moduleReportConfigId, deviceReportConfigId)
 		for _, reportConfigId := range []int{urlReportConfigId, hourReportConfigId, eventReportConfigId, moduleReportConfigId, deviceReportConfigId} {
 			if err := invokeBigtableTool("delete_reports", 0, reportConfigId); err != nil {
@@ -493,7 +493,7 @@ func invokeBigtableTool(command string, metricId, reportConfigId int) error {
 		"-project", strconv.Itoa(projectId),
 		"-metric", strconv.Itoa(metricId),
 		"-report_config", strconv.Itoa(reportConfigId),
-		"-bigtable_instance_name", *bigtableInstanceName,
+		"-bigtable_instance_id", *bigtableInstanceId,
 		"-bigtable_project_name", *bigtableProjectName,
 	}
 	cmd := exec.Command(*bigtableToolPath, arguments...)
@@ -523,8 +523,8 @@ func getNumObservations(metricId uint32, maxNum uint32) (uint32, error) {
 		"-metric", strconv.Itoa(int(metricId)),
 		"-max_num", strconv.Itoa(int(maxNum)),
 	}
-	if *bigtableInstanceName != "" && *bigtableProjectName != "" {
-		arguments = append(arguments, "-bigtable_instance_name", *bigtableInstanceName)
+	if *bigtableInstanceId != "" && *bigtableProjectName != "" {
+		arguments = append(arguments, "-bigtable_instance_id", *bigtableInstanceId)
 		arguments = append(arguments, "-bigtable_project_name", *bigtableProjectName)
 	} else {
 		arguments = append(arguments, "-for_testing_only_use_bigtable_emulator")

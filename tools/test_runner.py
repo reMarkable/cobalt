@@ -49,7 +49,7 @@ def run_all_tests(test_dir,
                   tls_cert_file=LOCALHOST_TLS_CERT_FILE,
                   tls_key_file=LOCALHOST_TLS_KEY_FILE,
                   bigtable_project_name = '',
-                  bigtable_instance_name = '',
+                  bigtable_instance_id = '',
                   verbose_count=0,
                   vmodule=None,
                   test_args=None):
@@ -117,7 +117,7 @@ def run_all_tests(test_dir,
       if start_cobalt_processes:
         time.sleep(1)
         analyzer_service_process=process_starter.start_analyzer_service(
-            bigtable_instance_name=bigtable_instance_name,
+            bigtable_instance_id=bigtable_instance_id,
             bigtable_project_name=bigtable_project_name,
             private_key_pem_file=E2E_TEST_ANALYZER_PRIVATE_KEY_PEM,
             verbose_count=verbose_count, vmodule=vmodule,
@@ -127,7 +127,7 @@ def run_all_tests(test_dir,
             use_tls=use_tls,
             tls_cert_file=tls_cert_file,
             tls_key_file=tls_key_file,
-            bigtable_instance_name=bigtable_instance_name,
+            bigtable_instance_id=bigtable_instance_id,
             bigtable_project_name=bigtable_project_name,
             verbose_count=verbose_count, vmodule=vmodule,
             wait=False)

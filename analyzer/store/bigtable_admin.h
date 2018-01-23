@@ -41,7 +41,7 @@ class BigtableAdmin {
 
   BigtableAdmin(const std::string& uri,
                 std::shared_ptr<grpc::ChannelCredentials> credentials,
-                std::string project_name, std::string instance_name);
+                std::string project_name, std::string instance_id);
 
   // Wait until deadline to be connected to the the server.
   // Returns whether or not the connection succeeded.
@@ -56,7 +56,7 @@ class BigtableAdmin {
   std::shared_ptr<grpc::Channel> channel_;
   std::shared_ptr<google::bigtable::admin::v2::BigtableTableAdmin::Stub> stub_;
   std::string project_name_;
-  std::string instance_name_;
+  std::string instance_id_;
 };
 
 }  // namespace store

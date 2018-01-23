@@ -118,31 +118,31 @@ std::unique_ptr<BigtableStore> BigtableStore::CreateFromFlagsOrDie() {
   // account the library looks for a key file located at the path specified in
   // the environment variable GOOGLE_APPLICATION_CREDENTIALS.
   CHECK_NE("", FLAGS_bigtable_project_name);
-  CHECK_NE("", FLAGS_bigtable_instance_name);
+  CHECK_NE("", FLAGS_bigtable_instance_id);
   auto creds = grpc::GoogleDefaultCredentials();
   CHECK(creds);
   LOG(INFO) << "Connecting to CloudBigtable at " << kCloudBigtableUri << ", "
             << kCloudBigtableAdminUri;
   LOG(INFO) << "project=" << FLAGS_bigtable_project_name
-            << " instance=" << FLAGS_bigtable_instance_name;
+            << " instance=" << FLAGS_bigtable_instance_id;
   return std::unique_ptr<BigtableStore>(new BigtableStore(
       kCloudBigtableUri, kCloudBigtableAdminUri, creds,
-      FLAGS_bigtable_project_name, FLAGS_bigtable_instance_name));
+      FLAGS_bigtable_project_name, FLAGS_bigtable_instance_id));
 }
 
 BigtableStore::BigtableStore(
     const std::string& uri, const std::string& admin_uri,
     std::shared_ptr<grpc::ChannelCredentials> credentials,
-    const std::string& project_name, const std::string& instance_name)
+    const std::string& project_name, const std::string& instance_id)
     : stub_(Bigtable::NewStub(grpc::CreateChannel(uri, credentials))),
       admin_stub_(BigtableTableAdmin::NewStub(
           grpc::CreateChannel(admin_uri, credentials))),
       observations_table_name_(
-          BigtableNames::ObservationsTableName(project_name, instance_name)),
+          BigtableNames::ObservationsTableName(project_name, instance_id)),
       report_progress_table_name_(
-          BigtableNames::ReportMetadataTableName(project_name, instance_name)),
+          BigtableNames::ReportMetadataTableName(project_name, instance_id)),
       report_rows_table_name_(
-          BigtableNames::ReportRowsTableName(project_name, instance_name)) {}
+          BigtableNames::ReportRowsTableName(project_name, instance_id)) {}
 
 std::string BigtableStore::TableName(DataStore::Table table) {
   switch (table) {

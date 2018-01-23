@@ -43,7 +43,7 @@ class BigtableStore : public DataStore {
   BigtableStore(const std::string& uri, const std::string& admin_uri,
                 std::shared_ptr<grpc::ChannelCredentials> credentials,
                 const std::string& project_name,
-                const std::string& instance_name);
+                const std::string& instance_id);
 
   Status WriteRow(Table table, DataStore::Row row) override;
 

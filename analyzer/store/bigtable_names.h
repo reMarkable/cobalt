@@ -32,29 +32,29 @@ const char kCloudBigtableAdminUri[] = "bigtableadmin.googleapis.com";
 class BigtableNames {
  public:
   static std::string TableParentName(const std::string& project_name,
-                                     const std::string& instance_name) {
-    return "projects/" + project_name + "/instances/" + instance_name;
+                                     const std::string& instance_id) {
+    return "projects/" + project_name + "/instances/" + instance_id;
   }
 
   static std::string ObservationsTableName(const std::string& project_name,
-                                           const std::string& instance_name) {
-    return FullTableName(project_name, instance_name, kObservationsTableId);
+                                           const std::string& instance_id) {
+    return FullTableName(project_name, instance_id, kObservationsTableId);
   }
 
   static std::string ReportMetadataTableName(const std::string& project_name,
-                                             const std::string& instance_name) {
-    return FullTableName(project_name, instance_name, kReportMetadataTableId);
+                                             const std::string& instance_id) {
+    return FullTableName(project_name, instance_id, kReportMetadataTableId);
   }
 
   static std::string ReportRowsTableName(const std::string& project_name,
-                                         const std::string& instance_name) {
-    return FullTableName(project_name, instance_name, kReportRowsTableId);
+                                         const std::string& instance_id) {
+    return FullTableName(project_name, instance_id, kReportRowsTableId);
   }
 
   static std::string FullTableName(const std::string& project_name,
-                                   const std::string& instance_name,
+                                   const std::string& instance_id,
                                    const std::string& table_id) {
-    return TableParentName(project_name, instance_name) + "/tables/" + table_id;
+    return TableParentName(project_name, instance_id) + "/tables/" + table_id;
   }
 };
 

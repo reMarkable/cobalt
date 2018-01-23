@@ -1,5 +1,5 @@
 {
-  "bigtable_instance_name": "cobalt",
+  "bigtable_instance_id": "cobalt",
   "cobalt_config_dir" : "config/production",
   "cloud_project_name": "fuchsia-cobalt",
   "cluster_name": "cobalt",

@@ -167,7 +167,7 @@ def _test(args):
       ", ".join(test_dirs))
 
   bigtable_project_name = ''
-  bigtable_instance_name = ''
+  bigtable_instance_id = ''
   for test_dir in test_dirs:
     start_bt_emulator = ((test_dir in NEEDS_BT_EMULATOR)
         and not args.use_cloud_bt and not args.cobalt_on_personal_cluster
@@ -186,16 +186,16 @@ def _test(args):
         print '--cloud_project_name must be specified'
         failure_list.append('gtests_cloud_bt')
         break
-      if args.bigtable_instance_name == '':
-        print '--bigtable_instance_name must be specified'
+      if args.bigtable_instance_id == '':
+        print '--bigtable_instance_id must be specified'
         failure_list.append('gtests_cloud_bt')
         break
       test_args = [
           "--bigtable_project_name=%s" % bigtable_project_name_from_args,
-          "--bigtable_instance_name=%s" % args.bigtable_instance_name
+          "--bigtable_instance_id=%s" % args.bigtable_instance_id
       ]
       bigtable_project_name = bigtable_project_name_from_args
-      bigtable_instance_name = args.bigtable_instance_name
+      bigtable_instance_id = args.bigtable_instance_id
     if (test_dir == 'gtests_btemulator' and args.tests != 'btemulator'):
       # TODO(rudominer) At the moment the EnableReportScheduling test case is
       # flaky so I am disabling it. If my analysis is correct the flakiness is
@@ -274,10 +274,10 @@ def _test(args):
         test_args = test_args + [
           "-bigtable_tool_path=%s" % BIGTABLE_TOOL_PATH,
           "-bigtable_project_name=%s" % bigtable_project_name_from_args,
-          "-bigtable_instance_name=%s" % args.bigtable_instance_name,
+          "-bigtable_instance_id=%s" % args.bigtable_instance_id,
         ]
         bigtable_project_name = bigtable_project_name_from_args
-        bigtable_instance_name = args.bigtable_instance_name
+        bigtable_instance_id = args.bigtable_instance_id
       if args.production_dir:
         # When running the end-to-end test against the production instance of
         # Cobalt, it may not be true that the Shuffler has been configured
@@ -291,7 +291,7 @@ def _test(args):
         test_dir, start_bt_emulator=start_bt_emulator,
         start_cobalt_processes=start_cobalt_processes,
         bigtable_project_name=bigtable_project_name,
-        bigtable_instance_name=bigtable_instance_name,
+        bigtable_instance_id=bigtable_instance_id,
         verbose_count=_verbose_count,
         vmodule=_vmodule,
         use_tls=_parse_bool(args.use_tls),
@@ -352,26 +352,26 @@ def _start_shuffler(args):
 
 def _start_analyzer_service(args):
   bigtable_project_name = ''
-  bigtable_instance_name = ''
+  bigtable_instance_id = ''
   if args.use_cloud_bt:
     bigtable_project_name = _compound_project_name(args)
-    bigtable_instance_name = args.bigtable_instance_name
+    bigtable_instance_id = args.bigtable_instance_id
   process_starter.start_analyzer_service(port=args.port,
       bigtable_project_name=bigtable_project_name,
-      bigtable_instance_name=bigtable_instance_name,
+      bigtable_instance_id=bigtable_instance_id,
       # Because it makes the demo more interesting
       # we use verbose_count at least 3.
       verbose_count=max(3, _verbose_count))
 
 def _start_report_master(args):
   bigtable_project_name = ''
-  bigtable_instance_name = ''
+  bigtable_instance_id = ''
   if args.use_cloud_bt:
     bigtable_project_name = _compound_project_name(args)
-    bigtable_instance_name = args.bigtable_instance_name
+    bigtable_instance_id = args.bigtable_instance_id
   process_starter.start_report_master(port=args.port,
       bigtable_project_name=bigtable_project_name,
-      bigtable_instance_name=bigtable_instance_name,
+      bigtable_instance_id=bigtable_instance_id,
       cobalt_config_dir=args.cobalt_config_dir,
       use_tls=_parse_bool(args.use_tls),
       tls_cert_file=args.tls_cert_file,
@@ -426,13 +426,13 @@ def _start_report_client(args):
 
 def _start_observation_querier(args):
   bigtable_project_name = ''
-  bigtable_instance_name = ''
+  bigtable_instance_id = ''
   if args.use_cloud_bt or args.production_dir:
     bigtable_project_name = _compound_project_name(args)
-    bigtable_instance_name = args.bigtable_instance_name
+    bigtable_instance_id = args.bigtable_instance_id
   process_starter.start_observation_querier(
       bigtable_project_name=bigtable_project_name,
-      bigtable_instance_name=bigtable_instance_name,
+      bigtable_instance_id=bigtable_instance_id,
       verbose_count=_verbose_count)
 
 def _generate_keys(args):
@@ -478,13 +478,13 @@ def _invoke_bigtable_tool(args, command):
   if bigtable_project_name_from_args == '':
     print '--cloud_project_name must be specified'
     return
-  if args.bigtable_instance_name == '':
-    print '--bigtable_instance_name must be specified'
+  if args.bigtable_instance_id == '':
+    print '--bigtable_instance_id must be specified'
     return
   cmd = [BIGTABLE_TOOL_PATH,
          "-command", command,
          "-bigtable_project_name", bigtable_project_name_from_args,
-         "-bigtable_instance_name", args.bigtable_instance_name]
+         "-bigtable_instance_id", args.bigtable_instance_id]
   if command == 'delete_observations':
     if args.customer_id == 0:
       print '--customer_id must be specified'
@@ -572,22 +572,22 @@ def _deploy_start(args):
         danger_danger_delete_all_data_at_startup=
             args.danger_danger_delete_all_data_at_startup)
   elif args.job == 'analyzer-service':
-    if args.bigtable_instance_name == '':
-        print '--bigtable_instance_name must be specified'
+    if args.bigtable_instance_id == '':
+        print '--bigtable_instance_id must be specified'
         return
     container_util.start_analyzer_service(
         args.cloud_project_prefix, args.cloud_project_name,
         args.cluster_zone, args.cluster_name,
-        args.bigtable_instance_name,
+        args.bigtable_instance_id,
         args.analyzer_service_static_ip)
   elif args.job == 'report-master':
-    if args.bigtable_instance_name == '':
-        print '--bigtable_instance_name must be specified'
+    if args.bigtable_instance_id == '':
+        print '--bigtable_instance_id must be specified'
         return
     container_util.start_report_master(
         args.cloud_project_prefix, args.cloud_project_name,
         args.cluster_zone, args.cluster_name,
-        args.bigtable_instance_name,
+        args.bigtable_instance_id,
         args.report_master_static_ip,
         enable_report_scheduling=_parse_bool(
             args.report_master_enable_scheduling))
@@ -836,7 +836,7 @@ def main():
   # cluster_settings contains the default values for many of the flags.
   cluster_settings = {
     'analyzer_service_static_ip' : '',
-    'bigtable_instance_name': '',
+    'bigtable_instance_id': '',
     'cloud_project_name': '',
     'cloud_project_prefix': '',
     'cluster_name': '',
@@ -1001,13 +1001,13 @@ def main():
       'production instance of Cobalt.',
       action='store_true')
   _add_cloud_access_args(sub_parser, cluster_settings)
-  sub_parser.add_argument('--bigtable_instance_name',
+  sub_parser.add_argument('--bigtable_instance_id',
       help='Specify a Cloud Bigtable instance within the specified Cloud'
       ' project against which to run some of the tests.'
       ' Only used for the cloud_bt tests and e2e tests when either '
       '-use_cloud_bt or -cobalt_on_personal_cluster are specified.'
-      ' default=%s'%cluster_settings['bigtable_instance_name'],
-      default=cluster_settings['bigtable_instance_name'])
+      ' default=%s'%cluster_settings['bigtable_instance_id'],
+      default=cluster_settings['bigtable_instance_id'])
   sub_parser.add_argument('--shuffler_preferred_address',
       default=default_shuffler_preferred_address,
       help='Address of the form <host>:<port> to be used by the '
@@ -1127,11 +1127,11 @@ def main():
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
            'default=%s'%cluster_settings['cloud_project_name'],
       default=cluster_settings['cloud_project_name'])
-  sub_parser.add_argument('--bigtable_instance_name',
+  sub_parser.add_argument('--bigtable_instance_id',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
       'project against which to query. Only used if -use_cloud_bt is set. '
-      'default=%s'%cluster_settings['bigtable_instance_name'],
-      default=cluster_settings['bigtable_instance_name'])
+      'default=%s'%cluster_settings['bigtable_instance_id'],
+      default=cluster_settings['bigtable_instance_id'])
   sub_parser.add_argument('--port',
       help='The port on which the Analyzer service should listen. '
            'Default=%s.' % DEFAULT_ANALYZER_SERVICE_PORT,
@@ -1163,11 +1163,11 @@ def main():
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
            'default=%s'%cluster_settings['cloud_project_name'],
       default=cluster_settings['cloud_project_name'])
-  sub_parser.add_argument('--bigtable_instance_name',
+  sub_parser.add_argument('--bigtable_instance_id',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
       'project against which to query. Only used if -use_cloud_bt is set. '
-      'default=%s'%cluster_settings['bigtable_instance_name'],
-      default=cluster_settings['bigtable_instance_name'])
+      'default=%s'%cluster_settings['bigtable_instance_id'],
+      default=cluster_settings['bigtable_instance_id'])
   sub_parser.add_argument('--port',
       help='The port on which the ReportMaster should listen. '
            'Default=%s.' % DEFAULT_REPORT_MASTER_PORT,
@@ -1285,11 +1285,11 @@ def main():
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
            'default=%s'%cluster_settings['cloud_project_name'],
       default=cluster_settings['cloud_project_name'])
-  sub_parser.add_argument('--bigtable_instance_name',
+  sub_parser.add_argument('--bigtable_instance_id',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
       'project against which to query. Only used if -use_cloud_bt is set. '
-      'default=%s'%cluster_settings['bigtable_instance_name'],
-      default=cluster_settings['bigtable_instance_name'])
+      'default=%s'%cluster_settings['bigtable_instance_id'],
+      default=cluster_settings['bigtable_instance_id'])
 
   sub_parser = start_subparsers.add_parser('bigtable_emulator',
     parents=[parent_parser],
@@ -1356,11 +1356,11 @@ def main():
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
            'default=%s'%cluster_settings['cloud_project_name'],
       default=cluster_settings['cloud_project_name'])
-  sub_parser.add_argument('--bigtable_instance_name',
+  sub_parser.add_argument('--bigtable_instance_id',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project that is to be provisioned. '
-    'default=%s'%cluster_settings['bigtable_instance_name'],
-    default=cluster_settings['bigtable_instance_name'])
+    'default=%s'%cluster_settings['bigtable_instance_id'],
+    default=cluster_settings['bigtable_instance_id'])
 
   sub_parser = bigtable_subparsers.add_parser('delete_observations',
     parents=[parent_parser],
@@ -1383,11 +1383,11 @@ def main():
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
            'default=%s'%cluster_settings['cloud_project_name'],
       default=cluster_settings['cloud_project_name'])
-  sub_parser.add_argument('--bigtable_instance_name',
+  sub_parser.add_argument('--bigtable_instance_id',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project from which all Observation data will be permanently deleted. '
-    'default=%s'%cluster_settings['bigtable_instance_name'],
-    default=cluster_settings['bigtable_instance_name'])
+    'default=%s'%cluster_settings['bigtable_instance_id'],
+    default=cluster_settings['bigtable_instance_id'])
   sub_parser.add_argument('--customer_id',
     help='Specify the Cobalt customer ID from which you wish to delete '
          'observations. Required.',
@@ -1422,11 +1422,11 @@ def main():
            'project name is <cloud_project_prefix>:<cloud_project_name>. '
            'default=%s'%cluster_settings['cloud_project_name'],
       default=cluster_settings['cloud_project_name'])
-  sub_parser.add_argument('--bigtable_instance_name',
+  sub_parser.add_argument('--bigtable_instance_id',
     help='Specify the Cloud Bigtable instance within the specified Cloud'
     ' project from which all Report data will be permanently deleted. '
-    'default=%s'%cluster_settings['bigtable_instance_name'],
-    default=cluster_settings['bigtable_instance_name'])
+    'default=%s'%cluster_settings['bigtable_instance_id'],
+    default=cluster_settings['bigtable_instance_id'])
   sub_parser.add_argument('--customer_id',
     help='Specify the Cobalt customer ID from which you wish to delete '
          'reports. Required.',
@@ -1503,12 +1503,12 @@ def main():
   sub_parser.add_argument('--job',
       help='The job you wish to start. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
-  sub_parser.add_argument('--bigtable_instance_name',
+  sub_parser.add_argument('--bigtable_instance_id',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
            'project that the Analyzer should connect to. This is required '
            'if and only if you are starting one of the two Analyzer jobs. '
-           'Default=%s' % cluster_settings['bigtable_instance_name'],
-      default=cluster_settings['bigtable_instance_name'])
+           'Default=%s' % cluster_settings['bigtable_instance_id'],
+      default=cluster_settings['bigtable_instance_id'])
   sub_parser.add_argument('--gce_pd_name',
       help='The name of a GCE persistent disk. This is used only when starting '
            'the Shuffler. The disk must already have been created in the same '

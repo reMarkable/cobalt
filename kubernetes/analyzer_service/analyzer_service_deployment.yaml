@@ -45,8 +45,8 @@ spec:
           - '6001'
           - '-bigtable_project_name'
           - $$BIGTABLE_PROJECT_NAME$$
-          - '-bigtable_instance_name'
-          - $$BIGTABLE_INSTANCE_NAME$$
+          - '-bigtable_instance_id'
+          - $$BIGTABLE_INSTANCE_ID$$
           - '-private_key_pem_file'
           # The directory path must match mountPath below.
           - '/var/lib/cobalt/$$ANALYZER_PRIVATE_PEM_NAME$$'

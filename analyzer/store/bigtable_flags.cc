@@ -20,7 +20,7 @@ namespace store {
 
 DEFINE_string(bigtable_project_name, "",
               "The name of Cobalt's Google Cloud project.");
-DEFINE_string(bigtable_instance_name, "",
+DEFINE_string(bigtable_instance_id, "",
               "The name of Cobalt's Google Cloud Bigtable instance.");
 
 DEFINE_bool(for_testing_only_use_bigtable_emulator, false,

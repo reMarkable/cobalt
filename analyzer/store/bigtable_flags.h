@@ -22,7 +22,7 @@ namespace analyzer {
 namespace store {
 
 DECLARE_string(bigtable_project_name);
-DECLARE_string(bigtable_instance_name);
+DECLARE_string(bigtable_instance_id);
 DECLARE_bool(for_testing_only_use_bigtable_emulator);
 
 }  // namespace store

@@ -44,24 +44,24 @@ std::shared_ptr<BigtableAdmin> BigtableAdmin::CreateFromFlagsOrDie() {
   // account the library looks for a key file located at the path specified in
   // the environment variable GOOGLE_APPLICATION_CREDENTIALS.
   CHECK_NE("", FLAGS_bigtable_project_name);
-  CHECK_NE("", FLAGS_bigtable_instance_name);
+  CHECK_NE("", FLAGS_bigtable_instance_id);
   auto creds = grpc::GoogleDefaultCredentials();
   CHECK(creds);
   LOG(INFO) << "Connecting to CloudBigtable admin API at "
             << kCloudBigtableAdminUri;
   return std::shared_ptr<BigtableAdmin>(new BigtableAdmin(
       kCloudBigtableAdminUri, creds, FLAGS_bigtable_project_name,
-      FLAGS_bigtable_instance_name));
+      FLAGS_bigtable_instance_id));
 }
 
 BigtableAdmin::BigtableAdmin(
     const std::string& uri,
     std::shared_ptr<grpc::ChannelCredentials> credentials,
-    std::string project_name, std::string instance_name)
+    std::string project_name, std::string instance_id)
     : channel_(grpc::CreateChannel(uri, credentials)),
       stub_(BigtableTableAdmin::NewStub(channel_)),
       project_name_(std::move(project_name)),
-      instance_name_(std::move(instance_name)) {}
+      instance_id_(std::move(instance_id)) {}
 
 bool BigtableAdmin::WaitForConnected(
     std::chrono::system_clock::time_point deadline) {
@@ -80,7 +80,7 @@ bool BigtableAdmin::CreateTableIfNecessary(std::string table_id) {
   GetTableRequest get_req;
   BtTable get_resp;
   get_req.set_name(
-      BigtableNames::FullTableName(project_name_, instance_name_, table_id));
+      BigtableNames::FullTableName(project_name_, instance_id_, table_id));
 
   // If the table exists, do nothing.
   grpc::Status get_s = stub_->GetTable(&get_ctx, get_req, &get_resp);
@@ -93,7 +93,7 @@ bool BigtableAdmin::CreateTableIfNecessary(std::string table_id) {
   BtTable create_resp;
 
   create_req.set_parent(
-      BigtableNames::TableParentName(project_name_, instance_name_));
+      BigtableNames::TableParentName(project_name_, instance_id_));
   create_req.set_table_id(std::move(table_id));
 
   // Set up columns.
