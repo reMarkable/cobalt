@@ -23,11 +23,26 @@ import "encrypted_message.proto";
 // Messages created in the Encoder and consumed in the Analyzer
 ///////////////////////////////////////////////////////////////
 
+// A distribution over an indexed set of value buckets.
+// The definition of the buckets is specified elsewhere.
+message BucketDistribution {
+  // |counts| maps buckets to counts for those buckets. The key is the bucket
+  // index. The value is the count.
+  map<uint32, uint64> counts = 1;
+};
+
 // A client-given value of a |MetricPart| to be encoded and collected by Cobalt.
 // An Encoder encodes a |ValuePart| and produces an |ObservationPart|. An
 // analyzer decodes an |ObservationPart| to recover the |ValuePart|. Cobalt
 // supports different types of values but the type must match the type declared
 // in the |MetricPart| definition.
+//
+// A ValuePart of type BucketDistribution is an exception to the description
+// above. It represents not a single client-given value but rather a
+// client-given distribution over many values. Currently Cobalt only supports
+// integer buckets and so a BucketDistribution may only be used when the
+// corresponding MetricPart is of type INT and includes an IntegerBuckets field
+// defining the buckets.
 message ValuePart {
   oneof data {
     // A human-readable, UTF8 string.
@@ -46,6 +61,16 @@ message ValuePart {
 
     // A double-precision floating point value.
     double double_value = 5;
+
+    // A distribution over an indexed set of buckets. An Observation may include
+    // at most one part whose value is a BucketDistribution. When Cobalt
+    // generates a report such an Observation will be treated mathematically as
+    // if it were many Observations.
+    //
+    // This can only be used if the corresponding metric part has |int_buckets|
+    // set and in that case the IntegerBuckets set there defines the bucket
+    // indices referenced by the BucketDistribution here.
+    BucketDistribution int_bucket_distribution = 999999;
   }
 }
 

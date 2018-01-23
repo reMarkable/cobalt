@@ -119,6 +119,9 @@ std::string ToString(const ValuePart& value) {
     case ValuePart::kBlobValue:
       stream << "<blob of length " << value.blob_value().size() << ">";
       break;
+    case ValuePart::kIntBucketDistribution:
+      stream << "<int bucket distribution>";
+      break;
     case ValuePart::DATA_NOT_SET:
       stream << "<ERROR: Invalid ValuePart message!>";
   }

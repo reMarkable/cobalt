@@ -17,6 +17,60 @@ package cobalt;
 
 option go_package = "config";
 
+// ExponentialIntegerBuckets is used to define a partition of the integers into
+// a finite number of buckets of exponentially-increasing size.
+//
+// Let n = num_buckets. Then there are n+2 buckets indexed 0,...,n+1.
+// Bucket 0 is the underflow bucket: (-infinity, floor)
+// Bucket n+1 is the overflow bucket:
+// [lower + initial_step * step_multiplier ^ n, +infinity)
+//
+// For i = 1 to n, the bucket i is defined as
+// [floor + initial_step * step_multiplier ^ (i-1), floor + initial_step * step_multiplier ^ i)
+//
+// Example: floor = 0, num_buckets = 3, initial_step = 10, step_multiplier = 10.
+// (-infinity, 0), [0, 10), [10, 100), [100, 1000), [1000, +inifinity)
+message ExponentialIntegerBuckets {
+  int64 floor = 1;
+
+  // num_buckets must be at least 1.
+  uint32 num_buckets = 2;
+
+  // Must be at least one.
+  uint32 initial_step = 3;
+
+  // Must be at least one.
+  uint32 step_multiplier = 4;
+};
+
+// LinearIntegerBuckets is used to define a partition of the integers into a
+// finite number of buckets of equal size.
+//
+// Let n = num_buckets. Then there are n+2 buckets indexed 0,...,n+1.
+// Bucket 0 is the underflow bucket: (-infinity, floor)
+// Bucket n+1 is the overflow bucket: [lower + step_size * n, +infinity)
+//
+// For i = 1 to n, the bucket i is defined as
+// [floor + step_size * (i-1), floor + step_size * i)
+//
+// Example: floor = 0, num_buckets = 3, step_size = 10.
+// (-infinity, 0), [0, 10), [10, 20), [20, 30), [30, +inifinity)
+message LinearIntegerBuckets {
+  int64 floor = 1;
+
+  // num_buckets >= 1
+  uint32 num_buckets = 2;
+
+  uint32 step_size = 3;
+}
+
+message IntegerBuckets {
+  oneof buckets {
+    ExponentialIntegerBuckets exponential = 1;
+    LinearIntegerBuckets linear = 2;
+  }
+};
+
 // A |Metric| is composed of one or more |MetricParts|. A |MetricPart| has a
 // name which is specified as the key in the |parts| field of |Metric|, a
 // description and a data type which specifies the type of a |ValuePart| that
@@ -65,6 +119,14 @@ message MetricPart {
 
   // The data-type for this MetricPart.
   DataType data_type = 2;
+
+  // This may only be set if |data_type| is |INT|. If this is set, a ValuePart
+  // for this MetricPart may contain a BucketDistribution instead of an int. In
+  // that case the ValuePart represents many integer observations rather than a
+  // single integer observation.
+  //
+  // Only one MetricPart per Metric may have this field set.
+  IntegerBuckets int_buckets = 3;
 }
 
 // A Metric represents a real-world value to be observed and reported by Cobalt.
