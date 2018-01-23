@@ -706,7 +706,7 @@ def _configure_endpoint(cloud_project_prefix, cloud_project_name,
       '$$STATIC_IP_ADDRESS$$': static_ip_address}
   _replace_tokens_in_template(
       config_template_file, config_file, token_substitutions)
-  subprocess.check_call(["gcloud", "service-management", "deploy",
+  subprocess.check_call(["gcloud", "endpoints", "services", "deploy",
     proto_descriptor, config_file, '--project',
     compound_project_name(cloud_project_prefix, cloud_project_name)])
 
