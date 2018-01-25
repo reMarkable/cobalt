@@ -143,6 +143,27 @@ element {
   }
 }
 
+# Metric 8 has an int distribution part.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 8
+  time_zone_policy: UTC
+  parts {
+    key: "Part1"
+    value {
+      data_type: INT
+      int_buckets: {
+        linear: {
+          floor: 0
+          num_buckets: 10
+          step_size: 5
+        }
+      }
+    }
+  }
+}
+
 )";
 
 const char* kEncodingConfigText = R"(
@@ -478,6 +499,41 @@ Observation DoEncodeBlobTest(
   return *result.observation;
 }
 
+// Tests the EncodeIntBucketDistribution() method using the given |distribution|
+// and the given metric and encoding. The metric is expected to have a single
+// part named "Part1". The encoding is expected to be NoOp.
+// Returns the encoded Observation.
+//
+// If expectOK is true then we verify that there are no errors and that the
+// produced Observation has the |expected_type| and is non-empty. Otherwise
+// we verify that kInvalidArguments is returned.
+Observation DoEncodeIntBucketDistributionTest(
+    bool expect_ok, const std::map<uint32_t, uint64_t>& distribution,
+    uint32_t metric_id, uint32_t encoding_config_id, bool expect_utc,
+    const ObservationPart::ValueCase& expected_encoding) {
+  // Build the ProjectContext encapsulating our test config data.
+  std::shared_ptr<ProjectContext> project = GetTestProject();
+
+  // Construct the Encoder.
+  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  // Set a static current time so we can test the day_index computation.
+  encoder.set_current_time(kSomeTimestamp);
+
+  // Encode an observation for the given metric and encoding. The metric is
+  // expected to have a single part.
+  Encoder::Result result = encoder.EncodeIntBucketDistribution(
+      metric_id, encoding_config_id, distribution);
+
+  if (expect_ok) {
+    CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
+                          expected_encoding);
+  } else {
+    EXPECT_EQ(Encoder::kInvalidArguments, result.status)
+        << "encoding_config_id=" << encoding_config_id;
+  }
+  return *result.observation;
+}
+
 // Tests EncodeString() with Forculus as the specified encoding.
 TEST(EncoderTest, EncodeStringForculus) {
   // Metric 1 has a single string part.
@@ -670,6 +726,50 @@ TEST(EncoderTest, EncodeBlobNoOp) {
                               false, ObservationPart::kUnencoded);
   EXPECT_EQ("This is a blob",
             obs.parts().at("Part1").unencoded().unencoded_value().blob_value());
+}
+
+// Tests EncodeIntBucketDistribution() with NoOp encoding.
+TEST(EncoderTest, EncodeIntBucketDistributionNoOp) {
+  // Metric 9 has a single int bucket distribution part.
+  // EncodingConfig 7 is NoOp.
+  std::map<uint32_t, uint64_t> distribution = {{0, 10}, {2, 6}, {11, 1}};
+  bool expect_ok = true;
+  bool expect_utc = true;
+  auto obs = DoEncodeIntBucketDistributionTest(
+      expect_ok, distribution, 8, 7, expect_utc, ObservationPart::kUnencoded);
+
+  EXPECT_EQ(uint64_t(3), obs.parts()
+                             .at("Part1")
+                             .unencoded()
+                             .unencoded_value()
+                             .int_bucket_distribution()
+                             .counts()
+                             .size());
+
+  for (auto it = distribution.begin(); it != distribution.end(); it++) {
+    EXPECT_EQ(it->second, obs.parts()
+                              .at("Part1")
+                              .unencoded()
+                              .unencoded_value()
+                              .int_bucket_distribution()
+                              .counts()
+                              .at(it->first));
+  }
+
+  expect_ok = false;
+  // Metric 1 has a single string part. That should fail.
+  DoEncodeIntBucketDistributionTest(expect_ok, distribution, 1, 7, expect_utc,
+                                    ObservationPart::kUnencoded);
+
+  // Metric 2 has an integer part, but no int_buckets set. That should fail.
+  DoEncodeIntBucketDistributionTest(expect_ok, distribution, 2, 7, expect_utc,
+                                    ObservationPart::kUnencoded);
+
+  // There are only 10 buckets + the overflow buckets configured.
+  // This should fail.
+  distribution[12] = 10;
+  DoEncodeIntBucketDistributionTest(expect_ok, distribution, 8, 7, expect_utc,
+                                    ObservationPart::kUnencoded);
 }
 
 // Tests the advanced API, when used corretly.

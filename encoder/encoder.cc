@@ -33,6 +33,29 @@ using rappor::BasicRapporEncoder;
 using rappor::RapporEncoder;
 using util::TimeToDayIndex;
 
+namespace {
+std::string DataCaseToString(ValuePart::DataCase data_case) {
+  switch (data_case) {
+    case ValuePart::kStringValue:
+      return "STRING";
+    case ValuePart::kIntValue:
+      return "INT";
+    case ValuePart::kBlobValue:
+      return "BLOB";
+    case ValuePart::kIndexValue:
+      return "INDEX";
+    case ValuePart::kDoubleValue:
+      return "DOUBLE";
+    case ValuePart::kIntBucketDistribution:
+      return "INT_BUCKET_DISTRIBUTION";
+    case ValuePart::DATA_NOT_SET:
+      return "<DATA_NOT_SET>";
+  }
+  return "UNKNOWN_TYPE";
+}
+
+} // namespace
+
 Encoder::Encoder(std::shared_ptr<ProjectContext> project,
                  ClientSecret client_secret)
     : customer_id_(project->customer_id()),
@@ -41,28 +64,20 @@ Encoder::Encoder(std::shared_ptr<ProjectContext> project,
       client_secret_(std::move(client_secret)) {}
 
 Encoder::Status Encoder::EncodeForculus(
-    uint32_t metric_id, uint32_t encoding_config_id,
-    MetricPart::DataType data_type, const ValuePart& value,
+    uint32_t metric_id, uint32_t encoding_config_id, const ValuePart& value,
     const EncodingConfig* encoding_config, const std::string& part_name,
     uint32_t day_index, ObservationPart* observation_part) {
-  switch (data_type) {
-    case MetricPart::INT: {
-      LOG(ERROR) << "Forculus doesn't support INTs: (" << customer_id_ << ", "
-                 << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    case MetricPart::DOUBLE: {
-      LOG(ERROR) << "Forculus doesn't support DOUBLEs: (" << customer_id_
-                 << ", " << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    case MetricPart::INDEX: {
-      LOG(ERROR) << "Forculus doesn't support INDEXes: (" << customer_id_
-                 << ", " << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    default:
+  switch (value.data_case()) {
+    case ValuePart::kStringValue:
+    case ValuePart::kBlobValue:
       break;
+    default: {
+      LOG(ERROR) << "Forculus doesn't support "
+                 << DataCaseToString(value.data_case()) << "s: ("
+                 << customer_id_ << ", " << project_id_ << ", "
+                 << encoding_config_id << ")";
+      return kInvalidArguments;
+    }
   }
   ForculusObservation* forculus_observation =
       observation_part->mutable_forculus();
@@ -87,34 +102,15 @@ Encoder::Status Encoder::EncodeForculus(
 
 Encoder::Status Encoder::EncodeRappor(uint32_t metric_id,
                                       uint32_t encoding_config_id,
-                                      MetricPart::DataType data_type,
                                       const ValuePart& value,
                                       const EncodingConfig* encoding_config,
                                       const std::string& part_name,
                                       ObservationPart* observation_part) {
-  switch (data_type) {
-    case MetricPart::INT: {
-      LOG(ERROR) << "RAPPOR doesn't support INTs: (" << customer_id_ << ", "
-                 << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    case MetricPart::DOUBLE: {
-      LOG(ERROR) << "RAPPOR doesn't support DOUBLEs: (" << customer_id_ << ", "
-                 << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    case MetricPart::INDEX: {
-      LOG(ERROR) << "RAPPOR doesn't support INDEXes: (" << customer_id_ << ", "
-                 << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    case MetricPart::BLOB: {
-      LOG(ERROR) << "RAPPOR doesn't support Blobs: (" << customer_id_ << ", "
-                 << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    default:
-      break;
+  if (value.data_case() != ValuePart::kStringValue) {
+    LOG(ERROR) << "RAPPOR doesn't support "
+               << DataCaseToString(value.data_case()) << "s: (" << customer_id_
+               << ", " << project_id_ << ", " << encoding_config_id << ")";
+    return kInvalidArguments;
   }
   RapporObservation* rappor_observation = observation_part->mutable_rappor();
   RapporEncoder rappor_encoder(encoding_config->rappor(), client_secret_);
@@ -134,23 +130,21 @@ Encoder::Status Encoder::EncodeRappor(uint32_t metric_id,
 }
 
 Encoder::Status Encoder::EncodeBasicRappor(
-    uint32_t metric_id, uint32_t encoding_config_id,
-    MetricPart::DataType data_type, const ValuePart& value,
+    uint32_t metric_id, uint32_t encoding_config_id, const ValuePart& value,
     const EncodingConfig* encoding_config, const std::string& part_name,
     ObservationPart* observation_part) {
-  switch (data_type) {
-    case MetricPart::DOUBLE: {
-      LOG(ERROR) << "Basic RAPPOR doesn't support DOUBLEs: (" << customer_id_
-                 << ", " << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    case MetricPart::BLOB: {
-      LOG(ERROR) << "Basic RAPPOR doesn't support Blobs: (" << customer_id_
-                 << ", " << project_id_ << ", " << encoding_config_id << ")";
-      return kInvalidArguments;
-    }
-    default:
+  switch (value.data_case()) {
+    case ValuePart::kStringValue:
+    case ValuePart::kIntValue:
+    case ValuePart::kIndexValue:
       break;
+    default: {
+      LOG(ERROR) << "Basic RAPPOR doesn't support "
+                 << DataCaseToString(value.data_case()) << "s: ("
+                 << customer_id_ << ", " << project_id_ << ", "
+                 << encoding_config_id << ")";
+      return kInvalidArguments;
+    }
   }
   BasicRapporObservation* basic_rappor_observation =
       observation_part->mutable_basic_rappor();
@@ -180,6 +174,109 @@ Encoder::Status Encoder::EncodeNoOp(uint32_t metric_id, const ValuePart& value,
   observation_part->mutable_unencoded()->set_allocated_unencoded_value(
       new ValuePart(value));
   return kOK;
+}
+
+// Check that the specified metric_part and value_part_data are compatible.
+// If they are not, return false and emit an error message.
+// Else, return true.
+// The part_name and metric_id are used to construct error messages.
+bool Encoder::CheckValidValuePart(
+    uint32_t metric_id, const std::string& part_name,
+    const MetricPart& metric_part,
+    const Encoder::Value::ValuePartData& value_part_data) {
+  // Check that the data_type of the ValuePart matches the data_type of the
+  // MetricPart.
+  MetricPart::DataType value_data_type;
+  switch (value_part_data.value_part.data_case()) {
+    case ValuePart::kStringValue:
+      value_data_type = MetricPart::STRING;
+      break;
+
+    case ValuePart::kIntBucketDistribution:
+    case ValuePart::kIntValue:
+      value_data_type = MetricPart::INT;
+      break;
+
+    case ValuePart::kDoubleValue:
+      value_data_type = MetricPart::DOUBLE;
+      break;
+
+    case ValuePart::kBlobValue:
+      value_data_type = MetricPart::BLOB;
+      break;
+
+    case ValuePart::kIndexValue: {
+      value_data_type = MetricPart::INDEX;
+      break;
+    }
+    case ValuePart::DATA_NOT_SET: {
+      LOG(ERROR) << "Metric part (" << customer_id_ << ", " << project_id_
+                 << ", " << metric_id << ")-" << part_name << " is not set.";
+      return false;
+    }
+  }
+  if (metric_part.data_type() != value_data_type) {
+    LOG(ERROR) << "Metric part (" << customer_id_ << ", " << project_id_ << ", "
+               << metric_id << ")-" << part_name << " is not of type "
+               << DataCaseToString(value_part_data.value_part.data_case())
+               << ".";
+    return false;
+  }
+
+  // Check that the int bucket distribution value is allowed and valid.
+  if (value_part_data.value_part.data_case() ==
+      ValuePart::kIntBucketDistribution) {
+    auto counts = value_part_data.value_part.int_bucket_distribution().counts();
+    if (!CheckIntBucketDistribution(metric_id, part_name, metric_part,
+                                    counts)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Check that the int bucket distribution value is allowed and valid.
+bool Encoder::CheckIntBucketDistribution(
+    uint32_t metric_id, const std::string& part_name,
+    const MetricPart& metric_part,
+    const google::protobuf::Map<uint32_t, uint64_t>& counts) {
+  // Check that if the ValuePart is an int_bucket_distribution, the MetricPart
+  // has int_buckets set.
+  if (!metric_part.has_int_buckets()) {
+    LOG(ERROR) << "Metric part (" << customer_id_ << ", " << project_id_ << ", "
+               << metric_id << ")-" << part_name << " does not have "
+               << "int_buckets set.";
+    return false;
+  }
+
+  // Find the number of buckets.
+  uint32_t num_buckets;
+  switch (metric_part.int_buckets().buckets_case()) {
+    case IntegerBuckets::kExponential:
+      num_buckets = metric_part.int_buckets().exponential().num_buckets();
+      break;
+    case IntegerBuckets::kLinear:
+      num_buckets = metric_part.int_buckets().linear().num_buckets();
+      break;
+    case IntegerBuckets::BUCKETS_NOT_SET:
+      LOG(ERROR) << "Buckets not set. This should never happen.";
+      return false;
+  }
+  // In addition to the specified num_buckets, there are the underflow and
+  // overflow buckets.
+  num_buckets += 2;
+
+  for (auto it = counts.begin(); it != counts.end(); ++it) {
+    // Check that all the specified bucket indices are valid.
+    if (it->first >= num_buckets) {
+      LOG(ERROR) << "Invalid bucket index " << it->first << " for Metric ("
+                 << customer_id_ << ", " << project_id_ << ", " << metric_id
+                 << ") - part " << part_name;
+      return false;
+    }
+  }
+  return true;
 }
 
 Encoder::Result Encoder::EncodeString(uint32_t metric_id,
@@ -229,6 +326,16 @@ Encoder::Result Encoder::EncodeBlob(uint32_t metric_id,
   // An empty part name is a signal to the function Encoder::Encode() that the
   // metric has only a single part.
   value.AddBlobPart(encoding_config_id, "", data, num_bytes);
+  return Encode(metric_id, value);
+}
+
+Encoder::Result Encoder::EncodeIntBucketDistribution(
+    uint32_t metric_id, uint32_t encoding_config_id,
+    const std::map<uint32_t, uint64_t>& distribution) {
+  Value value;
+  // An empty part name is a signal to the function Encoder::Encode() that the
+  // metric has only a single part.
+  value.AddIntBucketDistributionPart(encoding_config_id, "", distribution);
   return Encode(metric_id, value);
 }
 
@@ -316,12 +423,10 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
     }
     const MetricPart& metric_part = metric_part_iterator->second;
 
-    // Check that the data type of the ValuePart matches the data_type of the
+    // Check that the data type of the ValuePart is valid for the specified
     // MetricPart.
-    if (metric_part.data_type() != value_part_data.data_type) {
-      LOG(ERROR) << "Metric part (" << customer_id_ << ", " << project_id_
-                 << ", " << metric_id << ")-" << part_name << " is not of type "
-                 << value_part_data.data_type << ".";
+    if (!CheckValidValuePart(metric_id, part_name, metric_part,
+                             value_part_data)) {
       result.status = kInvalidArguments;
       return result;
     }
@@ -348,25 +453,23 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
     switch (encoding_config->config_case()) {
       case EncodingConfig::kForculus: {
         status = EncodeForculus(metric_id, value_part_data.encoding_config_id,
-                                value_part_data.data_type,
                                 value_part_data.value_part, encoding_config,
                                 part_name, day_index, &observation_part);
         break;
       }
 
       case EncodingConfig::kRappor: {
-        status =
-            EncodeRappor(metric_id, value_part_data.encoding_config_id,
-                         value_part_data.data_type, value_part_data.value_part,
-                         encoding_config, part_name, &observation_part);
+        status = EncodeRappor(metric_id, value_part_data.encoding_config_id,
+                              value_part_data.value_part, encoding_config,
+                              part_name, &observation_part);
         break;
       }
 
       case EncodingConfig::kBasicRappor: {
-        status = EncodeBasicRappor(
-            metric_id, value_part_data.encoding_config_id,
-            value_part_data.data_type, value_part_data.value_part,
-            encoding_config, part_name, &observation_part);
+        status =
+            EncodeBasicRappor(metric_id, value_part_data.encoding_config_id,
+                              value_part_data.value_part, encoding_config,
+                              part_name, &observation_part);
         break;
       }
 
@@ -390,44 +493,49 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
 }
 
 ValuePart& Encoder::Value::AddPart(uint32_t encoding_config_id,
-                                   const std::string& part_name,
-                                   MetricPart::DataType data_type) {
+                                   const std::string& part_name) {
   // emplace() returns a pair whose first element is an iterator over
   // pairs whose second element is a ValuePartData.
-  return parts_.emplace(part_name, ValuePartData(encoding_config_id, data_type))
+  return parts_.emplace(part_name, ValuePartData(encoding_config_id))
       .first->second.value_part;
 }
 
 void Encoder::Value::AddStringPart(uint32_t encoding_config_id,
                                    const std::string& part_name,
                                    const std::string& value) {
-  AddPart(encoding_config_id, part_name, MetricPart::STRING)
-      .set_string_value(value);
+  AddPart(encoding_config_id, part_name).set_string_value(value);
 }
 
 void Encoder::Value::AddIntPart(uint32_t encoding_config_id,
                                 const std::string& part_name, int64_t value) {
-  AddPart(encoding_config_id, part_name, MetricPart::INT).set_int_value(value);
+  AddPart(encoding_config_id, part_name).set_int_value(value);
 }
 
 void Encoder::Value::AddDoublePart(uint32_t encoding_config_id,
                                    const std::string& part_name, double value) {
-  AddPart(encoding_config_id, part_name, MetricPart::DOUBLE)
-      .set_double_value(value);
+  AddPart(encoding_config_id, part_name).set_double_value(value);
 }
 
 void Encoder::Value::AddIndexPart(uint32_t encoding_config_id,
                                   const std::string& part_name,
                                   uint32_t index) {
-  AddPart(encoding_config_id, part_name, MetricPart::INDEX)
-      .set_index_value(index);
+  AddPart(encoding_config_id, part_name).set_index_value(index);
 }
 
 void Encoder::Value::AddBlobPart(uint32_t encoding_config_id,
                                  const std::string& part_name, const void* data,
                                  size_t num_bytes) {
-  AddPart(encoding_config_id, part_name, MetricPart::BLOB)
-      .set_blob_value(data, num_bytes);
+  AddPart(encoding_config_id, part_name).set_blob_value(data, num_bytes);
+}
+
+void Encoder::Value::AddIntBucketDistributionPart(
+    uint32_t encoding_config_id, const std::string& part_name,
+    const std::map<uint32_t, uint64_t>& value) {
+  auto distribution =
+      AddPart(encoding_config_id, part_name).mutable_int_bucket_distribution();
+  for (auto it = value.begin(); it != value.end(); it++) {
+    (*distribution->mutable_counts())[it->first] = it->second;
+  }
 }
 
 }  // namespace encoder
