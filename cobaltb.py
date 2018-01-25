@@ -1588,11 +1588,9 @@ def main():
       help='The job whose certificate you wish to deploy. Valid choices: '
            '"report-master", "shuffler". Required.')
   sub_parser.add_argument('--path-to-cert',
-      help='Path to the certificate to be deployed. (Required unless '
-           '--dev-generate is set.)')
+      help='Path to the certificate to be deployed.')
   sub_parser.add_argument('--path-to-key',
-      help='Path to the private key to be deployed. (Required unless '
-           '--dev-generate is set.)')
+      help='Path to the private key to be deployed.')
   sub_parser.set_defaults(func=_deploy_upload_certificate)
 
   sub_parser = deploy_subparsers.add_parser('delete_certificate',
