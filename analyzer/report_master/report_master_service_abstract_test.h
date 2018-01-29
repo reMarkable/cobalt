@@ -17,6 +17,7 @@
 
 #include "analyzer/report_master/report_master_service.h"
 
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <string>
@@ -57,10 +58,12 @@ static const uint32_t kMetricId3 = 3;
 static const uint32_t kReportConfigId1 = 1;
 static const uint32_t kReportConfigId2 = 2;
 static const uint32_t kReportConfigId3 = 3;
+static const uint32_t kReportConfigId4 = 4;
 static const uint32_t kForculusEncodingConfigId = 1;
 static const uint32_t kBasicRapporStringEncodingConfigId = 2;
 static const uint32_t kBasicRapporIntEncodingConfigId = 3;
 static const uint32_t kBasicRapporIndexEncodingConfigId = 4;
+static const uint32_t kNoOpEncodingConfigId = 5;
 static const char kPartName1[] = "Part1";
 static const char kPartName2[] = "Part2";
 static const size_t kForculusThreshold = 20;
@@ -184,6 +187,15 @@ element {
   }
 }
 
+# EncodingConfig 5 is NoOp.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  no_op_encoding {
+  }
+}
+
 )";
 
 static const char* kReportConfigText = R"(
@@ -254,6 +266,31 @@ element {
     csv {}
     gcs {
       bucket: "bucket.name.3"
+    }
+  }
+}
+
+# ReportConfig 4 specifies a RAW_DUMP report of both variables of Metric 2.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  metric_id: 2
+  variable {
+    metric_part: "Part1"
+  }
+  variable {
+    metric_part: "Part2"
+  }
+  report_type: RAW_DUMP
+  scheduling {
+    # report_finalization_days will default to 0.
+    # aggregation_epoch_type will default to DAY.
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "bucket.name.4"
     }
   }
 }
@@ -585,6 +622,33 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     if (check_completed) {
       EXPECT_TRUE(second_marginal_report_out->has_rows());
     }
+  }
+
+  // Returns a version of the given |report| with the rows sorted.
+  // |report| is expected to be a serialized report that consist of a series
+  // of report rows separated by newlines. The first row of the report should be
+  // the header row. This method will build a new serialized report that
+  // has the same header row but with the remaining rows sorted.
+  std::string WithSortedRows(std::string report) {
+    std::istringstream istream(report);
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(istream, line)) {
+      lines.push_back(line);
+    }
+    auto begin = lines.begin();
+    begin++;
+    std::sort(begin, lines.end());
+    std::ostringstream ostream;
+    for (const auto& line : lines) {
+      ostream << line;
+    }
+    return ostream.str();
+  }
+
+  void CheckRawDumpReport(const std::string& expected_report,
+                          const std::string& report) {
+    EXPECT_EQ(WithSortedRows(expected_report), WithSortedRows(report));
   }
 
   // Invokes ReportMaster::QueryReportsInternal() using our fixed customer and
@@ -1025,15 +1089,19 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
   // reports will have something to analyzer. This part of the simulation is
   // unrealistic because we are going to add Observations for all of the days
   // at the beginning of the test instead of allowing the Observations to arrive
-  // interspersed with the report generation. We add observations for metrics 1
-  // and 3 for each day in the interval [kDayIndex - 30, kDayIndex + 15].
-  // We don't bother adding Observations for metric 2 because report config
-  // 2 does not have a ShedulingConfig so it will never be scheduled.
+  // interspersed with the report generation. We add observations for metrics 1,
+  // 2 and 3 for each day in the interval [kDayIndex - 30, kDayIndex + 15].
   for (uint32_t day_index = kDayIndex - 30; day_index < kDayIndex + 15;
        day_index++) {
     this->AddObservations("Apple", 1, kMetricId1,
                           kBasicRapporStringEncodingConfigId,
                           kBasicRapporIntEncodingConfigId, 20, day_index);
+    this->AddObservations("a", 1, kMetricId2, kNoOpEncodingConfigId,
+                          kNoOpEncodingConfigId, 1, day_index);
+    this->AddObservations("b", 2, kMetricId2, kNoOpEncodingConfigId,
+                          kNoOpEncodingConfigId, 2, day_index);
+    this->AddObservations("c", 3, kMetricId2, kNoOpEncodingConfigId,
+                          kNoOpEncodingConfigId, 3, day_index);
     this->AddIndexObservations(0, kMetricId3, kBasicRapporIndexEncodingConfigId,
                                5, day_index);
   }
@@ -1105,13 +1173,23 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
 <DATE>,"Event Z",0,0
 )";
 
+  static const char kExpectedReport4[] = R"(date,Part1,Part2
+<DATE>,"a",1
+<DATE>,"b",2
+<DATE>,"b",2
+<DATE>,"c",3
+<DATE>,"c",3
+<DATE>,"c",3
+)";
+
   // The keys to these maps are day indices and the values are the number of
   // reports found for that day.
   std::map<uint32_t, size_t> day_counts_for_report_1;
   std::map<uint32_t, size_t> day_counts_for_report_3;
+  std::map<uint32_t, size_t> day_counts_for_report_4;
 
   size_t num_reports = this->fake_uploader_->buckets.size();
-  ASSERT_TRUE(num_reports >= 80) << num_reports;
+  ASSERT_TRUE(num_reports >= 120) << num_reports;
   ASSERT_EQ(num_reports, this->fake_uploader_->paths.size());
   ASSERT_EQ(num_reports, this->fake_uploader_->reports.size());
   ASSERT_EQ(num_reports, this->fake_uploader_->mime_types.size());
@@ -1129,6 +1207,10 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
       report_config_id = kReportConfigId3;
       day_counts = &day_counts_for_report_3;
       expected_report = std::string(kExpectedReport3);
+    } else if (this->fake_uploader_->buckets[i] == "bucket.name.4") {
+      report_config_id = kReportConfigId4;
+      day_counts = &day_counts_for_report_4;
+      expected_report = std::string(kExpectedReport4);
     } else {
       FAIL() << this->fake_uploader_->buckets[i];
     }
@@ -1136,8 +1218,15 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
         this->fake_uploader_->paths[i], report_config_id);
     ASSERT_GE(day_index, kDayIndex - 30);
     ASSERT_LE(day_index, kDayIndex + 100);
-    EXPECT_EQ(this->ReplaceDateTokens(expected_report, kDateToken, day_index),
-              this->fake_uploader_->reports[i]);
+    expected_report =
+        this->ReplaceDateTokens(expected_report, kDateToken, day_index);
+    if (report_config_id == kReportConfigId4) {
+      this->CheckRawDumpReport(expected_report,
+                               this->fake_uploader_->reports[i]);
+    } else {
+      EXPECT_EQ(expected_report, this->fake_uploader_->reports[i]);
+    }
+
     (*day_counts)[day_index]++;
   }
 
@@ -1145,11 +1234,13 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
        day_index++) {
     EXPECT_EQ(1u, day_counts_for_report_1[day_index]) << day_index;
     EXPECT_EQ(1u, day_counts_for_report_3[day_index]) << day_index;
+    EXPECT_EQ(1u, day_counts_for_report_4[day_index]) << day_index;
   }
   for (uint32_t day_index = kDayIndex - 2; day_index <= kDayIndex + 9;
        day_index++) {
     EXPECT_TRUE(day_counts_for_report_1[day_index] >= 1) << day_index;
     EXPECT_EQ(1u, day_counts_for_report_3[day_index]) << day_index;
+    EXPECT_EQ(1u, day_counts_for_report_4[day_index]) << day_index;
   }
 }
 

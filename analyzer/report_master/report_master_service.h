@@ -163,6 +163,21 @@ class ReportMasterService final : public ReportMaster::Service {
                                 ReportId* report_id,
                                 StartReportResponse* response);
 
+  // Encapsulates the logic for starting a RAW_DUMP report. Invoked by
+  // StartReportNoAuth in the case that the type of report to be started is
+  // RAW_DUMP.
+  //
+  // |report_id| will be modified. On input customer_id, project_id and
+  // report_config_id should be set. This method will set the remaining fields
+  // thereby forming a new unique ReportId for the newly started RAW_DUMP
+  // report.
+  grpc::Status StartRawDumpReport(const StartReportRequest& request,
+                                  bool one_off, const std::string& export_name,
+                                  bool in_store,
+                                  const ReportConfig& report_config,
+                                  ReportId* report_id,
+                                  StartReportResponse* response);
+
   // Invokes ReportStore::StartNewReport().
   // Does Log(ERROR) and returns an error status on error.
   grpc::Status StartNewReport(const StartReportRequest& request, bool one_off,

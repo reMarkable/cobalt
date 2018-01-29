@@ -20,6 +20,7 @@
 #include "analyzer/report_master/report_master_service.h"
 
 #include <memory>
+#include <numeric>
 #include <string>
 #include <utility>
 #include <vector>
@@ -432,6 +433,11 @@ grpc::Status ReportMasterService::StartReportNoAuth(
                               report_id_out, response);
       break;
 
+    case RAW_DUMP:
+      return StartRawDumpReport(*request, one_off, export_name, in_store,
+                                *report_config, report_id_out, response);
+      break;
+
     default:
       std::ostringstream stream;
       stream << "Bad ReportConfig found with id=" << report_config_id
@@ -520,6 +526,36 @@ grpc::Status ReportMasterService::StartJointReport(
   }
 
   // Finally enqueue the chain of reports to be generated.
+  return report_executor_->EnqueueReportGeneration(report_chain);
+}
+
+grpc::Status ReportMasterService::StartRawDumpReport(
+    const StartReportRequest& request, bool one_off,
+    const std::string& export_name, bool in_store,
+    const ReportConfig& report_config, ReportId* report_id,
+    StartReportResponse* response) {
+  // We will be creating and starting one report only.
+  report_id->set_sequence_num(0);
+  // We do not want to alter the order or number of variables specified
+  // in the report config, so we want for variable_indices to specify
+  // all indices from 0 to num_variables - 1.
+  std::vector<uint32_t> variable_indices(report_config.variable_size());
+  std::iota(variable_indices.begin(), variable_indices.end(), 0);
+  auto status = StartNewReport(request, one_off, export_name, in_store,
+                               RAW_DUMP, variable_indices, report_id);
+  if (!status.ok()) {
+    return status;
+  }
+
+  // Build the public report_id string to return in the repsonse.
+  status = ReportIdToString(*report_id, response->mutable_report_id());
+  if (!status.ok()) {
+    return status;
+  }
+
+  // Finally enqueue the chain of one report to be generated.
+  std::vector<ReportId> report_chain(1);
+  report_chain[0] = *report_id;
   return report_executor_->EnqueueReportGeneration(report_chain);
 }
 
