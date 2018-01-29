@@ -107,6 +107,8 @@ class ReportSerializer {
 
   grpc::Status AppendCSVHistogramHeaderRow(std::ostream* stream);
 
+  grpc::Status AppendCSVRawDumpHeaderRow(std::ostream* stream);
+
   grpc::Status AppendCSVJointHeaderRow(std::ostream* stream);
 
   grpc::Status AppendCSVHeaderRowVariableNames(std::ostream* stream);
@@ -116,6 +118,9 @@ class ReportSerializer {
 
   grpc::Status AppendCSVHistogramReportRow(const HistogramReportRow& report_row,
                                            std::ostream* stream);
+
+  grpc::Status AppendCSVRawDumpReportRow(const RawDumpReportRow& report_row,
+                                         std::ostream* stream);
 
   grpc::Status AppendCSVJointReportRow(const JointReportRow& report_row,
                                        std::ostream* stream);

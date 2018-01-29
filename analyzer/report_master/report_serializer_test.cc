@@ -21,6 +21,11 @@ namespace {
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
 const uint32_t kSomeDayIndex = 123456;
+const uint32_t kFruitHistogramReportConfigId = 1;
+const uint32_t kCityHistogramReportConfigId = 2;
+const uint32_t kJointReportConfigId = 3;
+const uint32_t kInvalidHistogramReportConfigId = 4;
+const uint32_t kRawDumpReportConfigId = 5;
 
 const char* kReportConfigText = R"(
 element {
@@ -30,9 +35,6 @@ element {
   metric_id: 1
   variable {
     metric_part: "Fruit"
-  }
-  variable {
-    metric_part: "City"
   }
   export_configs {
     csv {}
@@ -44,8 +46,63 @@ element {
   project_id: 1
   id: 2
   metric_id: 1
+  variable {
+    metric_part: "City"
+  }
+  report_type: HISTOGRAM
+  export_configs {
+    csv {}
+  }
+}
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  metric_id: 1
+  variable {
+    metric_part: "City"
+  }
+  variable {
+    metric_part: "Fruit"
+  }
+  report_type: JOINT
+  export_configs {
+    csv {}
+  }
+}
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  metric_id: 1
+  report_type: HISTOGRAM
   # This export_config is invalid.
   export_configs {
+  }
+}
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  metric_id: 1
+  report_type: RAW_DUMP
+  variable {
+    metric_part: "City"
+  }
+  variable {
+    metric_part: "Fruit"
+  }
+  variable  {
+    metric_part: "Minutes"
+  }
+  variable  {
+    metric_part: "Rating"
+  }
+  export_configs {
+    csv {}
   }
 }
 )";
@@ -59,8 +116,20 @@ ReportMetadataLite BuildHistogramMetadata(uint32_t variable_index) {
   return metadata;
 }
 
-void AddFloatValues(float count_estimate, float std_error,
-                    HistogramReportRow* row) {
+ReportMetadataLite BuildRawDumpMetadata(
+    const std::vector<uint32_t>& variable_indices) {
+  ReportMetadataLite metadata;
+  metadata.set_report_type(ReportType::RAW_DUMP);
+  for (auto index : variable_indices) {
+    metadata.add_variable_indices(index);
+  }
+  metadata.set_first_day_index(kSomeDayIndex);
+  metadata.set_last_day_index(kSomeDayIndex);
+  return metadata;
+}
+
+void AddHistogramCountAndError(float count_estimate, float std_error,
+                               HistogramReportRow* row) {
   row->set_count_estimate(count_estimate);
   row->set_std_error(std_error);
 }
@@ -70,7 +139,7 @@ ReportRow HistogramReportIntValueRow(int value, float count_estimate,
   ReportRow report_row;
   HistogramReportRow* row = report_row.mutable_histogram();
   row->mutable_value()->set_int_value(value);
-  AddFloatValues(count_estimate, std_error, row);
+  AddHistogramCountAndError(count_estimate, std_error, row);
   return report_row;
 }
 
@@ -79,7 +148,7 @@ ReportRow HistogramReportStringValueRow(const std::string& value,
   ReportRow report_row;
   HistogramReportRow* row = report_row.mutable_histogram();
   row->mutable_value()->set_string_value(value);
-  AddFloatValues(count_estimate, std_error, row);
+  AddHistogramCountAndError(count_estimate, std_error, row);
   return report_row;
 }
 
@@ -88,7 +157,7 @@ ReportRow HistogramReportBlobValueRow(const std::string& value,
   ReportRow report_row;
   HistogramReportRow* row = report_row.mutable_histogram();
   row->mutable_value()->set_blob_value(value);
-  AddFloatValues(count_estimate, std_error, row);
+  AddHistogramCountAndError(count_estimate, std_error, row);
   return report_row;
 }
 
@@ -98,7 +167,26 @@ ReportRow HistogramReportIndexValueRow(int index, const std::string& label,
   HistogramReportRow* row = report_row.mutable_histogram();
   row->mutable_value()->set_index_value(index);
   row->set_label(label);
-  AddFloatValues(count_estimate, std_error, row);
+  AddHistogramCountAndError(count_estimate, std_error, row);
+  return report_row;
+}
+
+ReportRow BuildRawDumpReportRow(std::string city, std::string fruit, int count,
+                                double rating) {
+  ReportRow report_row;
+  RawDumpReportRow* row = report_row.mutable_raw_dump();
+  if (!city.empty()) {
+    row->add_values()->set_string_value(city);
+  }
+  if (!fruit.empty()) {
+    row->add_values()->set_string_value(fruit);
+  }
+  if (count != 0) {
+    row->add_values()->set_int_value(count);
+  }
+  if (rating > 0.0) {
+    row->add_values()->set_double_value(rating);
+  }
   return report_row;
 }
 
@@ -126,23 +214,26 @@ class ReportSerializerTest : public ::testing::Test {
                            serialized_report_out, mime_type_out);
   }
 
-  void DoSerializeHistogramReportTest(
-      uint32_t report_config_id, uint32_t variable_index,
+  grpc::Status SerializeRawDumpReport(
+      const std::vector<uint32_t>& variable_indices,
       const std::vector<ReportRow>& report_rows,
-      const std::string expected_mime_type,
-      const std::string& expected_serialization) {
-    std::string mime_type;
-    std::string report;
+      std::string* serialized_report_out, std::string* mime_type_out) {
+    const auto* report_config =
+        report_registry_->Get(kCustomerId, kProjectId, kRawDumpReportConfigId);
+    CHECK(report_config);
+    auto metadata = BuildRawDumpMetadata(variable_indices);
+    return SerializeReport(*report_config, metadata, report_rows,
+                           serialized_report_out, mime_type_out);
+  }
 
-    // Test firt using the method SerializeReport().
-    auto status = SerializeHistogramReport(report_config_id, variable_index,
-                                           report_rows, &report, &mime_type);
-    EXPECT_TRUE(status.ok()) << status.error_message() << " ";
-    EXPECT_EQ(expected_mime_type, mime_type);
-    EXPECT_EQ(expected_serialization, report);
-
-    // Test again using the methods StartSerializingReport() and AppendRows().
-    auto metadata = BuildHistogramMetadata(variable_index);
+  // Tests serialization via the methods StartSerializingReports() and
+  // ApendRows().
+  void TestStreamingSerialization(uint32_t report_config_id,
+                                  const std::vector<ReportRow>& report_rows,
+                                  const std::string expected_mime_type,
+                                  const std::string& expected_serialization,
+                                  const ReportMetadataLite& metadata,
+                                  grpc::Status status) {
     auto report_config =
         report_registry_->Get(kCustomerId, kProjectId, report_config_id);
     ReportSerializer serializer(report_config, &metadata,
@@ -188,6 +279,49 @@ class ReportSerializerTest : public ::testing::Test {
     EXPECT_TRUE(status.ok()) << status.error_message() << " ";
     EXPECT_EQ(expected_serialization, stream.str());
   }
+  void DoSerializeHistogramReportTest(
+      uint32_t report_config_id, uint32_t variable_index,
+      const std::vector<ReportRow>& report_rows,
+      const std::string expected_mime_type,
+      const std::string& expected_serialization) {
+    std::string mime_type;
+    std::string report;
+
+    // Test firt using the method SerializeReport().
+    auto status = SerializeHistogramReport(report_config_id, variable_index,
+                                           report_rows, &report, &mime_type);
+    EXPECT_TRUE(status.ok()) << status.error_message() << " ";
+    EXPECT_EQ(expected_mime_type, mime_type);
+    EXPECT_EQ(expected_serialization, report);
+
+    // Test again using the methods StartSerializingReport() and AppendRows().
+    auto metadata = BuildHistogramMetadata(variable_index);
+    TestStreamingSerialization(report_config_id, report_rows,
+                               expected_mime_type, expected_serialization,
+                               metadata, status);
+  }
+
+  void DoSerializeRawDumpReportTest(
+      const std::vector<uint32_t>& variable_indices,
+      const std::vector<ReportRow>& report_rows,
+      const std::string expected_mime_type,
+      const std::string& expected_serialization) {
+    std::string mime_type;
+    std::string report;
+
+    // Test firt using the method SerializeReport().
+    auto status = SerializeRawDumpReport(variable_indices, report_rows, &report,
+                                         &mime_type);
+    EXPECT_TRUE(status.ok()) << status.error_message() << " ";
+    EXPECT_EQ(expected_mime_type, mime_type);
+    EXPECT_EQ(expected_serialization, report);
+
+    // Test again using the methods StartSerializingReport() and AppendRows().
+    auto metadata = BuildRawDumpMetadata(variable_indices);
+    TestStreamingSerialization(kRawDumpReportConfigId, report_rows,
+                               expected_mime_type, expected_serialization,
+                               metadata, status);
+  }
 
  protected:
   grpc::Status SerializeReport(const ReportConfig& report_config,
@@ -211,7 +345,47 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVNoRows) {
   std::vector<ReportRow> report_rows;
   const char* kExpectedCSV = R"(date,Fruit,count,err
 )";
-  DoSerializeHistogramReportTest(1, 0, report_rows, "text/csv", kExpectedCSV);
+  DoSerializeHistogramReportTest(kFruitHistogramReportConfigId, 0, report_rows,
+                                 "text/csv", kExpectedCSV);
+}
+
+// Tests the function SerializeReport in the case that the
+// report is a raw dump report with zero rows added.
+TEST_F(ReportSerializerTest, SerializeRawDumpReportToCSVNoRows) {
+  std::vector<ReportRow> report_rows;
+  const char* kExpectedCSV = R"(date,City,Fruit,Minutes,Rating
+)";
+  DoSerializeRawDumpReportTest({0, 1, 2, 3}, report_rows, "text/csv",
+                               kExpectedCSV);
+}
+
+// Tests the function SerializeReport in the case that the
+// report is a raw dump report with one row added
+TEST_F(ReportSerializerTest, SerializeRawDumpReportToCSVOneRow) {
+  std::vector<ReportRow> report_rows;
+  report_rows.push_back(BuildRawDumpReportRow("New York", "", 42, 3.14));
+  const char* kExpectedCSV = R"(date,City,Minutes,Rating
+2035-10-22,"New York",42,3.140
+)";
+  DoSerializeRawDumpReportTest({0, 2, 3}, report_rows, "text/csv",
+                               kExpectedCSV);
+}
+
+// Tests the function SerializeReport in the case that the
+// report is a raw dump report with several row added
+TEST_F(ReportSerializerTest, SerializeRawDumpReportToCSV) {
+  std::vector<ReportRow> report_rows;
+  report_rows.push_back(BuildRawDumpReportRow("New York", "Apple", 42, 3.14));
+  report_rows.push_back(BuildRawDumpReportRow("Chicago", "Pear", -1, 2.718281));
+  report_rows.push_back(
+      BuildRawDumpReportRow("Miami", "Coconut", 9999999, 1.41421356237309504));
+  const char* kExpectedCSV = R"(date,City,Fruit,Minutes,Rating
+2035-10-22,"New York","Apple",42,3.140
+2035-10-22,"Chicago","Pear",-1,2.718
+2035-10-22,"Miami","Coconut",9999999,1.414
+)";
+  DoSerializeRawDumpReportTest({0, 1, 2, 3}, report_rows, "text/csv",
+                               kExpectedCSV);
 }
 
 // Tests the function SerializeReport in the case that the
@@ -227,7 +401,40 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIntegerRows) {
 2035-10-22,0,77777.000,0
 2035-10-22,-1001,0.020,0.010
 )";
-  DoSerializeHistogramReportTest(1, 1, report_rows, "text/csv", kExpectedCSV);
+  DoSerializeHistogramReportTest(kCityHistogramReportConfigId, 0, report_rows,
+                                 "text/csv", kExpectedCSV);
+}
+
+// Tests the case that the ReportConfig specifies multiple variables and
+// the meta-data picks out the variable with index 0 -- in this case "City."
+TEST_F(ReportSerializerTest, MarginalHistogramVariable0) {
+  std::vector<ReportRow> report_rows;
+  report_rows.push_back(HistogramReportIntValueRow(123, 456.7, 8.0));
+  report_rows.push_back(HistogramReportIntValueRow(0, 77777, 0.000001));
+  report_rows.push_back(HistogramReportIntValueRow(-1001, 0.019999999, 0.01));
+  const char* kExpectedCSV = R"(date,City,count,err
+2035-10-22,123,456.700,8.000
+2035-10-22,0,77777.000,0
+2035-10-22,-1001,0.020,0.010
+)";
+  DoSerializeHistogramReportTest(kJointReportConfigId, 0, report_rows,
+                                 "text/csv", kExpectedCSV);
+}
+
+// Tests the case that the ReportConfig specifies multiple variables and
+// the meta-data picks out the variable with index 1 -- in this case "Fruit."
+TEST_F(ReportSerializerTest, MarginalHistogramVariable1) {
+  std::vector<ReportRow> report_rows;
+  report_rows.push_back(HistogramReportIntValueRow(123, 456.7, 8.0));
+  report_rows.push_back(HistogramReportIntValueRow(0, 77777, 0.000001));
+  report_rows.push_back(HistogramReportIntValueRow(-1001, 0.019999999, 0.01));
+  const char* kExpectedCSV = R"(date,Fruit,count,err
+2035-10-22,123,456.700,8.000
+2035-10-22,0,77777.000,0
+2035-10-22,-1001,0.020,0.010
+)";
+  DoSerializeHistogramReportTest(kJointReportConfigId, 1, report_rows,
+                                 "text/csv", kExpectedCSV);
 }
 
 // Tests the function SerializeReport in the case that the
@@ -271,7 +478,8 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVBlobRows) {
 2035-10-22,bNJoxyQ/fmpYIi0JdGT62jdYZvZr1Qfh/3Ka+XHRPkc=,100.000,0.100
 2035-10-22,2aOnR4wmTEA2+lCg37Ocv9A6UdTx5rUJ4okYcaVBZ5s=,50.000,0
 )";
-  DoSerializeHistogramReportTest(1, 1, report_rows, "text/csv", kExpectedCSV);
+  DoSerializeHistogramReportTest(kCityHistogramReportConfigId, 0, report_rows,
+                                 "text/csv", kExpectedCSV);
 }
 
 // Tests the function SerializeReport in the case that the
@@ -292,7 +500,8 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIndexRows) {
 2035-10-22,<index 2>,51.000,0
 2035-10-22,"plum",52.000,0
 )";
-  DoSerializeHistogramReportTest(1, 0, report_rows, "text/csv", kExpectedCSV);
+  DoSerializeHistogramReportTest(kFruitHistogramReportConfigId, 0, report_rows,
+                                 "text/csv", kExpectedCSV);
 }
 
 // Tests the function SerializeReport in the case that the
@@ -306,7 +515,8 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVInvalidValue) {
   const char* kExpectedCSV = R"(date,City,count,err
 2035-10-22,<Unrecognized value data type>,0,0
 )";
-  DoSerializeHistogramReportTest(1, 1, report_rows, "text/csv", kExpectedCSV);
+  DoSerializeHistogramReportTest(kCityHistogramReportConfigId, 0, report_rows,
+                                 "text/csv", kExpectedCSV);
 }
 
 // Tests that if we use ReportExportConfig 2, which is invalid, that
@@ -315,8 +525,8 @@ TEST_F(ReportSerializerTest, InvalidReportExportConfig) {
   std::string mime_type;
   std::string report;
   std::vector<ReportRow> report_rows;
-  auto status =
-      SerializeHistogramReport(2, 0, report_rows, &report, &mime_type);
+  auto status = SerializeHistogramReport(kInvalidHistogramReportConfigId, 0,
+                                         report_rows, &report, &mime_type);
   EXPECT_EQ(grpc::INVALID_ARGUMENT, status.error_code());
 }
 
@@ -326,7 +536,8 @@ TEST_F(ReportSerializerTest, InvalidMetadataNoVariableIndices) {
   std::string mime_type;
   std::string report;
   std::vector<ReportRow> report_rows;
-  const auto* report_config = report_registry_->Get(kCustomerId, kProjectId, 1);
+  const auto* report_config = report_registry_->Get(
+      kCustomerId, kProjectId, kCityHistogramReportConfigId);
   CHECK(report_config);
   ReportMetadataLite metadata;
   auto status = SerializeReport(*report_config, metadata, report_rows, &report,
@@ -340,7 +551,8 @@ TEST_F(ReportSerializerTest, InvalidMetadataTwoVariableIndices) {
   std::string mime_type;
   std::string report;
   std::vector<ReportRow> report_rows;
-  const auto* report_config = report_registry_->Get(kCustomerId, kProjectId, 1);
+  const auto* report_config = report_registry_->Get(
+      kCustomerId, kProjectId, kCityHistogramReportConfigId);
   CHECK(report_config);
   ReportMetadataLite metadata;
   metadata.add_variable_indices(0);
@@ -356,7 +568,8 @@ TEST_F(ReportSerializerTest, InvalidMetadataIndexOutOfBounds) {
   std::string mime_type;
   std::string report;
   std::vector<ReportRow> report_rows;
-  const auto* report_config = report_registry_->Get(kCustomerId, kProjectId, 1);
+  const auto* report_config = report_registry_->Get(
+      kCustomerId, kProjectId, kCityHistogramReportConfigId);
   CHECK(report_config);
   ReportMetadataLite metadata;
   metadata.add_variable_indices(2);
@@ -371,7 +584,8 @@ TEST_F(ReportSerializerTest, InvalidMetadataUnimplementedReportType) {
   std::string mime_type;
   std::string report;
   std::vector<ReportRow> report_rows;
-  const auto* report_config = report_registry_->Get(kCustomerId, kProjectId, 1);
+  const auto* report_config = report_registry_->Get(
+      kCustomerId, kProjectId, kCityHistogramReportConfigId);
   CHECK(report_config);
   ReportMetadataLite metadata;
   metadata.add_variable_indices(0);
@@ -390,7 +604,8 @@ TEST_F(ReportSerializerTest, InvalidRowNonMatchingRowType) {
   ReportRow report_row;
   report_row.mutable_joint();
   report_rows.push_back(report_row);
-  const auto* report_config = report_registry_->Get(kCustomerId, kProjectId, 1);
+  const auto* report_config = report_registry_->Get(
+      kCustomerId, kProjectId, kCityHistogramReportConfigId);
   CHECK(report_config);
   auto status = SerializeReport(*report_config, BuildHistogramMetadata(0),
                                 report_rows, &report, &mime_type);
@@ -404,7 +619,8 @@ TEST_F(ReportSerializerTest, InvalidRowNoRowType) {
   std::string report;
   std::vector<ReportRow> report_rows;
   report_rows.push_back(ReportRow());
-  const auto* report_config = report_registry_->Get(kCustomerId, kProjectId, 1);
+  const auto* report_config = report_registry_->Get(
+      kCustomerId, kProjectId, kCityHistogramReportConfigId);
   CHECK(report_config);
   auto status = SerializeReport(*report_config, BuildHistogramMetadata(0),
                                 report_rows, &report, &mime_type);

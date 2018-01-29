@@ -319,6 +319,10 @@ grpc::Status ReportSerializer::AppendCSVHeaderRow(std::ostream* stream) {
       return AppendCSVJointHeaderRow(stream);
       break;
 
+    case RAW_DUMP:
+      return AppendCSVRawDumpHeaderRow(stream);
+      break;
+
     default: {
       std::ostringstream error_stream;
       error_stream << "Unrecognized report type: " << metadata_->report_type();
@@ -366,6 +370,40 @@ grpc::Status ReportSerializer::AppendCSVHistogramHeaderRow(
 
   // Append the "err" column header.
   (*stream) << kSeparator << "err" << std::endl;
+  return grpc::Status::OK;
+}
+
+grpc::Status ReportSerializer::AppendCSVRawDumpHeaderRow(std::ostream* stream) {
+  num_columns_ = metadata_->variable_indices_size();
+  if (num_columns_ < 1) {
+    std::ostringstream error_stream;
+    error_stream << "Invalid ReportMetadataLite: At least one variable needs "
+                    "to be specified for RAW_DUMP reports. For ReportConfig "
+                 << IdString(*report_config_);
+    std::string message = error_stream.str();
+    LOG(ERROR) << message;
+    return grpc::Status(grpc::INVALID_ARGUMENT, message);
+  }
+  fixed_leftmost_column_values_.clear();
+  fixed_leftmost_column_values_.push_back(
+      DayIndexToDateString(metadata_->first_day_index()));
+  if (metadata_->first_day_index() == metadata_->last_day_index()) {
+    (*stream) << "date" << kSeparator;
+    num_columns_ += 1u;
+  } else {
+    (*stream) << "start_date" << kSeparator << "end_date" << kSeparator;
+    fixed_leftmost_column_values_.push_back(
+        DayIndexToDateString(metadata_->last_day_index()));
+    num_columns_ += 2u;
+  }
+
+  auto status = AppendCSVHeaderRowVariableNames(stream);
+  if (!status.ok()) {
+    return status;
+  }
+
+  (*stream) << std::endl;
+
   return grpc::Status::OK;
 }
 
@@ -459,6 +497,19 @@ grpc::Status ReportSerializer::AppendCSVReportRow(const ReportRow& report_row,
       break;
     }
 
+    case RAW_DUMP: {
+      if (row_type != ReportRow::kRawDump) {
+        std::ostringstream error_stream;
+        error_stream << "Expecting a RAW_DUMP row but the row_type=" << row_type
+                     << ". For ReportConfig " << IdString(*report_config_);
+        std::string message = error_stream.str();
+        LOG(ERROR) << message;
+        return grpc::Status(grpc::INTERNAL, message);
+      }
+      return AppendCSVRawDumpReportRow(report_row.raw_dump(), stream);
+      break;
+    }
+
     default: {
       std::ostringstream error_stream;
       error_stream << "Unrecognized row_type: " << row_type;
@@ -496,6 +547,33 @@ grpc::Status ReportSerializer::AppendCSVHistogramReportRow(
   }
   (*stream) << kSeparator << CountEstimateToString(report_row.count_estimate());
   (*stream) << kSeparator << StdErrToString(report_row.std_error())
+            << std::endl;
+  return grpc::Status::OK;
+}
+
+grpc::Status ReportSerializer::AppendCSVRawDumpReportRow(
+    const RawDumpReportRow& report_row, std::ostream* stream) {
+  size_t num_fixed_values = fixed_leftmost_column_values_.size();
+  size_t num_values_this_row = report_row.values_size();
+  if (num_columns_ != num_values_this_row + num_fixed_values) {
+    std::ostringstream error_stream;
+    error_stream << "Encountered a RawDumpReportRow with the wrong number of "
+                    "values. Expecting "
+                 << (num_columns_ - num_fixed_values) << ". Found "
+                 << num_values_this_row << ". For ReportConfig "
+                 << IdString(*report_config_);
+    std::string message = error_stream.str();
+    LOG(ERROR) << message;
+    return grpc::Status(grpc::INTERNAL, message);
+  }
+  for (const std::string& v : fixed_leftmost_column_values_) {
+    (*stream) << v << kSeparator;
+  }
+  // TODO(rudominer) Handle labels for indices in RAW_DUMP reports.
+  for (size_t i = 0; i < num_values_this_row - 1; i++) {
+    (*stream) << ValueToString(report_row.values(i)) << kSeparator;
+  }
+  (*stream) << ValueToString(report_row.values(num_values_this_row - 1))
             << std::endl;
   return grpc::Status::OK;
 }
