@@ -237,7 +237,7 @@ class Encoder {
 
     // A tuple consisting of a ValuePart and an encoding_config_id.
     struct ValuePartData {
-      ValuePartData(uint32_t encoding_config_id)
+      explicit ValuePartData(uint32_t encoding_config_id)
           : encoding_config_id(encoding_config_id) {}
 
       uint32_t encoding_config_id;

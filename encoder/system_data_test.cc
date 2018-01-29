@@ -18,6 +18,10 @@ TEST(SystemDataTest, BasicTest) {
   SystemData system_data;
   EXPECT_NE(SystemProfile::UNKNOWN_OS, system_data.system_profile().os());
   EXPECT_NE(SystemProfile::UNKNOWN_ARCH, system_data.system_profile().arch());
+
+  // TODO(rudominer) Re-enable this when we have implemented
+  // PopulateCpuInfo() on ARM.
+  /*
   EXPECT_TRUE(system_data.system_profile().has_cpu());
 
   // Test the vendor_name.
@@ -41,6 +45,7 @@ TEST(SystemDataTest, BasicTest) {
   }
   EXPECT_GE(signature, 0x030000);
   EXPECT_LE(signature, 0x090000);
+  */
 }
 
 }  // namespace encoder

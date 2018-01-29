@@ -54,7 +54,7 @@ std::string DataCaseToString(ValuePart::DataCase data_case) {
   return "UNKNOWN_TYPE";
 }
 
-} // namespace
+}  // namespace
 
 Encoder::Encoder(std::shared_ptr<ProjectContext> project,
                  ClientSecret client_secret)
