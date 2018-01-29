@@ -13,6 +13,7 @@
 #include "util/crypto_util/base64.h"
 #include "util/crypto_util/hash.h"
 #include "util/datetime_util.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -20,6 +21,13 @@ namespace analyzer {
 using crypto::byte;
 using crypto::hash::DIGEST_SIZE;
 using crypto::hash::Hash;
+
+// Stackdriver metric constants
+namespace {
+const char kStartSerializingReportFailure[] =
+    "report-serializer-start-serializing-report-failure";
+const char kAppendRowsFailure[] = "report-serializir-append-rows-failure";
+}  // namespace
 
 namespace {
 // The field separator to use for our CSV output.
@@ -225,7 +233,8 @@ grpc::Status ReportSerializer::StartSerializingReport(std::ostream* stream) {
              "In ReportConfig "
           << IdString(*report_config_);
       std::string message = error_stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+          << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
     default: {
@@ -235,7 +244,8 @@ grpc::Status ReportSerializer::StartSerializingReport(std::ostream* stream) {
           << serialization_case << " In ReportConfig "
           << IdString(*report_config_);
       std::string message = error_stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+          << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
   }
@@ -258,7 +268,7 @@ grpc::Status ReportSerializer::AppendRows(size_t max_num_bytes,
              "In ReportConfig "
           << IdString(*report_config_);
       std::string message = error_stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
     default: {
@@ -268,7 +278,7 @@ grpc::Status ReportSerializer::AppendRows(size_t max_num_bytes,
           << serialization_case << " In ReportConfig "
           << IdString(*report_config_);
       std::string message = error_stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
   }
@@ -327,7 +337,8 @@ grpc::Status ReportSerializer::AppendCSVHeaderRow(std::ostream* stream) {
       std::ostringstream error_stream;
       error_stream << "Unrecognized report type: " << metadata_->report_type();
       std::string message = error_stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+          << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
   }
@@ -344,7 +355,8 @@ grpc::Status ReportSerializer::AppendCSVHistogramHeaderRow(
                  << metadata_->variable_indices_size() << ". For ReportConfig "
                  << IdString(*report_config_);
     std::string message = error_stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+        << message;
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
 
@@ -362,6 +374,8 @@ grpc::Status ReportSerializer::AppendCSVHistogramHeaderRow(
 
   auto status = AppendCSVHeaderRowVariableNames(stream);
   if (!status.ok()) {
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+        << status.error_message();
     return status;
   }
 
@@ -412,7 +426,8 @@ grpc::Status ReportSerializer::AppendCSVJointHeaderRow(std::ostream* stream) {
   error_stream << "JOINT reports are not yet implemented. For ReportConfig"
                << IdString(*report_config_);
   std::string message = error_stream.str();
-  LOG(ERROR) << message;
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+      << message;
   return grpc::Status(grpc::UNIMPLEMENTED, message);
 }
 
@@ -431,7 +446,8 @@ grpc::Status ReportSerializer::AppendCSVHeaderRowVariableNames(
           << "Invalid ReportMetadataLite: Variable index out-of-bounds: "
           << index << ". For ReportConfig " << IdString(*report_config_);
       std::string message = error_stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+          << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
     (*stream) << EscapeMetricPartNameForCSVColumHeader(
@@ -451,6 +467,8 @@ grpc::Status ReportSerializer::AppendCSVRows(size_t max_num_bytes,
       break;
     }
     if (!status.ok()) {
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure)
+          << status.error_message();
       return status;
     }
     status = AppendCSVReportRow(*row, stream);
@@ -477,7 +495,7 @@ grpc::Status ReportSerializer::AppendCSVReportRow(const ReportRow& report_row,
                      << row_type << ". For ReportConfig "
                      << IdString(*report_config_);
         std::string message = error_stream.str();
-        LOG(ERROR) << message;
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
         return grpc::Status(grpc::INTERNAL, message);
       }
       return AppendCSVHistogramReportRow(report_row.histogram(), stream);
@@ -490,7 +508,7 @@ grpc::Status ReportSerializer::AppendCSVReportRow(const ReportRow& report_row,
         error_stream << "Expecting a JOINT row but the row_type=" << row_type
                      << ". For ReportConfig " << IdString(*report_config_);
         std::string message = error_stream.str();
-        LOG(ERROR) << message;
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
         return grpc::Status(grpc::INTERNAL, message);
       }
       return AppendCSVJointReportRow(report_row.joint(), stream);
@@ -514,7 +532,7 @@ grpc::Status ReportSerializer::AppendCSVReportRow(const ReportRow& report_row,
       std::ostringstream error_stream;
       error_stream << "Unrecognized row_type: " << row_type;
       std::string message = error_stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
   }
@@ -531,7 +549,7 @@ grpc::Status ReportSerializer::AppendCSVHistogramReportRow(
                  << num_columns_
                  << " and num_fixed_values=" << num_fixed_values;
     std::string message = error_stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
     return grpc::Status(grpc::INTERNAL, message);
   }
   if (ShouldSkipRow(report_row)) {
@@ -580,8 +598,9 @@ grpc::Status ReportSerializer::AppendCSVRawDumpReportRow(
 
 grpc::Status ReportSerializer::AppendCSVJointReportRow(
     const JointReportRow& report_row, std::ostream* stream) {
-  return grpc::Status(grpc::UNIMPLEMENTED,
-                      "Joint reports are not implemented.");
+  std::string message = "Joint reports are not implemented.";
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
+  return grpc::Status(grpc::UNIMPLEMENTED, message);
 }
 
 }  // namespace analyzer

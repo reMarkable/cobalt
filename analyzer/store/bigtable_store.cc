@@ -57,6 +57,12 @@ namespace store {
 using crypto::RegexDecode;
 using crypto::RegexEncode;
 
+// Stackdriver metric constants
+namespace {
+const char kReadRowsFailure[] = "bigtable-store-read-rows-failure";
+const char kWriteRowsFailure[] = "bigtable-store-write-rows-failure";
+}  // namespace
+
 namespace {
 // We never request more than this many rows regardless of how many the user
 // asks for. Bigtable fails with "operation aborted", status_code=10 if too
@@ -167,8 +173,6 @@ Status BigtableStore::WriteRow(DataStore::Table table, DataStore::Row row) {
   return WriteRows(table, std::move(rows));
 }
 
-#define LOG_WRITE_ROWS_FAILURE(level) \
-  LOG_INT_STACKDRIVER_METRIC(level, "bigtable-store-write-rows-failure", 1)
 Status BigtableStore::WriteRows(DataStore::Table table,
                                 std::vector<DataStore::Row> rows) {
   // We use the following simplistic strategy to perform retries with
@@ -196,8 +200,8 @@ Status BigtableStore::WriteRows(DataStore::Table table,
       return kOK;
     }
     if (!ShouldRetry(status)) {
-      LOG_WRITE_ROWS_FAILURE(ERROR) << "Non-retryable error: "
-        << ErrorMessage(status, "WriteRows");
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kWriteRowsFailure)
+          << "Non-retryable error: " << ErrorMessage(status, "WriteRows");
       return GrpcStatusToStoreStatus(status);
     }
     if (attempt < kMaxAttempts - 1) {
@@ -206,8 +210,9 @@ Status BigtableStore::WriteRows(DataStore::Table table,
       sleepmillis *= 2;
     }
   }
-  LOG_WRITE_ROWS_FAILURE(ERROR) << "Retried " << kMaxAttempts
-    << " times without success. " << ErrorMessage(status, "WriteRows");
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kWriteRowsFailure)
+      << "Retried " << kMaxAttempts << " times without success. "
+      << ErrorMessage(status, "WriteRows");
   return GrpcStatusToStoreStatus(status);
 }
 
@@ -298,8 +303,6 @@ BigtableStore::ReadResponse BigtableStore::ReadRows(
                           column_names, max_rows);
 }
 
-#define LOG_READ_ROWS_FAILURE(level) \
-  LOG_INT_STACKDRIVER_METRIC(level, "bigtable-store-read-rows-failure", 1)
 BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
     Table table, std::string start_row_key, bool inclusive_start,
     std::string end_row_key, bool inclusive_end,
@@ -307,7 +310,7 @@ BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
   ReadResponse read_response;
   read_response.status = kOK;
   if (max_rows == 0) {
-    LOG_READ_ROWS_FAILURE(ERROR) << "max_rows=0";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadRowsFailure) << "max_rows=0";
     read_response.status = kInvalidArguments;
     return read_response;
   }
@@ -342,8 +345,8 @@ BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
       // Our column names are RegexEncoded.
       std::string encoded_column_name;
       if (!RegexEncode(column_name, &encoded_column_name)) {
-        LOG_READ_ROWS_FAILURE(ERROR) << "RegexEncode failed on '"
-          << column_name << "'";
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadRowsFailure)
+            << "RegexEncode failed on '" << column_name << "'";
         read_response.status = kOperationFailed;
         return read_response;
       }
@@ -404,8 +407,8 @@ BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
         // Update the current column.
         if (!RegexDecode(chunk.qualifier().value(),
                          &current_decoded_column_name)) {
-          LOG_READ_ROWS_FAILURE(ERROR) << "RegexEncode failed on '"
-            << chunk.qualifier().value() << "'";
+          LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadRowsFailure)
+              << "RegexEncode failed on '" << chunk.qualifier().value() << "'";
           read_response.status = kOperationFailed;
           return read_response;
         }
@@ -427,7 +430,8 @@ BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
   if (!status.ok()) {
     // TODO(rudominer) Consider doing a retry here. Consider if this
     // method should be asynchronous.
-    LOG_READ_ROWS_FAILURE(ERROR) << ErrorMessage(status, "ReadRows");
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadRowsFailure)
+        << ErrorMessage(status, "ReadRows");
     read_response.status = GrpcStatusToStoreStatus(status);
     return read_response;
   }

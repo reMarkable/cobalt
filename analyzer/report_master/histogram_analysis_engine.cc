@@ -23,6 +23,7 @@
 #include "algorithms/rappor/basic_rappor_analyzer.h"
 #include "algorithms/rappor/rappor_analyzer.h"
 #include "glog/logging.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -34,7 +35,26 @@ using rappor::RapporAnalyzer;
 using store::ObservationStore;
 using store::ReportStore;
 
+// Stackdriver metric constants
 namespace {
+const char kCheckConsistentEncodingFailure[] =
+    "check-consistent-encoding-failure";
+const char kForculusAdapterPerformAnalysisFailure[] =
+    "forculus-adapter-perform-analysis-failure";
+const char kRapporAdapterPerformAnalysisFailure[] =
+    "rappor-adapter-perform-analysis-failure";
+const char kNoOpAdapterProcessObservationPartFailure[] =
+    "no-op-adapter-process-observation-part-failure";
+const char kPerformAnalysisFailure[] =
+    "histogram-analysis-engine-perform-analysis-failure";
+const char kGetDecoderFailure[] =
+    "histogram-analysis-engine-get-decoder-failure";
+const char kNewDecoderFailure[] =
+    "histogram-analysis-engine-new-decoder-failure";
+}  // namespace
+
+namespace {
+
 // Checks that the type of encoding used by the observation_part is the
 // one specified by the encoding_config.
 bool CheckConsistentEncoding(const EncodingConfig& encoding_config,
@@ -62,10 +82,11 @@ bool CheckConsistentEncoding(const EncodingConfig& encoding_config,
       LOG(FATAL) << "Unexpected case " << observation_part.value_case();
   }
   if (!consistent) {
-    LOG(ERROR) << "Bad ObservationPart! Value uses encoding "
-               << observation_part.value_case() << " but "
-               << encoding_config.config_case() << " expected."
-               << " For report_id=" << ReportStore::ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCheckConsistentEncodingFailure)
+        << "Bad ObservationPart! Value uses encoding "
+        << observation_part.value_case() << " but "
+        << encoding_config.config_case() << " expected."
+        << " For report_id=" << ReportStore::ToString(report_id);
   }
 
   return consistent;
@@ -95,8 +116,10 @@ class ForculusAdapter : public DecoderAdapter {
     for (const auto& pair : result_map) {
       ValuePart value_part;
       if (!value_part.ParseFromString(pair.first)) {
-        LOG(ERROR) << "Bad value. Could not parse as ValuePart: " << pair.first
-                   << "report_id=" << ReportStore::ToString(report_id_);
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR,
+                                     kForculusAdapterPerformAnalysisFailure)
+            << "Bad value. Could not parse as ValuePart: " << pair.first
+            << "report_id=" << ReportStore::ToString(report_id_);
         continue;
       }
       results->emplace_back();
@@ -141,9 +164,10 @@ class RapporAdapter : public DecoderAdapter {
     std::vector<rappor::CandidateResult> candidate_results;
     auto status = analyzer_->Analyze(&candidate_results);
     if (!status.ok()) {
-      LOG(ERROR) << "String RAPPOR analysis failed with status=("
-                 << status.error_code() << ") " << status.error_message()
-                 << " For report_id=" << ReportStore::ToString(report_id_);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRapporAdapterPerformAnalysisFailure)
+          << "String RAPPOR analysis failed with status=("
+          << status.error_code() << ") " << status.error_message()
+          << " For report_id=" << ReportStore::ToString(report_id_);
       return status;
     }
     // If candidates_ is null or empty then analyzer_->Analyze() will return
@@ -256,7 +280,7 @@ class NoOpAdapter : public DecoderAdapter {
           str << "index=" << value.index_value();
           break;
         case ValuePart::kDoubleValue:
-          str<< value.double_value();
+          str << value.double_value();
         default:
           str << "[UNKNOWN DATA TYPE]";
       }
@@ -265,9 +289,11 @@ class NoOpAdapter : public DecoderAdapter {
     // For safety we will accept only up to 10,000 different values.
     static const size_t kMaxNumValues = 10000;
     if (counts_.size() >= kMaxNumValues) {
-      LOG(ERROR) << "Report truncated! May not exceed " << kMaxNumValues
-                 << " different values."
-                 << " report_id=" << ReportStore::ToString(report_id_);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR,
+                                   kNoOpAdapterProcessObservationPartFailure)
+          << "Report truncated! May not exceed " << kMaxNumValues
+          << " different values."
+          << " report_id=" << ReportStore::ToString(report_id_);
       return false;
     }
     counts_[serialized_value]++;
@@ -346,7 +372,7 @@ grpc::Status HistogramAnalysisEngine::PerformAnalysis(
               "support heterogeneous reports. report_id="
            << ReportStore::ToString(report_id_);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kPerformAnalysisFailure) << message;
     return grpc::Status(grpc::UNIMPLEMENTED, message);
   }
 
@@ -368,9 +394,10 @@ DecoderAdapter* HistogramAnalysisEngine::GetDecoder(
   const EncodingConfig* encoding_config = analyzer_config_->EncodingConfig(
       report_id_.customer_id(), report_id_.project_id(), encoding_config_id);
   if (!encoding_config) {
-    LOG(ERROR) << "Bad ObservationPart! Contains invalid encoding_config_id "
-               << encoding_config_id
-               << " for report_id=" << ReportStore::ToString(report_id_);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetDecoderFailure)
+        << "Bad ObservationPart! Contains invalid encoding_config_id "
+        << encoding_config_id
+        << " for report_id=" << ReportStore::ToString(report_id_);
     return nullptr;
   }
   if (!CheckConsistentEncoding(*encoding_config, observation_part,
@@ -404,12 +431,13 @@ std::unique_ptr<DecoderAdapter> HistogramAnalysisEngine::NewDecoder(
       if (report_variable_->has_rappor_candidates()) {
         rappor_candidates = &(report_variable_->rappor_candidates());
       } else {
-        LOG(ERROR) << "HistogramAnalysisEngine: Received an observation with "
-                      "encoding_config_id="
-                   << encoding_config->id()
-                   << " for String RAPPOR but no RAPPOR candidates are "
-                      "specified for report_id="
-                   << ReportStore::ToString(report_id_);
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kNewDecoderFailure)
+            << "HistogramAnalysisEngine: Received an observation with "
+               "encoding_config_id="
+            << encoding_config->id()
+            << " for String RAPPOR but no RAPPOR candidates are "
+               "specified for report_id="
+            << ReportStore::ToString(report_id_);
       }
       return std::unique_ptr<DecoderAdapter>(new RapporAdapter(
           report_id_, encoding_config->rappor(), rappor_candidates));

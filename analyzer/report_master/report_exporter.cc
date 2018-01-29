@@ -11,11 +11,19 @@
 #include "analyzer/report_master/report_serializer.h"
 #include "analyzer/report_master/report_stream.h"
 #include "glog/logging.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace analyzer {
 
 using util::gcs::GcsUtil;
+
+// Stackdriver metric constants
+namespace {
+const char kExportReportFailure[] = "report-exporter-export-report-failure";
+const char kUploadToGCSError[] = "gcs-uploader-upload-to-gcs-failure";
+const char kPingBucketFailure[] = "gcs-uploader-ping-bucket-failure";
+}  // namespace
 
 namespace {
 
@@ -79,7 +87,7 @@ grpc::Status ReportExporter::ExportReportOnce(
       std::ostringstream stream;
       stream << "Unrecognized export_location: " << location_case;
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kExportReportFailure) << message;
       return grpc::Status(grpc::INTERNAL, message);
     }
   }
@@ -91,7 +99,7 @@ grpc::Status ReportExporter::ExportReportToGCS(
     ReportStream* report_stream) {
   if (location.bucket().empty()) {
     std::string message = "CSVExportLocation has empty |bucket|";
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kExportReportFailure) << message;
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
 
@@ -124,7 +132,7 @@ grpc::Status GcsUploader::UploadToGCS(const std::string& bucket,
     if (!gcs_util_->InitFromDefaultPaths()) {
       gcs_util_.reset();
       std::string message = "Unable to initialize GcsUtil.";
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUploadToGCSError) << message;
       return grpc::Status(grpc::INTERNAL, message);
     }
     auto status = PingBucket(bucket);
@@ -155,7 +163,7 @@ grpc::Status GcsUploader::UploadToGCS(const std::string& bucket,
   stream << "Upload to GCS at " << bucket << "|" << path
          << " failed five times. Giving up.";
   std::string message = stream.str();
-  LOG(ERROR) << message;
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUploadToGCSError) << message;
   return grpc::Status(grpc::INTERNAL, message);
 }
 
@@ -165,7 +173,7 @@ grpc::Status GcsUploader::PingBucket(const std::string& bucket) {
     if (!gcs_util_->InitFromDefaultPaths()) {
       gcs_util_.reset();
       std::string message = "Unable to initialize GcsUtil.";
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kPingBucketFailure) << message;
       return grpc::Status(grpc::INTERNAL, message);
     }
   }
@@ -186,7 +194,7 @@ grpc::Status GcsUploader::PingBucket(const std::string& bucket) {
   std::ostringstream stream;
   stream << "Pinging " << bucket << " failed five times. Giving up.";
   std::string message = stream.str();
-  LOG(ERROR) << message;
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kPingBucketFailure) << message;
   return grpc::Status(grpc::INTERNAL, message);
 }
 

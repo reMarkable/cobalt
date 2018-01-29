@@ -10,12 +10,18 @@
 #include <vector>
 
 #include "glog/logging.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace analyzer {
 
 using config::AnalyzerConfig;
 using store::ObservationStore;
+
+// Stackdriver metric constants
+namespace {
+const char kRawDumpReportError[] = "raw-dump-report-error";
+}  // namespace
 
 RawDumpReportRowIterator::RawDumpReportRowIterator(
     uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
@@ -40,16 +46,17 @@ RawDumpReportRowIterator::RawDumpReportRowIterator(
   const Metric* metric =
       analyzer_config->Metric(customer_id_, project_id_, metric_id_);
   if (!metric) {
-    LOG(ERROR) << "Metric " << metric_id_string
-               << " not found in the the AnalyzerConfig, when initializing a "
-                  "RawDumpReportRowIterator for report_id="
-               << report_id_string_;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
+        << "Metric " << metric_id_string
+        << " not found in the the AnalyzerConfig, when initializing a "
+           "RawDumpReportRowIterator for report_id="
+        << report_id_string_;
     return;
   }
   for (const auto& part_name : parts_) {
     auto it = metric->parts().find(part_name);
     if (it == metric->parts().cend()) {
-      LOG(ERROR)
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
           << "Metric part '" << part_name << "' not found in Metric "
           << metric_id_string
           << " when initializing a RawDumpReportRowIterator for report_id="
@@ -162,8 +169,9 @@ void RawDumpReportRowIterator::TryBuildNextRow() {
   have_next_row_ = false;
   if (!have_query_response_ ||
       result_index_ >= static_cast<int>(query_response_.results.size())) {
-    LOG(ERROR) << "Internal logic error. TryBuildNextRow() invoked with no "
-                  "available input row.";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
+        << "Internal logic error. "
+           "TryBuildNextRow() invoked with no available input row.";
     return;
   }
   next_row_.Clear();
@@ -173,19 +181,20 @@ void RawDumpReportRowIterator::TryBuildNextRow() {
   for (const auto& part_name : parts_) {
     auto part_iter = observation.parts().find(part_name);
     if (part_iter == observation.parts().cend()) {
-      LOG(ERROR) << "Encountered an Observation that was missing a part while "
-                    "processing a RAW_DUMP report."
-                 << " For report_id=" << report_id_string_
-                 << ", part=" << part_name;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
+          << "Encountered an Observation that was "
+             "missing a part while processing a RAW_DUMP report."
+          << " For report_id=" << report_id_string_ << ", part=" << part_name;
       return;
     }
     auto observation_part = part_iter->second;
     if (observation_part.value_case() != ObservationPart::kUnencoded) {
-      LOG(ERROR) << "Encountered an ObservationPart that did not use the no-op "
-                    "encoding while processing a RAW_DUMP report."
-                 << " For report_id=" << report_id_string_
-                 << ", part=" << part_name
-                 << ". value_case=" << observation_part.value_case();
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
+          << "Encountered an ObservationPart that "
+             "did not use the no-op encoding while processing a "
+             "RAW_DUMP report."
+          << " For report_id=" << report_id_string_ << ", part=" << part_name
+          << ". value_case=" << observation_part.value_case();
       return;
     }
     ValuePart* unencoded_value =
@@ -213,19 +222,23 @@ void RawDumpReportRowIterator::TryBuildNextRow() {
         break;
       }
       default: {
-        LOG(ERROR) << "Encountered an unrecognized ValuePart data type while "
-                      "processing a RAW_DUMP report. For report_id="
-                   << report_id_string_ << ", part=" << part_name;
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
+            << "Encountered an unrecognized "
+               "ValuePart data type while processing a RAW_DUMP report. "
+               "For report_id="
+            << report_id_string_ << ", part=" << part_name;
         return;
       }
     }
     auto expected_type = expected_data_types_[part_index++];
     if (value_data_type != expected_type) {
-      LOG(ERROR) << "Encountered the wrong ValuePart data type while "
-                    "processing a RAW_DUMP report. For report_id="
-                 << report_id_string_ << ", part=" << part_name
-                 << " expected type=" << expected_type
-                 << " value type=" << value_data_type;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
+          << "Encountered the wrong ValuePart "
+             "data type while processing a RAW_DUMP report. For "
+             "report_id="
+          << report_id_string_ << ", part=" << part_name
+          << " expected type=" << expected_type
+          << " value type=" << value_data_type;
       return;
     }
     dump->add_values()->Swap(unencoded_value);
@@ -240,9 +253,10 @@ void RawDumpReportRowIterator::QueryObservations(std::string pagination_token) {
       customer_id_, project_id_, metric_id_, start_day_index_, end_day_index_,
       parts_, include_system_profiles_, kMaxResultsPerQuery, pagination_token);
   if (query_response_.status != store::kOK) {
-    LOG(ERROR) << "QueryObservations() returned error status: "
-               << query_response_.status
-               << ". For report_id=" << report_id_string_;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
+        << "QueryObservations() returned error "
+           "status: "
+        << query_response_.status << ". For report_id=" << report_id_string_;
   }
   have_query_response_ = true;
 }
@@ -250,14 +264,14 @@ void RawDumpReportRowIterator::QueryObservations(std::string pagination_token) {
 void RawDumpReportRowIterator::ValidateState() {
   bool valid = true;
   if (parts_.empty()) {
-    LOG(ERROR)
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
         << "Config for RAW_DUMP report did not specify any variables to dump."
            ". For report_id="
         << report_id_string_;
     valid = false;
   }
   if (expected_data_types_.size() != parts_.size()) {
-    LOG(ERROR)
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
         << "Not all of the specified metric parts were found in the Metric "
            "when initializing this RawDumpReportRowIterator for report_id="
         << report_id_string_

@@ -14,6 +14,7 @@
 #include "glog/logging.h"
 #include "util/clock.h"
 #include "util/datetime_util.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -22,6 +23,13 @@ using store::ReportStore;
 using util::MidnightUtcFromDayIndex;
 using util::SystemClock;
 using util::TimeToDayIndex;
+
+// Stackdriver metric constants
+namespace {
+const char kRefreshFailure[] = "report-history-cache-refresh-failure";
+const char kQueryCompletedReportsFailure[] =
+    "report-history-cache-query-completed-reports-failure";
+}  // namespace
 
 namespace {
 // Returns a human-readable respresentation of the report config ID.
@@ -122,8 +130,9 @@ void ReportHistoryCache::Refresh(const ReportConfig& report_config,
     const ReportId& report_id = *(history->report_id_in_progress);
     auto status = report_store_->GetMetadata(report_id, &metadata);
     if (status != store::kOK) {
-      LOG(ERROR) << "Unable to GetMetadata for report "
-                 << ReportStore::ToString(report_id);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRefreshFailure)
+          << "Unable to GetMetadata for report "
+          << ReportStore::ToString(report_id);
       // Since we are unable to determine if the report is still in progress
       // we'll assume it is.
       return;
@@ -141,9 +150,9 @@ void ReportHistoryCache::Refresh(const ReportConfig& report_config,
         history->report_id_in_progress.reset();
         return;
       default:
-        LOG(ERROR) << "Unrecognized state for report "
-                   << ReportStore::ToString(report_id) << " : "
-                   << metadata.state();
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRefreshFailure)
+            << "Unrecognized state for report "
+            << ReportStore::ToString(report_id) << " : " << metadata.state();
         // Since this state is unexpected and possibly unrecoverable we
         // will abandon this in-progress report.
         history->report_id_in_progress.reset();
@@ -168,9 +177,9 @@ void ReportHistoryCache::QueryCompletedReports(
         report_config.id(), query_interval_start_time_seconds_, UINT64_MAX, 500,
         pagination_token);
     if (query_reports_response.status != store::kOK) {
-      LOG(ERROR) << "QueryReports failed for report_config="
-                 << IdString(report_config)
-                 << ". status=" << query_reports_response.status;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kQueryCompletedReportsFailure)
+          << "QueryReports failed for report_config=" << IdString(report_config)
+          << ". status=" << query_reports_response.status;
       return;
     }
     for (auto& result : query_reports_response.results) {

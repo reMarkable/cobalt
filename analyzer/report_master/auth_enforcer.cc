@@ -9,6 +9,7 @@
 #include "glog/logging.h"
 #include "third_party/rapidjson/rapidjson/document.h"
 #include "util/crypto_util/base64.h"
+#include "util/log_based_metrics.h"
 
 DEFINE_bool(googlers_only, false,
             "Should only Googlers be able to access the ReportMaster Service? "
@@ -23,6 +24,12 @@ DEFINE_bool(authorization_log_only, false,
 
 namespace cobalt {
 namespace analyzer {
+
+// Stackdriver metric constants
+namespace {
+const char kGetEmailFromEncodedUserInfoFailure[] =
+    "google-email-enforcer-get-email-from-encoded-user-info-failure";
+}  // namespace
 
 std::shared_ptr<AuthEnforcer> AuthEnforcer::CreateFromFlagsOrDie() {
   std::shared_ptr<AuthEnforcer> enforcer;
@@ -53,7 +60,8 @@ grpc::Status GoogleEmailEnforcer::GetEmailFromEncodedUserInfo(
 
   std::string decoded_user_info;
   if (!cobalt::crypto::Base64Decode(encoded_user_info, &decoded_user_info)) {
-    LOG(ERROR) << "User info could not be decoded: " << encoded_user_info;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetEmailFromEncodedUserInfoFailure)
+        << "User info could not be decoded: " << encoded_user_info;
     return could_not_authorize;
   }
 
@@ -62,7 +70,8 @@ grpc::Status GoogleEmailEnforcer::GetEmailFromEncodedUserInfo(
 
   if (user_info_doc.HasParseError() || !user_info_doc.IsObject() ||
       !user_info_doc.HasMember("email") || !user_info_doc["email"].IsString()) {
-    LOG(ERROR) << "Could not get email from user info: " << decoded_user_info;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetEmailFromEncodedUserInfoFailure)
+        << "Could not get email from user info: " << decoded_user_info;
     return could_not_authorize;
   }
 

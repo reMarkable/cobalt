@@ -25,11 +25,28 @@
 #include <vector>
 
 #include "glog/logging.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace analyzer {
 
 using store::ReportStore;
+
+// Stackdriver metric constants
+namespace {
+const char kCheckReportIdChainFailure[] = "check-report-id-chain-failure";
+const char kCheckQueueSizeFailure[] =
+    "report-executor-check-queue-size-failure";
+const char kEnqueueFailure[] = "report-executor-enqueue-failure";
+const char kProcessDependencyChainFailure[] =
+    "report-executor-process-dependency-chain-failure";
+const char kProcessReportIdFailure[] =
+    "report-executor-process-report-id-failure";
+const char kGetMetadataFailure[] = "report-executor-get-metadata-failure";
+const char kStartDependentReportFailure[] =
+    "report-executor-start-dependent-report-failure";
+const char kEndReportFailure[] = "report-executor-end-report-failure";
+}  // namespace
 
 namespace {
 // If the worker queue grows larger than this we will stop accepting new
@@ -40,7 +57,8 @@ const size_t kMaxQueueSize = 50000;
 // ReportIds.
 grpc::Status CheckReportIdChain(const std::vector<ReportId>& report_id_chain) {
   if (report_id_chain.empty()) {
-    LOG(ERROR) << "report_id_chain is empty";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCheckReportIdChainFailure)
+        << "report_id_chain is empty";
     return grpc::Status(grpc::INVALID_ARGUMENT, "report_id_chain is empty");
   }
   for (const ReportId& report_id : report_id_chain) {
@@ -53,7 +71,8 @@ grpc::Status CheckReportIdChain(const std::vector<ReportId>& report_id_chain) {
       std::ostringstream stream;
       stream << "Not a complete ReportId: " << ReportStore::ToString(report_id);
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCheckReportIdChainFailure)
+          << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
   }
@@ -116,7 +135,8 @@ grpc::Status ReportExecutor::CheckQueueSize() {
     too_long = work_queue_.size() >= kMaxQueueSize;
   }
   if (too_long) {
-    LOG(ERROR) << "Work queue too long!";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCheckQueueSizeFailure)
+        << "Work queue too long!";
     return grpc::Status(grpc::ABORTED,
                         "Can't enqueue reports: queue too long!");
   }
@@ -128,7 +148,7 @@ grpc::Status ReportExecutor::Enqueue(std::vector<ReportId> report_id_chain) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (shut_down_) {
       std::string message = "Shutting down. Not enqueuing.";
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kEnqueueFailure) << message;
       return grpc::Status(grpc::ABORTED, message);
     }
     work_queue_.emplace_back(std::move(report_id_chain));
@@ -202,7 +222,8 @@ void ReportExecutor::ProcessDependencyChain(
              << ReportStore::ToString(report_id)
              << " because an earlier report in its dependency chain failed.";
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kProcessDependencyChainFailure)
+          << message;
       EndReport(report_id, false, message);
     } else {
       chain_failed = !ProcessReportId(report_id);
@@ -231,8 +252,9 @@ bool ReportExecutor::ProcessReportId(const ReportId& report_id) {
 
     default: {
       // Already in a terminal state.
-      LOG(ERROR) << "Unexpected state: " << metadata.state()
-                 << " for report_id=" << ReportStore::ToString(report_id);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kProcessReportIdFailure)
+          << "Unexpected state: " << metadata.state()
+          << " for report_id=" << ReportStore::ToString(report_id);
       return false;
     }
   }
@@ -249,8 +271,9 @@ bool ReportExecutor::GetMetadata(const ReportId& report_id,
                                  ReportMetadataLite* metadata_out) {
   auto status = report_store_->GetMetadata(report_id, metadata_out);
   if (status != store::kOK) {
-    LOG(ERROR) << "GetMetadata failed with status=" << status
-               << " for report_id=" << ReportStore::ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetMetadataFailure)
+        << "GetMetadata failed with status=" << status
+        << " for report_id=" << ReportStore::ToString(report_id);
     return false;
   }
   return true;
@@ -259,8 +282,9 @@ bool ReportExecutor::GetMetadata(const ReportId& report_id,
 bool ReportExecutor::StartDependentReport(const ReportId& report_id) {
   auto status = report_store_->StartDependentReport(report_id);
   if (status != store::kOK) {
-    LOG(ERROR) << "StartDependentReport failed with status=" << status
-               << " for report_id=" << ReportStore::ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartDependentReportFailure)
+        << "StartDependentReport failed with status=" << status
+        << " for report_id=" << ReportStore::ToString(report_id);
     return false;
   }
   return true;
@@ -271,8 +295,9 @@ bool ReportExecutor::EndReport(const ReportId& report_id, bool success,
   auto status =
       report_store_->EndReport(report_id, success, std::move(message));
   if (status != store::kOK) {
-    LOG(ERROR) << "EndReport failed with status=" << status
-               << " for report_id=" << ReportStore::ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kEndReportFailure)
+        << "EndReport failed with status=" << status
+        << " for report_id=" << ReportStore::ToString(report_id);
     return false;
   }
 

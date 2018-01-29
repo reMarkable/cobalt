@@ -24,6 +24,7 @@
 #include "analyzer/report_master/raw_dump_reports.h"
 #include "analyzer/report_master/report_row_iterator.h"
 #include "glog/logging.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -32,6 +33,12 @@ using forculus::ForculusAnalyzer;
 using store::ObservationStore;
 using store::ReportStore;
 using store::Status;
+
+// Stackdriver metric constants
+namespace {
+const char kReportGeneratorFailure[] =
+    "report-generator-generate-report-failure";
+}  // namespace
 
 namespace {
 std::string ThreePartIdString(const std::string& prefix, uint32_t a, uint32_t b,
@@ -57,8 +64,9 @@ std::string MetricIdString(const ReportConfig& report_config) {
                            report_config.metric_id());
 }
 
-// Checks the status returned from GetMetadata(). If not kOK, does LOG(ERROR)
-// and returns an appropriate grpc::Status.
+// Checks the status returned from GetMetadata(). If not kOK, does
+// LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) and returns an
+// appropriate grpc::Status.
 grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
   switch (status) {
     case store::kOK:
@@ -68,7 +76,7 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
       std::ostringstream stream;
       stream << "No report found with id=" << ReportStore::ToString(report_id);
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
       return grpc::Status(grpc::NOT_FOUND, message);
     }
 
@@ -77,7 +85,7 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
       stream << "GetMetadata failed with status=" << status
              << " for report_id=" << ReportStore::ToString(report_id);
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
       return grpc::Status(grpc::ABORTED, message);
     }
   }
@@ -109,7 +117,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     std::ostringstream stream;
     stream << "Report is not IN_PROGRESS" << ReportStore::ToString(report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
     return grpc::Status(grpc::FAILED_PRECONDITION, message);
   }
 
@@ -123,7 +131,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     std::ostringstream stream;
     stream << "Not found: " << ReportConfigIdString(report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
     return grpc::Status(grpc::NOT_FOUND, message);
   }
 
@@ -133,7 +141,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     stream << "Invalid ReportConfig, no variables. "
            << ReportConfigIdString(report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
 
@@ -145,7 +153,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     std::ostringstream stream;
     stream << "Not found: " << MetricIdString(*report_config);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
     return grpc::Status(grpc::NOT_FOUND, message);
   }
 
@@ -167,7 +175,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
              << MetricIdString(*report_config) << ". "
              << ReportConfigIdString(report_id);
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
   }
@@ -181,7 +189,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
            << ReportConfigIdString(report_id)
            << " report_id=" << ReportStore::ToString(report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
 
@@ -198,7 +206,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
       stream << "Report type JOINT is not yet implemented "
              << ReportConfigIdString(report_id);
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
       status = grpc::Status(grpc::UNIMPLEMENTED, message);
       break;
     }
@@ -214,7 +222,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
              << metadata.report_type()
              << " for report_id=" << ReportStore::ToString(report_id);
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
       status = grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
   }
@@ -245,7 +253,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
            << ReportConfigIdString(report_id)
            << " report_id=" << ReportStore::ToString(report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
 
@@ -281,7 +289,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
              << " for report_id=" << ReportStore::ToString(report_id)
              << " part=" << parts[0];
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
       return grpc::Status(grpc::ABORTED, message);
     }
 
@@ -325,7 +333,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
                   "report_id="
                << ReportStore::ToString(report_id);
         std::string message = stream.str();
-        LOG(ERROR) << message;
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
         return grpc::Status(grpc::INTERNAL, message);
       }
 
@@ -334,7 +342,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
         stream << "AddReportRows failed with status=" << store_status
                << " for report_id=" << ReportStore::ToString(report_id);
         std::string message = stream.str();
-        LOG(ERROR) << message;
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
         return grpc::Status(grpc::ABORTED, message);
       }
     }
@@ -392,7 +400,7 @@ grpc::Status ReportGenerator::BuildVariableList(
              << ReportConfigIdString(report_id)
              << " report_id=" << ReportStore::ToString(report_id);
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportGeneratorFailure) << message;
       return grpc::Status(grpc::INVALID_ARGUMENT, message);
     }
     variables->emplace_back(index, &report_config.variable(index));

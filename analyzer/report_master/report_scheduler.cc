@@ -14,6 +14,7 @@
 #include "glog/logging.h"
 #include "util/clock.h"
 #include "util/datetime_util.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace analyzer {
@@ -26,6 +27,13 @@ DEFINE_uint32(daily_report_makeup_days, 30,
               "The number of days in the past that the ReportMaster should "
               "look to find missed scheduled reports to make up. Must be less "
               "than 100 or we will CHECK fail.");
+
+// Stackdriver metric constants
+namespace {
+const char kStartReportNowFailure[] = "report-scheduler-start-report-failure";
+const std::string kProcessReportFailure =
+    "report-scheduler-process-report-failure-for-";
+}  // namespace
 
 namespace {
 // Returns a human-readable respresentation of the report config ID.
@@ -145,9 +153,10 @@ void ReportScheduler::ProcessOneReport(const ReportConfig& report_config,
       return;
 
     default: {
-      LOG(ERROR) << "Unrecognized aggregatoin_epoch_type: "
-                 << report_config.scheduling().aggregation_epoch_type()
-                 << "In ReportConfig " << IdString(report_config);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kProcessReportFailure + "one")
+          << "Unrecognized aggregatoin_epoch_type: "
+          << report_config.scheduling().aggregation_epoch_type()
+          << "In ReportConfig " << IdString(report_config);
       return;
     }
   }
@@ -159,9 +168,10 @@ void ReportScheduler::ProcessDailyReport(const ReportConfig& report_config,
   // and report_finalization_days.
   auto scheduling = report_config.scheduling();
   if (report_config.scheduling().report_finalization_days() > 20) {
-    LOG(ERROR) << "Invalid ReportConfig: " << IdString(report_config)
-               << " report_finalization_days too large: "
-               << report_config.scheduling().report_finalization_days();
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kProcessReportFailure + "daily")
+        << "Invalid ReportConfig: " << IdString(report_config)
+        << " report_finalization_days too large: "
+        << report_config.scheduling().report_finalization_days();
     return;
   }
 
@@ -192,7 +202,7 @@ void ReportScheduler::ProcessDailyReport(const ReportConfig& report_config,
 
 void ReportScheduler::ProcessWeeklyReport(const ReportConfig& report_config,
                                           uint32_t current_day_index) {
-  LOG(ERROR)
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kProcessReportFailure + "weekly")
       << "Scheduling of weekly reports is not yet implemented. ReportConfig: "
       << IdString(report_config);
   return;
@@ -200,7 +210,7 @@ void ReportScheduler::ProcessWeeklyReport(const ReportConfig& report_config,
 
 void ReportScheduler::ProcessMonthlyReport(const ReportConfig& report_config,
                                            uint32_t current_day_index) {
-  LOG(ERROR)
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kProcessReportFailure + "monthly")
       << "Scheduling of monthly reports is not yet implemented. ReportConfig: "
       << IdString(report_config);
   return;
@@ -210,9 +220,10 @@ bool ReportScheduler::ShouldStartDailyReportNow(
     const ReportConfig& report_config, uint32_t day_index,
     uint32_t current_day_index) {
   if (day_index > current_day_index) {
-    LOG(ERROR) << "Unexpected condition: " << day_index
-               << " = day_index > current_day_index = " << current_day_index
-               << " for ReportConfig " << IdString(report_config);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kProcessReportFailure + "daily")
+        << "Unexpected condition: " << day_index
+        << " = day_index > current_day_index = " << current_day_index
+        << " for ReportConfig " << IdString(report_config);
     return false;
   }
   if (day_index > current_day_index -
@@ -245,7 +256,7 @@ void ReportScheduler::StartReportNow(const ReportConfig& report_config,
                                              last_day_index, export_name,
                                              in_store, &report_id);
   if (!status.ok()) {
-    LOG(ERROR)
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartReportNowFailure)
         << "ReportScheduler was unable to start a report for ReportConfig "
         << IdString(report_config) << " first_day_index=" << first_day_index
         << " last_day_index=" << last_day_index

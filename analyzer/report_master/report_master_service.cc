@@ -32,6 +32,7 @@
 #include "config/analyzer_config_manager.h"
 #include "glog/logging.h"
 #include "util/crypto_util/base64.h"
+#include "util/log_based_metrics.h"
 #include "util/pem_util.h"
 
 namespace cobalt {
@@ -64,7 +65,26 @@ DEFINE_bool(
     enable_report_scheduling, false,
     "Should the ReportMaster run all reports automatically on a schedule?");
 
+// Stackdriver metric constants
 namespace {
+const char kReportIdToStringFailure[] = "report-id-to-string-failure";
+const char kReportIdFromStringFailure[] = "report-id-from-string-failure";
+const char kMakeReportMetadataFailure[] = "make-report-metadata-failure";
+const char kStartReportNoAuthFailure[] =
+    "report-master-service-start-report-no-auth-failure";
+const char kQueryReportsNoAuthFailure[] =
+    "report-master-service-query-reports-no-auth-failure";
+const char kGetAndValidateReportConfigFailure[] =
+    "report-master-service-get-and-validate-report-config-failure";
+const char kStartNewReportFailure[] =
+    "report-master-service-start-new-report-failure";
+const char kCreateDependentReportFailure[] =
+    "report-master-service-create-dependent-report-failure";
+const char kGetReportFailure[] = "report-master-service-get-report-failure";
+}  // namespace
+
+namespace {
+
 // Builds the string form of a report_id used in the public ReportMasterService
 // API from the ReportId message used in the internal API to ReportStore.
 grpc::Status ReportIdToString(const ReportId& report_id,
@@ -73,14 +93,16 @@ grpc::Status ReportIdToString(const ReportId& report_id,
   if (!report_id.SerializeToString(&serialized_id)) {
     // Note(rudominer) This is just for completeness. I expect this to never
     // happen.
-    LOG(ERROR) << "ReportId serialization failed: "
-               << ReportStore::ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportIdToStringFailure)
+        << "ReportId serialization failed: "
+        << ReportStore::ToString(report_id);
     return grpc::Status(grpc::ABORTED, "Unable to build report_id string");
   }
   if (!Base64Encode(serialized_id, id_string_out)) {
     // Note(rudominer) This is just for completeness. I expect this to never
     // happen.
-    LOG(ERROR) << "Base64Encode failed: " << ReportStore::ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportIdToStringFailure)
+        << "Base64Encode failed: " << ReportStore::ToString(report_id);
     return grpc::Status(grpc::ABORTED, "Unable to build report_id string");
   }
   return grpc::Status::OK;
@@ -92,11 +114,13 @@ grpc::Status ReportIdFromString(const std::string& id_string,
                                 ReportId* report_id_out) {
   std::string serialized_id;
   if (!Base64Decode(id_string, &serialized_id)) {
-    LOG(ERROR) << "Base64Encode failed: " << id_string;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportIdFromStringFailure)
+        << "Base64Decode failed: " << id_string;
     return grpc::Status(grpc::INVALID_ARGUMENT, "Bad report_id.");
   }
   if (!report_id_out->ParseFromString(serialized_id)) {
-    LOG(ERROR) << "ParseFromString failed: " << id_string;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReportIdFromStringFailure)
+        << "ParseFromString failed: " << id_string;
     return grpc::Status(grpc::INVALID_ARGUMENT, "Bad report_id.");
   }
   return grpc::Status::OK;
@@ -143,7 +167,8 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
              << ReportStore::ToString(report_id)
              << ". Unrecognized state: " << metadata->state();
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kMakeReportMetadataFailure)
+          << message;
       return grpc::Status(grpc::FAILED_PRECONDITION, message);
     }
   }
@@ -157,7 +182,7 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
     stream << "Invalid metadata, no variable indices for report_id="
            << ReportStore::ToString(report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kMakeReportMetadataFailure) << message;
     return grpc::Status(grpc::FAILED_PRECONDITION, message);
   }
 
@@ -169,7 +194,8 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
              << ReportStore::ToString(report_id) << ". index=" << index
              << ". variable_size=" << report_config->variable_size();
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kMakeReportMetadataFailure)
+          << message;
       return grpc::Status(grpc::FAILED_PRECONDITION, message);
     }
     metadata->add_metric_parts(report_config->variable(index).metric_part());
@@ -187,7 +213,8 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
              << ". sequence_num=" << report_id.sequence_num()
              << " but report_type == JOINT.";
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kMakeReportMetadataFailure)
+          << message;
       return grpc::Status(grpc::FAILED_PRECONDITION, message);
     }
     ReportId associated_id = report_id;
@@ -197,7 +224,8 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
         ReportIdToString(associated_id, metadata->add_associated_report_ids());
     if (!status.ok()) {
       // This is just for completeness. We don't expect it to ever happen.
-      LOG(ERROR) << "ReportIdToString failed unexpectedly.";
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kMakeReportMetadataFailure)
+          << "ReportIdToString failed unexpectedly.";
       return status;
     }
 
@@ -207,7 +235,8 @@ grpc::Status MakeReportMetadata(const std::string& report_id_string,
         ReportIdToString(associated_id, metadata->add_associated_report_ids());
     if (!status.ok()) {
       // This is just for completeness. We don't expect it to ever happen.
-      LOG(ERROR) << "ReportIdToString failed unexpectedly.";
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kMakeReportMetadataFailure)
+          << "ReportIdToString failed unexpectedly.";
       return status;
     }
   }
@@ -408,7 +437,7 @@ grpc::Status ReportMasterService::StartReportNoAuth(
       stream << "Bad ReportConfig found with id=" << report_config_id
              << ". Unrecognized report type: " << report_config->report_type();
       std::string message = stream.str();
-      LOG(ERROR) << message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartReportNoAuthFailure) << message;
       return grpc::Status(grpc::FAILED_PRECONDITION, message);
   }
 }
@@ -608,7 +637,8 @@ grpc::Status ReportMasterService::QueryReportsNoAuth(
         interval_limit_time_seconds, kBatchSize,
         store_response.pagination_token);
     if (store_response.status != store::kOK) {
-      LOG(ERROR) << "Read failed during QueryReports.";
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kQueryReportsNoAuthFailure)
+          << "Read failed during QueryReports.";
       return grpc::Status(grpc::ABORTED, "Read failed.");
     }
 
@@ -642,7 +672,8 @@ grpc::Status ReportMasterService::QueryReportsNoAuth(
 
     // Send |rpc_response| containing the current batch back to the client.
     if (!writer->Write(rpc_response)) {
-      LOG(ERROR) << "Stream closed while writing response from QueryReports.";
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kQueryReportsNoAuthFailure)
+          << "Stream closed while writing response from QueryReports.";
       return grpc::Status(grpc::ABORTED, "Stream closed.");
     }
   } while (!store_response.pagination_token.empty());
@@ -664,7 +695,8 @@ grpc::Status ReportMasterService::GetAndValidateReportConfig(
     stream << "No ReportConfig found with id=(" << customer_id << ", "
            << project_id << ", " << report_config_id << ")";
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetAndValidateReportConfigFailure)
+        << message;
     return grpc::Status(grpc::NOT_FOUND, message);
   }
 
@@ -677,7 +709,8 @@ grpc::Status ReportMasterService::GetAndValidateReportConfig(
            << ") is invalid. Number of variables=" << num_variables
            << ". Cobalt ReportConfigs may have either one or two variables.";
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetAndValidateReportConfigFailure)
+        << message;
     return grpc::Status(grpc::FAILED_PRECONDITION, message);
   }
 
@@ -699,7 +732,7 @@ grpc::Status ReportMasterService::StartNewReport(
     stream << "StartNewReport failed with status=" << store_status
            << " for report_id=" << ReportStore::ToString(*report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartNewReportFailure) << message;
     return grpc::Status(grpc::ABORTED, message);
   }
   return grpc::Status::OK;
@@ -713,13 +746,15 @@ grpc::Status ReportMasterService::CreateDependentReport(
       sequence_number, export_name, in_store, report_type, variable_indices,
       report_id);
 
-  // LOG(ERROR) if not OK.
+  // LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateDependentReportFailure) if not
+  // OK.
   if (store_status != store::kOK) {
     std::ostringstream stream;
     stream << "CreateDependentReport failed with status=" << store_status
            << " for report_id=" << ReportStore::ToString(*report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateDependentReportFailure)
+        << message;
     return grpc::Status(grpc::ABORTED, message);
   }
   return grpc::Status::OK;
@@ -732,13 +767,13 @@ grpc::Status ReportMasterService::GetReport(const ReportId& report_id,
   auto store_status =
       report_store_->GetReport(report_id, metadata_out, report_out);
 
-  // LOG(ERROR) if not OK.
+  // LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetReportFailure) if not OK.
   if (store_status != store::kOK) {
     std::ostringstream stream;
     stream << "GetReport failed with status=" << store_status
            << " for report_id=" << ReportStore::ToString(report_id);
     std::string message = stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetReportFailure) << message;
     return grpc::Status(grpc::ABORTED, message);
   }
   return grpc::Status::OK;
