@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "analyzer/report_master/histogram_analysis_engine.h"
+#include "analyzer/report_master/raw_dump_reports.h"
 #include "analyzer/report_master/report_row_iterator.h"
 #include "glog/logging.h"
 
@@ -171,13 +172,25 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     }
   }
 
+  uint32_t first_day_index = metadata.first_day_index();
+  uint32_t last_day_index = metadata.last_day_index();
+  if (first_day_index > last_day_index) {
+    std::ostringstream stream;
+    stream << "Invalid arguments: first_day_index=" << first_day_index << ">"
+           << last_day_index << "=last_day_index. "
+           << ReportConfigIdString(report_id)
+           << " report_id=" << ReportStore::ToString(report_id);
+    std::string message = stream.str();
+    LOG(ERROR) << message;
+    return grpc::Status(grpc::INVALID_ARGUMENT, message);
+  }
+
   std::unique_ptr<ReportRowIterator> row_iterator;
   switch (metadata.report_type()) {
     case HISTOGRAM: {
       status = GenerateHistogramReport(
           report_id, *report_config, *metric, std::move(variables),
-          metadata.first_day_index(), metadata.last_day_index(),
-          metadata.in_store(), &row_iterator);
+          first_day_index, last_day_index, metadata.in_store(), &row_iterator);
       break;
     }
     case JOINT: {
@@ -192,8 +205,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     case RAW_DUMP: {
       status = GenerateRawDumpReport(
           report_id, *report_config, *metric, std::move(variables),
-          metadata.first_day_index(), metadata.last_day_index(),
-          metadata.in_store(), &row_iterator);
+          first_day_index, last_day_index, metadata.in_store(), &row_iterator);
       break;
     }
     default: {
@@ -223,18 +235,8 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
 grpc::Status ReportGenerator::GenerateHistogramReport(
     const ReportId& report_id, const ReportConfig& report_config,
     const Metric& metric, std::vector<Variable> variables,
-    uint32_t start_day_index, uint32_t end_day_index, bool in_store,
+    uint32_t first_day_index, uint32_t last_day_index, bool in_store,
     std::unique_ptr<ReportRowIterator>* row_iterator) {
-  if (start_day_index > end_day_index) {
-    std::ostringstream stream;
-    stream << "Invalid arguments: start_day_index=" << start_day_index << ">"
-           << end_day_index << "=end_day_index. "
-           << ReportConfigIdString(report_id)
-           << " report_id=" << ReportStore::ToString(report_id);
-    std::string message = stream.str();
-    LOG(ERROR) << message;
-    return grpc::Status(grpc::INVALID_ARGUMENT, message);
-  }
   if (variables.size() != 1) {
     std::ostringstream stream;
     stream << "Invalid arguments: There are " << variables.size()
@@ -269,7 +271,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
             << ", " << report_config.metric_id() << ")";
     query_response = observation_store_->QueryObservations(
         report_config.customer_id(), report_config.project_id(),
-        report_config.metric_id(), start_day_index, end_day_index, parts,
+        report_config.metric_id(), first_day_index, last_day_index, parts,
         include_system_profile, kMaxResultsPerIteration,
         query_response.pagination_token);
 
@@ -349,7 +351,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
 grpc::Status ReportGenerator::GenerateRawDumpReport(
     const ReportId& report_id, const ReportConfig& report_config,
     const Metric& metric, std::vector<Variable> variables,
-    uint32_t start_day_index, uint32_t end_day_index, bool in_store,
+    uint32_t first_day_index, uint32_t last_day_index, bool in_store,
     std::unique_ptr<ReportRowIterator>* row_iterator) {
   if (in_store) {
     return grpc::Status(
@@ -357,9 +359,23 @@ grpc::Status ReportGenerator::GenerateRawDumpReport(
         "Cobalt does not support storing RAW_DUMP reports in the ReportStore.");
   }
 
-  // TODO(rudominer) Implement this.
-  return grpc::Status(grpc::UNIMPLEMENTED,
-                      "Raw Dump reports are not yet implemented.");
+  std::vector<std::string> parts(variables.size());
+  for (size_t i = 0; i < variables.size(); i++) {
+    parts[i] = variables[i].report_variable->metric_part();
+  }
+
+  // TODO(rudominer) Support reports that include the SystemProfile.
+  bool include_system_profile = false;
+
+  CHECK(row_iterator);
+  row_iterator->reset(new RawDumpReportRowIterator(
+      report_config.customer_id(), report_config.project_id(),
+      report_config.metric_id(), first_day_index, last_day_index,
+      std::move(parts), include_system_profile,
+      ReportStore::ToString(report_id), observation_store_,
+      config_manager_->GetCurrent()));
+
+  return grpc::Status::OK;
 }
 
 grpc::Status ReportGenerator::BuildVariableList(

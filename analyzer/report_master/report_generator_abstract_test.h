@@ -50,9 +50,11 @@ namespace testing {
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
 const uint32_t kMetricId = 1;
-const uint32_t kReportConfigId = 1;
+const uint32_t kJointReportConfigId = 1;
+const uint32_t kRawDumpReportConfigId = 1;
 const uint32_t kForculusEncodingConfigId = 1;
 const uint32_t kBasicRapporEncodingConfigId = 2;
+const uint32_t kNoOpEncodingConfigId = 3;
 const char kPartName1[] = "Part1";
 const char kPartName2[] = "Part2";
 const size_t kForculusThreshold = 20;
@@ -110,10 +112,22 @@ element {
   }
 }
 
+# EncodingConfig 3 is NoOp.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  no_op_encoding {
+  }
+}
+
 )";
 
 const char* kReportConfigText = R"(
-# ReportConfig 1 specifies a report of both variables of Metric 1.
+# ReportConfig 1 specifies a JOINT report of both variables of Metric 1.
+# We use this config only in order to run HISTOGRAM reports on the
+# two variables separately since JOINT reports are not currently
+# implemented.
 element {
   customer_id: 1
   project_id: 1
@@ -125,6 +139,28 @@ element {
   variable {
     metric_part: "Part2"
   }
+  report_type: JOINT
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "BUCKET-NAME"
+    }
+  }
+}
+
+# ReportConfig 2 specifies a RAW_DUMP report of both variables of Metric 1.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 2
+  metric_id: 1
+  variable {
+    metric_part: "Part1"
+  }
+  variable {
+    metric_part: "Part2"
+  }
+  report_type: RAW_DUMP
   export_configs {
     csv {}
     gcs {
@@ -174,7 +210,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
         fake_uploader_(new testing::FakeGcsUploader()) {
     report_id_.set_customer_id(testing::kCustomerId);
     report_id_.set_project_id(testing::kProjectId);
-    report_id_.set_report_config_id(testing::kReportConfigId);
+    report_id_.set_report_config_id(testing::kJointReportConfigId);
   }
 
   void SetUp() {
@@ -303,6 +339,28 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     return report;
   }
 
+  GeneratedReport GenerateRawDumpReport(bool export_report, bool in_store) {
+    report_id_.set_sequence_num(0);
+
+    // Start a report for the specified variable, for the interval of days
+    // [kDayIndex, kDayIndex].
+    std::string export_name = export_report ? "export_name" : "";
+    EXPECT_EQ(store::kOK,
+              report_store_->StartNewReport(
+                  testing::kDayIndex, testing::kDayIndex, true, export_name,
+                  in_store, RAW_DUMP, {0, 1}, &report_id_));
+
+    // Generate the report
+    EXPECT_TRUE(report_generator_->GenerateReport(report_id_).ok());
+
+    // Fetch the report from the ReportStore.
+    GeneratedReport report;
+    EXPECT_EQ(store::kOK, report_store_->GetReport(report_id_, &report.metadata,
+                                                   &report.rows));
+
+    return report;
+  }
+
   // Adds to the ObservationStore a bunch of Observations of our test metric
   // that use our test Forculus encoding config in which the Forculus threshold
   // is 20. Each Observation is generated as if from a different client.
@@ -388,6 +446,12 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     AddObservations("Cantaloupe", testing::kBasicRapporEncodingConfigId, 300);
   }
 
+  void AddUnencodedObservations() {
+    AddObservations("Apple", testing::kNoOpEncodingConfigId, 1);
+    AddObservations("Banana", testing::kNoOpEncodingConfigId, 2);
+    AddObservations("Cantaloupe", testing::kNoOpEncodingConfigId, 3);
+  }
+
   // This method should be invoked after invoking AddBasicRapporObservations()
   // and then GenerateReport. It checks the generated Report to make sure
   // it is correct given the Observations that were added. We are not attempting
@@ -428,6 +492,55 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
       EXPECT_EQ("1_1_1/export_name.csv", fake_uploader_->path);
       EXPECT_EQ("text/csv", fake_uploader_->mime_type);
       EXPECT_FALSE(fake_uploader_->serialized_report.empty());
+    }
+  }
+
+  void CheckRawDumpReport(const GeneratedReport& report) {
+    EXPECT_EQ(RAW_DUMP, report.metadata.report_type());
+    EXPECT_EQ(2, report.metadata.variable_indices_size());
+    EXPECT_EQ(0u, report.metadata.variable_indices(0));
+    EXPECT_EQ(1u, report.metadata.variable_indices(1));
+    if (report.metadata.in_store()) {
+      EXPECT_EQ(6, report.rows.rows_size());
+    } else {
+      EXPECT_EQ(0, report.rows.rows_size());
+    }
+    if (report.metadata.export_name() == "") {
+      EXPECT_FALSE(this->fake_uploader_->upload_was_invoked);
+    } else {
+      EXPECT_TRUE(this->fake_uploader_->upload_was_invoked);
+      // Reset for next time
+      this->fake_uploader_->upload_was_invoked = false;
+      EXPECT_EQ("BUCKET-NAME", fake_uploader_->bucket);
+      EXPECT_EQ("1_1_1/export_name.csv", fake_uploader_->path);
+      EXPECT_EQ("text/csv", fake_uploader_->mime_type);
+      // Take the export CSV file and split it into lines.
+      std::stringstream csv_stream(fake_uploader_->serialized_report);
+      std::vector<std::string> csv_lines;
+      std::string line;
+      while (std::getline(csv_stream, line)) {
+        csv_lines.push_back(line);
+      }
+      EXPECT_EQ(7u, csv_lines.size());
+      // Check the header line.
+      EXPECT_EQ("date,Part1,Part2", csv_lines[0]);
+      // Check the body of the report. They are in random order so we
+      // need to count them and check the totals.
+      size_t apple_lines = 0;
+      size_t banana_lines = 0;
+      size_t cantaloupe_lines = 0;
+      for (auto i = 1; i < 7; i++) {
+        if (csv_lines[i] == "2016-12-2,\"Apple\",\"Apple\"") {
+          apple_lines++;
+        } else if (csv_lines[i] == "2016-12-2,\"Banana\",\"Banana\"") {
+          banana_lines++;
+        } else if ("2016-12-2,\"Cantaloupe\",\"Cantaloupe\"") {
+          cantaloupe_lines++;
+        }
+      }
+      EXPECT_EQ(1u, apple_lines);
+      EXPECT_EQ(2u, banana_lines);
+      EXPECT_EQ(3u, cantaloupe_lines);
     }
   }
 
@@ -511,7 +624,16 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, BasicRappor) {
   }
 }
 
-REGISTER_TYPED_TEST_CASE_P(ReportGeneratorAbstractTest, Forculus, BasicRappor);
+TYPED_TEST_P(ReportGeneratorAbstractTest, RawDump) {
+  this->AddUnencodedObservations();
+  // Do exort the report. Don't store it to the store.
+  bool in_store = false;
+  auto report = this->GenerateRawDumpReport(true, in_store);
+  this->CheckRawDumpReport(report);
+}
+
+REGISTER_TYPED_TEST_CASE_P(ReportGeneratorAbstractTest, Forculus, BasicRappor,
+                           RawDump);
 
 }  // namespace analyzer
 }  // namespace cobalt
