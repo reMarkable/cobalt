@@ -27,6 +27,7 @@
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace config {
@@ -46,6 +47,13 @@ DEFINE_string(cobalt_report_configs_file_name, "registered_reports.txt",
               "Name of the file within cobalt_config_dir that contains the "
               "registered ReportConfigs.");
 
+// Stackdriver metric constants
+namespace {
+const char kAnalyzerConfigError[] = "analyzer-config-error";
+const char kCreateFromCobaltConfigProtoFailure[] =
+    "analyzer-config-create-from-cobalt-config-proto-failure";
+}  // namespace
+
 namespace {
 class LoggingErrorCollector : public ErrorCollector {
  public:
@@ -53,8 +61,9 @@ class LoggingErrorCollector : public ErrorCollector {
 
   void AddError(int line, ColumnNumber column,
                 const std::string& message) override {
-    LOG(ERROR) << "file: " << file_name << " line: " << line
-               << " column: " << column << " " << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAnalyzerConfigError)
+        << "file: " << file_name << " line: " << line << " column: " << column
+        << " " << message;
   }
 
   void AddWarning(int line, ColumnNumber column,
@@ -145,8 +154,9 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
   auto encodings =
       EncodingRegistry::FromProto(&registered_encodings, &error_collector);
   if (encodings.second != config::kOK) {
-    LOG(ERROR) << "Error getting EncodingConfigs from registry. "
-               << ErrorMessage(encodings.second);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateFromCobaltConfigProtoFailure)
+        << "Error getting EncodingConfigs from registry. "
+        << ErrorMessage(encodings.second);
     return std::unique_ptr<AnalyzerConfig>(nullptr);
   }
 
@@ -155,8 +165,9 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
   auto metrics =
       MetricRegistry::FromProto(&registered_metrics, &error_collector);
   if (metrics.second != config::kOK) {
-    LOG(ERROR) << "Error getting Metrics from registry. "
-               << ErrorMessage(metrics.second);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateFromCobaltConfigProtoFailure)
+        << "Error getting Metrics from registry. "
+        << ErrorMessage(metrics.second);
     return std::unique_ptr<AnalyzerConfig>(nullptr);
   }
 
@@ -165,8 +176,9 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
   auto reports =
       ReportRegistry::FromProto(&registered_reports, &error_collector);
   if (reports.second != config::kOK) {
-    LOG(ERROR) << "Error getting ReportConfigs from registry. "
-               << ErrorMessage(reports.second);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateFromCobaltConfigProtoFailure)
+        << "Error getting ReportConfigs from registry. "
+        << ErrorMessage(reports.second);
     return std::unique_ptr<AnalyzerConfig>(nullptr);
   }
 
@@ -181,7 +193,8 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProtoText(
   CobaltConfig cobalt_config;
   google::protobuf::TextFormat::Parser parser;
   if (!parser.ParseFromString(cobalt_config_proto_text, &cobalt_config)) {
-    LOG(ERROR) << "Error while parsing a CobaltConfig ASCII proto string.";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateFromCobaltConfigProtoFailure)
+        << "Error while parsing a CobaltConfig ASCII proto string.";
     return std::unique_ptr<AnalyzerConfig>(nullptr);
   }
   return CreateFromCobaltConfigProto(&cobalt_config);

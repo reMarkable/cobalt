@@ -18,6 +18,7 @@
 #include "third_party/google-api-cpp-client/src/googleapis/client/transport/http_transport.h"
 #include "third_party/google-api-cpp-client/src/googleapis/strings/stringpiece.h"
 
+#include "util/log_based_metrics.h"
 #include "util/pem_util.h"
 
 using google_storage_api::BucketsResource_GetMethod;
@@ -34,6 +35,13 @@ using googleapis::client::OAuth2ServiceAccountFlow;
 namespace cobalt {
 namespace util {
 namespace gcs {
+
+// Stackdriver metric constants
+namespace {
+const char kInitFailure[] = "gcs-util-init-failure";
+const char kUploadFailure[] = "gcs-util-upload-failure";
+const char kPingFailure[] = "gcs-util-ping-failure";
+}  // namespace
 
 struct GcsUtil::Impl {
   googleapis::client::OAuth2Credential oauth_credential_;
@@ -52,8 +60,9 @@ bool GcsUtil::InitFromDefaultPaths() {
   // //kubernetes/cobalt_common/Dockerfile
   char* p = std::getenv("GRPC_DEFAULT_SSL_ROOTS_FILE_PATH");
   if (!p) {
-    LOG(ERROR) << "The environment variable GRPC_DEFAULT_SSL_ROOTS_FILE_PATH "
-                  "is not set.";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kInitFailure)
+        << "The environment variable GRPC_DEFAULT_SSL_ROOTS_FILE_PATH "
+           "is not set.";
     return false;
   }
   std::string ca_certs_path(p);
@@ -63,8 +72,9 @@ bool GcsUtil::InitFromDefaultPaths() {
   // file //kubernets/report_master/Dockerfile
   p = std::getenv("COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS");
   if (!p) {
-    LOG(ERROR) << "The environment variable "
-                  "COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS is not set.";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kInitFailure)
+        << "The environment variable "
+           "COBALT_GCS_SERVICE_ACCOUNT_CREDENTIALS is not set.";
     return false;
   }
   std::string service_account_json_path(p);
@@ -85,8 +95,9 @@ bool GcsUtil::Init(const std::string ca_certs_path,
   impl_->oauth_flow_.reset(new OAuth2ServiceAccountFlow(
       impl_->http_config_->NewDefaultTransport(&status)));
   if (!status.ok()) {
-    LOG(ERROR) << "GcsUitl::Init(). Error creating new Http transport: "
-               << status.ToString();
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kInitFailure)
+        << "GcsUitl::Init(). Error creating new Http transport: "
+        << status.ToString();
     return false;
   }
 
@@ -94,8 +105,9 @@ bool GcsUtil::Init(const std::string ca_certs_path,
   std::string json;
   PemUtil::ReadTextFile(service_account_json_path, &json);
   if (json.empty()) {
-    LOG(ERROR) << "GcsUitl::Init(). Unable to read service account json from: "
-               << service_account_json_path;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kInitFailure)
+        << "GcsUitl::Init(). Unable to read service account json from: "
+        << service_account_json_path;
     return false;
   }
   // Initialize the flow with the contents of the service account json.
@@ -109,8 +121,9 @@ bool GcsUtil::Init(const std::string ca_certs_path,
   impl_->storage_service_.reset(
       new StorageService(impl_->http_config_->NewDefaultTransport(&status)));
   if (!status.ok()) {
-    LOG(ERROR) << "GcsUitl::Init(). Error creating new Http transport: "
-               << status.ToString();
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kInitFailure)
+        << "GcsUitl::Init(). Error creating new Http transport: "
+        << status.ToString();
     return false;
   }
 
@@ -157,7 +170,8 @@ bool GcsUtil::Upload(const std::string& bucket, const std::string& path,
   if (status.ok()) {
     return true;
   }
-  LOG(ERROR) << "Error attempting upload: " << status.ToString();
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUploadFailure)
+      << "Error attempting upload: " << status.ToString();
   return false;
 }
 
@@ -172,7 +186,8 @@ bool GcsUtil::Ping(const std::string& bucket) {
   if (status.ok()) {
     return true;
   }
-  LOG(ERROR) << "Error attempting to ping bucket: " << status.ToString();
+  LOG_STACKDRIVER_COUNT_METRIC(ERROR, kPingFailure)
+      << "Error attempting to ping bucket: " << status.ToString();
   return false;
 }
 

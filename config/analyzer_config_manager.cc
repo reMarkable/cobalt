@@ -18,6 +18,7 @@
 #include "config/cobalt_config.pb.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace config {
@@ -33,6 +34,13 @@ DEFINE_string(config_update_repository_url, "",
               "(e.g. \"https://cobalt-analytics.googlesource.com/config/\")");
 DEFINE_string(config_parser_bin_path, "/usr/local/bin/config_parser",
               "Location on disk of the configuration parser.");
+
+// Stackdriver metric constants
+namespace {
+const char kUpdateFailure[] = "analyzer-config-manager-update-failure";
+const char kReadConfigFromCobaltConfigFileFailure[] =
+    "analyzer-config-manager-read-config-from-cobalt-config-file-failure";
+}  // namespace
 
 AnalyzerConfigManager::AnalyzerConfigManager(
     std::shared_ptr<AnalyzerConfig> config,
@@ -102,7 +110,8 @@ bool AnalyzerConfigManager::Update(unsigned int timeout_seconds) {
                            &spawnattr, const_cast<char* const*>(argv), env);
 
   if (0 != status) {
-    LOG(ERROR) << "Error spawning config_parser at " << config_parser_bin_path_;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUpdateFailure)
+        << "Error spawning config_parser at " << config_parser_bin_path_;
     return false;
   }
   LOG(INFO) << "Spawned " << config_parser_bin_path_;
@@ -110,22 +119,27 @@ bool AnalyzerConfigManager::Update(unsigned int timeout_seconds) {
   // Catch state changes of config_parser process until it terminates.
   errno = 0;
   if (waitpid(pid, &status, WUNTRACED) != pid) {
-    LOG(ERROR) << "Error waiting for config_parser: " << strerror(errno);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUpdateFailure)
+        << "Error waiting for config_parser: " << strerror(errno);
     return false;
   }
 
   if (!WIFEXITED(status) || 0 != WEXITSTATUS(status)) {
     if (WIFSIGNALED(status)) {
-      LOG(ERROR) << "config_parser terminated by signal " << WTERMSIG(status);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUpdateFailure)
+          << "config_parser terminated by signal " << WTERMSIG(status);
       return false;
     } else if (WIFEXITED(status)) {
-      LOG(ERROR) << "config_parser exited with signal " << WEXITSTATUS(status);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUpdateFailure)
+          << "config_parser exited with signal " << WEXITSTATUS(status);
       return false;
     } else if (WIFSTOPPED(status)) {
-      LOG(ERROR) << "config_parser was stopped by signal " << WSTOPSIG(status);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUpdateFailure)
+          << "config_parser was stopped by signal " << WSTOPSIG(status);
       return false;
     } else {
-      LOG(ERROR) << "Error while waiting for config_parser.";
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUpdateFailure)
+          << "Error while waiting for config_parser.";
       return false;
     }
   }
@@ -147,19 +161,22 @@ AnalyzerConfigManager::ReadConfigFromSerializedCobaltConfigFile(
   std::ifstream config_file_stream;
   config_file_stream.open(config_path);
   if (!config_file_stream) {
-    LOG(ERROR) << "Could not open config proto: " << config_path;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadConfigFromCobaltConfigFileFailure)
+        << "Could not open config proto: " << config_path;
     return nullptr;
   }
 
   CobaltConfig cobalt_config;
   if (!cobalt_config.ParseFromIstream(&config_file_stream)) {
-    LOG(ERROR) << "Could not parse config proto: " << config_path;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadConfigFromCobaltConfigFileFailure)
+        << "Could not parse config proto: " << config_path;
     return nullptr;
   }
 
   auto config = AnalyzerConfig::CreateFromCobaltConfigProto(&cobalt_config);
   if (!config) {
-    LOG(ERROR) << "Error creating AnalyzerConfig: " << config_path;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadConfigFromCobaltConfigFileFailure)
+        << "Error creating AnalyzerConfig: " << config_path;
     return nullptr;
   }
 
