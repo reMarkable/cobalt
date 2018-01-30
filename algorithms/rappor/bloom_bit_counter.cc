@@ -20,13 +20,24 @@
 #include <utility>
 #include <vector>
 
+#include "util/log_based_metrics.h"
+
 namespace cobalt {
 namespace rappor {
+
+// Stackdriver metric constants
+namespace {
+const char kBloomBitCounterConstructorFailure[] =
+    "bloom-bit-counter-constructor-failure";
+const char kAddObservationFailure[] =
+    "bloom-bin-counter-add-observation-failure";
+}  // namespace
 
 BloomBitCounter::BloomBitCounter(const RapporConfig& config)
     : config_(new RapporConfigValidator(config)), num_bloom_bytes_(0) {
   if (!config_->valid()) {
-    LOG(ERROR) << "RapporConfig is invalid";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kBloomBitCounterConstructorFailure)
+        << "RapporConfig is invalid";
     return;
   }
   estimated_bloom_counts_.reserve(config_->num_cohorts());
@@ -39,20 +50,23 @@ BloomBitCounter::BloomBitCounter(const RapporConfig& config)
 
 bool BloomBitCounter::AddObservation(const RapporObservation& obs) {
   if (!config_->valid()) {
-    LOG(ERROR) << "RapporConfig is invalid";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationFailure)
+        << "RapporConfig is invalid";
     observation_errors_++;
     return false;
   }
   if (obs.data().size() != num_bloom_bytes_) {
-    LOG(ERROR) << "RapporObservation has the wrong number of bytes: "
-               << obs.data().size() << ". Expecting " << num_bloom_bytes_;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationFailure)
+        << "RapporObservation has the wrong number of bytes: "
+        << obs.data().size() << ". Expecting " << num_bloom_bytes_;
     observation_errors_++;
     return false;
   }
   auto cohort = obs.cohort();
   if (cohort >= config_->num_cohorts()) {
-    LOG(ERROR) << "RapporObservation has an invalid cohort index: " << cohort
-               << ". num_cohorts= " << config_->num_cohorts();
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationFailure)
+        << "RapporObservation has an invalid cohort index: " << cohort
+        << ". num_cohorts= " << config_->num_cohorts();
     observation_errors_++;
     return false;
   }
@@ -118,8 +132,7 @@ const std::vector<CohortCounts>& BloomBitCounter::EstimateCounts() {
       // See go/cobalt-basic-rappor-analysis for an explanation of the
       // formulas we use for count_estimate and std_error.
       count_estimates[bit_index] = (Y - correction) / divisor;
-      std_errors[bit_index] =
-          sqrt(Y * one_minus_q_plus_p + Npq) / abs_divisor;
+      std_errors[bit_index] = sqrt(Y * one_minus_q_plus_p + Npq) / abs_divisor;
     }
   }
 

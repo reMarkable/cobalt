@@ -21,9 +21,15 @@
 #include "third_party/lossmin/lossmin/minimizers/gradient-evaluator.h"
 #include "third_party/lossmin/lossmin/minimizers/parallel-boosting-with-momentum.h"
 #include "util/crypto_util/hash.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace rappor {
+
+// Stackdriver metric contants
+namespace {
+const char kAnalyzeFailure[] = "rappor-analyzer-analyze-failure";
+}  // namespace
 
 using crypto::byte;
 
@@ -121,7 +127,7 @@ grpc::Status RapporAnalyzer::Analyze(
   if (!minimizer.Run(10000, &est_candidate_weights, &loss_not_used)) {
     std::string message =
         "ParallelBoostingWithMomentum did not converge after 10,000 epochs.";
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAnalyzeFailure) << message;
     return grpc::Status(grpc::INTERNAL, message);
   }
 

@@ -18,13 +18,24 @@
 #include <cmath>
 #include <vector>
 
+#include "util/log_based_metrics.h"
+
 namespace cobalt {
 namespace rappor {
+
+// Stackdriver metric constants
+namespace {
+const char kBasicRapporAnalyzerConstructorFailure[] =
+    "basic-rappor-analyzer-constructor-failure";
+const char kAddObservationFailure[] =
+    "basic-rappor-analyzer-add-observation-failure";
+}  // namespace
 
 BasicRapporAnalyzer::BasicRapporAnalyzer(const BasicRapporConfig& config)
     : config_(new RapporConfigValidator(config)), num_encoding_bytes_(0) {
   if (!config_->valid()) {
-    LOG(ERROR) << "BasicRapporConfig is invalid";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kBasicRapporAnalyzerConstructorFailure)
+        << "BasicRapporConfig is invalid";
     return;
   }
   category_counts_.resize(config_->num_bits(), 0);
@@ -33,13 +44,15 @@ BasicRapporAnalyzer::BasicRapporAnalyzer(const BasicRapporConfig& config)
 
 bool BasicRapporAnalyzer::AddObservation(const BasicRapporObservation& obs) {
   if (!config_->valid()) {
-    LOG(ERROR) << "BasicRapporConfig is invalid";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationFailure)
+        << "BasicRapporConfig is invalid";
     observation_errors_++;
     return false;
   }
   if (obs.data().size() != num_encoding_bytes_) {
-    LOG(ERROR) << "BasicRapporObservation has the wrong number of bytes: "
-               << obs.data().size() << ". Expecting " << num_encoding_bytes_;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationFailure)
+        << "BasicRapporObservation has the wrong number of bytes: "
+        << obs.data().size() << ". Expecting " << num_encoding_bytes_;
     observation_errors_++;
     return false;
   }

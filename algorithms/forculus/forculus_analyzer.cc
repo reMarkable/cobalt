@@ -18,9 +18,16 @@
 
 #include "algorithms/forculus/forculus_utils.h"
 #include "util/crypto_util/base64.h"
+#include "util/log_based_metrics.h"
 
 namespace cobalt {
 namespace forculus {
+
+// Stackdriver metric constants
+namespace {
+const char kAddObservationFailure[] =
+    "forculus-analyzer-add-observation-failure";
+}  // namespace
 
 namespace {
 // Produces a string used in an error message to describe the observation.
@@ -36,11 +43,11 @@ std::string ErrorString(const ForculusObservation& obs) {
 
 }  // namespace
 
-ForculusAnalyzer::ForculusAnalyzer(const cobalt::ForculusConfig& config) :
-    config_(config) {}
+ForculusAnalyzer::ForculusAnalyzer(const cobalt::ForculusConfig& config)
+    : config_(config) {}
 
 bool ForculusAnalyzer::AddObservation(uint32_t day_index,
-    const ForculusObservation& obs) {
+                                      const ForculusObservation& obs) {
   // Compute the epoch_index from the day_index.
   uint32_t epoch_index =
       EpochIndexFromDayIndex(day_index, config_.epoch_type());
@@ -52,8 +59,8 @@ bool ForculusAnalyzer::AddObservation(uint32_t day_index,
   if (decryption_map_iter == decryption_map_.end()) {
     // There was no entry for this group_key in decryption_map. Create a
     // new ForculusDecrypter and a new entry.
-    std::unique_ptr<ForculusDecrypter> decrypter(new ForculusDecrypter(
-        config_.threshold(), obs.ciphertext()));
+    std::unique_ptr<ForculusDecrypter> decrypter(
+        new ForculusDecrypter(config_.threshold(), obs.ciphertext()));
     decrypter->AddObservation(obs);
     decryption_map_.emplace(group_key, DecrypterResult(std::move(decrypter)));
   } else {
@@ -68,16 +75,18 @@ bool ForculusAnalyzer::AddObservation(uint32_t day_index,
       if (!decrypter_result.decrypter) {
         // We have previously deleted the decrypter object because it was
         // in an inconsistent state.
-        LOG(ERROR) << "Skipping decryption because of a previous error: " <<
-            "day_index=" << day_index << " " << ErrorString(obs);
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationFailure)
+            << "Skipping decryption because of a previous error: "
+            << "day_index=" << day_index << " " << ErrorString(obs);
         observation_errors_++;
         return false;
       }
       if (decrypter_result.decrypter->AddObservation(obs) !=
           ForculusDecrypter::kOK) {
         // Delete the Decrypter object. It is in an inconsistent state.
-        LOG(ERROR) << "Found inconsistent observation. Deleting Decrypter: " <<
-            ErrorString(obs);
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationFailure)
+            << "Found inconsistent observation. Deleting Decrypter: "
+            << ErrorString(obs);
         decrypter_result.decrypter.reset();
         observation_errors_++;
         return false;
@@ -88,8 +97,8 @@ bool ForculusAnalyzer::AddObservation(uint32_t day_index,
         if (decrypter_result.decrypter->Decrypt(&recovered_text) !=
             ForculusDecrypter::kOK) {
           // Delete the Decrypter object. It is in an inconsistent state.
-          LOG(ERROR) << "Decryption failed. Deleting Decrypter: " <<
-            ErrorString(obs);
+          LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationFailure)
+              << "Decryption failed. Deleting Decrypter: " << ErrorString(obs);
           decrypter_result.decrypter.reset();
           observation_errors_++;
           return false;
@@ -98,9 +107,9 @@ bool ForculusAnalyzer::AddObservation(uint32_t day_index,
 
         // Delete the Decrypter object. It has done its job and we don't need
         // it anymore.
-        VLOG(4) << "Decryption succeeded: '" << recovered_text <<
-            "' Deleting Decrypter: day_index=" << day_index << " " <<
-            ErrorString(obs);
+        VLOG(4) << "Decryption succeeded: '" << recovered_text
+                << "' Deleting Decrypter: day_index=" << day_index << " "
+                << ErrorString(obs);
         decrypter_result.decrypter.reset();
         auto results_iter = results_.find(recovered_text);
         if (results_iter == results_.end()) {
@@ -119,7 +128,7 @@ bool ForculusAnalyzer::AddObservation(uint32_t day_index,
           // recovered text was seen in a different epoch.
           auto& result_info = results_iter->second;
           result_info->num_epochs++;
-          result_info->total_count+= num_seen;
+          result_info->total_count += num_seen;
           // Keep a non-owned pointer to result_info in the decrypter_map
           // so we can find it quickly the next time we get another observation
           // with the same group_key.
@@ -132,8 +141,8 @@ bool ForculusAnalyzer::AddObservation(uint32_t day_index,
   return true;
 }
 
-size_t ForculusAnalyzer::KeyHasher::operator()(const DecrypterGroupKey &key)
-  const {
+size_t ForculusAnalyzer::KeyHasher::operator()(
+    const DecrypterGroupKey& key) const {
   // The probability of having the same ciphertext with two different
   // epoch_indexes is negligably small since the epoch_index was one of
   // the ingredients that went into the master key during encryption. For
@@ -144,4 +153,3 @@ size_t ForculusAnalyzer::KeyHasher::operator()(const DecrypterGroupKey &key)
 
 }  // namespace forculus
 }  // namespace cobalt
-
