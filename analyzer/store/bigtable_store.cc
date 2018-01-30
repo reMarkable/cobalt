@@ -61,6 +61,11 @@ using crypto::RegexEncode;
 namespace {
 const char kReadRowsFailure[] = "bigtable-store-read-rows-failure";
 const char kWriteRowsFailure[] = "bigtable-store-write-rows-failure";
+const char kDeleteAllRowsFailure[] = "bigtable-store-delete-all-rows-failure";
+const char kDeleteRowFailure[] = "bigtable-store-delete-row-failure";
+const char kDeleteRowsWithPrefixFailure[] =
+    "bigtable-store-delete-rows-with-prefix-failure";
+const char kDoWriteRowsFailure[] = "bigtable-store-do-write-rows-failure";
 }  // namespace
 
 namespace {
@@ -232,7 +237,8 @@ grpc::Status BigtableStore::DoWriteRows(
       // later.
       std::string encoded_column_name;
       if (!RegexEncode(pair.first, &encoded_column_name)) {
-        LOG(ERROR) << "RegexEncode failed on '" << pair.first << "'";
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kDoWriteRowsFailure)
+            << "RegexEncode failed on '" << pair.first << "'";
         return grpc::Status(grpc::INVALID_ARGUMENT, "RegexEncode failed.");
       }
       cell->mutable_column_qualifier()->swap(encoded_column_name);
@@ -453,7 +459,8 @@ Status BigtableStore::DeleteRow(Table table, std::string row_key) {
   if (!status.ok()) {
     // TODO(rudominer) Consider doing a retry here. Consider if this
     // method should be asynchronous.
-    LOG(ERROR) << ErrorMessage(status, "DeleteRow");
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kDeleteRowFailure)
+        << ErrorMessage(status, "DeleteRow");
     return GrpcStatusToStoreStatus(status);
   }
 
@@ -473,7 +480,8 @@ Status BigtableStore::DeleteRowsWithPrefix(Table table,
   if (!status.ok()) {
     // TODO(rudominer) Consider doing a retry here. Consider if this
     // method should be asynchronous.
-    LOG(ERROR) << ErrorMessage(status, "DeleteRowsWithPrefix");
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kDeleteRowsWithPrefixFailure)
+        << ErrorMessage(status, "DeleteRowsWithPrefix");
     return GrpcStatusToStoreStatus(status);
   }
 
@@ -492,7 +500,8 @@ Status BigtableStore::DeleteAllRows(Table table) {
   if (!status.ok()) {
     // TODO(rudominer) Consider doing a retry here. Consider if this
     // method should be asynchronous.
-    LOG(ERROR) << ErrorMessage(status, "DeleteAllRows");
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kDeleteAllRowsFailure)
+        << ErrorMessage(status, "DeleteAllRows");
     return GrpcStatusToStoreStatus(status);
   }
 

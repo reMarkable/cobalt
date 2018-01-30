@@ -395,7 +395,8 @@ grpc::Status ReportSerializer::AppendCSVRawDumpHeaderRow(std::ostream* stream) {
                     "to be specified for RAW_DUMP reports. For ReportConfig "
                  << IdString(*report_config_);
     std::string message = error_stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+        << message;
     return grpc::Status(grpc::INVALID_ARGUMENT, message);
   }
   fixed_leftmost_column_values_.clear();
@@ -521,7 +522,7 @@ grpc::Status ReportSerializer::AppendCSVReportRow(const ReportRow& report_row,
         error_stream << "Expecting a RAW_DUMP row but the row_type=" << row_type
                      << ". For ReportConfig " << IdString(*report_config_);
         std::string message = error_stream.str();
-        LOG(ERROR) << message;
+        LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
         return grpc::Status(grpc::INTERNAL, message);
       }
       return AppendCSVRawDumpReportRow(report_row.raw_dump(), stream);
@@ -581,7 +582,7 @@ grpc::Status ReportSerializer::AppendCSVRawDumpReportRow(
                  << num_values_this_row << ". For ReportConfig "
                  << IdString(*report_config_);
     std::string message = error_stream.str();
-    LOG(ERROR) << message;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAppendRowsFailure) << message;
     return grpc::Status(grpc::INTERNAL, message);
   }
   for (const std::string& v : fixed_leftmost_column_values_) {

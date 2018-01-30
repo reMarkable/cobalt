@@ -27,6 +27,7 @@
 #include "analyzer/store/bigtable_store.h"
 #include "analyzer/store/data_store.h"
 #include "util/encrypted_message_util.h"
+#include "util/log_based_metrics.h"
 #include "util/pem_util.h"
 
 namespace cobalt {
@@ -37,6 +38,12 @@ using store::DataStore;
 using store::ObservationStore;
 using util::MessageDecrypter;
 using util::PemUtil;
+
+// Stackdriver metric constants
+namespace {
+const char kAddObservationsFailure[] =
+    "analyzer-service-add-observations-failure";
+}  // namespace
 
 DEFINE_int32(port, 0, "The port that the Analyzer Service should listen on.");
 DEFINE_string(
@@ -108,7 +115,8 @@ grpc::Status AnalyzerServiceImpl::AddObservations(
   for (const EncryptedMessage& em : batch->encrypted_observation()) {
     if (!message_decrypter_.DecryptMessage(em, &observations[index++])) {
       std::string error_message = "Decryption of an Observation failed.";
-      LOG(ERROR) << error_message;
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationsFailure)
+          << error_message;
       return grpc::Status(grpc::INVALID_ARGUMENT, error_message);
     }
   }
@@ -116,8 +124,8 @@ grpc::Status AnalyzerServiceImpl::AddObservations(
   auto add_status =
       observation_store_->AddObservationBatch(batch->meta_data(), observations);
   if (add_status != store::kOK) {
-    LOG(ERROR) << "AddObservationBatch() failed with status code "
-               << add_status;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddObservationsFailure)
+        << "AddObservationBatch() failed with status code " << add_status;
     switch (add_status) {
       case store::kInvalidArguments:
         return grpc::Status(grpc::INVALID_ARGUMENT, "");

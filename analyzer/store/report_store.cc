@@ -26,6 +26,7 @@
 #include "glog/logging.h"
 #include "util/crypto_util/random.h"
 #include "util/datetime_util.h"
+#include "util/log_based_metrics.h"
 
 using google::protobuf::MessageLite;
 
@@ -34,6 +35,20 @@ namespace analyzer {
 namespace store {
 
 using util::ToUnixSeconds;
+
+// Stackdriver metric constants
+namespace {
+const char kParseSingleColumnFailure[] = "parse-single-column-failure";
+const char kCheckRowTypeFailure[] = "check-row-type-failure";
+const char kWriteMetadataFailure[] = "report-store-write-metadata-failure";
+const char kWriteBulkMetadataFailure[] =
+    "report-store-write-bulk-metadata-failure";
+const char kStartNewReportFailure[] = "report-store-start-new-report-failure";
+const char kCreateDependentReportFailure[] =
+    "report-store-create-dependent-report-failure";
+const char kAddReportRowsFailure[] = "report-store-add-report-rows-failure";
+const char kGetReportFailure[] = "report-store-get-report-failure";
+}  // namespace
 
 namespace {
 // We currently do not support reports with more than this many rows.
@@ -90,26 +105,28 @@ Status ParseSingleColumn(const ReportId& report_id, const DataStore::Row& row,
                          const std::string& error_message_prefix,
                          MessageLite* proto_message) {
   if (row.column_values.size() != 1) {
-    LOG(ERROR) << error_message_prefix << " for report_id "
-               << ReportStore::ToString(report_id)
-               << ": expected to receive one column but recieved "
-               << row.column_values.size() << " columns.";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kParseSingleColumnFailure)
+        << error_message_prefix << " for report_id "
+        << ReportStore::ToString(report_id)
+        << ": expected to receive one column but recieved "
+        << row.column_values.size() << " columns.";
     return kOperationFailed;
   }
 
   auto iter = row.column_values.find(column_name);
 
   if (iter == row.column_values.end()) {
-    LOG(ERROR) << error_message_prefix << " for report_id "
-               << ReportStore::ToString(report_id)
-               << ": Column not found: " << column_name;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kParseSingleColumnFailure)
+        << error_message_prefix << " for report_id "
+        << ReportStore::ToString(report_id)
+        << ": Column not found: " << column_name;
     return kOperationFailed;
   }
 
   if (!proto_message->ParseFromString(iter->second)) {
-    LOG(ERROR) << error_message_prefix << " for report_id "
-               << ReportStore::ToString(report_id)
-               << ": Unable to parse ReportRow";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kParseSingleColumnFailure)
+        << error_message_prefix << " for report_id "
+        << ReportStore::ToString(report_id) << ": Unable to parse ReportRow";
     return kOperationFailed;
   }
   return kOK;
@@ -154,8 +171,9 @@ bool CheckRowType(const ReportId& report_id, const ReportMetadataLite& metadata,
       return report_row.has_joint();
     }
     default: {
-      LOG(ERROR) << "Unrecognized ReportType: " << metadata.report_type()
-                 << " for report_id=" << ReportStore::ToString(report_id);
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCheckRowTypeFailure)
+          << "Unrecognized ReportType: " << metadata.report_type()
+          << " for report_id=" << ReportStore::ToString(report_id);
       return false;
     }
   }
@@ -186,9 +204,10 @@ Status ReportStore::WriteMetadata(const ReportId& report_id,
   // Write the Row to the report_metadata table.
   Status status = store_->WriteRow(DataStore::kReportMetadata, std::move(row));
   if (status != kOK) {
-    LOG(ERROR) << "Error while writing metadata for report_id "
-               << ToString(report_id) << ": WriteRow() "
-               << "failed with status=" << status;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kWriteMetadataFailure)
+        << "Error while writing metadata for report_id " << ToString(report_id)
+        << ": WriteRow() "
+        << "failed with status=" << status;
     return status;
   }
 
@@ -208,9 +227,10 @@ Status ReportStore::WriteBulkMetadata(
   Status status =
       store_->WriteRows(DataStore::kReportMetadata, std::move(rows));
   if (status != kOK) {
-    LOG(ERROR) << "Error while writing metadata for " << num_reports
-               << "reports: WriteRows() "
-               << "failed with status=" << status;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kWriteBulkMetadataFailure)
+        << "Error while writing metadata for " << num_reports
+        << "reports: WriteRows() "
+        << "failed with status=" << status;
     return status;
   }
 
@@ -239,7 +259,8 @@ Status ReportStore::StartNewReport(
   metadata.set_export_name(export_name);
   metadata.set_in_store(in_store);
   if (in_store && report_type == RAW_DUMP) {
-    LOG(ERROR) << "A RAW_DUMP report may not be stored in the ReportStore.";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartNewReportFailure)
+        << "A RAW_DUMP report may not be stored in the ReportStore.";
     return kInvalidArguments;
   }
 
@@ -273,7 +294,8 @@ Status ReportStore::CreateDependentReport(
   metadata.set_report_type(report_type);
   metadata.set_in_store(in_store);
   if (in_store && report_type == RAW_DUMP) {
-    LOG(ERROR) << "A RAW_DUMP report may not be stored in the ReportStore.";
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateDependentReportFailure)
+        << "A RAW_DUMP report may not be stored in the ReportStore.";
     return kInvalidArguments;
   }
 
@@ -336,29 +358,31 @@ Status ReportStore::AddReportRows(const ReportId& report_id,
     return kOK;
   }
   if (report_id.creation_time_seconds() == 0 || report_id.instance_id() == 0) {
-    LOG(ERROR) << "Attempt to AddReportRow for incomplete report_id: "
-               << ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddReportRowsFailure)
+        << "Attempt to AddReportRow for incomplete report_id: "
+        << ToString(report_id);
     return kInvalidArguments;
   }
 
   ReportMetadataLite metadata;
   Status status = GetMetadata(report_id, &metadata);
   if (status != kOK) {
-    LOG(ERROR) << "Failed to get metadata for report_id: "
-               << ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddReportRowsFailure)
+        << "Failed to get metadata for report_id: " << ToString(report_id);
     return status;
   }
 
   if (!metadata.in_store()) {
-    LOG(ERROR)
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddReportRowsFailure)
         << "Cannot add report rows for a report for which in_store is false."
         << " report_id: " << ToString(report_id);
     return kInvalidArguments;
   }
 
   if (metadata.state() != IN_PROGRESS) {
-    LOG(ERROR) << "Report is not IN_PROGRESS. state=" << metadata.state()
-               << " report_id: " << ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddReportRowsFailure)
+        << "Report is not IN_PROGRESS. state=" << metadata.state()
+        << " report_id: " << ToString(report_id);
     return kPreconditionFailed;
   }
 
@@ -371,7 +395,8 @@ Status ReportStore::AddReportRows(const ReportId& report_id,
 
     std::string serialized_row;
     if (!report_row.SerializeToString(&serialized_row)) {
-      LOG(ERROR) << "Serializing report_row failed";
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddReportRowsFailure)
+          << "Serializing report_row failed";
       return kOperationFailed;
     }
 
@@ -386,9 +411,10 @@ Status ReportStore::AddReportRows(const ReportId& report_id,
   status =
       store_->WriteRows(DataStore::kReportRows, std::move(data_store_rows));
   if (status != kOK) {
-    LOG(ERROR) << "Error while attempting to write report rows for report_id "
-               << ToString(report_id) << ": WriteRow() "
-               << "failed with status=" << status;
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAddReportRowsFailure)
+        << "Error while attempting to write report rows for report_id "
+        << ToString(report_id) << ": WriteRow() "
+        << "failed with status=" << status;
     return status;
   }
 
@@ -440,8 +466,8 @@ Status ReportStore::GetReport(const ReportId& report_id,
   }
 
   if (read_response.more_available) {
-    LOG(ERROR) << "Report contains too many rows to return! "
-               << ToString(report_id);
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetReportFailure)
+        << "Report contains too many rows to return! " << ToString(report_id);
     return kPreconditionFailed;
   }
 
