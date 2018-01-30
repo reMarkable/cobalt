@@ -21,6 +21,12 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"cobalt"
+	"util/stackdriver"
+)
+
+const (
+	newEncryptedMessageMakerFailed = "encrypted-message-util-new-encrypted-message-maker-failed"
+	newMessageDecrypterFailed      = "encrypted-message-util-new-message-decrypter-failed"
 )
 
 // This file contains two types for working with EncryptedMessages.
@@ -62,12 +68,12 @@ func NewEncryptedMessageMaker(publicKeyPem string,
 	if scheme == cobalt.EncryptedMessage_HYBRID_ECDH_V1 {
 		publicKey, err := ParseECPublicKeyPem(publicKeyPem)
 		if err != nil {
-			glog.Errorf("Failed to decode public key PEM: %v.", err)
+			stackdriver.LogCountMetricf(newEncryptedMessageMakerFailed, "Failed to decode public key PEM: %v.", err)
 			return nil
 		}
 		cipher = NewHybridCipher(nil, publicKey)
 		if cipher == nil {
-			glog.Errorln("Failed to construct a HybridCipher.")
+			stackdriver.LogCountMetricln(newEncryptedMessageMakerFailed, "Failed to construct a HybridCipher.")
 			return nil
 		}
 	}
@@ -140,7 +146,7 @@ func NewMessageDecrypter(privateKeyPem string) *MessageDecrypter {
 	} else {
 		privateKey, err := ParseECPrivateKeyPem(privateKeyPem)
 		if err != nil {
-			glog.Errorf("Failed to decode private key PEM: %v, Shuffler will not be able to decrypt EncryptedMessages.", err)
+			stackdriver.LogCountMetricf(newMessageDecrypterFailed, "Failed to decode private key PEM: %v, Shuffler will not be able to decrypt EncryptedMessages.", err)
 		} else {
 			hybridCipher = NewHybridCipher(privateKey, nil)
 			glog.Infoln("Successfully parsed the private key PEM file.")

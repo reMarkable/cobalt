@@ -31,6 +31,12 @@ import (
 
 	"cobalt"
 	"shuffler"
+	"util/stackdriver"
+)
+
+const (
+	initializeFailed         = "leveldb-store-initialize-failed"
+	addAllObservationsFailed = "leveldb-store-add-all-observations-failed"
 )
 
 // LevelDBStore is an persistent store implementation of the Store interface.
@@ -95,7 +101,7 @@ func (store *LevelDBStore) initialize() error {
 		dbKey := string(iter.Key())
 		bKey, err := ExtractBKey(dbKey)
 		if err != nil {
-			glog.Errorln("Existing DB key [", dbKey, "] found corrupted: ", err)
+			stackdriver.LogCountMetricln(initializeFailed, "Existing DB key [", dbKey, "] found corrupted: ", err)
 			continue
 		}
 		store.bucketSizes[bKey]++
@@ -187,14 +193,14 @@ func (store *LevelDBStore) AddAllObservations(envelopeBatch []*cobalt.Observatio
 			// generate a new random key for each encrypted observation
 			key, id, err := NewRowKey(bKey)
 			if err != nil {
-				glog.Errorln("AddAllObservations() failed in generating PKey for metadata [", om, "]: ", err)
+				stackdriver.LogCountMetricln(addAllObservationsFailed, "AddAllObservations() failed in generating PKey for metadata [", om, "]: ", err)
 				return grpc.Errorf(codes.Internal, "Error in processing observation metadata for batch [%v]", om)
 			}
 
 			// generate |ObservationVal| for each encrypted observation
 			val, err := makeDBVal(encryptedObservation, id, arrivalDayIndex)
 			if err != nil {
-				glog.Errorln("AddAllObservations() failed in parsing observation value for metadata [", *om, "]: ", err)
+				stackdriver.LogCountMetricln(addAllObservationsFailed, "AddAllObservations() failed in parsing observation value for metadata [", *om, "]: ", err)
 				return grpc.Errorf(codes.Internal, "Error in processing one of the observations for metadata [%v]", *om)
 			}
 
@@ -215,7 +221,7 @@ func (store *LevelDBStore) AddAllObservations(envelopeBatch []*cobalt.Observatio
 
 	// commit |dbBatch|
 	if err := store.db.Write(dbBatch, woptions); err != nil {
-		glog.Errorln("AddAllObservations failed with error:", err)
+		stackdriver.LogCountMetricln(addAllObservationsFailed, "AddAllObservations failed with error:", err)
 		return grpc.Errorf(codes.Internal, "Internal error in processing the ObservationBatch.")
 	}
 

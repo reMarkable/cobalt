@@ -25,6 +25,7 @@ import (
 	"shuffler"
 	"shuffler_config"
 	"storage"
+	"util/stackdriver"
 
 	"github.com/golang/glog"
 )
@@ -61,6 +62,10 @@ var (
 			"This should not be set true in normal shuffler operation.")
 )
 
+const (
+	readPrivateKeyPemFileFailure = "shuffler-main-read-private-key-pem-file-failure"
+)
+
 func main() {
 	flag.Parse()
 
@@ -87,8 +92,9 @@ func main() {
 	privateKeyPem := ""
 	if *privateKeyPemFile != "" {
 		if fileContents, err := ioutil.ReadFile(*privateKeyPemFile); err != nil {
-			glog.Errorf("Error attempting to read private key PEM file %s: %v. "+
-				"The shuffler will not be able to decrypt EncryptedMessages.", *privateKeyPemFile, err)
+			stackdriver.LogCountMetricf(readPrivateKeyPemFileFailure,
+				"Error attempting to read private key PEM file %s: %v. "+
+					"The shuffler will not be able to decrypt EncryptedMessages.", *privateKeyPemFile, err)
 		} else {
 			glog.Infof("Successfully read private key PEM file %s.", *privateKeyPemFile)
 			privateKeyPem = string(fileContents)

@@ -34,6 +34,7 @@ import (
 	"cobalt"
 	"shuffler"
 	"storage"
+	"util/stackdriver"
 )
 
 // We sleep for this amount of time between buckets and between batches within a bucket
@@ -42,6 +43,13 @@ const dispatchDelay = 1 * time.Second
 // In the case that FrequencyInHours has been set to zero we sleep for this
 // duration between each invocation of Dispatch().
 const minWaitTime = 1 * time.Second
+
+const (
+	dispatchFailed              = "dispatcher-dispatch-failed"
+	dispatchBucketFailed        = "dispatcher-dispatch-bucket-failed"
+	deleteOldObservationsFailed = "dispatcher-delete-old-observations-failed"
+	makeBatchFailed             = "dispatcher-make-batch-failed"
+)
 
 // AnalyzerTransport is an interface for Analyzer where the observations get
 // collected, analyzed and reported.
@@ -300,7 +308,7 @@ func (d *Dispatcher) dispatch(sleepDuration time.Duration) {
 	glog.V(5).Infoln("Start dispatching ...")
 	keys, err := d.store.GetKeys()
 	if err != nil {
-		glog.Errorf("GetKeys() failed with error: %v", err)
+		stackdriver.LogCountMetricf(dispatchFailed, "GetKeys() failed with error: %v", err)
 		return
 	}
 
@@ -328,7 +336,7 @@ func (d *Dispatcher) dispatch(sleepDuration time.Duration) {
 		bucketSize, err := d.store.GetNumObservations(key)
 		glog.V(5).Infof("Bucket size from store: [%d]", bucketSize)
 		if err != nil {
-			glog.Errorf("GetNumObservations() failed for key: %v with error: %v", key, err)
+			stackdriver.LogCountMetricf(dispatchFailed, "GetNumObservations() failed for key: %v with error: %v", key, err)
 			continue
 		}
 
@@ -337,7 +345,7 @@ func (d *Dispatcher) dispatch(sleepDuration time.Duration) {
 			// Dispatch bucket associated with |key| and delete it after sending.
 			err := d.dispatchBucket(key, sleepDuration)
 			if err != nil {
-				glog.Errorf("dispatchBucket() failed for key: %v with error: %v", key, err)
+				stackdriver.LogCountMetricf(dispatchFailed, "dispatchBucket() failed for key: %v with error: %v", key, err)
 				continue
 			}
 		} else {
@@ -347,7 +355,7 @@ func (d *Dispatcher) dispatch(sleepDuration time.Duration) {
 			// in the store for the next dispatch event.
 			err = d.deleteOldObservations(key, storage.GetDayIndexUtc(time.Now()), d.config.GetGlobalConfig().DisposalAgeDays)
 			if err != nil {
-				glog.Errorf("Error in filtering Observations for key [%v]: %v", key, err)
+				stackdriver.LogCountMetricf(dispatchFailed, "Error in filtering Observations for key [%v]: %v", key, err)
 			}
 		}
 		time.Sleep(sleepDuration)
@@ -370,7 +378,7 @@ func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata, sleepDurati
 	// Retrieve shuffled bucket from store for the given |key|
 	iterator, err := d.store.GetObservations(key)
 	if err != nil {
-		glog.Errorf("GetObservations() failed for key: %v with error: %v", key, err)
+		stackdriver.LogCountMetricf(dispatchBucketFailed, "GetObservations() failed for key: %v with error: %v", key, err)
 		return err
 	}
 
@@ -390,12 +398,12 @@ func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata, sleepDurati
 			// After successful send, delete the observations from the local
 			// datastore.
 			if err := d.store.DeleteValues(key, obVals); err != nil {
-				glog.Errorf("Error in deleting dispatched observations from the store for key: %v", key)
+				stackdriver.LogCountMetricf(dispatchBucketFailed, "Error in deleting dispatched observations from the store for key: %v", key)
 			}
 		} else {
 			// TODO(ukode): Add retry behaviour for 3 or more attempts or use
 			// exponential backoff for errors relating to network issues.
-			glog.Errorf("Error in transmitting data to Analyzer for key [%v]: %v", key, sendErr)
+			stackdriver.LogCountMetricf(dispatchBucketFailed, "Error in transmitting data to Analyzer for key [%v]: %v", key, sendErr)
 		}
 		time.Sleep(sleepDuration)
 	}
@@ -418,7 +426,7 @@ func (d *Dispatcher) deleteOldObservations(key *cobalt.ObservationMetadata,
 
 	iterator, err := d.store.GetObservations(key)
 	if err != nil {
-		glog.Errorf("GetObservation call failed for key: %v with error: %v", key, err)
+		stackdriver.LogCountMetricf(deleteOldObservationsFailed, "GetObservation call failed for key: %v with error: %v", key, err)
 		return nil
 	}
 
@@ -429,7 +437,7 @@ func (d *Dispatcher) deleteOldObservations(key *cobalt.ObservationMetadata,
 		for iterator.Next() {
 			obVal, err := iterator.Get()
 			if err != nil {
-				glog.Errorf("deleteOldObservations: iterator.Get() returned an error: %v", err)
+				stackdriver.LogCountMetricf(deleteOldObservationsFailed, "deleteOldObservations: iterator.Get() returned an error: %v", err)
 				continue
 			}
 			if currentDayIndex-obVal.ArrivalDayIndex > disposalAgeInDays {
@@ -474,7 +482,7 @@ func makeBatch(key *cobalt.ObservationMetadata, iterator storage.Iterator, batch
 	for iterator.Next() {
 		obVal, err := iterator.Get()
 		if err != nil {
-			glog.Errorf("makeBatch: iterator.Get() returned an error: %v", err)
+			stackdriver.LogCountMetricf(makeBatchFailed, "makeBatch: iterator.Get() returned an error: %v", err)
 			continue
 		}
 		obVals = append(obVals, obVal)

@@ -39,6 +39,12 @@ import (
 	"shuffler"
 	"storage"
 	"util"
+	"util/stackdriver"
+)
+
+const (
+	startServerFailed     = "reciever-start-server-failed"
+	decryptEnvelopeFailed = "reciever-decrypt-envelope-failed"
 )
 
 var shufflerServerSingleton *ShufflerServer
@@ -145,7 +151,7 @@ func Run(dataStore storage.Store, config *ServerConfig) {
 func (s *ShufflerServer) startServer() {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.Port))
 	if err != nil {
-		glog.Error("Grpc: Error in accepting connections on port [", s.config.Port, "]:", err)
+		stackdriver.LogCountMetric(startServerFailed, "Grpc: Error in accepting connections on port [", s.config.Port, "]:", err)
 		return
 	}
 	var opts []grpc.ServerOption
@@ -155,7 +161,7 @@ func (s *ShufflerServer) startServer() {
 		glog.Infof("Reading tls cert file %s and tls key file %s.", s.config.CertFile, s.config.KeyFile)
 		creds, err := credentials.NewServerTLSFromFile(s.config.CertFile, s.config.KeyFile)
 		if err != nil {
-			glog.Error("Grpc: Failed to create TLS credentials from files:", err)
+			stackdriver.LogCountMetric(startServerFailed, "Grpc: Failed to create TLS credentials from files:", err)
 			return
 		}
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
@@ -179,7 +185,7 @@ func (s *ShufflerServer) decryptEnvelope(encryptedMessage *cobalt.EncryptedMessa
 	}
 	envelope := new(cobalt.Envelope)
 	if err := s.decrypter.DecryptMessage(encryptedMessage, envelope); err != nil {
-		glog.Errorf("Decryption failed: %v", err)
+		stackdriver.LogCountMetricf(decryptEnvelopeFailed, "Decryption failed: %v", err)
 		return nil, err
 	}
 	return envelope, nil

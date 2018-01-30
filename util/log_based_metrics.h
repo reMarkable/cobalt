@@ -11,7 +11,7 @@
 #define COBALT_UTIL_LOG_BASED_METRICS_H_
 
 #define LOG_STACKDRIVER_METRIC(level, metric_id) \
-  LOG(level) << "Logs-Based Stackdriver Metric [" << (metric_id) << "] "
+  LOG(level) << "$@LBSDM@$ [" << (metric_id) << "] "
 
 #define LOG_BOOL_STACKDRIVER_METRIC(level, metric_id, value) \
   LOG_STACKDRIVER_METRIC(level, metric_id) << "BoolValue [" << (value) << "] "
