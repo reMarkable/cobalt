@@ -28,6 +28,13 @@ cobalt_protobuf_generate_go(generate_config_pb_go_files
                             false
                             cobalt_config encodings metrics report_configs)
 
+add_library(buckets_config
+            buckets_config.cc
+            ${CONFIG_PROTO_HDRS})
+target_link_libraries(buckets_config
+    config_proto_lib)
+add_cobalt_dependencies(buckets_config)
+
 # Build the analyzer_config library
 add_library(analyzer_config
             analyzer_config.cc
@@ -45,9 +52,11 @@ add_cobalt_dependencies(config_gen)
 add_executable(config_tests
                analyzer_config_test.cc
                config_test.cc
+               buckets_config_test.cc
                ${CONFIG_PROTO_HDRS})
 target_link_libraries(config_tests
-                      analyzer_config)
+                      analyzer_config
+                      buckets_config)
 add_cobalt_test_dependencies(config_tests ${DIR_GTESTS})
 
 set(CONFIG_DIR "${CMAKE_SOURCE_DIR}/third_party/config")

@@ -58,9 +58,10 @@ message ExponentialIntegerBuckets {
 message LinearIntegerBuckets {
   int64 floor = 1;
 
-  // num_buckets >= 1
+  // Must be at least one.
   uint32 num_buckets = 2;
 
+  // Must be at least one.
   uint32 step_size = 3;
 }
 
