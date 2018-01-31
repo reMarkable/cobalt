@@ -23,6 +23,7 @@ import shutil
 import string
 import subprocess
 import sys
+import tempfile
 
 import process_starter
 from process_starter import ANALYZER_PRIVATE_KEY_PEM_NAME
@@ -149,6 +150,8 @@ REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME = \
 # //kubernetes/report_master/Dockerfile
 REPORT_MASTER_GCS_SERVICE_ACCOUNT_JSON_FILE_NAME = "gcs_service_account.json"
 
+COBALT_REPO_CLONE_URL = "https://fuchsia.googlesource.com/cobalt"
+
 def _ensure_dir(dir_path):
   """Ensures that the directory at |dir_path| exists. If not it is created.
 
@@ -196,17 +199,17 @@ def _build_docker_image(image_name, deploy_dir, extra_args=None):
   subprocess.check_call(cmd)
 
 def build_all_docker_images(shuffler_config_file=SHUFFLER_CONFIG_FILE,
-      cobalt_config_dir=DEMO_CONFIG_DIR):
+      cobalt_config_dir=DEMO_CONFIG_DIR, tag='latest'):
   _build_cobalt_common_deploy_dir()
-  _build_docker_image(COBALT_COMMON_IMAGE_NAME,
+  _build_docker_image(COBALT_COMMON_IMAGE_NAME + ':' + tag,
                       COBALT_COMMON_DOCKER_BUILD_DIR)
 
   _build_analyzer_service_deploy_dir()
-  _build_docker_image(ANALYZER_SERVICE_IMAGE_NAME,
+  _build_docker_image(ANALYZER_SERVICE_IMAGE_NAME + ':' + tag,
                       ANALYZER_SERVICE_DOCKER_BUILD_DIR)
 
   _build_report_master_deploy_dir(cobalt_config_dir)
-  _build_docker_image(REPORT_MASTER_IMAGE_NAME,
+  _build_docker_image(REPORT_MASTER_IMAGE_NAME + ':' + tag,
                       REPORT_MASTER_DOCKER_BUILD_DIR)
 
   # Pass the full path of the config file to be copied into the deoply dir.
@@ -214,36 +217,130 @@ def build_all_docker_images(shuffler_config_file=SHUFFLER_CONFIG_FILE,
 
   # But pass only the basename to be found by Docker and copied into the image.
   config_file_name = os.path.basename(shuffler_config_file)
-  _build_docker_image(SHUFFLER_IMAGE_NAME, SHUFFLER_DOCKER_BUILD_DIR,
+  _build_docker_image(SHUFFLER_IMAGE_NAME + ':' + tag,
+      SHUFFLER_DOCKER_BUILD_DIR,
       extra_args=["--build-arg", "config_file=%s"%config_file_name])
 
-def _image_registry_uri(cloud_project_prefix, cloud_project_name, image_name):
+
+def _select_git_revision():
+  tags = subprocess.check_output(['git', 'tag', '-l',
+    '--sort=-version:refname']).strip().split('\n')[:5]
+  tags.append('HEAD')
+
+  while True:
+    print
+    print
+    print('Which version would you like to build for?')
+    for i, tag in enumerate(tags):
+      print('({}) {}'.format(i, tag))
+
+    selection = raw_input('? ')
+    try:
+      selection = int(selection)
+      if selection < len(tags):
+        return tags[selection]
+    except:
+      print("Invalid selection")
+
+
+def build_and_push_production_docker_images(cloud_project_prefix,
+    cloud_project_name, production_dir, git_revision):
+  """ Builds and pushes production-ready docker images from a clean git repo.
+  cloud_project_prefix {sring}: For example "google.com"
+  cloud_project_name {sring}: For example "shuffler-test". The prefix and
+      name are used when forming the URI to the image in the registry and
+      also the bigtable project name.
+  production_dir {string}: The directory of the production config files.
+  git_revision {string}: A git revision passed in from the command line, if none
+    is provided, the user will be prompted to select one.
+    latest will be used.
+  """
+
+  clean_repo_dir = tempfile.mkdtemp('-cobalt-production-build')
+
+  try:
+    subprocess.check_call(['git', 'clone', COBALT_REPO_CLONE_URL,
+      clean_repo_dir])
+
+    wd = os.getcwd()
+    os.chdir(clean_repo_dir)
+
+    if not git_revision:
+      git_revision = _select_git_revision()
+
+    if git_revision is 'HEAD':
+      git_revision = subprocess.check_output(['git', 'rev-parse',
+        'HEAD']).strip()
+
+    subprocess.check_call(['git', 'checkout', git_revision])
+    describe = subprocess.check_output(['git', 'describe']).strip()
+    full_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
+
+    subprocess.check_call(['./cobaltb.py', 'setup'])
+    subprocess.check_call(['./cobaltb.py', 'clean', '--full'])
+    subprocess.check_call(['./cobaltb.py', 'build'])
+    p = subprocess.Popen(['./cobaltb.py', 'deploy', 'build',
+                           '--production_dir=%s' % production_dir],
+                           stdin=subprocess.PIPE)
+    p.communicate('yes')
+
+    tags_to_apply = ['latest', full_rev]
+    if describe is not git_revision:
+      tags_to_apply.append(describe)
+    subrev = ''
+    for part in git_revision.split('.'):
+      if subrev is not '':
+        subrev += '.'
+      subrev += part
+      tags_to_apply.append(subrev)
+
+    for tag in tags_to_apply:
+      push_shuffler_to_container_registry(cloud_project_prefix,
+          cloud_project_name, tag)
+      push_analyzer_service_to_container_registry(cloud_project_prefix,
+          cloud_project_name, tag)
+      push_report_master_to_container_registry(cloud_project_prefix,
+          cloud_project_name, tag)
+
+    os.chdir(wd)
+
+    return full_rev
+  finally:
+    print("Cleaning up")
+    shutil.rmtree(clean_repo_dir)
+
+def _image_registry_uri(cloud_project_prefix, cloud_project_name, image_name,
+    tag='latest'):
   if not cloud_project_prefix:
-    return "%s/%s/%s" % (CONTAINER_REGISTRY_URI, cloud_project_name, image_name)
-  return "%s/%s/%s/%s" % (CONTAINER_REGISTRY_URI, cloud_project_prefix,
-                          cloud_project_name, image_name)
+    return "%s/%s/%s:%s" % (CONTAINER_REGISTRY_URI, cloud_project_name,
+        image_name, tag)
+  return "%s/%s/%s/%s:%s" % (CONTAINER_REGISTRY_URI, cloud_project_prefix,
+                          cloud_project_name, image_name, tag)
 
 def _push_to_container_registry(cloud_project_prefix, cloud_project_name,
-                                image_name):
+                                image_name, tag='latest'):
   registry_tag = _image_registry_uri(cloud_project_prefix, cloud_project_name,
-                                     image_name)
+                                     image_name, tag)
   subprocess.check_call(["docker", "tag", image_name, registry_tag])
   subprocess.check_call(["gcloud", "docker", "--", "push", registry_tag])
 
 def push_analyzer_service_to_container_registry(cloud_project_prefix,
-                                               cloud_project_name):
+                                               cloud_project_name,
+                                               tag='latest'):
   _push_to_container_registry(cloud_project_prefix, cloud_project_name,
-                              ANALYZER_SERVICE_IMAGE_NAME)
+                              ANALYZER_SERVICE_IMAGE_NAME, tag)
 
 def push_report_master_to_container_registry(cloud_project_prefix,
-                                             cloud_project_name):
+                                             cloud_project_name,
+                                             tag='latest'):
   _push_to_container_registry(cloud_project_prefix, cloud_project_name,
-                              REPORT_MASTER_IMAGE_NAME)
+                              REPORT_MASTER_IMAGE_NAME, tag)
 
 def push_shuffler_to_container_registry(cloud_project_prefix,
-                                        cloud_project_name):
+                                        cloud_project_name,
+                                        tag='latest'):
   _push_to_container_registry(cloud_project_prefix, cloud_project_name,
-                              SHUFFLER_IMAGE_NAME)
+                              SHUFFLER_IMAGE_NAME, tag)
 
 # A special value recognized by the function _replace_tokens_in_template. If
 # a line of a template file contains a token $$FOO$$ and if the provided
@@ -428,7 +525,8 @@ def start_analyzer_service(cloud_project_prefix,
                            cloud_project_name,
                            cluster_zone, cluster_name,
                            bigtable_instance_id,
-                           static_ip_address):
+                           static_ip_address,
+                           version):
   """ Starts the analyzer-service deployment and service.
   cloud_project_prefix {sring}: For example "google.com"
   cloud_project_name {sring}: For example "shuffler-test". The prefix and
@@ -438,9 +536,11 @@ def start_analyzer_service(cloud_project_prefix,
       within the specified project to be used by the Analyzer Service.
   static_ip_address {string}: A static IP address that has already been
      reserved on the GKE cluster.
+  version {string}: The version of the docker image to use. If none is provided,
+    latest will be used.
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
-                                  ANALYZER_SERVICE_IMAGE_NAME)
+                                  ANALYZER_SERVICE_IMAGE_NAME, version)
 
   bigtable_project_name = compound_project_name(cloud_project_prefix,
                                                  cloud_project_name)
@@ -474,6 +574,7 @@ def start_report_master(cloud_project_prefix,
                         cluster_zone, cluster_name,
                         bigtable_instance_id,
                         static_ip_address,
+                        version,
                         enable_report_scheduling=False):
   """ Starts the report-master deployment and service.
   cloud_project_prefix {string}: For example "google.com"
@@ -484,10 +585,12 @@ def start_report_master(cloud_project_prefix,
       within the specified project to be used by the Report Master.
   static_ip_address {string}: A static IP address that has already been
       reserved on the GKE cluster.
+  version {string}: The version of the docker image to use. If none is provided,
+    latest will be used.
   enable_report_scheduling {bool}: Should report scheduling be enabled?
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
-                                  REPORT_MASTER_IMAGE_NAME)
+                                  REPORT_MASTER_IMAGE_NAME, version)
 
   bigtable_project_name = compound_project_name(cloud_project_prefix,
                                                  cloud_project_name)
@@ -535,6 +638,7 @@ def start_shuffler(cloud_project_prefix,
                    cluster_zone, cluster_name,
                    gce_pd_name,
                    static_ip_address,
+                   version,
                    use_memstore=False,
                    danger_danger_delete_all_data_at_startup=False):
   """ Starts the shuffler deployment and service.
@@ -546,9 +650,11 @@ def start_shuffler(cloud_project_prefix,
       storage so that the data persists between Shuffler updates.
   static_ip_address {string}: A static IP address that has already been
       reserved on the GKE cluster.
+  version {string}: The version of the docker image to use. If none is provided,
+    latest will be used.
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
-                                  SHUFFLER_IMAGE_NAME)
+                                  SHUFFLER_IMAGE_NAME, version)
   # These are the token replacements that must be made inside the deployment
   # template file.
   use_memstore_string = 'false'

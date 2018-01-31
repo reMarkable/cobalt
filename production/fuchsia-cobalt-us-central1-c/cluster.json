@@ -4,6 +4,7 @@
   "cloud_project_name": "fuchsia-cobalt",
   "cluster_name": "cobalt",
   "cluster_zone": "us-central1-c",
+  "deployed_versions_file": "versions.json",
   "gce_pd_name": "cobalt",
   "report_master_enable_scheduling" : "true",
   "report_master_preferred_address": "reportmaster.cobalt-api.fuchsia.com:443",
@@ -12,5 +13,6 @@
   "shuffler_preferred_address": "shuffler.cobalt-api.fuchsia.com:443",
   "shuffler_static_ip" : "",
   "shuffler_use_memstore" : "true",
-  "use_tls": "true"
+  "use_tls": "true",
+  "is_production_cluster": "true"
 }

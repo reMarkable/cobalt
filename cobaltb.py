@@ -536,12 +536,39 @@ def _deploy_authenticate(args):
       args.cloud_project_name, args.cluster_zone)
 
 def _deploy_build(args):
+  if _parse_bool(args.is_production_cluster):
+    print("Production configs must be built using './cobaltb.py deploy "
+    "production_build' which will build a clean version of the binaries, then "
+    "build the docker images in one step.")
+    answer = raw_input("Continue? (y/N) ")
+    if not _parse_bool(answer):
+      return
   container_util.build_all_docker_images(
       shuffler_config_file=args.shuffler_config_file,
       cobalt_config_dir=args.cobalt_config_dir)
   if not _is_config_up_to_date():
     print("Docker image was built using an older config. You can update the "
           "config using the './cobaltb.py update_config' command.")
+
+def _deploy_production_build(args):
+  full_ref = container_util.build_and_push_production_docker_images(
+      args.cloud_project_prefix,
+      args.cloud_project_name,
+      args.production_dir,
+      args.git_revision)
+
+  if full_ref:
+    print
+    print
+    print 'To enable this build, copy this json blob into versions.json:'
+    print
+    print '{'
+    print '  "shuffler": "%s",' % full_ref
+    print '  "report-master": "%s",' % full_ref
+    print '  "analyzer-service": "%s"' % full_ref
+    print '}'
+
+
 
 def _deploy_push(args):
   if args.job == 'shuffler':
@@ -560,7 +587,27 @@ def _deploy_push(args):
 def _parse_bool(bool_string):
   return bool_string.lower() in ['true', 't', 'y', 'yes', '1']
 
+def _load_versions_file(args):
+  versions = {
+      'shuffler': 'latest',
+      'analyzer-service': 'latest',
+      'report-master': 'latest',
+  }
+
+  with open(args.deployed_versions_file) as f:
+    try:
+      read_versions_file = json.load(f)
+    except ValueError:
+      print('%s could not be parsed.' % args.deployed_versions_file)
+  for key in read_versions_file:
+    if key in versions:
+      versions[key] = read_versions_file[key]
+
+  return versions
+
 def _deploy_start(args):
+  version = _load_versions_file(args).get(args.job, 'latest')
+
   if args.job == 'shuffler':
     container_util.start_shuffler(
         args.cloud_project_prefix,
@@ -568,6 +615,7 @@ def _deploy_start(args):
         args.cluster_zone, args.cluster_name,
         args.gce_pd_name,
         args.shuffler_static_ip,
+        version,
         use_memstore=_parse_bool(args.shuffler_use_memstore),
         danger_danger_delete_all_data_at_startup=
             args.danger_danger_delete_all_data_at_startup)
@@ -579,7 +627,8 @@ def _deploy_start(args):
         args.cloud_project_prefix, args.cloud_project_name,
         args.cluster_zone, args.cluster_name,
         args.bigtable_instance_id,
-        args.analyzer_service_static_ip)
+        args.analyzer_service_static_ip,
+        version)
   elif args.job == 'report-master':
     if args.bigtable_instance_id == '':
         print '--bigtable_instance_id must be specified'
@@ -589,6 +638,7 @@ def _deploy_start(args):
         args.cluster_zone, args.cluster_name,
         args.bigtable_instance_id,
         args.report_master_static_ip,
+        version,
         enable_report_scheduling=_parse_bool(
             args.report_master_enable_scheduling))
   else:
@@ -608,6 +658,10 @@ def _deploy_stop(args):
   else:
     print('Unknown job "%s". I only know how to stop "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
+
+def _deploy_stopstart(args):
+  _deploy_stop(args)
+  _deploy_start(args)
 
 def _deploy_upload_secret_keys(args):
   container_util.create_analyzer_private_key_secret(args.cloud_project_prefix,
@@ -751,6 +805,11 @@ def _cluster_settings_from_json(cluster_settings, json_file_path):
     if key in cluster_settings:
       cluster_settings[key] = read_cluster_settings[key]
 
+  cluster_settings['deployed_versions_file'] = os.path.join(
+      os.path.dirname(json_file_path),
+      cluster_settings['deployed_versions_file'])
+
+
 def _add_cloud_project_args(parser, cluster_settings):
   parser.add_argument('--cloud_project_prefix',
       help='The prefix part of name of the Cloud project with which you wish '
@@ -778,6 +837,10 @@ def _add_cloud_access_args(parser, cluster_settings):
       help='The zone in which your GKE "container cluster" is located. '
            'Default=%s' % cluster_settings['cluster_zone'],
       default=cluster_settings['cluster_zone'])
+  parser.add_argument('--is_production_cluster',
+      help='True if we are deploying to a production cluster '
+           'Default=%s' % cluster_settings['is_production_cluster'],
+      default=cluster_settings['is_production_cluster'])
 
 def _add_static_ip_args(parser, cluster_settings):
   parser.add_argument('--shuffler_static_ip',
@@ -799,6 +862,45 @@ def _add_static_ip_args(parser, cluster_settings):
 def _add_gke_deployment_args(parser, cluster_settings):
   _add_cloud_access_args(parser, cluster_settings)
   _add_static_ip_args(parser, cluster_settings)
+
+def _add_deploy_start_stop_args(parser, cluster_settings):
+  parser.add_argument('--job',
+      help='The job you wish to start or stop. Valid choices are "shuffler", '
+           '"analyzer-service", "report-master". Required.')
+  parser.add_argument('--bigtable_instance_id',
+      help='Specify a Cloud Bigtable instance within the specified Cloud '
+           'project that the Analyzer should connect to. This is required '
+           'if and only if you are starting one of the two Analyzer jobs. '
+           'Default=%s' % cluster_settings['bigtable_instance_id'],
+      default=cluster_settings['bigtable_instance_id'])
+  parser.add_argument('--gce_pd_name',
+      help='The name of a GCE persistent disk. This is used only when starting '
+           'the Shuffler. The disk must already have been created in the same '
+           'Cloud project in which the Shuffler is being deployed. '
+           'Default=%s' % cluster_settings['gce_pd_name'],
+      default=cluster_settings['gce_pd_name'])
+  parser.add_argument('--deployed_versions_file',
+      help='A file with version numbers to use',
+      default=cluster_settings['deployed_versions_file'])
+  default_report_master_enable_scheduling = \
+      _default_report_master_enable_scheduling(cluster_settings)
+  parser.add_argument('--report_master_enable_scheduling',
+      default=default_report_master_enable_scheduling,
+      help=('When starting the ReportMaster, should the ReportMaster run all '
+            'reports automatically on a schedule? Default=%s.' %
+            default_report_master_enable_scheduling))
+  default_shuffler_use_memstore = _default_shuffler_use_memstore(
+      cluster_settings)
+  parser.add_argument('--shuffler-use-memstore',
+      default=default_shuffler_use_memstore,
+      help=('When starting the Shuffler, should the Suffler use its in-memory '
+            'data store rather than a persistent datastore? Default=%s.' %
+            default_shuffler_use_memstore))
+  parser.add_argument('-danger_danger_delete_all_data_at_startup',
+      help='When starting the Shuffler, should all of the Observations '
+      'collected during previous runs of the Shuffler be permanently and '
+      'irrecoverably deleted from the Shuffler\'s store upon startup?',
+      action='store_true')
 
 def _is_config_up_to_date():
   savedDir = os.getcwd()
@@ -842,6 +944,7 @@ def main():
     'cluster_name': '',
     'cluster_zone': '',
     'cobalt_config_dir': '',
+    'deployed_versions_file': 'versions.json',
     'gce_pd_name': '',
     'report_master_enable_scheduling': '',
     'report_master_preferred_address': '',
@@ -853,6 +956,7 @@ def main():
     'shuffler_static_ip' : '',
     'shuffler_use_memstore' : '',
     'use_tls': '',
+    'is_production_cluster': 'false',
   }
   if production_cluster_json_file:
     _cluster_settings_from_json(cluster_settings, production_cluster_json_file)
@@ -1475,6 +1579,7 @@ def main():
       parents=[parent_parser], help='Rebuild all Docker images. '
           'You must have the Docker daemon running.')
   sub_parser.set_defaults(func=_deploy_build)
+  _add_cloud_access_args(sub_parser, cluster_settings)
   default_shuffler_config_file = _default_shuffler_config_file(
       cluster_settings)
   sub_parser.add_argument('--shuffler_config_file',
@@ -1486,6 +1591,24 @@ def main():
       help='Path of directory containing Cobalt configuration files. '
            'Default=%s' % default_cobalt_config_dir,
       default=default_cobalt_config_dir)
+
+  sub_parser = deploy_subparsers.add_parser('production_build',
+      parents=[parent_parser], help='Clean rebuild of binaries followed by '
+           'a build of all Docker images.')
+  sub_parser.set_defaults(func=_deploy_production_build)
+  _add_cloud_access_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--shuffler_config_file',
+      help='Path to the Shuffler configuration file. '
+           'Default=%s' % default_shuffler_config_file,
+      default=default_shuffler_config_file)
+  sub_parser.add_argument('--cobalt_config_dir',
+      help='Path of directory containing Cobalt configuration files. '
+           'Default=%s' % default_cobalt_config_dir,
+      default=default_cobalt_config_dir)
+  sub_parser.add_argument('--git_revision',
+      help='A git revision to build the binaries off of. If this is not '
+      'provided, you will be prompted to select one from a list',
+      default='')
 
   sub_parser = deploy_subparsers.add_parser('push',
       parents=[parent_parser], help='Push a Docker image to the Google'
@@ -1500,48 +1623,19 @@ def main():
       parents=[parent_parser], help='Start one of the jobs on GKE.')
   sub_parser.set_defaults(func=_deploy_start)
   _add_gke_deployment_args(sub_parser, cluster_settings)
-  sub_parser.add_argument('--job',
-      help='The job you wish to start. Valid choices are "shuffler", '
-           '"analyzer-service", "report-master". Required.')
-  sub_parser.add_argument('--bigtable_instance_id',
-      help='Specify a Cloud Bigtable instance within the specified Cloud '
-           'project that the Analyzer should connect to. This is required '
-           'if and only if you are starting one of the two Analyzer jobs. '
-           'Default=%s' % cluster_settings['bigtable_instance_id'],
-      default=cluster_settings['bigtable_instance_id'])
-  sub_parser.add_argument('--gce_pd_name',
-      help='The name of a GCE persistent disk. This is used only when starting '
-           'the Shuffler. The disk must already have been created in the same '
-           'Cloud project in which the Shuffler is being deployed. '
-           'Default=%s' % cluster_settings['gce_pd_name'],
-      default=cluster_settings['gce_pd_name'])
-  default_report_master_enable_scheduling = \
-      _default_report_master_enable_scheduling(cluster_settings)
-  sub_parser.add_argument('--report_master_enable_scheduling',
-      default=default_report_master_enable_scheduling,
-      help=('When starting the ReportMaster, should the ReportMaster run all '
-            'reports automatically on a schedule? Default=%s.' %
-            default_report_master_enable_scheduling))
-  default_shuffler_use_memstore = _default_shuffler_use_memstore(
-      cluster_settings)
-  sub_parser.add_argument('--shuffler-use-memstore',
-      default=default_shuffler_use_memstore,
-      help=('When starting the Shuffler, should the Suffler use its in-memory '
-            'data store rather than a persistent datastore? Default=%s.' %
-            default_shuffler_use_memstore))
-  sub_parser.add_argument('-danger_danger_delete_all_data_at_startup',
-      help='When starting the Shuffler, should all of the Observations '
-      'collected during previous runs of the Shuffler be permanently and '
-      'irrecoverably deleted from the Shuffler\'s store upon startup?',
-      action='store_true')
+  _add_deploy_start_stop_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('stop',
       parents=[parent_parser], help='Stop one of the jobs on GKE.')
   sub_parser.set_defaults(func=_deploy_stop)
   _add_gke_deployment_args(sub_parser, cluster_settings)
-  sub_parser.add_argument('--job',
-      help='The job you wish to stop. Valid choices are "shuffler", '
-           '"analyzer-service", "report-master". Required.')
+  _add_deploy_start_stop_args(sub_parser, cluster_settings)
+
+  sub_parser = deploy_subparsers.add_parser('stopstart',
+      parents=[parent_parser], help='Stop and start a job on GKE.')
+  sub_parser.set_defaults(func=_deploy_stopstart)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
+  _add_deploy_start_stop_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('upload_secret_keys',
       parents=[parent_parser], help='Creates |secret| objects in the '
