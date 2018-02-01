@@ -21,7 +21,7 @@ func LogMetricln(metric string, args ...interface{}) {
 }
 
 func LogBoolStackdriverMetric(metric string, value bool, args ...interface{}) {
-	LogMetric(metric, "BoolValue [", value, "] ", args)
+	LogMetric(metric, "B[", value, "] ", args)
 }
 func LogBoolStackdriverMetricf(metric string, value bool, format string, args ...interface{}) {
 	LogBoolStackdriverMetric(metric, value, fmt.Sprintf(format, args))
@@ -31,7 +31,7 @@ func LogBoolStackdriverMetricln(metric string, value bool, args ...interface{}) 
 }
 
 func LogIntStackdriverMetric(metric string, value int, args ...interface{}) {
-	LogMetric(metric, "IntValue [", value, "] ", args)
+	LogMetric(metric, "I[", value, "] ", args)
 }
 func LogIntStackdriverMetricf(metric string, value int, format string, args ...interface{}) {
 	LogIntStackdriverMetric(metric, value, fmt.Sprintf(format, args))
@@ -41,7 +41,7 @@ func LogIntStackdriverMetricln(metric string, value int, args ...interface{}) {
 }
 
 func LogStringStackdriverMetric(metric, value string, args ...interface{}) {
-	LogMetric(metric, "StrValue [", value, "] ", args)
+	LogMetric(metric, "S[", value, "] ", args)
 }
 func LogStringStackdriverMetricf(metric, value, format string, args ...interface{}) {
 	LogStringStackdriverMetric(metric, value, fmt.Sprintf(format, args))
@@ -51,7 +51,7 @@ func LogStringStackdriverMetricln(metric, value string, args ...interface{}) {
 }
 
 func LogCountMetric(metric string, args ...interface{}) {
-	LogIntStackdriverMetric(metric, 1, args)
+	LogMetric(metric, args)
 }
 func LogCountMetricf(metric, format string, args ...interface{}) {
 	LogCountMetric(metric, fmt.Sprintf(format, args))
