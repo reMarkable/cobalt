@@ -42,6 +42,7 @@ const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
 const uint32_t kStringMetricId = 1;
 const uint32_t kIndexMetricId = 2;
+const uint32_t kIntBucketsMetricId = 3;
 const uint32_t kForculusEncodingConfigId = 1;
 const uint32_t kBasicRapporStringEncodingConfigId = 2;
 const uint32_t kBasicRapporIndexEncodingConfigId = 3;
@@ -49,6 +50,7 @@ const uint32_t kStringRapporEncodingConfigId = 4;
 const uint32_t kNoOpEncodingConfigId = 5;
 const uint32_t kStringReportConfigId = 1;
 const uint32_t kIndexReportConfigId = 2;
+const uint32_t kIntBucketsReportConfigId = 3;
 const char kPartName[] = "Part1";
 const size_t kForculusThreshold = 20;
 
@@ -81,6 +83,27 @@ element {
     key: "Part1"
     value {
       data_type: INDEX
+    }
+  }
+}
+
+# Metric 3 has one INT part with linear buckets.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  time_zone_policy: UTC
+  parts {
+    key: "Part1"
+    value {
+      data_type: INT
+      int_buckets: {
+        linear: {
+          floor: 0
+          num_buckets: 5
+          step_size: 10
+        }
+      }
     }
   }
 }
@@ -197,6 +220,16 @@ element {
   }
 }
 
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  metric_id: 3
+  variable {
+    metric_part: "Part1"
+  }
+}
+
 )";
 
 }  // namespace
@@ -206,6 +239,7 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
   void Init(uint32_t report_config_id) {
     report_id_.set_customer_id(kCustomerId);
     report_id_.set_project_id(kProjectId);
+    report_id_.set_report_config_id(report_config_id);
 
     // Parse the metric config string
     auto metric_parse_result =
@@ -221,17 +255,18 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     std::shared_ptr<EncodingRegistry> encoding_registry(
         (encoding_parse_result.first.release()));
 
-    project_.reset(new ProjectContext(kCustomerId, kProjectId, metric_registry,
-                                      encoding_registry));
-
-    std::shared_ptr<AnalyzerConfig> analyzer_config(
-        new AnalyzerConfig(encoding_registry, metric_registry, nullptr));
-
     // Parse the report config string
     auto report_parse_result =
         ReportRegistry::FromString(kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
     report_registry_.reset((report_parse_result.first.release()));
+
+    project_.reset(new ProjectContext(kCustomerId, kProjectId, metric_registry,
+                                      encoding_registry));
+
+    std::shared_ptr<AnalyzerConfig> analyzer_config(new AnalyzerConfig(
+        encoding_registry, metric_registry, report_registry_));
+
 
     // Extract the ReportVariable from the ReportConfig.
     const auto* report_config =
@@ -240,8 +275,16 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     const ReportVariable* report_variable = &(report_config->variable(0));
     EXPECT_NE(nullptr, report_variable);
 
+    const Metric* metric = analyzer_config->Metric(report_config->customer_id(),
+                                                   report_config->project_id(),
+                                                   report_config->metric_id());
+    EXPECT_NE(nullptr, metric);
+    const MetricPart* metric_part =
+        &(metric->parts().at(report_variable->metric_part()));
+    EXPECT_NE(nullptr, metric_part);
+
     analysis_engine_.reset(new HistogramAnalysisEngine(
-        report_id_, report_variable, analyzer_config));
+        report_id_, report_variable, metric_part, analyzer_config));
   }
 
   // Makes an Observation with one string part which has the given
@@ -280,6 +323,43 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     return std::move(result.observation);
   }
 
+  // Makes an Observation with one INT part which has the given |value|, using
+  // the encoding with the given encoding_config_id for the bucketed int metric.
+  std::unique_ptr<Observation> MakeBucketedIntObservation(
+      int64_t value, uint32_t encoding_config_id) {
+    // Construct a new Encoder with a new client secret.
+    Encoder encoder(project_, ClientSecret::GenerateNewSecret());
+    // Set a static current time so we know we have a static day_index.
+    encoder.set_current_time(kSomeTimestamp);
+
+    // Encode an observation.
+    Encoder::Result result =
+        encoder.EncodeInt(kIntBucketsMetricId, encoding_config_id, value);
+    EXPECT_EQ(Encoder::kOK, result.status);
+    EXPECT_TRUE(result.observation.get() != nullptr);
+    EXPECT_EQ(1, result.observation->parts_size());
+    return std::move(result.observation);
+  }
+
+  // Makes an Observation with one IntBucketDistribution part which has the
+  // given |counts| value, using the encoding with the given encoding_config_id
+  // for the bucketed int metric.
+  std::unique_ptr<Observation> MakeIntBucketDistributionObservation(
+      const std::map<uint32_t, uint64_t>& counts, uint32_t encoding_config_id) {
+    // Construct a new Encoder with a new client secret.
+    Encoder encoder(project_, ClientSecret::GenerateNewSecret());
+    // Set a static current time so we know we have a static day_index.
+    encoder.set_current_time(kSomeTimestamp);
+
+    // Encode an observation.
+    Encoder::Result result = encoder.EncodeIntBucketDistribution(
+        kIntBucketsMetricId, encoding_config_id, counts);
+    EXPECT_EQ(Encoder::kOK, result.status);
+    EXPECT_TRUE(result.observation.get() != nullptr);
+    EXPECT_EQ(1, result.observation->parts_size());
+    return std::move(result.observation);
+  }
+
   // Makes an Observation with one string part which has the given
   // |string_value|, using the encoding with the given encoding_config_id.
   // Then passes the ObservationPart into
@@ -300,6 +380,31 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
                                           uint32_t encoding_config_id) {
     std::unique_ptr<Observation> observation =
         MakeIndexObservation(index, encoding_config_id);
+    return analysis_engine_->ProcessObservationPart(
+        kDayIndex, observation->parts().at(kPartName));
+  }
+
+  // Makes an Observation with one INT part which has the given |value|, using
+  // the encoding with the given encoding_config_id for the bucketed int metric.
+  // Then passes the ObservationPart into
+  // HistogramAnalysisEngine::ProcessObservationPart().
+  bool MakeAndProcessBucketedIntObservationPart(int64_t value,
+                                                uint32_t encoding_config_id) {
+    std::unique_ptr<Observation> observation =
+        MakeBucketedIntObservation(value, encoding_config_id);
+    return analysis_engine_->ProcessObservationPart(
+        kDayIndex, observation->parts().at(kPartName));
+  }
+
+  // Makes an Observation with one IntBucketDistribution part which has the
+  // given |counts| value, using the encoding with the given encoding_config_id
+  // for the bucketed int metric.
+  // Then passes the ObservationPart into
+  // HistogramAnalysisEngine::ProcessObservationPart().
+  bool MakeAndProcessIntBucketDistributionObservationPart(
+      const std::map<uint32_t, uint64_t>& counts, uint32_t encoding_config_id) {
+    std::unique_ptr<Observation> observation =
+        MakeIntBucketDistributionObservation(counts, encoding_config_id);
     return analysis_engine_->ProcessObservationPart(
         kDayIndex, observation->parts().at(kPartName));
   }
@@ -585,6 +690,47 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
   }
 
   // Tests HistogramAnalysisEngine in the case where it performs a NoOp
+  // report using Observations of type INT and with bucketing enabled.
+  void DoUnencodedIntBucketsTest() {
+    Init(kIntBucketsReportConfigId);
+
+    // We add a mix of distributions and individual integer observations.
+    std::map<uint32_t, uint64_t> distribution1 = {
+        {0, 6}, {1, 9}, {2, 2}, {3, 7}, {4, 3}, {5, 1}, {6, 7}};
+    MakeAndProcessIntBucketDistributionObservationPart(distribution1,
+                                                       kNoOpEncodingConfigId);
+    MakeAndProcessBucketedIntObservationPart(-10, kNoOpEncodingConfigId);
+    MakeAndProcessBucketedIntObservationPart(0, kNoOpEncodingConfigId);
+    MakeAndProcessBucketedIntObservationPart(10, kNoOpEncodingConfigId);
+    MakeAndProcessBucketedIntObservationPart(6000, kNoOpEncodingConfigId);
+    std::map<uint32_t, uint64_t> distribution2 = {
+        {0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 6}, {6, 7}};
+    MakeAndProcessIntBucketDistributionObservationPart(distribution2,
+                                                       kNoOpEncodingConfigId);
+
+    // Perform the analysis.
+    std::vector<ReportRow> report_rows;
+    EXPECT_TRUE(analysis_engine_->PerformAnalysis(&report_rows).ok());
+
+    // Check that the results are as expected.
+    std::map<uint32_t, uint64_t> expected = {{0, 8}, {1, 12}, {2, 6}, {3, 11},
+                                             {4, 8}, {5, 7},  {6, 15}};
+
+    EXPECT_EQ(7u, report_rows.size());
+    for (const auto& report_row : report_rows) {
+      EXPECT_EQ(0, report_row.histogram().std_error());
+      ValuePart recovered_value;
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
+      EXPECT_EQ(ValuePart::kIndexValue, recovered_value.data_case());
+      uint32_t index = recovered_value.index_value();
+      EXPECT_EQ(expected[index], report_row.histogram().count_estimate())
+          << index;
+      // TODO(azani): Check the labels.
+    }
+  }
+
+  // Tests HistogramAnalysisEngine in the case where it performs a NoOp
   // report using Observations of type INDEX. We test that the correct
   // human-readable labels from the ReportConfig are applied to the correct
   // report rows.
@@ -662,6 +808,10 @@ TEST_F(HistogramAnalysisEngineTest, UnencodedStrings) {
 
 TEST_F(HistogramAnalysisEngineTest, UnencodedIndices) {
   DoUnencodedIndexTest();
+}
+
+TEST_F(HistogramAnalysisEngineTest, UnencodedIntBuckets) {
+  DoUnencodedIntBucketsTest();
 }
 
 TEST_F(HistogramAnalysisEngineTest, MixedEncoding) { DoMixedEncodingTest(); }

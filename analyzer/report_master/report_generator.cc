@@ -260,7 +260,9 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
   auto analyzer_config = config_manager_->GetCurrent();
   // Construct the HistogramAnalysisEngine.
   HistogramAnalysisEngine analysis_engine(
-      report_id, variables[0].report_variable, analyzer_config);
+      report_id, variables[0].report_variable,
+      &(metric.parts().at(variables[0].report_variable->metric_part())),
+      analyzer_config);
 
   // We query the ObservationStore for the relevant ObservationParts.
   store::ObservationStore::QueryResponse query_response;

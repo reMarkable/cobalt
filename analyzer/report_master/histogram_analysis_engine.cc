@@ -22,6 +22,7 @@
 #include "algorithms/forculus/forculus_analyzer.h"
 #include "algorithms/rappor/basic_rappor_analyzer.h"
 #include "algorithms/rappor/rappor_analyzer.h"
+#include "config/buckets_config.h"
 #include "glog/logging.h"
 #include "util/log_based_metrics.h"
 
@@ -45,6 +46,8 @@ const char kRapporAdapterPerformAnalysisFailure[] =
     "rappor-adapter-perform-analysis-failure";
 const char kNoOpAdapterProcessObservationPartFailure[] =
     "no-op-adapter-process-observation-part-failure";
+const char kNoOpIntBucketDistributionAdapterProcessObservationPartFailure[] =
+    "no-op-int-bucket-distribution-adapter-process-observation-part-failure";
 const char kPerformAnalysisFailure[] =
     "histogram-analysis-engine-perform-analysis-failure";
 const char kGetDecoderFailure[] =
@@ -330,13 +333,85 @@ class NoOpAdapter : public DecoderAdapter {
 };
 
 ////////////////////////////////////////////////////////////////////////////
+/// class NoOpIntBucketDistributionAdapter
+//
+// A concrete subclass of DecoderAdapter that collects counts of bucketed
+// integer observations and merges int bucket distribution observations.
+///////////////////////////////////////////////////////////////////////////
+class NoOpIntBucketDistributionAdapter : public DecoderAdapter {
+ public:
+  NoOpIntBucketDistributionAdapter(
+      const ReportId& report_id, const cobalt::NoOpEncodingConfig& config,
+      std::unique_ptr<cobalt::config::IntegerBucketConfig> int_bucket_config)
+      : report_id_(report_id),
+        config_(config),
+        int_bucket_config_(std::move(int_bucket_config)) {}
+
+  bool ProcessObservationPart(uint32_t day_index,
+                              const ObservationPart& obs) override {
+    if (obs.value_case() != ObservationPart::kUnencoded) {
+      LOG_STACKDRIVER_COUNT_METRIC(
+          ERROR, kNoOpIntBucketDistributionAdapterProcessObservationPartFailure)
+          << "Encoded observation ignored. report_id="
+          << ReportStore::ToString(report_id_);
+      return false;
+    }
+
+    const auto& value = obs.unencoded().unencoded_value();
+    // If the value provided is an integer, we bucket it and increment the
+    // corresponding bucket.
+    if (ValuePart::kIntValue == value.data_case()) {
+      counts_[int_bucket_config_->BucketIndex(value.int_value())] += 1;
+      return true;
+    }
+
+    if (ValuePart::kIntBucketDistribution == value.data_case()) {
+      // First, we check that all the indices correspond to valid buckets.
+      for (auto iter = value.int_bucket_distribution().counts().begin();
+           value.int_bucket_distribution().counts().end() != iter; iter++) {
+        if (iter->first > int_bucket_config_->OverflowBucket()) {
+          return false;
+        }
+      }
+
+      for (auto iter = value.int_bucket_distribution().counts().begin();
+           value.int_bucket_distribution().counts().end() != iter; iter++) {
+        counts_[iter->first] += iter->second;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  grpc::Status PerformAnalysis(std::vector<ReportRow>* results) override {
+    for (const auto& pair : counts_) {
+      results->emplace_back();
+      HistogramReportRow* row = results->back().mutable_histogram();
+      row->mutable_value()->set_index_value(pair.first);
+      row->set_count_estimate(pair.second);
+      row->set_std_error(0);
+      // TODO(azani): Generate labels.
+    }
+    return grpc::Status::OK;
+  }
+
+ private:
+  ReportId report_id_;
+  cobalt::NoOpEncodingConfig config_;
+  std::map<uint32_t, size_t> counts_;
+  std::unique_ptr<cobalt::config::IntegerBucketConfig> int_bucket_config_;
+};
+
+////////////////////////////////////////////////////////////////////////////
 /// HistogramAnalysisEngine methods.
 ///////////////////////////////////////////////////////////////////////////
 HistogramAnalysisEngine::HistogramAnalysisEngine(
     const ReportId& report_id, const ReportVariable* report_variable,
+    const MetricPart* metric_part,
     std::shared_ptr<AnalyzerConfig> analyzer_config)
     : report_id_(report_id),
       report_variable_(report_variable),
+      metric_part_(metric_part),
       analyzer_config_(analyzer_config) {}
 
 bool HistogramAnalysisEngine::ProcessObservationPart(
@@ -418,6 +493,13 @@ DecoderAdapter* HistogramAnalysisEngine::GetDecoder(
 
 std::unique_ptr<DecoderAdapter> HistogramAnalysisEngine::NewDecoder(
     const EncodingConfig* encoding_config) {
+  if (metric_part_->has_int_buckets()) {
+    return std::unique_ptr<DecoderAdapter>(new NoOpIntBucketDistributionAdapter(
+        report_id_, encoding_config->no_op_encoding(),
+        cobalt::config::IntegerBucketConfig::CreateFromProto(
+            metric_part_->int_buckets())));
+  }
+
   const IndexLabels* index_labels = nullptr;
   if (report_variable_->has_index_labels()) {
     index_labels = &(report_variable_->index_labels());

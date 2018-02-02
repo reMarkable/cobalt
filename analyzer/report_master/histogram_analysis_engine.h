@@ -62,6 +62,7 @@ class HistogramAnalysisEngine {
   // The |analyzer_config| is used to look up EncodingConfigs by their ID.
   HistogramAnalysisEngine(
       const ReportId& report_id, const ReportVariable* report_variable,
+      const MetricPart* metric_part,
       std::shared_ptr<config::AnalyzerConfig> analyzer_config);
 
   // Process the given (day_index, ObservationPart) pair. The |day_index|
@@ -97,6 +98,9 @@ class HistogramAnalysisEngine {
 
   // The variable being analyzed.
   const ReportVariable* report_variable_;
+
+  // Pointer to the metric part for the variable being analyzed.
+  const MetricPart* metric_part_;
 
   // The keys to this map are encoding-config IDs and the values are the
   // DecoderAdapters adapting to the decoder/analyzer that knows how to

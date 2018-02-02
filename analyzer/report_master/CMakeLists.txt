@@ -53,6 +53,7 @@ add_library(analyzer_report_master_lib
 target_link_libraries(analyzer_report_master_lib
                       analyzer_config
                       analyzer_store
+                      buckets_config
                       cobalt_crypto
                       gcs_util
                       pem_util
