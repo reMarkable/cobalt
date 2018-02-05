@@ -31,6 +31,7 @@ import tools.cpplint as cpplint
 import tools.golint as golint
 import tools.process_starter as process_starter
 import tools.test_runner as test_runner
+import tools.production_util as production_util
 
 from tools.test_runner import E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
 from tools.test_runner import E2E_TEST_SHUFFLER_PUBLIC_KEY_PEM
@@ -536,11 +537,11 @@ def _deploy_authenticate(args):
       args.cloud_project_name, args.cluster_zone)
 
 def _deploy_build(args):
-  if _parse_bool(args.is_production_cluster):
-    print("Production configs must be built using './cobaltb.py deploy "
+  if args.production_dir:
+    print("Production configs should be built using './cobaltb.py deploy "
     "production_build' which will build a clean version of the binaries, then "
     "build the docker images in one step.")
-    answer = raw_input("Continue? (y/N) ")
+    answer = raw_input("Continue anyway? (y/N) ")
     if not _parse_bool(answer):
       return
   container_util.build_all_docker_images(
@@ -551,8 +552,7 @@ def _deploy_build(args):
           "config using the './cobaltb.py update_config' command.")
 
 def _deploy_production_build(args):
-  full_ref = container_util.build_and_push_production_docker_images(
-      args.cloud_project_prefix,
+  full_ref = production_util.build_and_push_production_docker_images(
       args.cloud_project_name,
       args.production_dir,
       args.git_revision)
@@ -560,7 +560,8 @@ def _deploy_production_build(args):
   if full_ref:
     print
     print
-    print 'To enable this build, copy this json blob into versions.json:'
+    print('Done pushing the new build. To set this as the default build, copy '
+          'the following json blob into the versions.json.')
     print
     print '{'
     print '  "shuffler": "%s",' % full_ref
@@ -837,10 +838,6 @@ def _add_cloud_access_args(parser, cluster_settings):
       help='The zone in which your GKE "container cluster" is located. '
            'Default=%s' % cluster_settings['cluster_zone'],
       default=cluster_settings['cluster_zone'])
-  parser.add_argument('--is_production_cluster',
-      help='True if we are deploying to a production cluster '
-           'Default=%s' % cluster_settings['is_production_cluster'],
-      default=cluster_settings['is_production_cluster'])
 
 def _add_static_ip_args(parser, cluster_settings):
   parser.add_argument('--shuffler_static_ip',
@@ -863,10 +860,7 @@ def _add_gke_deployment_args(parser, cluster_settings):
   _add_cloud_access_args(parser, cluster_settings)
   _add_static_ip_args(parser, cluster_settings)
 
-def _add_deploy_start_stop_args(parser, cluster_settings):
-  parser.add_argument('--job',
-      help='The job you wish to start or stop. Valid choices are "shuffler", '
-           '"analyzer-service", "report-master". Required.')
+def _add_deploy_start_args(parser, cluster_settings):
   parser.add_argument('--bigtable_instance_id',
       help='Specify a Cloud Bigtable instance within the specified Cloud '
            'project that the Analyzer should connect to. This is required '
@@ -956,7 +950,6 @@ def main():
     'shuffler_static_ip' : '',
     'shuffler_use_memstore' : '',
     'use_tls': '',
-    'is_production_cluster': 'false',
   }
   if production_cluster_json_file:
     _cluster_settings_from_json(cluster_settings, production_cluster_json_file)
@@ -1623,19 +1616,27 @@ def main():
       parents=[parent_parser], help='Start one of the jobs on GKE.')
   sub_parser.set_defaults(func=_deploy_start)
   _add_gke_deployment_args(sub_parser, cluster_settings)
-  _add_deploy_start_stop_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--job',
+      help='The job you wish to start. Valid choices are "shuffler", '
+           '"analyzer-service", "report-master". Required.')
+  _add_deploy_start_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('stop',
       parents=[parent_parser], help='Stop one of the jobs on GKE.')
   sub_parser.set_defaults(func=_deploy_stop)
   _add_gke_deployment_args(sub_parser, cluster_settings)
-  _add_deploy_start_stop_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--job',
+      help='The job you wish to stop. Valid choices are "shuffler", '
+           '"analyzer-service", "report-master". Required.')
+  _add_deploy_start_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('stopstart',
       parents=[parent_parser], help='Stop and start a job on GKE.')
   sub_parser.set_defaults(func=_deploy_stopstart)
   _add_gke_deployment_args(sub_parser, cluster_settings)
-  _add_deploy_start_stop_args(sub_parser, cluster_settings)
+  sub_parser.add_argument('--job',
+      help='The job you wish to stop then start. Valid choices are "shuffler", '
+           '"analyzer-service", "report-master". Required.')
 
   sub_parser = deploy_subparsers.add_parser('upload_secret_keys',
       parents=[parent_parser], help='Creates |secret| objects in the '

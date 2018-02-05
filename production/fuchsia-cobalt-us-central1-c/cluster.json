@@ -13,6 +13,5 @@
   "shuffler_preferred_address": "shuffler.cobalt-api.fuchsia.com:443",
   "shuffler_static_ip" : "",
   "shuffler_use_memstore" : "true",
-  "use_tls": "true",
-  "is_production_cluster": "true"
+  "use_tls": "true"
 }
