@@ -98,11 +98,11 @@ def build_and_push_production_docker_images(cloud_project_name, production_dir,
       tags_to_apply.append(subrev)
 
     for tag in tags_to_apply:
-      container_util.push_shuffler_to_container_registry(cloud_project_prefix,
+      container_util.push_shuffler_to_container_registry('', cloud_project_name,
+          tag)
+      container_util.push_analyzer_service_to_container_registry('',
           cloud_project_name, tag)
-      container_util.push_analyzer_service_to_container_registry(cloud_project_prefix,
-          cloud_project_name, tag)
-      container_util.push_report_master_to_container_registry(cloud_project_prefix,
+      container_util.push_report_master_to_container_registry('',
           cloud_project_name, tag)
 
     os.chdir(wd)
