@@ -79,7 +79,7 @@ func TestMemStoreShuffler(t *testing.T) {
 
 func TestLevelDBShuffler(t *testing.T) {
 	for _, envelopeData := range makeTestEnvelopes() {
-		levelDBStore, err := storage.NewLevelDBStore("/tmp")
+		levelDBStore, err := storage.NewLevelDBStore("/tmp/receiver_db")
 		if err != nil {
 			t.Errorf("Failed to initialize leveldb store")
 			return

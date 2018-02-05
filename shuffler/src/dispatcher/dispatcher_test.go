@@ -67,7 +67,7 @@ func makeTestStore(numObservations int, currentDayIndex uint32, useMemStore bool
 	if useMemStore {
 		store = storage.NewMemStore()
 	} else {
-		if store, err = storage.NewLevelDBStore("/tmp"); err != nil {
+		if store, err = storage.NewLevelDBStore("/tmp/dispatcher_db"); err != nil {
 			return nil, nil, nil, err
 		}
 	}
