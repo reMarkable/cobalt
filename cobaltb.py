@@ -1632,7 +1632,6 @@ def main():
   sub_parser.add_argument('--job',
       help='The job you wish to stop. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
-  _add_deploy_start_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('stopstart',
       parents=[parent_parser], help='Stop and start a job on GKE.')
@@ -1641,6 +1640,7 @@ def main():
   sub_parser.add_argument('--job',
       help='The job you wish to stop then start. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
+  _add_deploy_start_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('upload_secret_keys',
       parents=[parent_parser], help='Creates |secret| objects in the '
