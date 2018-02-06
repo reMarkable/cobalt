@@ -77,6 +77,7 @@ func TestLevelDBInitialization(t *testing.T) {
 
 func TestLevelDBStoreIterator(t *testing.T) {
 	s := makeLevelDBTestStore(t)
+	defer ResetStoreForTesting(s, true)
 
 	// add observations for different metrics
 	const numBatches = 10
