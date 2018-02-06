@@ -1,0 +1,48 @@
+# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+#
+# This file contains the definitions of the Shuffler's Service object.
+#
+# The definitions contain some parameters (indicated by $$PARAMETER_NAME$$)
+# that will be replaced by the script tools/container_util.py prior to being
+# passed to "kubectl apply"
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: shuffler
+spec:
+  ports:
+    # Requests to this port are forwarded directly to the Shuffler
+    # implementation on port 5000. This will be deleted after all clients have
+    # been moved over to accessing the Shuffler through Cloud Endpoints.
+  - port: 5001
+    # The port which the Shuffler implementation exposes within the cluster.
+    # This must match the value passed to the implementation in the "-port" flag
+    # above and the value passed to the Endpoints process in the the "-a" flag
+    # above and the value used in Shuffler's Dockerfile.
+    targetPort: 5000
+    protocol: TCP
+    name: shuffler-http2
+    # Requests to this port are forwarded to the Endpoints
+    # implementation on port 8000.
+  - port: 8001
+    # The port which the Endpoint implementation exposes within the cluster.
+    # This must match the value passed to the Endpoints process in the '-P' flag
+    # above.
+    targetPort: 8000
+    protocol: TCP
+    name: endpoint-http2
+    # Requests to this port are forwarded to the Endpoints implementation
+    # on the same port. Requests made to this port protected by TLS.
+    # All clients should access Shuffler via this port.
+  - port: 443
+    protocol: TCP
+    name: endpoint-https
+  selector:
+    # This must match the metadata.labels section in shuffler_deployment.yaml.
+    name: shuffler
+  type: LoadBalancer
+  loadBalancerIP: $$SHUFFLER_STATIC_IP_ADDRESS$$
+

@@ -65,14 +65,25 @@ CONFIG_BINARY_PROTO = os.path.join(OUT_DIR, 'third_party', 'config',
 
 # Kubernetes deployment yaml template files with replaceable tokens.
 ANALYZER_SERVICE_DEPLOYMENT_YAML = 'analyzer_service_deployment.yaml'
+ANALYZER_SERVICE_SERVICE_YAML = 'analyzer_service_service.yaml'
 ANALYZER_SERVICE_DEPLOYMENT_TEMPLATE_FILE = os.path.join(KUBE_SRC_DIR,
     'analyzer_service', ANALYZER_SERVICE_DEPLOYMENT_YAML)
+ANALYZER_SERVICE_SERVICE_TEMPLATE_FILE = os.path.join(KUBE_SRC_DIR,
+    'analyzer_service', ANALYZER_SERVICE_SERVICE_YAML)
+
 REPORT_MASTER_DEPLOYMENT_YAML = 'report_master_deployment.yaml'
+REPORT_MASTER_SERVICE_YAML = 'report_master_service.yaml'
 REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE = os.path.join(KUBE_SRC_DIR,
     'report_master', REPORT_MASTER_DEPLOYMENT_YAML)
+REPORT_MASTER_SERVICE_TEMPLATE_FILE = os.path.join(KUBE_SRC_DIR,
+    'report_master', REPORT_MASTER_SERVICE_YAML)
+
 SHUFFLER_DEPLOYMENT_YAML = 'shuffler_deployment.yaml'
+SHUFFLER_SERVICE_YAML = 'shuffler_service.yaml'
 SHUFFLER_DEPLOYMENT_TEMPLATE_FILE = os.path.join(KUBE_SRC_DIR, 'shuffler',
     SHUFFLER_DEPLOYMENT_YAML)
+SHUFFLER_SERVICE_TEMPLATE_FILE = os.path.join(KUBE_SRC_DIR, 'shuffler',
+    SHUFFLER_SERVICE_YAML)
 
 # Kubernetes output directory
 KUBE_OUT_DIR = os.path.join(OUT_DIR, 'kubernetes')
@@ -81,9 +92,14 @@ KUBE_OUT_DIR = os.path.join(OUT_DIR, 'kubernetes')
 # replaced and are ready to be used by "kubectl create"
 ANALYZER_SERVICE_DEPLOYMENT_FILE = os.path.join(KUBE_OUT_DIR,
     ANALYZER_SERVICE_DEPLOYMENT_YAML)
+ANALYZER_SERVICE_SERVICE_FILE = os.path.join(KUBE_OUT_DIR,
+    ANALYZER_SERVICE_SERVICE_YAML)
 REPORT_MASTER_DEPLOYMENT_FILE = os.path.join(KUBE_OUT_DIR,
     REPORT_MASTER_DEPLOYMENT_YAML)
+REPORT_MASTER_SERVICE_FILE = os.path.join(KUBE_OUT_DIR,
+    REPORT_MASTER_SERVICE_YAML)
 SHUFFLER_DEPLOYMENT_FILE = os.path.join(KUBE_OUT_DIR, SHUFFLER_DEPLOYMENT_YAML)
+SHUFFLER_SERVICE_FILE = os.path.join(KUBE_OUT_DIR, SHUFFLER_SERVICE_YAML)
 
 # Yaml file configuring the report master endpoint.
 REPORT_MASTER_ENDPOINT_CONFIG_YAML = 'report_master_endpoint.yaml'
@@ -382,8 +398,8 @@ def _start_gke_service(deployment_template_file, deployment_file,
   _replace_tokens_in_template(deployment_template_file, deployment_file,
                               token_substitutions)
 
-  # Invoke "kubectl create" on the deployment file we just generated.
-  subprocess.check_call(["kubectl", "create", "-f", deployment_file,
+  # Invoke "kubectl apply" on the deployment file we just generated.
+  subprocess.check_call(["kubectl", "apply", "-f", deployment_file,
                          "--context", context])
 
 def _build_report_master_endpoint_name(cloud_project_prefix,
@@ -436,6 +452,7 @@ def start_analyzer_service(cloud_project_prefix,
                            cluster_zone, cluster_name,
                            bigtable_instance_id,
                            static_ip_address,
+                           components,
                            docker_tag):
   """ Starts the analyzer-service deployment and service.
   cloud_project_prefix {sring}: For example "google.com"
@@ -466,24 +483,31 @@ def start_analyzer_service(cloud_project_prefix,
   if not static_ip_address:
     static_ip_address = DELETE_LINE_INDICATOR
 
-  # These are the token replacements that must be made inside the deployment
-  # template file.
-  token_substitutions = {
-      '$$ANALYZER_SERVICE_IMAGE_URI$$' : image_uri,
-      '$$BIGTABLE_PROJECT_NAME$$' : bigtable_project_name,
-      '$$BIGTABLE_INSTANCE_ID$$' :bigtable_instance_id,
-      '$$ANALYZER_PRIVATE_PEM_NAME$$' : ANALYZER_PRIVATE_KEY_PEM_NAME,
-      '$$ANALYZER_PRIVATE_KEY_SECRET_NAME$$' : ANALYZER_PRIVATE_KEY_SECRET_NAME,
-      '$$ANALYZER_STATIC_IP_ADDRESS$$' : static_ip_address}
-  _start_gke_service(ANALYZER_SERVICE_DEPLOYMENT_TEMPLATE_FILE,
-                     ANALYZER_SERVICE_DEPLOYMENT_FILE,
-                     token_substitutions, context)
+  if 'statefulset' in components:
+    # These are the token replacements that must be made inside the deployment
+    # template file.
+    deployment_substitutions = {
+        '$$ANALYZER_SERVICE_IMAGE_URI$$' : image_uri,
+        '$$BIGTABLE_PROJECT_NAME$$' : bigtable_project_name,
+        '$$BIGTABLE_INSTANCE_ID$$' :bigtable_instance_id,
+        '$$ANALYZER_PRIVATE_PEM_NAME$$' : ANALYZER_PRIVATE_KEY_PEM_NAME,
+        '$$ANALYZER_PRIVATE_KEY_SECRET_NAME$$' : ANALYZER_PRIVATE_KEY_SECRET_NAME}
+    _start_gke_service(ANALYZER_SERVICE_DEPLOYMENT_TEMPLATE_FILE,
+                       ANALYZER_SERVICE_DEPLOYMENT_FILE,
+                       deployment_substitutions, context)
+  if 'service' in components:
+    service_substitutions = {
+        '$$ANALYZER_STATIC_IP_ADDRESS$$' : static_ip_address}
+    _start_gke_service(ANALYZER_SERVICE_SERVICE_TEMPLATE_FILE,
+                     ANALYZER_SERVICE_SERVICE_FILE,
+                     service_substitutions, context)
 
 def start_report_master(cloud_project_prefix,
                         cloud_project_name,
                         cluster_zone, cluster_name,
                         bigtable_instance_id,
                         static_ip_address,
+                        components,
                         docker_tag,
                         update_repo_url,
                         enable_report_scheduling=False):
@@ -530,31 +554,37 @@ def start_report_master(cloud_project_prefix,
   enable_scheduling_flag = ("'-enable_report_scheduling'"
       if enable_report_scheduling else DELETE_LINE_INDICATOR)
 
-  # These are the token replacements that must be made inside the deployment
-  # template file.
-  token_substitutions = {
-      '$$REPORT_MASTER_IMAGE_URI$$': image_uri,
-      '$$BIGTABLE_PROJECT_NAME$$': bigtable_project_name,
-      '$$BIGTABLE_INSTANCE_ID$$': bigtable_instance_id,
-      '$$REPORT_MASTER_STATIC_IP_ADDRESS$$': static_ip_address,
-      '$$REPORT_MASTER_ENABLE_REPORT_SCHEDULING_FLAG$$':
-      enable_scheduling_flag,
-      '$$ENDPOINT_NAME$$': endpoint_name,
-      '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
-      '$$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$':
-      REPORT_MASTER_CERTIFICATE_SECRET_NAME,
-      '$$REPORT_MASTER_CONFIG_UPDATE_REPO_URL$$': update_repo_url,
-      '$$REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME$$':
-      REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME}
-  _start_gke_service(REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE,
-                     REPORT_MASTER_DEPLOYMENT_FILE,
-                     token_substitutions, context)
+  if 'statefulset' in components:
+    # These are the token replacements that must be made inside the deployment
+    # template file.
+    token_substitutions = {
+        '$$REPORT_MASTER_IMAGE_URI$$': image_uri,
+        '$$BIGTABLE_PROJECT_NAME$$': bigtable_project_name,
+        '$$BIGTABLE_INSTANCE_ID$$': bigtable_instance_id,
+        '$$REPORT_MASTER_ENABLE_REPORT_SCHEDULING_FLAG$$':
+        enable_scheduling_flag,
+        '$$ENDPOINT_NAME$$': endpoint_name,
+        '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
+        '$$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$':
+        REPORT_MASTER_CERTIFICATE_SECRET_NAME,
+        '$$REPORT_MASTER_CONFIG_UPDATE_REPO_URL$$': update_repo_url,
+        '$$REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME$$':
+        REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME}
+    _start_gke_service(REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE,
+                       REPORT_MASTER_DEPLOYMENT_FILE,
+                       token_substitutions, context)
+  if 'service' in components:
+    service_substitutions = {
+        '$$REPORT_MASTER_STATIC_IP_ADDRESS$$': static_ip_address}
+    _start_gke_service(REPORT_MASTER_SERVICE_TEMPLATE_FILE,
+                       REPORT_MASTER_SERVICE_FILE,
+                       service_substitutions, context)
 
 def start_shuffler(cloud_project_prefix,
                    cloud_project_name,
                    cluster_zone, cluster_name,
-                   gce_pd_name,
                    static_ip_address,
+                   components,
                    docker_tag,
                    use_memstore=False,
                    danger_danger_delete_all_data_at_startup=False):
@@ -562,9 +592,6 @@ def start_shuffler(cloud_project_prefix,
   cloud_project_prefix {sring}: For example "google.com"
   cloud_project_name {sring}: For example "shuffler-test". The prefix and
       name are used when forming the URI to the image in the registry.
-  gce_pd_name: {string} The name of a GCE persistent disk. This must have
-      already been created. The shuffler will use this disk for it LevelDB
-      storage so that the data persists between Shuffler updates.
   static_ip_address {string}: A static IP address that has already been
       reserved on the GKE cluster.
   docker_tag {string}: The docker_tag of the docker image to use. If none is
@@ -596,46 +623,54 @@ def start_shuffler(cloud_project_prefix,
   if not static_ip_address:
     static_ip_address = DELETE_LINE_INDICATOR
 
-  # These are the token replacements that must be made inside the deployment
-  # template file.
-  token_substitutions = {'$$SHUFFLER_IMAGE_URI$$' : image_uri,
-      '$$GCE_PERSISTENT_DISK_NAME$$' : gce_pd_name,
-      '$$SHUFFLER_USE_MEMSTORE$$' : use_memstore_string,
-      '$$SHUFFLER_PRIVATE_PEM_NAME$$' : SHUFFLER_PRIVATE_KEY_PEM_NAME,
-      '$$SHUFFLER_STATIC_IP_ADDRESS$$' : static_ip_address,
-      '$$SHUFFLER_PRIVATE_KEY_SECRET_NAME$$' : SHUFFLER_PRIVATE_KEY_SECRET_NAME,
-      '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data,
-      '$$ENDPOINT_NAME$$': endpoint_name,
-      '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
-      '$$SHUFFLER_CERTIFICATE_SECRET_NAME$$': SHUFFLER_CERTIFICATE_SECRET_NAME}
-  _start_gke_service(SHUFFLER_DEPLOYMENT_TEMPLATE_FILE,
-                     SHUFFLER_DEPLOYMENT_FILE,
-                     token_substitutions, context)
+  if 'statefulset' in components:
+    # These are the token replacements that must be made inside the deployment
+    # template file.
+    token_substitutions = {'$$SHUFFLER_IMAGE_URI$$' : image_uri,
+        '$$SHUFFLER_USE_MEMSTORE$$' : use_memstore_string,
+        '$$SHUFFLER_PRIVATE_PEM_NAME$$' : SHUFFLER_PRIVATE_KEY_PEM_NAME,
+        '$$SHUFFLER_PRIVATE_KEY_SECRET_NAME$$' : SHUFFLER_PRIVATE_KEY_SECRET_NAME,
+        '$$DANGER_DANGER_DELETE_ALL_DATA_AT_STARTUP$$' : delete_all_data,
+        '$$ENDPOINT_NAME$$': endpoint_name,
+        '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
+        '$$SHUFFLER_CERTIFICATE_SECRET_NAME$$': SHUFFLER_CERTIFICATE_SECRET_NAME}
+    _start_gke_service(SHUFFLER_DEPLOYMENT_TEMPLATE_FILE,
+                       SHUFFLER_DEPLOYMENT_FILE,
+                       token_substitutions, context)
+  if 'service' in components:
+    service_substitutions = {
+        '$$SHUFFLER_STATIC_IP_ADDRESS$$' : static_ip_address}
+    _start_gke_service(SHUFFLER_SERVICE_TEMPLATE_FILE,
+                       SHUFFLER_SERVICE_FILE,
+                       service_substitutions, context)
 
-def _stop_gke_service(name, context):
-  subprocess.check_call(["kubectl", "delete", "service,deployment", name,
+def _stop_gke_service(name, context, components = ['service', 'statefulset']):
+  subprocess.check_call(["kubectl", "delete", ','.join(components), name,
                          "--context", context])
 
 def stop_analyzer_service(cloud_project_prefix,
                           cloud_project_name,
-                          cluster_zone, cluster_name):
+                          cluster_zone, cluster_name,
+                          components):
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
-  _stop_gke_service(ANALYZER_SERVICE_IMAGE_NAME, context)
+  _stop_gke_service(ANALYZER_SERVICE_IMAGE_NAME, context, components)
 
 def stop_report_master(cloud_project_prefix,
                        cloud_project_name,
-                       cluster_zone, cluster_name):
+                       cluster_zone, cluster_name,
+                       components):
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
-  _stop_gke_service(REPORT_MASTER_IMAGE_NAME, context)
+  _stop_gke_service(REPORT_MASTER_IMAGE_NAME, context, components)
 
 def stop_shuffler(cloud_project_prefix,
                   cloud_project_name,
-                  cluster_zone, cluster_name):
+                  cluster_zone, cluster_name,
+                  components):
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
-  _stop_gke_service(SHUFFLER_IMAGE_NAME, context)
+  _stop_gke_service(SHUFFLER_IMAGE_NAME, context, components)
 
 def login(cloud_project_prefix, cloud_project_name):
   subprocess.check_call(["gcloud", "auth", "login", "--project",

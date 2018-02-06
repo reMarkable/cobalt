@@ -1,35 +1,28 @@
-# Copyright 2016 The Fuchsia Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
 
 # This file contans the definitions of the Analyzer Service's  Deployment object
-# (which includes an embedded defintion of the it's Pod object) and the
+# (which includes an embedded defintion of its Pod object) and the
 # Analyzer Service's Service object.
 #
 # The definitions contain some parameters (indicated by $$PARAMETER_NAME$$)
 # that will be replaced by the script tools/container_util.py prior to being
-# passed to "kubectl create"
+# passed to "kubectl apply"
 
 # The defintion of the Deployment and Pod
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: apps/v1beta1
+kind: StatefulSet
 metadata:
   name: analyzer-service
   labels:
     name: analyzer-service
 # Pod object
 spec:
-  replicas: 1
+  serviceName: analyzer-service
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       name: analyzer-service
@@ -64,20 +57,3 @@ spec:
         - name: analyzer-key-storage
           secret:
             secretName: $$ANALYZER_PRIVATE_KEY_SECRET_NAME$$
----
-# The defintion of the Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: analyzer-service
-spec:
-  ports:
-    # The port that this service should serve on. This should match the port
-    # used several times above and the one specified in Dockerfile.
-  - port: 6001
-  selector:
-    # This must match the metadata.labels section of the Deployment above.
-    name: analyzer-service
-  type: LoadBalancer
-  loadBalancerIP: $$ANALYZER_STATIC_IP_ADDRESS$$
-

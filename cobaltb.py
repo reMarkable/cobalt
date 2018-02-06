@@ -612,14 +612,15 @@ def _load_versions_file(args):
 
 def _deploy_start(args):
   version = _load_versions_file(args).get(args.job, 'latest')
+  components = [c.strip() for c in args.components.split(',')]
 
   if args.job == 'shuffler':
     container_util.start_shuffler(
         args.cloud_project_prefix,
         args.cloud_project_name,
         args.cluster_zone, args.cluster_name,
-        args.gce_pd_name,
         args.shuffler_static_ip,
+        components,
         version,
         use_memstore=_parse_bool(args.shuffler_use_memstore),
         danger_danger_delete_all_data_at_startup=
@@ -633,6 +634,7 @@ def _deploy_start(args):
         args.cluster_zone, args.cluster_name,
         args.bigtable_instance_id,
         args.analyzer_service_static_ip,
+        components,
         version)
   elif args.job == 'report-master':
     if args.bigtable_instance_id == '':
@@ -643,6 +645,7 @@ def _deploy_start(args):
         args.cluster_zone, args.cluster_name,
         args.bigtable_instance_id,
         args.report_master_static_ip,
+        components,
         version,
         args.report_master_update_repo_url,
         enable_report_scheduling=_parse_bool(
@@ -652,15 +655,20 @@ def _deploy_start(args):
           '"analyzer-service" and "report-master".' % args.job)
 
 def _deploy_stop(args):
+  components = [c.strip() for c in args.components.split(',')]
+
   if args.job == 'shuffler':
     container_util.stop_shuffler(args.cloud_project_prefix,
-        args.cloud_project_name, args.cluster_zone, args.cluster_name)
+        args.cloud_project_name, args.cluster_zone, args.cluster_name,
+        components)
   elif args.job == 'analyzer-service':
     container_util.stop_analyzer_service(args.cloud_project_prefix,
-        args.cloud_project_name, args.cluster_zone, args.cluster_name)
+        args.cloud_project_name, args.cluster_zone, args.cluster_name,
+        components)
   elif args.job == 'report-master':
     container_util.stop_report_master(args.cloud_project_prefix,
-        args.cloud_project_name, args.cluster_zone, args.cluster_name)
+        args.cloud_project_name, args.cluster_zone, args.cluster_name,
+        components)
   else:
     print('Unknown job "%s". I only know how to stop "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
@@ -876,12 +884,6 @@ def _add_deploy_start_args(parser, cluster_settings):
            'if and only if you are starting one of the two Analyzer jobs. '
            'Default=%s' % cluster_settings['bigtable_instance_id'],
       default=cluster_settings['bigtable_instance_id'])
-  parser.add_argument('--gce_pd_name',
-      help='The name of a GCE persistent disk. This is used only when starting '
-           'the Shuffler. The disk must already have been created in the same '
-           'Cloud project in which the Shuffler is being deployed. '
-           'Default=%s' % cluster_settings['gce_pd_name'],
-      default=cluster_settings['gce_pd_name'])
   parser.add_argument('--deployed_versions_file',
       help='A file with version numbers to use',
       default=cluster_settings['deployed_versions_file'])
@@ -911,6 +913,15 @@ def _add_deploy_start_args(parser, cluster_settings):
       'collected during previous runs of the Shuffler be permanently and '
       'irrecoverably deleted from the Shuffler\'s store upon startup?',
       action='store_true')
+
+def _add_deploy_start_stop_args(parser, cluster_settings, verb):
+  parser.add_argument('--job',
+      help='The job you wish to ' + verb + '. Valid choices are "shuffler", '
+           '"analyzer-service", "report-master". Required.')
+  parser.add_argument('--components',
+      help='The components you wish to ' + verb + '. Valid choices are '
+           '"service" and "statefulset". Default: "service,statefulset".',
+      default='service,statefulset')
 
 def _is_config_up_to_date():
   savedDir = os.getcwd()
@@ -955,7 +966,6 @@ def main():
     'cluster_zone': '',
     'cobalt_config_dir': '',
     'deployed_versions_file': 'versions.json',
-    'gce_pd_name': '',
     'report_master_enable_scheduling': '',
     'report_master_preferred_address': '',
     'report_master_root_certs': '',
@@ -1633,26 +1643,20 @@ def main():
       parents=[parent_parser], help='Start one of the jobs on GKE.')
   sub_parser.set_defaults(func=_deploy_start)
   _add_gke_deployment_args(sub_parser, cluster_settings)
-  sub_parser.add_argument('--job',
-      help='The job you wish to start. Valid choices are "shuffler", '
-           '"analyzer-service", "report-master". Required.')
+  _add_deploy_start_stop_args(sub_parser, cluster_settings, 'start')
   _add_deploy_start_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('stop',
       parents=[parent_parser], help='Stop one of the jobs on GKE.')
   sub_parser.set_defaults(func=_deploy_stop)
   _add_gke_deployment_args(sub_parser, cluster_settings)
-  sub_parser.add_argument('--job',
-      help='The job you wish to stop. Valid choices are "shuffler", '
-           '"analyzer-service", "report-master". Required.')
+  _add_deploy_start_stop_args(sub_parser, cluster_settings, 'stop')
 
   sub_parser = deploy_subparsers.add_parser('stopstart',
       parents=[parent_parser], help='Stop and start a job on GKE.')
   sub_parser.set_defaults(func=_deploy_stopstart)
   _add_gke_deployment_args(sub_parser, cluster_settings)
-  sub_parser.add_argument('--job',
-      help='The job you wish to stop then start. Valid choices are "shuffler", '
-           '"analyzer-service", "report-master". Required.')
+  _add_deploy_start_stop_args(sub_parser, cluster_settings, 'stopstart')
   _add_deploy_start_args(sub_parser, cluster_settings)
 
   sub_parser = deploy_subparsers.add_parser('upload_secret_keys',
