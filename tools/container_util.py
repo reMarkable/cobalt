@@ -485,6 +485,7 @@ def start_report_master(cloud_project_prefix,
                         bigtable_instance_id,
                         static_ip_address,
                         docker_tag,
+                        update_repo_url,
                         enable_report_scheduling=False):
   """ Starts the report-master deployment and service.
   cloud_project_prefix {string}: For example "google.com"
@@ -497,6 +498,11 @@ def start_report_master(cloud_project_prefix,
       reserved on the GKE cluster.
   docker_tag {string}: The docker_tag of the docker image to use. If none is
     provided, latest will be used.
+  update_repo_url {string}: URL to a git repository containing a cobalt
+    configuration in its master branch. If this arg is not empty, the
+    configuration of report master will be updated by pulling from the specified
+    repository before scheduled reports are run.
+    (e.g. "https://cobalt-analytics.googlesource.com/config/")
   enable_report_scheduling {bool}: Should report scheduling be enabled?
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
@@ -537,6 +543,7 @@ def start_report_master(cloud_project_prefix,
       '$$ENDPOINT_CONFIG_ID$$': endpoint_config_id,
       '$$REPORT_MASTER_CERTIFICATE_SECRET_NAME$$':
       REPORT_MASTER_CERTIFICATE_SECRET_NAME,
+      '$$REPORT_MASTER_CONFIG_UPDATE_REPO_URL$$': update_repo_url,
       '$$REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME$$':
       REPORT_MASTER_GCS_SERVICE_ACCOUNT_SECRET_NAME}
   _start_gke_service(REPORT_MASTER_DEPLOYMENT_TEMPLATE_FILE,

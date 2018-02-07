@@ -64,10 +64,16 @@ spec:
           - $$BIGTABLE_PROJECT_NAME$$
           - '-bigtable_instance_id'
           - $$BIGTABLE_INSTANCE_ID$$
-          - '-cobalt_config_dir'
-          # This path must match the path to where the config files are copied
-          # in Dockerfile.
-          - '/etc/cobalt'
+          - '-cobalt_config_proto_path'
+          # This path must match the path to where the binproto config file is
+          # copied in Dockerfile.
+          - '/etc/cobalt/cobalt_config.binproto'
+          - '-config_parser_bin_path'
+          # This path must match the path to where the config parser binary is
+          # copied in Dockerfile.
+          - '/usr/local/bin/config_parser'
+          - '-config_update_repository_url'
+          - '"$$REPORT_MASTER_CONFIG_UPDATE_REPO_URL$$"'
           - $$REPORT_MASTER_ENABLE_REPORT_SCHEDULING_FLAG$$
           # This configures the AuthEnforcer.
           - '-googlers_only'

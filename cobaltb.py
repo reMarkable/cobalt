@@ -644,6 +644,7 @@ def _deploy_start(args):
         args.bigtable_instance_id,
         args.report_master_static_ip,
         version,
+        args.report_master_update_repo_url,
         enable_report_scheduling=_parse_bool(
             args.report_master_enable_scheduling))
   else:
@@ -887,6 +888,13 @@ def _add_deploy_start_args(parser, cluster_settings):
       help=('When starting the ReportMaster, should the ReportMaster run all '
             'reports automatically on a schedule? Default=%s.' %
             default_report_master_enable_scheduling))
+  parser.add_argument('--report_master_update_repo_url',
+      help='URL to a git repository containing a cobalt configuration in '
+           'its master branch. If this flag is set, the configuration of '
+           'report master will be updated by pulling from the specified '
+           'repository before scheduled reports are run. '
+           '(e.g. "https://cobalt-analytics.googlesource.com/config/")',
+      default=cluster_settings['report_master_update_repo_url'])
   default_shuffler_use_memstore = _default_shuffler_use_memstore(
       cluster_settings)
   parser.add_argument('--shuffler-use-memstore',
@@ -948,6 +956,7 @@ def main():
     'report_master_preferred_address': '',
     'report_master_root_certs': '',
     'report_master_static_ip' : '',
+    'report_master_update_repo_url': '',
     'shuffler_config_file': '',
     'shuffler_preferred_address': '',
     'shuffler_root_certs': '',
