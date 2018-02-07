@@ -595,14 +595,18 @@ def _load_versions_file(args):
       'report-master': 'latest',
   }
 
-  with open(args.deployed_versions_file) as f:
-    try:
-      read_versions_file = json.load(f)
-    except ValueError:
-      print('%s could not be parsed.' % args.deployed_versions_file)
-  for key in read_versions_file:
-    if key in versions:
-      versions[key] = read_versions_file[key]
+  try:
+    with open(args.deployed_versions_file) as f:
+      read_versions_file = {}
+      try:
+        read_versions_file = json.load(f)
+      except ValueError:
+        print('%s could not be parsed.' % args.deployed_versions_file)
+    for key in read_versions_file:
+      if key in versions:
+        versions[key] = read_versions_file[key]
+  except IOError:
+    print('%s could not be found.' % args.deployed_versions_file)
 
   return versions
 
