@@ -243,6 +243,9 @@ def _image_registry_uri(cloud_project_prefix, cloud_project_name, image_name,
   return "%s/%s/%s/%s:%s" % (CONTAINER_REGISTRY_URI, cloud_project_prefix,
                           cloud_project_name, image_name, tag)
 
+def _validate_image_uri(uri):
+  subprocess.check_call(["gcloud", "container", "images", "describe", uri])
+
 def _push_to_container_registry(cloud_project_prefix, cloud_project_name,
                                 image_name, tag='latest'):
   registry_tag = _image_registry_uri(cloud_project_prefix, cloud_project_name,
@@ -468,6 +471,7 @@ def start_analyzer_service(cloud_project_prefix,
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   ANALYZER_SERVICE_IMAGE_NAME, docker_tag)
+  _validate_image_uri(image_uri)
 
   bigtable_project_name = compound_project_name(cloud_project_prefix,
                                                  cloud_project_name)
@@ -531,6 +535,7 @@ def start_report_master(cloud_project_prefix,
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   REPORT_MASTER_IMAGE_NAME, docker_tag)
+  _validate_image_uri(image_uri)
 
   bigtable_project_name = compound_project_name(cloud_project_prefix,
                                                  cloud_project_name)
@@ -599,6 +604,7 @@ def start_shuffler(cloud_project_prefix,
   """
   image_uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
                                   SHUFFLER_IMAGE_NAME, docker_tag)
+  _validate_image_uri(image_uri)
   # These are the token replacements that must be made inside the deployment
   # template file.
   use_memstore_string = 'false'
