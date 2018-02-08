@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"

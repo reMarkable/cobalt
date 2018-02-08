@@ -6,6 +6,7 @@
 #define COBALT_CONFIG_BUCKETS_CONFIG_H_
 
 #include <memory>
+#include <vector>
 
 #include "config/metrics.pb.h"
 
@@ -30,10 +31,10 @@ class IntegerBucketConfig {
   uint32_t BucketIndex(int64_t val) const;
 
   // Returns the index of the underflow bucket: 0.
-  uint32_t UnderflowBucket() const { return 0; };
+  uint32_t UnderflowBucket() const { return 0; }
 
   // Returns the index of the overflow bucket.
-  uint32_t OverflowBucket() const { return floors_.size(); };
+  uint32_t OverflowBucket() const { return floors_.size(); }
 
  private:
   // Constructs an IntegerBucketConfig with the specified floors. See floors_.
@@ -66,7 +67,7 @@ class IntegerBucketConfig {
   // Otherwise, bucket i is defined as [floors_[i-1], floors_[i]).
   const std::vector<int64_t> floors_;
 };
-}
-}
+}  // namespace config
+}  // namespace cobalt
 
 #endif  // COBALT_CONFIG_BUCKETS_CONFIG_H_
