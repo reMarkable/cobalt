@@ -787,6 +787,12 @@ def _get_analyzer_static_ip(cloud_project_prefix, cloud_project_name):
   ips = _get_static_ips(cloud_project_prefix, cloud_project_name)
   return ips.get(ANALYZER_STATIC_IP_NAME)
 
+def kube_ui(cloud_project_name, cluster_zone, cluster_name):
+  context = _form_context_name(None, cloud_project_name, cluster_zone,
+                               cluster_name)
+  proxy = subprocess.Popen(['kubectl', 'proxy', '--context', context])
+  subprocess.check_call(['xdg-open', 'http://127.0.0.1:8001/ui'])
+  proxy.wait()
 
 def main():
   print get_public_uris()

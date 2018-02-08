@@ -743,6 +743,10 @@ def _deploy_upload_service_account_key(args):
       args.cloud_project_prefix, args.cloud_project_name, args.cluster_zone,
       args.cluster_name, args.service_account_key_json)
 
+def _deploy_kube_ui(args):
+  container_util.kube_ui(args.cloud_project_name, args.cluster_zone,
+      args.cluster_name)
+
 def _default_shuffler_config_file(cluster_settings):
   if cluster_settings['shuffler_config_file'] :
     return  os.path.join(THIS_DIR, cluster_settings['shuffler_config_file'])
@@ -1726,6 +1730,11 @@ def main():
   _add_gke_deployment_args(sub_parser, cluster_settings)
   sub_parser.add_argument('--service_account_key_json',
       help='Path to the private key json file to upload. Required.')
+
+  sub_parser = deploy_subparsers.add_parser('kube_ui',
+      parents=[parent_parser], help='Launches the kubernetes ui.')
+  sub_parser.set_defaults(func=_deploy_kube_ui)
+  _add_gke_deployment_args(sub_parser, cluster_settings)
 
   args = parser.parse_args()
   global _verbose_count
