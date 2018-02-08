@@ -16,8 +16,8 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 #include "./observation.pb.h"
 #include "algorithms/forculus/forculus_analyzer.h"
@@ -453,12 +453,10 @@ grpc::Status HistogramAnalysisEngine::PerformAnalysis(
   }
 
   if (decoders_.size() == 0) {
-    std::ostringstream stream;
-    stream << "Empty report. No valid observations found for report_id="
-           << ReportStore::ToString(report_id_);
-    std::string message = stream.str();
-    LOG(INFO) << message;
-    return grpc::Status(grpc::FAILED_PRECONDITION, message);
+    LOG(INFO)
+        << "Empty HISTOGRAM report. No valid observations found for report_id="
+        << ReportStore::ToString(report_id_);
+    return grpc::Status::OK;
   }
 
   return decoders_.begin()->second->PerformAnalysis(results);

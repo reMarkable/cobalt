@@ -236,6 +236,20 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
     return grpc::Status::OK;
   }
 
+  bool have_some_observations;
+  status = row_iterator->HasMoreRows(&have_some_observations);
+  if (!status.ok()) {
+    return status;
+  }
+  if (!have_some_observations) {
+    std::ostringstream stream;
+    stream << "Not exporting report. No Observations found for report_id="
+           << ReportStore::ToString(report_id);
+    std::string message = stream.str();
+    LOG(INFO) << message;
+    return grpc::Status::OK;
+  }
+
   return report_exporter_->ExportReport(*report_config, metadata,
                                         row_iterator.get());
 }
