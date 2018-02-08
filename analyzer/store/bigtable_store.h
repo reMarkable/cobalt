@@ -70,6 +70,14 @@ class BigtableStore : public DataStore {
   // in a loop, retrying with exponential backoff when a retryable error occurs.
   grpc::Status DoWriteRows(Table table, const std::vector<Row>& rows);
 
+  // This method invokes ReadRowsInternal() multiple times until it succeeds,
+  // returns a non-retryable error, or exceeds a maximum number of attempts.
+  ReadResponse ReadRowsWithRetry(Table table, std::string start_row_key,
+                                 bool inclusive_start, std::string end_row_key,
+                                 bool inclusive_end,
+                                 const std::vector<std::string>& column_names,
+                                 size_t max_rows);
+
   // This method is used to implement ReadRow and ReadRows. It is identical to
   // ReadRows except that instead of limit_row_key it has end_row_key and
   // inclusive_end. In other words it supports intervals that are closed on

@@ -280,7 +280,7 @@ Status BigtableStore::ReadRow(Table table,
     return kInvalidArguments;
   }
   auto read_response =
-      ReadRowsInternal(table, row->key, true, row->key, true, column_names, 1);
+      ReadRowsWithRetry(table, row->key, true, row->key, true, column_names, 1);
 
   if (read_response.status != kOK) {
     return read_response.status;
@@ -303,10 +303,30 @@ BigtableStore::ReadResponse BigtableStore::ReadRows(
     Table table, std::string start_row_key, bool inclusive,
     std::string limit_row_key, const std::vector<std::string>& column_names,
     size_t max_rows) {
-  // Invoke ReadRowsInternal passing in false for |inclusive_end| indicating
+  // Invoke ReadRowsWithRetry passing in false for |inclusive_end| indicating
   // that our interval is open on the right.
-  return ReadRowsInternal(table, start_row_key, inclusive, limit_row_key, false,
-                          column_names, max_rows);
+  return ReadRowsWithRetry(table, start_row_key, inclusive, limit_row_key,
+                           false, column_names, max_rows);
+}
+
+BigtableStore::ReadResponse BigtableStore::ReadRowsWithRetry(
+    Table table, std::string start_row_key, bool inclusive_start,
+    std::string end_row_key, bool inclusive_end,
+    const std::vector<std::string>& column_names, size_t max_rows) {
+  static const size_t kMaxAttempts = 4;
+  int sleepmillis = 10;
+  size_t attempt = 0;
+  while (true) {
+    auto read_response =
+        ReadRowsInternal(table, start_row_key, inclusive_start, end_row_key,
+                         inclusive_end, column_names, max_rows);
+    if (!ShouldRetry(read_response.grpc_status) || attempt++ >= kMaxAttempts) {
+      return read_response;
+    }
+    VLOG(1) << "Sleeping for " << sleepmillis << " ms.";
+    std::this_thread::sleep_for(std::chrono::milliseconds(sleepmillis));
+    sleepmillis *= 2;
+  }
 }
 
 BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
@@ -315,9 +335,12 @@ BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
     const std::vector<std::string>& column_names, size_t max_rows) {
   ReadResponse read_response;
   read_response.status = kOK;
+  read_response.grpc_status = grpc::Status::OK;
   if (max_rows == 0) {
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadRowsFailure) << "max_rows=0";
     read_response.status = kInvalidArguments;
+    read_response.grpc_status =
+        grpc::Status(grpc::INVALID_ARGUMENT, "max_rows=0");
     return read_response;
   }
   max_rows = std::min(max_rows, kMaxRowsReadLimit);
@@ -354,6 +377,8 @@ BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
         LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadRowsFailure)
             << "RegexEncode failed on '" << column_name << "'";
         read_response.status = kOperationFailed;
+        read_response.grpc_status =
+            grpc::Status(grpc::FAILED_PRECONDITION, "RegexEncode failed");
         return read_response;
       }
       column_filter += encoded_column_name;
@@ -414,8 +439,10 @@ BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
         if (!RegexDecode(chunk.qualifier().value(),
                          &current_decoded_column_name)) {
           LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadRowsFailure)
-              << "RegexEncode failed on '" << chunk.qualifier().value() << "'";
+              << "RegexDecode failed on '" << chunk.qualifier().value() << "'";
           read_response.status = kOperationFailed;
+          read_response.grpc_status =
+              grpc::Status(grpc::FAILED_PRECONDITION, "RegexDecode failed");
           return read_response;
         }
       }
@@ -431,14 +458,13 @@ BigtableStore::ReadResponse BigtableStore::ReadRowsInternal(
     }
   }
 
-  grpc::Status status = reader->Finish();
+  read_response.grpc_status = reader->Finish();
 
-  if (!status.ok()) {
-    // TODO(rudominer) Consider doing a retry here. Consider if this
-    // method should be asynchronous.
+  if (!read_response.grpc_status.ok()) {
+    // TODO(rudominer) Consider if this method should be asynchronous.
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kReadRowsFailure)
-        << ErrorMessage(status, "ReadRows");
-    read_response.status = GrpcStatusToStoreStatus(status);
+        << ErrorMessage(read_response.grpc_status, "ReadRows");
+    read_response.status = GrpcStatusToStoreStatus(read_response.grpc_status);
     return read_response;
   }
 

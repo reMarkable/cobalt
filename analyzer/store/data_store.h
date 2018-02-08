@@ -21,6 +21,8 @@
 #include <utility>
 #include <vector>
 
+#include "grpc++/grpc++.h"
+
 namespace cobalt {
 namespace analyzer {
 namespace store {
@@ -135,6 +137,9 @@ class DataStore {
     // If there was an error then the other fields of ReadResponse
     // should be ignored.
     Status status;
+
+    // The grpc::Status returned from Bigtable.
+    grpc::Status grpc_status;
 
     // If status is kOK then this is the list of returned rows. If
     // |more_available| is true then there will be at least one row.
