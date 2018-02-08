@@ -246,6 +246,12 @@ def _image_registry_uri(cloud_project_prefix, cloud_project_name, image_name,
 def _validate_image_uri(uri):
   subprocess.check_call(["gcloud", "container", "images", "describe", uri])
 
+def _validate_image_exists(cloud_project_prefix, cloud_project_name, image_name,
+                           tag='latest'):
+  uri = _image_registry_uri(cloud_project_prefix, cloud_project_name,
+                            image_name, tag)
+  _validate_image_uri(uri)
+
 def _push_to_container_registry(cloud_project_prefix, cloud_project_name,
                                 image_name, tag='latest'):
   registry_tag = _image_registry_uri(cloud_project_prefix, cloud_project_name,
@@ -657,25 +663,37 @@ def _stop_gke_service(name, context, components = ['service', 'statefulset']):
 def stop_analyzer_service(cloud_project_prefix,
                           cloud_project_name,
                           cluster_zone, cluster_name,
-                          components):
+                          components,
+                          docker_tag):
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
+
+  _validate_image_exists(cloud_project_prefix, cloud_project_name,
+                         ANALYZER_SERVICE_IMAGE_NAME, docker_tag)
   _stop_gke_service(ANALYZER_SERVICE_IMAGE_NAME, context, components)
 
 def stop_report_master(cloud_project_prefix,
                        cloud_project_name,
                        cluster_zone, cluster_name,
-                       components):
+                       components,
+                       docker_tag):
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
+
+  _validate_image_exists(cloud_project_prefix, cloud_project_name,
+                         REPORT_MASTER_IMAGE_NAME, docker_tag)
   _stop_gke_service(REPORT_MASTER_IMAGE_NAME, context, components)
 
 def stop_shuffler(cloud_project_prefix,
                   cloud_project_name,
                   cluster_zone, cluster_name,
-                  components):
+                  components,
+                  docker_tag):
   context = _form_context_name(cloud_project_prefix, cloud_project_name,
       cluster_zone, cluster_name)
+
+  _validate_image_exists(cloud_project_prefix, cloud_project_name,
+                         SHUFFLER_IMAGE_NAME, docker_tag)
   _stop_gke_service(SHUFFLER_IMAGE_NAME, context, components)
 
 def login(cloud_project_prefix, cloud_project_name):

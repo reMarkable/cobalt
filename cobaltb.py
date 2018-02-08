@@ -659,20 +659,21 @@ def _deploy_start(args):
           '"analyzer-service" and "report-master".' % args.job)
 
 def _deploy_stop(args):
+  version = _load_versions_file(args).get(args.job, 'latest')
   components = [c.strip() for c in args.components.split(',')]
 
   if args.job == 'shuffler':
     container_util.stop_shuffler(args.cloud_project_prefix,
         args.cloud_project_name, args.cluster_zone, args.cluster_name,
-        components)
+        components, version)
   elif args.job == 'analyzer-service':
     container_util.stop_analyzer_service(args.cloud_project_prefix,
         args.cloud_project_name, args.cluster_zone, args.cluster_name,
-        components)
+        components, version)
   elif args.job == 'report-master':
     container_util.stop_report_master(args.cloud_project_prefix,
         args.cloud_project_name, args.cluster_zone, args.cluster_name,
-        components)
+        components, version)
   else:
     print('Unknown job "%s". I only know how to stop "shuffler", '
           '"analyzer-service" and "report-master".' % args.job)
