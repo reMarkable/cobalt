@@ -67,13 +67,25 @@ class ReportStream::ReportStreambuf : public std::streambuf {
   pos_type seekoff(off_type off, std::ios_base::seekdir dir,
                    std::ios_base::openmode which) override;
 
+  pos_type seekpos(pos_type pos, std::ios_base::openmode which) override;
+
  private:
+  // Reset the stream to the begining.
+  grpc::Status Reset();
+
+  // A helper method invoked by Start() and Reset().
+  grpc::Status StartSerializingReport();
+
   std::vector<char> buffer_;
   size_t max_size_;
   ReportSerializer* report_serializer_;  // not owned
   ReportRowIterator* row_iterator_;      // not owned
   ReportStream* owning_istream_;  // not owned. Set via the Start() method.
   grpc::Status status_;
+  // Has underflow() been invoked at least once since that last
+  // StartSerializingReport()? We need to keep track of this in order to
+  // understand if any data at all has been read from this input stream yet.
+  bool underflow_invoked_ = false;
 };
 
 ReportStream::ReportStreambuf::ReportStreambuf(
@@ -96,7 +108,27 @@ grpc::Status ReportStream::ReportStreambuf::Start(
     ReportStream* owning_istream) {
   CHECK(owning_istream);
   owning_istream_ = owning_istream;
+  return StartSerializingReport();
+}
 
+grpc::Status ReportStream::ReportStreambuf::Reset() {
+  // Don't do anything if no data has yet been read from this buffer. We don't
+  // want to issue another Bigtable query via RawDumpReportRowIterator.Reset()
+  // just to fill our buffer with the same data that is already in it.
+  if (!underflow_invoked_ && (gptr() == buffer_.data())) {
+    return grpc::Status::OK;
+  }
+  row_iterator_->Reset();
+  return StartSerializingReport();
+}
+
+grpc::Status ReportStream::ReportStreambuf::StartSerializingReport() {
+  // Tell any readers there is nothing to read yet.
+  setg(0, 0, 0);
+  // Reset underflow_invoked_.
+  underflow_invoked_ = false;
+  // Tell any writers where the underlying write buffer is.
+  setp(buffer_.data(), buffer_.data() + buffer_.size());
   // Make a temporary ostream to wrap this buffer.
   std::ostream ostream(this);
   // Give this ostream to ReportSerializer so it will write into this buffer.
@@ -107,6 +139,7 @@ grpc::Status ReportStream::ReportStreambuf::Start(
     owning_istream_->setstate(std::ios_base::badbit);
     return status_;
   }
+
   // Ask the ReportSerializer to wite some of the report rows, up to max_size_.
   status_ = report_serializer_->AppendRows(max_size_, row_iterator_, &ostream);
   if (!status_.ok()) {
@@ -145,6 +178,7 @@ int ReportStream::ReportStreambuf::overflow(int value) {
 // we run out of data to read. In this case we serialize more of the report
 // into the buffer, or return EOF.
 int ReportStream::ReportStreambuf::underflow() {
+  underflow_invoked_ = true;
   if (!status_.ok()) {
     // Tell the reader there is no more data.
     setg(0, 0, 0);
@@ -189,18 +223,27 @@ int ReportStream::ReportStreambuf::underflow() {
 }
 
 // The base class std::streambuf always return pos_type(-1) for seekoff(). We
-// override this behavior only in one special case: the case in which this
-// function is being invoked from std::ostream::tellp(). That is because we
-// want for a ReportStream to support the tellp() function because tellp()
-// is invoked by ReportSerializer::AppendRows() in order to determine how many
-// bytes have already been written to the stream. According to the
-// documentation for tellp(), seekoff() is invoked with parameters
-// (0, cur, out), meaning that the write pointer should be moved to an offset
-// of 0 from its current position and that position should be returned. In
-// other words, the write pointer should not be moved at all, but its
-// current position should be returned. So here we check that the parameters
-// are (0, cur, out) and if they are we return the current position of the
-// write pointer.
+// override this behavior only in two special cases: the case in which this
+// function is being invoked from std::ostream::tellp() or
+// std::istream::tellg(). Both of these methods may be invoked during
+// report exporting. For example tellp() is invoked by
+// ReportSerializer::AppendRows() in order to determine how many
+// bytes have already been written to the stream.
+//
+// According to the documentation for tellp(), seekoff() is invoked with
+// parameters (0, cur, out), meaning that the write pointer should be moved to
+// an offset of 0 from its current position and that position should be
+// returned. In other words, the write pointer should not be moved at all,
+// but its current position should be returned.
+//
+// According to the documentation for tellg(), seekoff() is invoked with
+// parameters (0, cur, in), meaning that the read pointer should be moved to
+// an offset of 0 from its current position and that position should be
+// returned. In other words, the read pointer should not be moved at all,
+// but its current position should be returned.
+//
+// So here we check that we are in one of those two cases and we return the
+// current position of the read or write pointer as appropriate.
 ReportStream::ReportStreambuf::pos_type ReportStream::ReportStreambuf::seekoff(
     off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which) {
   if (off == 0 && dir == std::ios_base::cur && which == std::ios_base::out) {
@@ -213,7 +256,31 @@ ReportStream::ReportStreambuf::pos_type ReportStream::ReportStreambuf::seekoff(
     // get pointer gptr().
     return gptr() - buffer_.data();
   }
-  // We are not in the case of tellp() so do what the base class impl does.
+  // We are not in any of the other cases so do what the base class impl does.
+  return pos_type(-1);
+}
+
+// The base class std::streambuf always return pos_type(-1) for seekpos(). We
+// override this behavior only in one special case: the case in which this
+// function is being invoked from std::istream::seekg(0). This is invoked
+// during report exporting in the case that the google-api-cpp client
+// receives a "401 authorization required" response from the Google server and
+// it therefore needs to perform a reset to start reading from the beginning of
+// the stream again.
+//
+// According to the documentation for seekg(), in the case of seekg(0),
+// seekpos() is invoked with parameters (0, in), so here we check that we are
+// in that case and return -1 otherwise.
+ReportStream::ReportStreambuf::pos_type ReportStream::ReportStreambuf::seekpos(
+    pos_type pos, std::ios_base::openmode which) {
+  if (pos == 0 && which == std::ios_base::in) {
+    // We are in the case of seekg(0);
+    Reset();
+    return 0;
+  }
+
+  // We are not in any of the cases we wish to support so do what the base
+  // class impl does.
   return pos_type(-1);
 }
 

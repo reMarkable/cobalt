@@ -140,34 +140,55 @@ class ReportStreamTest : public ::testing::Test {
     // Construct a ReportStream wrapping |serializer| and |row_iterator| that
     //  uses the given |buffer_size|.
     ReportStream report_stream(&serializer, row_iterator, buffer_size);
-
     // Invoke Start() and check the MIME type and status.
     auto status = report_stream.Start();
     EXPECT_EQ(expected_start_status, status.error_code())
         << status.error_message() << " ";
     EXPECT_EQ(expected_mime_type, report_stream.mime_type());
 
-    if (status.ok()) {
-      // Test that before reading from the stream, tellg() returns zero.
-      EXPECT_EQ(0, report_stream.tellg());
-    }
+    for (auto test_iteration = 0; test_iteration < 3; test_iteration++) {
+      if (status.ok()) {
+        // Test that before reading from the stream, tellg() returns zero.
+        EXPECT_EQ(0, report_stream.tellg())
+            << "test_iteration=" << test_iteration
+            << " tellg() = " << report_stream.tellg();
 
-    // Read the entire serialized report from the ReportStream into a string.
-    std::string serialized_report(std::istreambuf_iterator<char>(report_stream),
-                                  {});
+        // This should be a no-op seekg.
+        report_stream.seekg(0);
+        // tellg() should again return 0
+        EXPECT_EQ(0, report_stream.tellg())
+            << "test_iteration=" << test_iteration
+            << " tellg() = " << report_stream.tellg();
+      }
 
-    // Check the serialized report.
-    EXPECT_EQ(expected_serialization.size(), serialized_report.size());
-    EXPECT_EQ(expected_serialization, serialized_report);
+      // Read the entire serialized report from the ReportStream into a string.
+      std::string serialized_report(
+          std::istreambuf_iterator<char>(report_stream), {});
 
-    // Check the status.
-    status = report_stream.status();
-    EXPECT_EQ(expected_end_status, status.error_code())
-        << status.error_message() << " ";
+      // Check the serialized report.
+      EXPECT_EQ(expected_serialization.size(), serialized_report.size())
+          << "test_iteration=" << test_iteration;
+      EXPECT_EQ(expected_serialization, serialized_report)
+          << "test_iteration=" << test_iteration;
 
-    if (!report_stream.status().ok()) {
-      EXPECT_TRUE(report_stream.fail());
-      EXPECT_TRUE(report_stream.bad());
+      // Check the status.
+      status = report_stream.status();
+      EXPECT_EQ(expected_end_status, status.error_code())
+          << status.error_message() << " "
+          << " test_iteration=" << test_iteration;
+
+      if (!report_stream.status().ok()) {
+        EXPECT_TRUE(report_stream.fail());
+        EXPECT_TRUE(report_stream.bad());
+        EXPECT_FALSE(report_stream.good());
+      } else {
+        EXPECT_FALSE(report_stream.fail());
+        EXPECT_FALSE(report_stream.bad());
+        EXPECT_TRUE(report_stream.good());
+        EXPECT_NE(0, report_stream.tellg());
+      }
+      report_stream.clear(0);
+      report_stream.seekg(0);
     }
   }
 

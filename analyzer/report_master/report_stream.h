@@ -40,7 +40,7 @@ class ReportStream : public std::istream {
   // maintains ownership of report_serializer which must remain valid
   // as long as the ReportStream is being used.
   //
-  // | row_iterator|. Rows of the report will be read from this incrementally
+  // |row_iterator|. Rows of the report will be read from this incrementally
   // as bytes are read from this ReportStream. The caller maintains ownership
   // of row_iterator which must remain valid as long as the ReportStream
   // is being used.
@@ -59,7 +59,7 @@ class ReportStream : public std::istream {
 
   // Invoke this method once before commencing reading from this Stream.
   // After this method has been invoked the MIME type of the report may
-  // be retrieved via the access mime_type(). Returns OK on success or an
+  // be retrieved via the accessor mime_type(). Returns OK on success or an
   // error status otherwise.
   grpc::Status Start();
 
