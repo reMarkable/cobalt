@@ -93,6 +93,33 @@ element {
   }
 }
 
+#### ReportConfig (1, 1, 4)
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  name: "Fuchsia Daily Fruit Rating"
+  description: "This is a fictional report used for the development of Cobalt."
+  metric_id: 3
+  report_type: RAW_DUMP
+  variable {
+    metric_part: "fruit"
+  }
+  variable {
+    metric_part: "rating"
+  }
+  scheduling {
+    report_finalization_days: 3
+    aggregation_epoch_type: DAY
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "fuchsia-cobalt-reports-test1-rudominer"
+    }
+  }
+}
+
 #########################
 # Customer 2 (Acme)
 ########################

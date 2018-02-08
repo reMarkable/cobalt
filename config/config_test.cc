@@ -199,7 +199,7 @@ TEST(ReportRegistryFromFile, ValidFile) {
       "config/test_files/registered_reports_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
-  EXPECT_EQ(5u, registry->size());
+  EXPECT_EQ(6u, registry->size());
 
   // (1, 1, 1) should have 2 variables
   auto* report_config = registry->Get(1, 1, 1);
@@ -227,8 +227,8 @@ TEST(ReportRegistryFromFile, ValidFile) {
   EXPECT_EQ("Event B", variable0.index_labels().labels().at(1));
   EXPECT_EQ("Event Z", variable0.index_labels().labels().at(25));
 
-  // (1, 1, 4) Should be not present
-  EXPECT_EQ(nullptr, registry->Get(1, 1, 4));
+  // (1, 1, 5) Should be not present
+  EXPECT_EQ(nullptr, registry->Get(1, 1, 5));
 }
 
 // This test runs EncodingRegistry::FromFile() on our demo
