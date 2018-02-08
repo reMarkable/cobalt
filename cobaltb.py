@@ -552,6 +552,10 @@ def _deploy_build(args):
           "config using the './cobaltb.py update_config' command.")
 
 def _deploy_production_build(args):
+  if not args.production_dir:
+    print("The production_build sub-command is intended to be used for "
+          "production builds only. Please specify the --production_dir arg.")
+    return
   full_ref = production_util.build_and_push_production_docker_images(
       args.cloud_project_name,
       args.production_dir,
