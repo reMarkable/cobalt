@@ -135,11 +135,24 @@ grpc::Status GcsUploader::UploadToGCS(const std::string& bucket,
       LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUploadToGCSError) << message;
       return grpc::Status(grpc::INTERNAL, message);
     }
-    auto status = PingBucket(bucket);
-    if (!status.ok()) {
-      gcs_util_.reset();
-      return status;
-    }
+  }
+  // We perform a "Ping" before performing an upload. A ping uses
+  // a GET request whereas an upload uses a POST request. If the
+  // currently cached OAUTH token needs to be refreshed, then the
+  // server will return a 401 UNAUTHORIZED causing the google-api-cpp-client
+  // to refresh the OAUTH token and then retry the original request. We are
+  // working around a bug in that code in which it fails to reset the content
+  // input stream when it does that retry. The symptom is either that an empty
+  // file is uploaded, overwriting the previously uploaded serialized report,
+  // or else a timeout occurs, depending on which implementation of input
+  // stream is used. When using our ReportInputStream it is the former.
+  // Although we have fixed this bug in our copy of google-api-cpp-client we
+  // still choose to use the ping here in order to avoid that code path out of
+  // caution.
+  auto status = PingBucket(bucket);
+  if (!status.ok()) {
+    gcs_util_.reset();
+    return status;
   }
   int seconds_to_sleep = 1;
   for (int i = 0; i < 5; i++) {
