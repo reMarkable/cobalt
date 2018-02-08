@@ -37,6 +37,7 @@ SKIP_LINT_DIRS = [
 ]
 
 def main():
+  status = 0
   for root, dirs, files in os.walk(SRC_ROOT_DIR):
     print "Linting c++ files in %s" % root
     for f in files:
@@ -47,6 +48,7 @@ def main():
         out, err = cmd.communicate()
 
         if cmd.returncode:
+          status += 1
           print "Error %s" % err
 
     # Before recursing into directories remove the ones we want to skip.
@@ -54,6 +56,7 @@ def main():
         os.path.join(root, dir) in SKIP_LINT_DIRS]
     for d in dirs_to_skip:
       dirs.remove(d)
+  return status
 
 if __name__ == '__main__':
-  main()
+  exit(main())

@@ -127,6 +127,14 @@
     "name": "test"
   },
   {
+    "cmd": [
+      "./cobaltb.py",
+      "lint"
+    ],
+    "cwd": "[START_DIR]/cobalt",
+    "name": "lint"
+  },
+  {
     "name": "$result",
     "recipe_result": null,
     "status_code": 0

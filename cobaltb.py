@@ -124,8 +124,11 @@ def _build(args):
   os.chdir(savedir)
 
 def _lint(args):
-  cpplint.main()
-  golint.main()
+  status = 0
+  status += cpplint.main()
+  status += golint.main()
+
+  exit(status)
 
 # Specifiers of subsets of tests to run
 TEST_FILTERS =['all', 'gtests', 'nogtests', 'gotests', 'nogotests',
