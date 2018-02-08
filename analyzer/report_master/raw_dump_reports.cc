@@ -135,7 +135,7 @@ void RawDumpReportRowIterator::TryEnsureHaveNextRow() {
     have_next_row_ = false;
     return;
   }
-  // Keep trying to build next_row_ until we succeed or reach OEF or encounter
+  // Keep trying to build next_row_ until we succeed or reach EOF or encounter
   // a query error. In the case that we encounter an invalid input row (one
   // that cannot be converted to next_row_) then we LOG(ERROR) but keep going.
   while (true) {

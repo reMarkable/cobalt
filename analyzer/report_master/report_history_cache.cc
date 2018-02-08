@@ -132,7 +132,7 @@ void ReportHistoryCache::Refresh(const ReportConfig& report_config,
     if (status != store::kOK) {
       LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRefreshFailure)
           << "Unable to GetMetadata for report "
-          << ReportStore::ToString(report_id);
+          << ReportStore::ToString(report_id) << " status= " << status;
       // Since we are unable to determine if the report is still in progress
       // we'll assume it is.
       return;
