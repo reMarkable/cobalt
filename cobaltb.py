@@ -892,9 +892,6 @@ def _add_deploy_start_args(parser, cluster_settings):
            'if and only if you are starting one of the two Analyzer jobs. '
            'Default=%s' % cluster_settings['bigtable_instance_id'],
       default=cluster_settings['bigtable_instance_id'])
-  parser.add_argument('--deployed_versions_file',
-      help='A file with version numbers to use',
-      default=cluster_settings['deployed_versions_file'])
   default_report_master_enable_scheduling = \
       _default_report_master_enable_scheduling(cluster_settings)
   parser.add_argument('--report_master_enable_scheduling',
@@ -923,6 +920,9 @@ def _add_deploy_start_args(parser, cluster_settings):
       action='store_true')
 
 def _add_deploy_start_stop_args(parser, cluster_settings, verb):
+  parser.add_argument('--deployed_versions_file',
+      help='A file with version numbers to use',
+      default=cluster_settings['deployed_versions_file'])
   parser.add_argument('--job',
       help='The job you wish to ' + verb + '. Valid choices are "shuffler", '
            '"analyzer-service", "report-master". Required.')
