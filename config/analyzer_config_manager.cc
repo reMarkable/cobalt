@@ -8,6 +8,7 @@
 #include <spawn.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 #include <fstream>
 #include <memory>
 #include <mutex>
@@ -84,6 +85,7 @@ AnalyzerConfigManager::CreateFromFlagsOrDie() {
       std::shared_ptr<AnalyzerConfigManager>(new AnalyzerConfigManager(
           std::move(config), FLAGS_cobalt_config_proto_path,
           FLAGS_config_update_repository_url, FLAGS_config_parser_bin_path));
+  manager->Update(120);
   return manager;
 }
 
@@ -95,23 +97,26 @@ bool AnalyzerConfigManager::Update(unsigned int timeout_seconds) {
 
   LOG(INFO) << "Updating configuration from " << update_repository_path_;
 
+  std::string timeout_seconds_str = std::to_string(timeout_seconds);
   const char* argv[] = {
-      config_parser_bin_path_.c_str(),         "-repo_url",
-      update_repository_path_.c_str(),         "-output_file",
-      cobalt_config_proto_path_.c_str(),       "-git_timeout",
-      std::to_string(timeout_seconds).c_str(), nullptr,
+      config_parser_bin_path_.c_str(),   "-repo_url",
+      update_repository_path_.c_str(),   "-output_file",
+      cobalt_config_proto_path_.c_str(), "-git_timeout",
+      timeout_seconds_str.c_str(),       nullptr,
   };
-  char* env[] = {};
   pid_t pid;
   posix_spawnattr_t spawnattr;
   posix_spawnattr_init(&spawnattr);
 
+  errno = 0;
+  // The variable "environ" is the current environment found in unistd.h.
   int status = posix_spawn(&pid, config_parser_bin_path_.c_str(), nullptr,
-                           &spawnattr, const_cast<char* const*>(argv), env);
+                           &spawnattr, const_cast<char* const*>(argv), environ);
 
   if (0 != status) {
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kUpdateFailure)
-        << "Error spawning config_parser at " << config_parser_bin_path_;
+        << "Error spawning config_parser at " << config_parser_bin_path_
+        << " with error: " << strerror(errno);
     return false;
   }
   LOG(INFO) << "Spawned " << config_parser_bin_path_;

@@ -287,7 +287,7 @@ ReportMasterService::CreateFromFlagsOrDie() {
     options.pem_key_cert_pairs.back().cert_chain = std::move(tls_server_cert);
     server_credentials = grpc::SslServerCredentials(options);
   } else {
-    LOG(WARNING) << "Using insecure server credentials becuase -use_tls=false.";
+    LOG(WARNING) << "Using insecure server credentials because -use_tls=false.";
     server_credentials = grpc::InsecureServerCredentials();
   }
 
