@@ -98,7 +98,7 @@ report_configs:
     aggregation_epoch_type: DAY
   export_configs:
   - csv: {}
-  - gcs:
+    gcs:
       bucket: "fuchsia-cobalt-reports-p2-test-app"
 
 - id: 2
@@ -112,7 +112,7 @@ report_configs:
     aggregation_epoch_type: DAY
   export_configs:
   - csv: {}
-  - gcs:
+    gcs:
       bucket: "fuchsia-cobalt-reports-p2-test-app"
 `
 

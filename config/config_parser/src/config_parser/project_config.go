@@ -96,6 +96,16 @@ func parseProjectConfig(y string, c *projectConfig) (err error) {
 		if err := validateReportVariables(*e, *m); err != nil {
 			return fmt.Errorf("Error validating report %v (%v): %v", e.Name, e.Id, err)
 		}
+
+		for exportConfigIdx, exportConfig := range e.ExportConfigs {
+			if exportConfig.ExportSerialization == nil {
+				return fmt.Errorf("Error validating report %v (%v): element %v of export_configs has no export serialization set.", e.Name, e.Id, exportConfigIdx)
+			}
+
+			if exportConfig.ExportLocation == nil {
+				return fmt.Errorf("Error validating report %v (%v): element %v of export_configs has no export location set.", e.Name, e.Id, exportConfigIdx)
+			}
+		}
 	}
 
 	return nil
