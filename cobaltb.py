@@ -159,6 +159,9 @@ def _test(args):
   # Analyzer Service, Report Master.)
   NEEDS_COBALT_PROCESSES=['e2e_tests']
 
+  # By default try each test just once.
+  num_times_to_try = 1
+
   # Get the list of test directories we should run.
   if args.tests.startswith('no'):
     test_dirs = [test_dir for test_dir in FILTER_MAP['all']
@@ -211,6 +214,9 @@ def _test(args):
         "--gtest_filter=-*EnableReportScheduling*"
       ]
     if (test_dir == 'e2e_tests'):
+      # The end-to-end test is naturally flaky. Our strategy is to attempt
+      # it multiple times.
+      num_times_to_try = 3
       analyzer_pk_pem_file=E2E_TEST_ANALYZER_PUBLIC_KEY_PEM
       analyzer_uri = "localhost:%d" % DEFAULT_ANALYZER_SERVICE_PORT
       report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
@@ -291,17 +297,26 @@ def _test(args):
           "-do_shuffler_threshold_test=false",
         ]
     print '********************************************************'
-    this_failure_list = test_runner.run_all_tests(
-        test_dir, start_bt_emulator=start_bt_emulator,
-        start_cobalt_processes=start_cobalt_processes,
-        bigtable_project_name=bigtable_project_name,
-        bigtable_instance_id=bigtable_instance_id,
-        verbose_count=_verbose_count,
-        vmodule=_vmodule,
-        use_tls=_parse_bool(args.use_tls),
-        tls_cert_file=args.tls_cert_file,
-        tls_key_file=args.tls_key_file,
-        test_args=test_args)
+    this_failure_list = []
+    for attempt in range(num_times_to_try):
+      this_failure_list = test_runner.run_all_tests(
+          test_dir, start_bt_emulator=start_bt_emulator,
+          start_cobalt_processes=start_cobalt_processes,
+          bigtable_project_name=bigtable_project_name,
+          bigtable_instance_id=bigtable_instance_id,
+          verbose_count=_verbose_count,
+          vmodule=_vmodule,
+          use_tls=_parse_bool(args.use_tls),
+          tls_cert_file=args.tls_cert_file,
+          tls_key_file=args.tls_key_file,
+          test_args=test_args)
+      if  this_failure_list and attempt < num_times_to_try - 1:
+        print
+        print '***** Attempt %i of %s failed. Retrying...' % (attempt,
+            this_failure_list)
+        print
+      else:
+        break;
     if this_failure_list:
       failure_list.append("%s (%s)" % (test_dir, this_failure_list))
 
