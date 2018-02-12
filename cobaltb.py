@@ -123,6 +123,16 @@ def _build(args):
   subprocess.check_call([args.ninja_path])
   os.chdir(savedir)
 
+def _check_config(args):
+  config_parser_bin = os.path.join(OUT_DIR, 'config', 'config_parser',
+      'config_parser')
+  if not os.path.isfile(config_parser_bin):
+    print('%s could not be found. Run "%s build" and try again.'
+        % (config_parser_bin, sys.argv[0]))
+    return
+  subprocess.check_call([config_parser_bin, '-config_dir', args.config_dir,
+      '-check_only'])
+
 def _lint(args):
   status = 0
   status += cpplint.main()
@@ -850,7 +860,6 @@ def _cluster_settings_from_json(cluster_settings, json_file_path):
       os.path.dirname(json_file_path),
       cluster_settings['deployed_versions_file'])
 
-
 def _add_cloud_project_args(parser, cluster_settings):
   parser.add_argument('--cloud_project_prefix',
       help='The prefix part of name of the Cloud project with which you wish '
@@ -1105,6 +1114,18 @@ def main():
     parents=[parent_parser], help="Pulls the current version Cobalt's config "
                                   "from its remote repo.")
   sub_parser.set_defaults(func=_update_config)
+
+  ########################################################
+  # check_config command
+  ########################################################
+  sub_parser = subparsers.add_parser('check_config',
+    parents=[parent_parser], help="Check the validity of the cobalt "
+                                  "configuration.")
+  sub_parser.add_argument('--config_dir',
+      help='Path to the configuration directory to be checked. Default: %s'
+      % CONFIG_SUBMODULE_PATH,
+      default=CONFIG_SUBMODULE_PATH)
+  sub_parser.set_defaults(func=_check_config)
 
   ########################################################
   # build command

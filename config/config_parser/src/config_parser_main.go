@@ -11,6 +11,7 @@ import (
 	"config"
 	"config_parser"
 	"flag"
+	"fmt"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"io"
@@ -40,11 +41,14 @@ func main() {
 
 	// First, we parse the configuration from the specified location.
 	var c config.CobaltConfig
+	var configLocation string
 	var err error
 	if *repoUrl != "" {
+		configLocation = *repoUrl
 		gitTimeout := time.Duration(*gitTimeoutSec) * time.Second
 		c, err = config_parser.ReadConfigFromRepo(*repoUrl, gitTimeout)
 	} else {
+		configLocation = *configDir
 		c, err = config_parser.ReadConfigFromDir(*configDir)
 	}
 
@@ -65,6 +69,7 @@ func main() {
 
 	// If no errors have occured yet and checkOnly was set, we are done.
 	if *checkOnly {
+		fmt.Printf("%s OK\n", configLocation)
 		os.Exit(0)
 	}
 
