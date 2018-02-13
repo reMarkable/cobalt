@@ -61,6 +61,8 @@ OPEN_SSL_CONFIG_FILE = os.path.join(THIS_DIR, 'self-signed-with-ip.cnf')
 GRPC_PEM_ROOTS = os.path.join(THIS_DIR, "third_party", "grpc",
                               "etc", "roots.pem")
 CONFIG_SUBMODULE_PATH = os.path.join(THIS_DIR, "third_party", "config")
+CONFIG_BINARY_PROTO = os.path.join(OUT_DIR, 'third_party', 'config',
+    'cobalt_config.binproto')
 
 _logger = logging.getLogger()
 _verbose_count = 0
@@ -232,7 +234,6 @@ def _test(args):
       report_master_uri = "localhost:%d" % DEFAULT_REPORT_MASTER_PORT
       shuffler_pk_pem_file=E2E_TEST_SHUFFLER_PUBLIC_KEY_PEM
       shuffler_uri = "localhost:%d" % DEFAULT_SHUFFLER_PORT
-      config_dir_path=DEMO_CONFIG_DIR
       if args.cobalt_on_personal_cluster or args.production_dir:
         if args.cobalt_on_personal_cluster and args.production_dir:
           print ("Do not specify both --production_dir and "
@@ -263,7 +264,6 @@ def _test(args):
             'analyzer_public.pem')
         shuffler_pk_pem_file = os.path.join(pem_directory,
             'shuffler_public.pem')
-        config_dir_path=PRODUCTION_CONFIG_DIR
       report_master_uri = (args.report_master_preferred_address
           or report_master_uri)
       shuffler_uri = (args.shuffler_preferred_address or shuffler_uri)
@@ -276,7 +276,7 @@ def _test(args):
           ("-observation_querier_path=%s" %
               process_starter.OBSERVATION_QUERIER_PATH),
           "-test_app_path=%s" % process_starter.TEST_APP_PATH,
-          "-config_reg_dir_path=%s" % config_dir_path,
+          "-config_bin_proto_path=%s" % CONFIG_BINARY_PROTO,
           "-sub_process_v=%d"%_verbose_count
       ]
       use_tls = _parse_bool(args.use_tls)

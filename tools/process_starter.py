@@ -28,6 +28,8 @@ DEMO_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
     'demo'))
 PRODUCTION_CONFIG_DIR = os.path.abspath(os.path.join(SRC_ROOT_DIR, 'config',
     'production'))
+CONFIG_BINARY_PROTO = os.path.join(OUT_DIR, 'third_party', 'config',
+    'cobalt_config.binproto')
 SHUFFLER_DEMO_CONFIG_FILE = os.path.abspath(os.path.join(SRC_ROOT_DIR,
     'shuffler', 'src', 'config', 'config_demo.txt'))
 SHUFFLER_DB_DIR = os.path.join("/tmp/cobalt_shuffler")
@@ -187,7 +189,7 @@ REPORT_MASTER_PATH = os.path.abspath(os.path.join(OUT_DIR, 'analyzer',
     'report_master', 'analyzer_report_master'))
 def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
                         bigtable_project_name='', bigtable_instance_id='',
-                        cobalt_config_dir=DEMO_CONFIG_DIR,
+                        cobalt_config_proto_path=CONFIG_BINARY_PROTO,
                         use_tls=False,
                         tls_cert_file=LOCALHOST_TLS_CERT_FILE,
                         tls_key_file=LOCALHOST_TLS_KEY_FILE,
@@ -198,7 +200,7 @@ def start_report_master(port=DEFAULT_REPORT_MASTER_PORT,
   print
   cmd = [REPORT_MASTER_PATH,
       "-port", str(port),
-      "-cobalt_config_dir", cobalt_config_dir,
+      "-cobalt_config_proto_path", cobalt_config_proto_path,
       "-logtostderr"]
   if use_tls:
     cmd.append("-use_tls")
@@ -226,7 +228,7 @@ def start_test_app(shuffler_uri='', analyzer_uri='', use_tls=False,
                    root_certs_pem_file='',
                    analyzer_pk_pem_file=DEFAULT_ANALYZER_PUBLIC_KEY_PEM,
                    shuffler_pk_pem_file=DEFAULT_SHUFFLER_PUBLIC_KEY_PEM,
-                   cobalt_config_dir=DEMO_CONFIG_DIR,
+                   cobalt_config_proto_path=CONFIG_BINARY_PROTO,
                    project_id=1,
                    verbose_count=0, wait=True):
   cmd = [TEST_APP_PATH,
@@ -234,7 +236,7 @@ def start_test_app(shuffler_uri='', analyzer_uri='', use_tls=False,
       "-analyzer_uri", analyzer_uri,
       "-analyzer_pk_pem_file", analyzer_pk_pem_file,
       "-shuffler_pk_pem_file", shuffler_pk_pem_file,
-      "-registry", cobalt_config_dir,
+      "-config_bin_proto_path", cobalt_config_proto_path,
       "-project", str(project_id),
       "-logtostderr"]
   if (use_tls):

@@ -351,7 +351,7 @@ var (
 	observationQuerierPath = flag.String("observation_querier_path", "", "The full path to the Observation querier binary")
 	testAppPath            = flag.String("test_app_path", "", "The full path to the Cobalt test app binary")
 	bigtableToolPath       = flag.String("bigtable_tool_path", "", "The full path to the Cobalt bigtable_tool binary")
-	configRegDirPath       = flag.String("config_reg_dir_path", "", "The full path to the cobalt config registration directory")
+	configBinProtoPath     = flag.String("config_bin_proto_path", "", "The full path to the serialized CobaltConfig proto from which the configuration is to be read.")
 
 	analyzerUri     = flag.String("analyzer_uri", "", "The URI of the Analyzer Service")
 	reportMasterUri = flag.String("report_master_uri", "", "The URI of the Report Master")
@@ -578,7 +578,7 @@ func waitForObservations(metricId uint32, expectedNum uint32) error {
 func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, numClients uint, repeatCount uint) error {
 	cmd := exec.Command(*testAppPath,
 		"-mode", "send-once",
-		"-registry", *configRegDirPath,
+		"-config_bin_proto_path", *configBinProtoPath,
 		"-analyzer_uri", *analyzerUri,
 		"-analyzer_pk_pem_file", *analyzerPkPemFile,
 		"-shuffler_uri", *shufflerUri,

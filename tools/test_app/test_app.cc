@@ -17,6 +17,7 @@
 #include <libgen.h>
 
 #include <chrono>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <thread>
@@ -25,6 +26,7 @@
 
 #include "./observation.pb.h"
 #include "analyzer/analyzer_service/analyzer.grpc.pb.h"
+#include "config/cobalt_config.pb.h"
 #include "config/encoding_config.h"
 #include "encoder/encoder.h"
 #include "encoder/envelope_maker.h"
@@ -97,7 +99,9 @@ DEFINE_string(root_certs_pem_file, "",
               "Full path to a file containing a PEM encoding of the TLS root "
               "certificates to be used by the gRPC client.");
 DEFINE_uint32(deadline_seconds, 10, "RPC deadline.");
-DEFINE_string(registry, "", "Directory path of config registry.  Optional.");
+DEFINE_string(config_bin_proto_path, "",
+              "Path to the serialized CobaltConfig proto from which the "
+              "configuration is to be read. (Optional)");
 
 // Category 2: Flags consumed by CreateFromFlagsOrDie() that set values that
 // may be overidden by a set command in interactive mode.
@@ -176,9 +180,9 @@ void PrintHelp(std::ostream* ostream) {
   *ostream << std::endl;
 }
 
-// Returns the path to the standard Cobalt demo configuration directory
-// based on the presumed location of this binary.
-std::string FindConfigRegistrationDirectory(char* argv[]) {
+// Returns the path to the standard Cobalt configuration based on the presumed
+// location of this binary.
+std::string FindCobaltConfigProto(char* argv[]) {
   char path[PATH_MAX], path2[PATH_MAX];
 
   // Get the directory of this binary.
@@ -186,13 +190,14 @@ std::string FindConfigRegistrationDirectory(char* argv[]) {
     LOG(FATAL) << "realpath(): " << argv[0];
   }
   char* dir = dirname(path);
-
   // Set the relative path to the registry.
-  snprintf(path2, sizeof(path2), "%s/../../../config/demo", dir);
+  snprintf(path2, sizeof(path2),
+           "%s/../../config/third_party/config/cobalt_config.binproto", dir);
 
   // Get the absolute path to the registry.
   if (!realpath(path2, path)) {
-    LOG(FATAL) << "Computed path to config directory is invalid: " << path;
+    LOG(FATAL) << "Computed path to serialized CobaltConfig is invalid: "
+               << path;
   }
 
   return path;
@@ -224,18 +229,29 @@ bool ReadPublicKeyPem(const std::string& pem_file, std::string* pem_out) {
   return false;
 }
 
-// Reads the config files from the given directory. Returns a ProjectContext
+// Reads the specified serialized CobaltConfig proto. Returns a ProjectContext
 // containing the read config and the values of the -customer and
 // -project flags.
 std::shared_ptr<ProjectContext> LoadProjectContext(
-    const std::string& registration_dir_path) {
-  VLOG(2) << "Loading Cobalt configuration from " << registration_dir_path;
+    const std::string& config_bin_proto_path) {
+  VLOG(2) << "Loading Cobalt configuration from " << config_bin_proto_path;
+
+  std::ifstream config_file_stream;
+  config_file_stream.open(config_bin_proto_path);
+  CHECK(config_file_stream)
+      << "Could not open cobalt config proto file: " << config_bin_proto_path;
+
+  // Parse the cobalt config file.
+  cobalt::CobaltConfig cobalt_config;
+  CHECK(cobalt_config.ParseFromIstream(&config_file_stream))
+      << "Could not parse the cobalt config proto file: "
+      << config_bin_proto_path;
 
   // Load the encoding registry.
-  char fname[PATH_MAX];
-  snprintf(fname, sizeof(fname), "%s/registered_encodings.txt",
-           registration_dir_path.c_str());
-  auto encodings = EncodingRegistry::FromFile(fname, nullptr);
+  cobalt::RegisteredEncodings registered_encodings;
+  registered_encodings.mutable_element()->Swap(
+      cobalt_config.mutable_encoding_configs());
+  auto encodings = EncodingRegistry::FromProto(&registered_encodings, nullptr);
   if (encodings.second != config::kOK) {
     LOG(FATAL) << "Can't load encodings configuration";
   }
@@ -243,9 +259,10 @@ std::shared_ptr<ProjectContext> LoadProjectContext(
       encodings.first.release());
 
   // Load the metrics registry.
-  snprintf(fname, sizeof(fname), "%s/registered_metrics.txt",
-           registration_dir_path.c_str());
-  auto metrics = MetricRegistry::FromFile(fname, nullptr);
+  cobalt::RegisteredMetrics registered_metrics;
+  registered_metrics.mutable_element()->Swap(
+      cobalt_config.mutable_metric_configs());
+  auto metrics = MetricRegistry::FromProto(&registered_metrics, nullptr);
   if (metrics.second != config::kOK) {
     LOG(FATAL) << "Can't load metrics configuration";
   }
@@ -429,14 +446,14 @@ void TestApp::SendToShuffler() {
 }
 
 std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
-  std::string registry_path = FLAGS_registry;
+  std::string config_bin_proto_path = FLAGS_config_bin_proto_path;
   // If no path is given, try to deduce it from the binary location.
-  if (registry_path == "") {
-    registry_path = FindConfigRegistrationDirectory(argv);
+  if (config_bin_proto_path == "") {
+    config_bin_proto_path = FindCobaltConfigProto(argv);
   }
 
   std::shared_ptr<encoder::ProjectContext> project_context =
-      LoadProjectContext(registry_path);
+      LoadProjectContext(config_bin_proto_path);
 
   CHECK(!FLAGS_analyzer_uri.empty() || !FLAGS_shuffler_uri.empty())
       << "You must specify either -shuffler_uri or -analyzer_uri";
