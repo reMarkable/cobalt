@@ -581,9 +581,13 @@ def _deploy_build(args):
 
 def _deploy_production_build(args):
   if not args.production_dir:
-    print("The production_build sub-command is intended to be used for "
-          "production builds only. Please specify the --production_dir arg.")
-    return
+    print("You are running production_build on a non production configuration. "
+          "If you are using this to validate a new build on your personal dev "
+          "cluster feel free to continue, but be aware that this will not "
+          "push the build to production.")
+    answer = raw_input("Continue anyway? (y/N) ")
+    if not _parse_bool(answer):
+      return
   full_ref = production_util.build_and_push_production_docker_images(
       args.cloud_project_name,
       args.production_dir,
