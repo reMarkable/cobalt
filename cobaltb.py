@@ -972,6 +972,9 @@ def _is_config_up_to_date():
     os.chdir(savedDir)
 
 def main():
+  if not sys.platform.startswith('linux'):
+    print 'Only linux is supported!'
+    return 1
   # We parse the command line flags twice. The first time we are looking
   # only for two particular flags, namely --production_dir and
   # --cobalt_on_personal_cluster. This first pass
