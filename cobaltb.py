@@ -129,8 +129,8 @@ def _check_config(args):
   config_parser_bin = os.path.join(OUT_DIR, 'config', 'config_parser',
       'config_parser')
   if not os.path.isfile(config_parser_bin):
-    print('%s could not be found. Run "%s build" and try again.'
-        % (config_parser_bin, sys.argv[0]))
+    print('%s could not be found. Run \n\n%s setup\n%s build\n\nand try again.'
+        % (config_parser_bin, sys.argv[0], sys.argv[0]))
     return
   subprocess.check_call([config_parser_bin, '-config_dir', args.config_dir,
       '-check_only'])
