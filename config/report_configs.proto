@@ -16,6 +16,7 @@ syntax = "proto3";
 package cobalt;
 
 import "config/encodings.proto";
+import "config/metrics.proto";
 
 option go_package = "config";
 
@@ -169,6 +170,8 @@ message ReportSchedulingConfig {
 // A ReportConfig describes to the Analyzer a particular report to produce.
 // A report is for a particular metric.
 message ReportConfig {
+  // Next ID: 13
+
   // These three numbers form this ReportConfig's unique ID in the Cobalt Config
   // DB.
   uint32 customer_id = 1;
@@ -193,6 +196,8 @@ message ReportConfig {
   // be consistent with the type of report.
   repeated ReportVariable variable = 8;
 
+  // The list of SystemProfileFields to include in each row of the report.
+  repeated SystemProfileField system_profile_field = 12;
 
   DifferentialPrivacyConfig dp_config = 9;
 
@@ -217,4 +222,3 @@ message ReportConfig {
 message RegisteredReports {
   repeated ReportConfig element = 1;
 }
-

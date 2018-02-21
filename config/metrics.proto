@@ -17,6 +17,16 @@ package cobalt;
 
 option go_package = "config";
 
+// A specification of a field from SystemProfile. These are used in a Metric to
+// specify which fields should be included in collected Observations and they
+// are used in a ReportConfig to specify which fields should be included in each
+// row of a generated report.
+enum SystemProfileField {
+  OS = 0;
+  ARCH = 1;
+  BOARD_NAME = 2;
+}
+
 // ExponentialIntegerBuckets is used to define a partition of the integers into
 // a finite number of buckets of exponentially-increasing size.
 //
@@ -26,7 +36,8 @@ option go_package = "config";
 // [lower + initial_step * step_multiplier ^ n, +infinity)
 //
 // For i = 1 to n, the bucket i is defined as
-// [floor + initial_step * step_multiplier ^ (i-1), floor + initial_step * step_multiplier ^ i)
+// [floor + initial_step * step_multiplier ^ (i-1), floor + initial_step *
+// step_multiplier ^ i)
 //
 // Example: floor = 0, num_buckets = 3, initial_step = 10, step_multiplier = 10.
 // (-infinity, 0), [0, 10), [10, 100), [100, 1000), [1000, +inifinity)
