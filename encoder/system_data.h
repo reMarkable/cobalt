@@ -35,6 +35,9 @@ class SystemData : public SystemDataInterface {
     return system_profile_;
   }
 
+  // Overrides the stored SystemProfile. Useful for testing.
+  void OverrideSystemProfile(const SystemProfile& profile);
+
  private:
   void PopulateSystemProfile();
 

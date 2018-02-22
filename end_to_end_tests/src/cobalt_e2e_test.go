@@ -334,11 +334,12 @@ const (
 	basicRapporIndexEncodingConfigId   = 5
 	noOpEncodingConfigId               = 6
 
-	urlReportConfigId    = 1
-	hourReportConfigId   = 2
-	eventReportConfigId  = 4
-	moduleReportConfigId = 5
-	deviceReportConfigId = 6
+	urlReportConfigId        = 1
+	hourReportConfigId       = 2
+	eventReportConfigId      = 4
+	moduleReportConfigId     = 5
+	deviceReportConfigId     = 6
+	groupedUrlReportConfigId = 7
 
 	hourMetricPartName   = "hour"
 	urlMetricPartName    = "url"
@@ -439,10 +440,10 @@ func init() {
 				panic(fmt.Sprintf("Error deleting observations for metric [%v].", err))
 			}
 		}
-		fmt.Printf("*** Deleting reports from the Report Store at %s;%s for project (%d, %d), report configs %d, %d, %d, %d and %d.\n",
+		fmt.Printf("*** Deleting reports from the Report Store at %s;%s for project (%d, %d), report configs %d, %d, %d, %d, %d and %d.\n",
 			*bigtableProjectName, *bigtableInstanceId, customerId, projectId,
-			urlReportConfigId, hourReportConfigId, eventReportConfigId, moduleReportConfigId, deviceReportConfigId)
-		for _, reportConfigId := range []int{urlReportConfigId, hourReportConfigId, eventReportConfigId, moduleReportConfigId, deviceReportConfigId} {
+			urlReportConfigId, hourReportConfigId, eventReportConfigId, moduleReportConfigId, deviceReportConfigId, groupedUrlReportConfigId)
+		for _, reportConfigId := range []int{urlReportConfigId, hourReportConfigId, eventReportConfigId, moduleReportConfigId, deviceReportConfigId, groupedUrlReportConfigId} {
 			if err := invokeBigtableTool("delete_reports", 0, reportConfigId); err != nil {
 				panic(fmt.Sprintf("Error deleting reports [%v].", err))
 			}
@@ -573,9 +574,20 @@ func waitForObservations(metricId uint32, expectedNum uint32) error {
 	return fmt.Errorf("After 30 attempts the number of observations was still not the expected number of %d", expectedNum)
 }
 
-// sendObservations uses the cobalt_test_app to encode the given values into observations and send the
-// observations to the Shuffler or the Analyzer.
+// sendObservations calls sendObservationGroup with 2 different board names, to
+// simulate getting some observations from different boards.
 func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, numClients uint, repeatCount uint) error {
+	err := sendObservationGroup(metricId, values, skipShuffler, numClients/2, repeatCount, "CobaltE2EBoardName")
+	if err != nil {
+		return err
+	}
+	err = sendObservationGroup(metricId, values, skipShuffler, numClients-(numClients/2), repeatCount, "CobaltE2EBoardName2")
+	return err
+}
+
+// sendObservationGroup uses the cobalt_test_app to encode the given values into
+// observations and send the observations to the Shuffler or the Analyzer.
+func sendObservationGroup(metricId uint32, values []ValuePart, skipShuffler bool, numClients uint, repeatCount uint, boardName string) error {
 	cmd := exec.Command(*testAppPath,
 		"-mode", "send-once",
 		"-config_bin_proto_path", *configBinProtoPath,
@@ -585,6 +597,7 @@ func sendObservations(metricId uint32, values []ValuePart, skipShuffler bool, nu
 		"-shuffler_pk_pem_file", *shufflerPkPemFile,
 		"-logtostderr", fmt.Sprintf("-v=%d", *subProcessVerbosity),
 		"-metric", strconv.Itoa(int(metricId)),
+		"-override_board_name", boardName,
 		"-num_clients", strconv.Itoa(int(numClients)),
 		// We perform the generate-add-send operation repeateCount times. This
 		// allows us to test re-using the same instance of the Cobalt Client
@@ -795,6 +808,16 @@ www.FFFF.com,69.000
 	// Generate the report, fetch it as a CSV, check it.
 	csv := getCSVReport(urlReportConfigId, false, t)
 	if csv != expectedCSV {
+		t.Errorf("Got csv:[%s]", csv)
+	}
+
+	const groupedExpectedCSV = `www.EEEE.com,CobaltE2EBoardName,22.000
+www.EEEE.com,CobaltE2EBoardName2,22.000
+www.FFFF.com,CobaltE2EBoardName,33.000
+www.FFFF.com,CobaltE2EBoardName2,36.000
+`
+	csv = getCSVReport(groupedUrlReportConfigId, false, t)
+	if csv != groupedExpectedCSV {
 		t.Errorf("Got csv:[%s]", csv)
 	}
 }

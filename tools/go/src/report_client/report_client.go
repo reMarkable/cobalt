@@ -25,6 +25,7 @@ import (
 	"io"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -265,6 +266,9 @@ type ReportRowStrings struct {
 	// The estimated std error for the row.
 	stdError string
 
+	// The fields from the SystemProfile that are set
+	systemProfileFields []string
+
 	// An indication of whether the row may be considered "empty." This
 	// means that the row probably does not contain any information that
 	// is useful to a user and we might want to omit it in a printed
@@ -279,6 +283,30 @@ func ReportRowToStrings(row *report_master.ReportRow) ReportRowStrings {
 	}
 	glog.Fatalf("Unknown report row type %t", row)
 	return ReportRowStrings{}
+}
+
+func SystemProfileToStrings(profile *cobalt.SystemProfile) []string {
+	var fields []string
+
+	if profile != nil {
+		if profile.Os != cobalt.SystemProfile_UNKNOWN_OS {
+			fields = append(fields, profile.Os.String())
+		}
+		if profile.Arch != cobalt.SystemProfile_UNKNOWN_ARCH {
+			fields = append(fields, profile.Arch.String())
+		}
+		if profile.GetCpu() != nil {
+			fields = append(fields, profile.GetCpu().VendorName)
+			if profile.GetCpu().Signature != 0 {
+				fields = append(fields, strconv.FormatInt(int64(profile.GetCpu().Signature), 10))
+			}
+		}
+		if profile.BoardName != "" {
+			fields = append(fields, profile.BoardName)
+		}
+	}
+
+	return fields
 }
 
 // Returns a ReportRowStrings for the given HistogramReportRow.
@@ -296,6 +324,8 @@ func HistogramReportRowToStrings(row *report_master.HistogramReportRow) ReportRo
 	rowStrings.stdError = fmt.Sprintf("%.3f", row.StdError)
 
 	_, rowUsesIndex := row.Value.GetData().(*cobalt.ValuePart_IndexValue)
+
+	rowStrings.systemProfileFields = SystemProfileToStrings(row.SystemProfile)
 
 	// We use the following heuristic: If the rows is identified only by an index without
 	// an associated label and its count is zero then probably printing the row would
@@ -396,12 +426,33 @@ func CompareValueParts(v1, v2 *cobalt.ValuePart) int {
 
 }
 
+func compareSystemProfile(a, b *cobalt.SystemProfile) int {
+	if a.Os > b.Os {
+		return 1
+	} else if a.Os < b.Os {
+		return -1
+	}
+
+	if a.Arch > b.Arch {
+		return 1
+	} else if a.Arch < b.Arch {
+		return -1
+	}
+
+	return strings.Compare(a.BoardName, b.BoardName)
+}
+
 func compareHistogramRows(a, b *report_master.HistogramReportRow) int {
 	if a == nil || b == nil {
 		return 1
 	}
 	// We just compare the two values.
-	return CompareValueParts(a.GetValue(), b.GetValue())
+	val := CompareValueParts(a.GetValue(), b.GetValue())
+	if val != 0 {
+		return val
+	}
+
+	return compareSystemProfile(a.GetSystemProfile(), b.GetSystemProfile())
 }
 
 // ByValues implements the sort.Interface interface.
@@ -448,6 +499,9 @@ func ReportToStrings(report *report_master.Report, includeStdErr bool, supressEm
 			}
 			currentRow := []string{}
 			currentRow = append(currentRow, rowStrings.rowKey)
+			for _, field := range rowStrings.systemProfileFields {
+				currentRow = append(currentRow, field)
+			}
 			currentRow = append(currentRow, rowStrings.countEstimate)
 			if includeStdErr {
 				currentRow = append(currentRow, rowStrings.stdError)

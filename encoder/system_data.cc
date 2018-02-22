@@ -83,6 +83,10 @@ void PopulateBoardName(SystemProfile& profile) {}
 
 SystemData::SystemData() { PopulateSystemProfile(); }
 
+void SystemData::OverrideSystemProfile(const SystemProfile& profile) {
+  system_profile_ = profile;
+}
+
 void SystemData::PopulateSystemProfile() {
 #if defined(__linux__)
 

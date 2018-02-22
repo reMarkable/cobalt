@@ -47,11 +47,11 @@ using encoder::ClientSecret;
 using encoder::Encoder;
 using encoder::EnvelopeMaker;
 using encoder::ProjectContext;
-using encoder::send_retryer::SendRetryer;
 using encoder::ShippingManager;
 using encoder::ShufflerClient;
 using encoder::ShufflerClientInterface;
 using encoder::SystemData;
+using encoder::send_retryer::SendRetryer;
 using google::protobuf::Empty;
 using grpc::Channel;
 using grpc::ClientContext;
@@ -129,6 +129,9 @@ DEFINE_uint32(num_adds_per_observation, 1,
               "Number of times each Observation should be added to the "
               "envelope. Setting this to more than 1 allows us to test "
               "idempotency.");
+
+DEFINE_string(override_board_name, "",
+              "A board name to override the default one");
 
 namespace {
 
@@ -508,6 +511,13 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
   }
 
   std::unique_ptr<SystemData> system_data(new SystemData());
+  if (!FLAGS_override_board_name.empty()) {
+    SystemProfile profile;
+    profile.set_os(SystemProfile::FUCHSIA);
+    profile.set_arch(SystemProfile::X86_64);
+    profile.set_board_name(FLAGS_override_board_name);
+    system_data->OverrideSystemProfile(profile);
+  }
 
   auto test_app = std::unique_ptr<TestApp>(new TestApp(
       project_context, analyzer_client, shuffler_client, std::move(system_data),
