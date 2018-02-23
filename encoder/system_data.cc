@@ -16,6 +16,27 @@ namespace {
 
 #if defined(__x86_64__)
 
+// This identifies board names for x86 Systems.
+// If the signature of the CPU matches a known signature, then we use the name,
+// otherwise we encode the signature as a string so we can easily identify when
+// new signatures start to become popular.
+std::string getBoardName(int signature) {
+  // This function will only be run once per system boot, so this map will only
+  // be created once.
+  std::map<int, std::string> knownCPUSignatures = {
+      {0x806e9, "Eve"},
+  };
+
+  auto name = knownCPUSignatures.find(signature);
+  if (name == knownCPUSignatures.end()) {
+    char sigstr[20];
+    sprintf(sigstr, "unknown:0x%X", signature);
+    return sigstr;
+  } else {
+    return name->second;
+  }
+}
+
 // Invokes the cpuid instruction on X86. |info_type| specifies which query
 // we are performing. This is written into register EAX prior to invoking
 // cpuid. (The sub-type specifier in register ECX is alwyas set to zero.)  The
@@ -29,26 +50,19 @@ void Cpuid(int info_type, int cpu_info[4]) {
                    : "a"(info_type), "c"(0));
 }
 
-// Invokes Cpuid() and uses the results to populate |cpu|.
-void PopuluateCpuInfo(SystemProfile::CPU* cpu) {
+// Invokes Cpuid() to determine the board_name.
+void PopulateBoardName(SystemProfile& profile) {
   // First we invoke Cpuid with info_type = 0 in order to obtain num_ids
   // and vendor_name.
   int cpu_info[4] = {-1};
   Cpuid(0, cpu_info);
   int num_ids = cpu_info[0];
 
-  // The human-readable vendor name is the concatenation of three substrings
-  // in fields 1, 3, 2 respectively.
-  std::swap(cpu_info[2], cpu_info[3]);
-  cpu->mutable_vendor_name()->resize(3 * sizeof(cpu_info[1]));
-  std::memcpy(&(*cpu->mutable_vendor_name())[0], &cpu_info[1],
-              3 * sizeof(cpu_info[1]));
-
   if (num_ids > 0) {
     // Then invoke Cpuid again with info_type = 1 in order to obtain
     // |signature|.
     Cpuid(1, cpu_info);
-    cpu->set_signature(cpu_info[0]);
+    profile.set_board_name(getBoardName(cpu_info[0]));
   }
 }
 
@@ -76,7 +90,7 @@ void SystemData::PopulateSystemProfile() {
 #if defined(__x86_64__)
 
   system_profile_.set_arch(SystemProfile::X86_64);
-  PopuluateCpuInfo(system_profile_.mutable_cpu());
+  PopulateBoardName(system_profile_);
 
 #elif defined(__aarch64__)
 

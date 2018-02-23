@@ -143,7 +143,11 @@ message SystemProfile {
 
   OS os = 1;
   ARCH arch = 2;
-  CPU cpu = 3;
+  CPU cpu = 3 [deprecated = true];
+
+  // This is a string representing the board name of the device. If a board name
+  // cannot be determined, then this field will be 'unknown:<cpu signature>'.
+  string board_name = 4;
 }
 
 // An Observation consists of one or more ObservationParts.
