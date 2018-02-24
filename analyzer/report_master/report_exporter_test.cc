@@ -7,6 +7,7 @@
 #include <memory>
 #include <sstream>
 
+#include "config/config_text_parser.h"
 #include "config/report_config.h"
 #include "glog/logging.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
@@ -176,7 +177,7 @@ class ReportExporterTest : public ::testing::Test {
   void SetUp() {
     // Parse the report config string
     auto report_parse_result =
-        ReportRegistry::FromString(kReportConfigText, nullptr);
+        config::FromString<RegisteredReports>(kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
     report_registry_.reset((report_parse_result.first.release()));
     fake_uploader_.reset(new FakeGcsUploader());
@@ -280,7 +281,7 @@ TEST_F(ReportExporterTest, InvalidReportConfig) {
 // a 0.5GB report in 5 minutes.
 TEST_F(ReportExporterTest, DISABLED_RealVeryLargeUploadToGCS) {
   // Parse the report config string
-  auto report_parse_result = ReportRegistry::FromString(
+  auto report_parse_result = config::FromString<RegisteredReports>(
       ReplaceBucketName("<put-your-real-bucket-name-here>"), nullptr);
   EXPECT_EQ(config::kOK, report_parse_result.second);
   report_registry_.reset((report_parse_result.first.release()));

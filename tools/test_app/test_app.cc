@@ -251,7 +251,7 @@ std::shared_ptr<ProjectContext> LoadProjectContext(
   cobalt::RegisteredEncodings registered_encodings;
   registered_encodings.mutable_element()->Swap(
       cobalt_config.mutable_encoding_configs());
-  auto encodings = EncodingRegistry::FromProto(&registered_encodings, nullptr);
+  auto encodings = EncodingRegistry::TakeFrom(&registered_encodings, nullptr);
   if (encodings.second != config::kOK) {
     LOG(FATAL) << "Can't load encodings configuration";
   }
@@ -262,7 +262,7 @@ std::shared_ptr<ProjectContext> LoadProjectContext(
   cobalt::RegisteredMetrics registered_metrics;
   registered_metrics.mutable_element()->Swap(
       cobalt_config.mutable_metric_configs());
-  auto metrics = MetricRegistry::FromProto(&registered_metrics, nullptr);
+  auto metrics = MetricRegistry::TakeFrom(&registered_metrics, nullptr);
   if (metrics.second != config::kOK) {
     LOG(FATAL) << "Can't load metrics configuration";
   }

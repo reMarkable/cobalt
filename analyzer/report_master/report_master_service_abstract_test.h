@@ -26,6 +26,7 @@
 
 #include "./observation.pb.h"
 #include "analyzer/store/report_store_test_utils.h"
+#include "config/config_text_parser.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
@@ -360,22 +361,23 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
               data_store_->DeleteAllRows(store::DataStore::kReportRows));
 
     // Parse the metric config string
-    auto metric_parse_result =
-        config::MetricRegistry::FromString(kMetricConfigText, nullptr);
+    auto metric_parse_result = config::FromString<RegisteredMetrics>(
+        kMetricConfigText, nullptr);
     EXPECT_EQ(config::kOK, metric_parse_result.second);
     std::shared_ptr<config::MetricRegistry> metric_registry(
         metric_parse_result.first.release());
 
     // Parse the encoding config string
     auto encoding_parse_result =
-        config::EncodingRegistry::FromString(kEncodingConfigText, nullptr);
+        config::FromString<RegisteredEncodings>(kEncodingConfigText,
+                                                        nullptr);
     EXPECT_EQ(config::kOK, encoding_parse_result.second);
     std::shared_ptr<config::EncodingRegistry> encoding_config_registry(
         encoding_parse_result.first.release());
 
     // Parse the report config string
-    auto report_parse_result =
-        config::ReportRegistry::FromString(kReportConfigText, nullptr);
+    auto report_parse_result = config::FromString<RegisteredReports>(
+        kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
     std::shared_ptr<config::ReportRegistry> report_config_registry(
         report_parse_result.first.release());

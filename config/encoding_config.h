@@ -31,33 +31,6 @@ typedef Registry<RegisteredEncodings> EncodingRegistry;
 /*
 class EncodingRegistry {
  public:
-  // Populates a new instance of EncodingRegistry by reading and parsing the
-  // specified file. Returns a pair consisting of a pointer to the result and a
-  // Status.
-  //
-  // If the operation is successful then the status is kOK. Otherwise the
-  // Status indicates the error.
-  //
-  // If |error_collector| is not null then it will be notified of any parsing
-  // errors or warnings.
-  static std::pair<std::unique_ptr<EncodingRegistry>, Status>
-      FromFile(const std::string& file_path,
-               google::protobuf::io::ErrorCollector* error_collector);
-
-
-  // Populates a new instance of EncodingRegistry by reading and parsing the
-  // specified string. Returns a pair consisting of a pointer to the result and
-  // a Status.
-  //
-  // If the operation is successful then the status is kOK. Otherwise the
-  // Status indicates the error.
-  //
-  // If |error_collector| is not null then it will be notified of any parsing
-  // errors or warnings.
-  static std::pair<std::unique_ptr<EncodingRegistry>, Status>
-      FromString(const std::string& input,
-               google::protobuf::io::ErrorCollector* error_collector);
-
   // Returns the number of EncodingConfigs in this registry.
   size_t size();
 

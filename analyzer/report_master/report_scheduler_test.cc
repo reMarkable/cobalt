@@ -14,6 +14,7 @@
 
 #include "analyzer/report_master/report_master_service.h"
 #include "analyzer/store/memory_store.h"
+#include "config/config_text_parser.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
@@ -178,16 +179,18 @@ class ReportSchedulerTest : public ::testing::Test {
  public:
   void SetUp() {
     auto report_parse_result =
-        ReportRegistry::FromString(kReportConfigText, nullptr);
+        config::FromString<RegisteredReports>(kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
     report_registry_.reset((report_parse_result.first.release()));
 
-    auto encoding_parse_result = EncodingRegistry::FromString("", nullptr);
+    auto encoding_parse_result =
+        config::FromString<RegisteredEncodings>("", nullptr);
     EXPECT_EQ(config::kOK, encoding_parse_result.second);
     std::shared_ptr<config::EncodingRegistry> encoding_registry(
         encoding_parse_result.first.release());
 
-    auto metric_parse_result = MetricRegistry::FromString("", nullptr);
+    auto metric_parse_result =
+        config::FromString<RegisteredMetrics>("", nullptr);
     EXPECT_EQ(config::kOK, metric_parse_result.second);
     std::shared_ptr<config::MetricRegistry> metric_registry(
         metric_parse_result.first.release());

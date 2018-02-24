@@ -18,6 +18,7 @@
 #include <string>
 #include <utility>
 
+#include "config/config_text_parser.h"
 #include "config/encoding_config.h"
 #include "config/encodings.pb.h"
 #include "config/metric_config.h"
@@ -110,7 +111,7 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromFlagsOrDie() {
       FLAGS_cobalt_config_dir + "/" + FLAGS_cobalt_encoding_configs_file_name;
   error_collector.file_name = file_path;
 
-  auto encodings = EncodingRegistry::FromFile(file_path, &error_collector);
+  auto encodings = FromFile<RegisteredEncodings>(file_path, &error_collector);
   if (encodings.second != config::kOK) {
     LOG(FATAL) << "Error getting EncodingConfigs from registry. "
                << ErrorMessage(encodings.second) << file_path;
@@ -119,7 +120,7 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromFlagsOrDie() {
   file_path = FLAGS_cobalt_config_dir + "/" + FLAGS_cobalt_metrics_file_name;
   error_collector.file_name = file_path;
 
-  auto metrics = MetricRegistry::FromFile(file_path, nullptr);
+  auto metrics = FromFile<RegisteredMetrics>(file_path, nullptr);
   if (metrics.second != config::kOK) {
     LOG(FATAL) << "Error getting Metrics from registry. "
                << ErrorMessage(metrics.second) << file_path;
@@ -129,7 +130,7 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromFlagsOrDie() {
       FLAGS_cobalt_config_dir + "/" + FLAGS_cobalt_report_configs_file_name;
   error_collector.file_name = file_path;
 
-  auto report_configs = ReportRegistry::FromFile(file_path, nullptr);
+  auto report_configs = FromFile<RegisteredReports>(file_path, nullptr);
   if (report_configs.second != config::kOK) {
     LOG(FATAL) << "Error getting ReportConfigs from registry. "
                << ErrorMessage(report_configs.second) << file_path;
@@ -152,7 +153,7 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
   registered_encodings.mutable_element()->Swap(
       config->mutable_encoding_configs());
   auto encodings =
-      EncodingRegistry::FromProto(&registered_encodings, &error_collector);
+      EncodingRegistry::TakeFrom(&registered_encodings, &error_collector);
   if (encodings.second != config::kOK) {
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateFromCobaltConfigProtoFailure)
         << "Error getting EncodingConfigs from registry. "
@@ -163,7 +164,7 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
   RegisteredMetrics registered_metrics;
   registered_metrics.mutable_element()->Swap(config->mutable_metric_configs());
   auto metrics =
-      MetricRegistry::FromProto(&registered_metrics, &error_collector);
+      MetricRegistry::TakeFrom(&registered_metrics, &error_collector);
   if (metrics.second != config::kOK) {
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateFromCobaltConfigProtoFailure)
         << "Error getting Metrics from registry. "
@@ -174,7 +175,7 @@ std::unique_ptr<AnalyzerConfig> AnalyzerConfig::CreateFromCobaltConfigProto(
   RegisteredReports registered_reports;
   registered_reports.mutable_element()->Swap(config->mutable_report_configs());
   auto reports =
-      ReportRegistry::FromProto(&registered_reports, &error_collector);
+      ReportRegistry::TakeFrom(&registered_reports, &error_collector);
   if (reports.second != config::kOK) {
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kCreateFromCobaltConfigProtoFailure)
         << "Error getting ReportConfigs from registry. "

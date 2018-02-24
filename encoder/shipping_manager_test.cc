@@ -12,6 +12,7 @@
 
 #include "./gtest.h"
 #include "./logging.h"
+#include "config/config_text_parser.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
@@ -76,14 +77,14 @@ element {
 std::shared_ptr<ProjectContext> GetTestProject() {
   // Parse the metric config string
   auto metric_parse_result =
-      MetricRegistry::FromString(kMetricConfigText, nullptr);
+      config::FromString<RegisteredMetrics>(kMetricConfigText, nullptr);
   EXPECT_EQ(config::kOK, metric_parse_result.second);
   std::shared_ptr<MetricRegistry> metric_registry(
       metric_parse_result.first.release());
 
   // Parse the encoding config string
   auto encoding_parse_result =
-      EncodingRegistry::FromString(kEncodingConfigText, nullptr);
+      config::FromString<RegisteredEncodings>(kEncodingConfigText, nullptr);
   EXPECT_EQ(config::kOK, encoding_parse_result.second);
   std::shared_ptr<EncodingRegistry> encoding_registry(
       encoding_parse_result.first.release());

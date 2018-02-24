@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "config/config_text_parser.h"
 #include "config/encoding_config.h"
 #include "config/metric_config.h"
 #include "config/report_config.h"
@@ -54,84 +55,88 @@ class TestErrorCollector : public ErrorCollector {
 // directory as a command-line argument into the test. Currently there is no
 // Cobalt infrastructure for passing command-line arguments to unit tests.
 
-// Tests EncodingRegistry::FromFile() when a bad file path is used.
+// Tests EncodingRegistryFromFile<RegisteredEncodings>() when a bad file path is
+// used.
 TEST(EncodingRegistryFromFile, BadFilePath) {
-  auto result = EncodingRegistry::FromFile("not a valid path", nullptr);
+  auto result = FromFile<RegisteredEncodings>("not a valid path", nullptr);
   EXPECT_EQ(kFileOpenError, result.second);
 }
 
-// Tests MetricRegistry::FromFile() when a bad file path is used.
+// Tests FromFile<RegisteredMetrics>() when a bad file path is used.
 TEST(MetricRegistryFromFile, BadFilePath) {
-  auto result = MetricRegistry::FromFile("not a valid path", nullptr);
+  auto result = FromFile<RegisteredMetrics>("not a valid path", nullptr);
   EXPECT_EQ(kFileOpenError, result.second);
 }
 
-// Tests ReportRegistry::FromFile() when a bad file path is used.
+// Tests FromFile<RegisteredReports>() when a bad file path is used.
 TEST(ReportRegistryFromFile, BadFilePath) {
-  auto result = ReportRegistry::FromFile("not a valid path", nullptr);
+  auto result = FromFile<RegisteredReports>("not a valid path", nullptr);
   EXPECT_EQ(kFileOpenError, result.second);
 }
 
-// Tests EncodingRegistry::FromFile() when a valid file path is used but the
-// file is not a valid ASCII proto file.
+// Tests EncodingRegistryFromFile<RegisteredEncodings>() when a valid file path
+// is used but the file is not a valid ASCII proto file.
 TEST(EncodingRegistryFromFile, NotValidAsciiProtoFile) {
   TestErrorCollector collector;
   EXPECT_EQ(0u, collector.line_numbers().size());
-  auto result = EncodingRegistry::FromFile("config/config_test.cc", &collector);
+  auto result =
+      FromFile<RegisteredEncodings>("config/config_test.cc", &collector);
   EXPECT_EQ(kParsingError, result.second);
   EXPECT_EQ(1u, collector.line_numbers().size());
   EXPECT_EQ(0, collector.line_numbers()[0]);
 }
 
-// Tests MetricRegistry::FromFile() when a valid file path is used but the
+// Tests FromFile<RegisteredMetrics>() when a valid file path is used but the
 // file is not a valid ASCII proto file.
 TEST(MetricRegistryFromFile, NotValidAsciiProtoFile) {
   TestErrorCollector collector;
   EXPECT_EQ(0u, collector.line_numbers().size());
-  auto result = MetricRegistry::FromFile("config/config_test.cc", &collector);
+  auto result =
+      FromFile<RegisteredMetrics>("config/config_test.cc", &collector);
   EXPECT_EQ(kParsingError, result.second);
   EXPECT_EQ(1u, collector.line_numbers().size());
   EXPECT_EQ(0, collector.line_numbers()[0]);
 }
 
-// Tests ReportRegistry::FromFile() when a valid file path is used but the
+// Tests FromFile<RegisteredReports>() when a valid file path is used but the
 // file is not a valid ASCII proto file.
 TEST(ReportRegistryFromFile, NotValidAsciiProtoFile) {
   TestErrorCollector collector;
   EXPECT_EQ(0u, collector.line_numbers().size());
-  auto result = ReportRegistry::FromFile("config/config_test.cc", &collector);
+  auto result =
+      FromFile<RegisteredReports>("config/config_test.cc", &collector);
   EXPECT_EQ(kParsingError, result.second);
   EXPECT_EQ(1u, collector.line_numbers().size());
   EXPECT_EQ(0, collector.line_numbers()[0]);
 }
 
-// Tests EncodingRegistry::FromFile() when a valid ASCII proto file is
-// read but there is a duplicate registration.
+// Tests EncodingRegistryFromFile<RegisteredEncodings>() when a valid ASCII
+// proto file is read but there is a duplicate registration.
 TEST(EncodingRegistryFromFile, DuplicateRegistration) {
-  auto result = EncodingRegistry::FromFile(
+  auto result = FromFile<RegisteredEncodings>(
       "config/test_files/registered_encodings_contains_duplicate.txt", nullptr);
   EXPECT_EQ(kDuplicateRegistration, result.second);
 }
 
-// Tests MetricRegistry::FromFile() when a valid ASCII proto file is
+// Tests FromFile<RegisteredMetrics>() when a valid ASCII proto file is
 // read but there is a duplicate registration.
 TEST(MetricRegistryFromFile, DuplicateRegistration) {
-  auto result = MetricRegistry::FromFile(
+  auto result = FromFile<RegisteredMetrics>(
       "config/test_files/registered_metrics_contains_duplicate.txt", nullptr);
   EXPECT_EQ(kDuplicateRegistration, result.second);
 }
 
-// Tests ReportRegistry::FromFile() when a valid ASCII proto file is
+// Tests FromFile<RegisteredReports>() when a valid ASCII proto file is
 // read but there is a duplicate registration.
 TEST(ReportRegistryFromFile, DuplicateRegistration) {
-  auto result = ReportRegistry::FromFile(
+  auto result = FromFile<RegisteredReports>(
       "config/test_files/registered_reports_contains_duplicate.txt", nullptr);
   EXPECT_EQ(kDuplicateRegistration, result.second);
 }
 
-// Tests EncodingRegistry::FromFile() on a fully valid file.
+// Tests EncodingRegistryFromFile<RegisteredEncodings>() on a fully valid file.
 TEST(EncodingRegistryFromFile, ValidFile) {
-  auto result = EncodingRegistry::FromFile(
+  auto result = FromFile<RegisteredEncodings>(
       "config/test_files/registered_encodings_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
@@ -167,9 +172,9 @@ TEST(EncodingRegistryFromFile, ValidFile) {
       3, encoding_config->basic_rappor().string_categories().category_size());
 }
 
-// Tests MetricRegistry::FromFile() on a fully valid file.
+// Tests FromFile<RegisteredMetrics>() on a fully valid file.
 TEST(MetricRegistryFromFile, ValidFile) {
-  auto result = MetricRegistry::FromFile(
+  auto result = FromFile<RegisteredMetrics>(
       "config/test_files/registered_metrics_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
@@ -193,9 +198,9 @@ TEST(MetricRegistryFromFile, ValidFile) {
   EXPECT_EQ(nullptr, registry->Get(1, 1, 4));
 }
 
-// Tests ReportRegistry::FromFile() on a fully valid file.
+// Tests FromFile<RegisteredReports>() on a fully valid file.
 TEST(ReportRegistryFromFile, ValidFile) {
-  auto result = ReportRegistry::FromFile(
+  auto result = FromFile<RegisteredReports>(
       "config/test_files/registered_reports_valid.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
@@ -231,50 +236,51 @@ TEST(ReportRegistryFromFile, ValidFile) {
   EXPECT_EQ(nullptr, registry->Get(1, 1, 5));
 }
 
-// This test runs EncodingRegistry::FromFile() on our demo
+// This test runs EncodingRegistryFromFile<RegisteredEncodings>() on our demo
 // file, registered_encodings.txt. The purpose is to validate that file.
 TEST(EncodingRegistryFromFile, CheckDemoEncodings) {
-  auto result = EncodingRegistry::FromFile(
+  auto result = FromFile<RegisteredEncodings>(
       "config/demo/registered_encodings.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
-// This test runs EncodingRegistry::FromFile() on our official registration
-// file, registered_encodings.txt. The purpose is to validate that file.
+// This test runs EncodingRegistryFromFile<RegisteredEncodings>() on our
+// official registration file, registered_encodings.txt. The purpose is to
+// validate that file.
 TEST(EncodingRegistryFromFile, CheckProductionEncodings) {
-  auto result = EncodingRegistry::FromFile(
+  auto result = FromFile<RegisteredEncodings>(
       "config/production/registered_encodings.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
-// This test runs MetricRegistry::FromFile() on our demo
+// This test runs FromFile<RegisteredMetrics>() on our demo
 // file, registered_metrics.txt. The purpose is to validate that file.
 TEST(MetricRegistryFromFile, CheckDemoMetrics) {
-  auto result =
-      MetricRegistry::FromFile("config/demo/registered_metrics.txt", nullptr);
+  auto result = FromFile<RegisteredMetrics>(
+      "config/demo/registered_metrics.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
-// This test runs MetricRegistry::FromFile() on our official registration
+// This test runs FromFile<RegisteredMetrics>() on our official registration
 // file, registered_metrics.txt. The purpose is to validate that file.
 TEST(MetricRegistryFromFile, CheckProductionMetrics) {
-  auto result = MetricRegistry::FromFile(
+  auto result = FromFile<RegisteredMetrics>(
       "config/production/registered_metrics.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
-// This test runs ReportRegistry::FromFile() on our demo
+// This test runs FromFile<RegisteredReports>() on our demo
 // file, registered_reports.txt. The purpose is to validate that file.
 TEST(ReportRegistryFromFile, CheckDemodReports) {
-  auto result =
-      ReportRegistry::FromFile("config/demo/registered_reports.txt", nullptr);
+  auto result = FromFile<RegisteredReports>(
+      "config/demo/registered_reports.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
 
-// This test runs ReportRegistry::FromFile() on our official registration
+// This test runs FromFile<RegisteredReports>() on our official registration
 // file, registered_reports.txt. The purpose is to validate that file.
 TEST(ReportRegistryFromFile, CheckProductionReports) {
-  auto result = ReportRegistry::FromFile(
+  auto result = FromFile<RegisteredReports>(
       "config/production/registered_reports.txt", nullptr);
   EXPECT_EQ(kOK, result.second);
 }
@@ -307,7 +313,7 @@ element {
 }
 )";
 TEST(EncodingRegistryFromString, ValidString) {
-  auto result = EncodingRegistry::FromString(kEncodingConfigText, nullptr);
+  auto result = FromString<RegisteredEncodings>(kEncodingConfigText, nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
   EXPECT_EQ(2u, registry->size());
@@ -352,7 +358,7 @@ element {
 }
 )";
 TEST(MetricRegistryFromString, ValidString) {
-  auto result = MetricRegistry::FromString(kMetricConfigText, nullptr);
+  auto result = FromString<RegisteredMetrics>(kMetricConfigText, nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
   EXPECT_EQ(2u, registry->size());
@@ -374,7 +380,7 @@ TEST(EncodingRegistryFromProto, ValidProto) {
   EXPECT_TRUE(
       parser.ParseFromString(kEncodingConfigText, &registered_encodings));
 
-  auto result = EncodingRegistry::FromProto(&registered_encodings, nullptr);
+  auto result = EncodingRegistry::TakeFrom(&registered_encodings, nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
   EXPECT_EQ(2u, registry->size());
@@ -392,7 +398,7 @@ TEST(MetricsRegistryFromProto, ValidProto) {
   google::protobuf::TextFormat::Parser parser;
   EXPECT_TRUE(parser.ParseFromString(kMetricConfigText, &registered_metrics));
 
-  auto result = MetricRegistry::FromProto(&registered_metrics, nullptr);
+  auto result = MetricRegistry::TakeFrom(&registered_metrics, nullptr);
   EXPECT_EQ(kOK, result.second);
   auto& registry = result.first;
   EXPECT_EQ(2u, registry->size());

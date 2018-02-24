@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "./observation.pb.h"
+#include "config/config_text_parser.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
@@ -243,21 +244,21 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
 
     // Parse the metric config string
     auto metric_parse_result =
-        MetricRegistry::FromString(kMetricConfigText, nullptr);
+        config::FromString<RegisteredMetrics>(kMetricConfigText, nullptr);
     EXPECT_EQ(config::kOK, metric_parse_result.second);
     std::shared_ptr<MetricRegistry> metric_registry(
         metric_parse_result.first.release());
 
     // Parse the encoding config string
     auto encoding_parse_result =
-        EncodingRegistry::FromString(kEncodingConfigText, nullptr);
+        config::FromString<RegisteredEncodings>(kEncodingConfigText, nullptr);
     EXPECT_EQ(config::kOK, encoding_parse_result.second);
     std::shared_ptr<EncodingRegistry> encoding_registry(
         (encoding_parse_result.first.release()));
 
     // Parse the report config string
     auto report_parse_result =
-        ReportRegistry::FromString(kReportConfigText, nullptr);
+        config::FromString<RegisteredReports>(kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
     report_registry_.reset((report_parse_result.first.release()));
 
@@ -266,7 +267,6 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
 
     std::shared_ptr<AnalyzerConfig> analyzer_config(new AnalyzerConfig(
         encoding_registry, metric_registry, report_registry_));
-
 
     // Extract the ReportVariable from the ReportConfig.
     const auto* report_config =

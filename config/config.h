@@ -18,7 +18,6 @@
 #include <fcntl.h>
 #include <google/protobuf/io/tokenizer.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/text_format.h>
 
 #include <memory>
 #include <string>
@@ -90,34 +89,8 @@ class Registry {
   };
   typedef RegistryIterator iterator;
 
-  // Populates a new instance of Registry<T> by reading and parsing the
-  // specified file. Returns a pair consisting of a pointer to the result and a
-  // Status.
-  //
-  // If the operation is successful then the status is kOK. Otherwise the
-  // Status indicates the error.
-  //
-  // If |error_collector| is not null then it will be notified of any parsing
-  // errors or warnings.
-  static std::pair<std::unique_ptr<Registry<RT>>, Status> FromFile(
-      const std::string& file_path,
-      google::protobuf::io::ErrorCollector* error_collector);
-
-  // Populates a new instance of Registry<T> by reading and parsing the
-  // specified string. Returns a pair consisting of a pointer to the result and
-  // a Status.
-  //
-  // If the operation is successful then the status is kOK. Otherwise the
-  // Status indicates the error.
-  //
-  // If |error_collector| is not null then it will be notified of any parsing
-  // errors or warnings.
-  static std::pair<std::unique_ptr<Registry<RT>>, Status> FromString(
-      const std::string& contents,
-      google::protobuf::io::ErrorCollector* error_collector);
-
-  // Populates a new instance of Registry<T> by swapping the contents out of
-  // of |registered_configs|. Returns a pair consisting of a pointer to the
+  // Populates a new instance of Registry<RT> by swapping the contents out of
+  // of |contents|. Returns a pair consisting of a pointer to the
   // result and a Status.
   //
   // If the operation is successful then the status is kOK. Otherwise the
@@ -125,7 +98,7 @@ class Registry {
   //
   // If |error_collector| is not null then it will be notified of any parsing
   // errors or warnings.
-  static std::pair<std::unique_ptr<Registry<RT>>, Status> FromProto(
+  static std::pair<std::unique_ptr<Registry<RT>>, Status> TakeFrom(
       RT* contents, google::protobuf::io::ErrorCollector* error_collector);
 
   // Returns the number of |T| in this registry.
@@ -184,57 +157,7 @@ std::string Registry<RT>::MakeKey(const T& config_proto) {
 }
 
 template <class RT>
-std::pair<std::unique_ptr<Registry<RT>>, Status> Registry<RT>::FromFile(
-    const std::string& file_path,
-    google::protobuf::io::ErrorCollector* error_collector) {
-  // Make an empty registry to return;
-  std::unique_ptr<Registry<RT>> registry(new Registry<RT>());
-
-  // Try to open the specified file.
-  int fd = open(file_path.c_str(), O_RDONLY);
-  if (fd < 0) {
-    return std::make_pair(std::move(registry), kFileOpenError);
-  }
-
-  // Try to parse the specified file.
-  google::protobuf::io::FileInputStream file_input_stream(fd);
-  file_input_stream.SetCloseOnDelete(true);
-  // The contents of the file should be a serialized |RT|.
-  RT registered_configs;
-  google::protobuf::TextFormat::Parser parser;
-  if (error_collector) {
-    parser.RecordErrorsTo(error_collector);
-  }
-  if (!parser.Parse(&file_input_stream, &registered_configs)) {
-    return std::make_pair(std::move(registry), kParsingError);
-  }
-
-  return FromProto(&registered_configs, error_collector);
-}
-
-template <class RT>
-std::pair<std::unique_ptr<Registry<RT>>, Status> Registry<RT>::FromString(
-    const std::string& input,
-    google::protobuf::io::ErrorCollector* error_collector) {
-  // Make an empty registry to return;
-  std::unique_ptr<Registry<RT>> registry(new Registry<RT>());
-
-  // Try to parse the specified string
-  // The contents of the string should be a serialized |RT|.
-  RT registered_configs;
-  google::protobuf::TextFormat::Parser parser;
-  if (error_collector) {
-    parser.RecordErrorsTo(error_collector);
-  }
-  if (!parser.ParseFromString(input, &registered_configs)) {
-    return std::make_pair(std::move(registry), kParsingError);
-  }
-
-  return FromProto(&registered_configs, error_collector);
-}
-
-template <class RT>
-std::pair<std::unique_ptr<Registry<RT>>, Status> Registry<RT>::FromProto(
+std::pair<std::unique_ptr<Registry<RT>>, Status> Registry<RT>::TakeFrom(
     RT* registered_configs,
     google::protobuf::io::ErrorCollector* error_collector) {
   // Make an empty registry to return;

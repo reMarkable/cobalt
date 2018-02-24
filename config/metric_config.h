@@ -26,37 +26,11 @@ namespace config {
 typedef Registry<RegisteredMetrics> MetricRegistry;
 
 // For ease of understanding we specify the interfaces below as if
-// MetricRegistry were not a template specializations but astand-alone classe.
+// MetricRegistry were not a template specializations but a stand-alone class.
 
 /*
 class MetricRegistry {
  public:
-  // Populates a new instance of MetricRegistry by reading and parsing the
-  // specified file. Returns a pair consisting of a pointer to the result and a
-  // Status.
-  //
-  // If the operation is successful then the status is kOK. Otherwise the
-  // Status indicates the error.
-  //
-  // If |error_collector| is not null then it will be notified of any parsing
-  // errors or warnings.
-  static std::pair<std::unique_ptr<MetricRegistry>, Status>
-      FromFile(const std::string& file_path,
-               google::protobuf::io::ErrorCollector* error_collector);
-
-  // Populates a new instance of MetricRegistry by reading and parsing the
-  // specified string. Returns a pair consisting of a pointer to the result and
-  // a Status.
-  //
-  // If the operation is successful then the status is kOK. Otherwise the
-  // Status indicates the error.
-  //
-  // If |error_collector| is not null then it will be notified of any parsing
-  // errors or warnings.
-  static std::pair<std::unique_ptr<MetricRegistry>, Status>
-      FromString(const std::string& input,
-                 google::protobuf::io::ErrorCollector* error_collector);
-
   // Returns the number of Metrics in this registry.
   size_t size();
 

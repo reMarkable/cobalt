@@ -7,6 +7,7 @@
 #include <memory>
 #include <sstream>
 
+#include "config/config_text_parser.h"
 #include "config/report_config.h"
 #include "glog/logging.h"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
@@ -197,7 +198,7 @@ class ReportSerializerTest : public ::testing::Test {
   void SetUp() {
     // Parse the report config string
     auto report_parse_result =
-        ReportRegistry::FromString(kReportConfigText, nullptr);
+        config::FromString<RegisteredReports>(kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
     report_registry_.reset((report_parse_result.first.release()));
   }
