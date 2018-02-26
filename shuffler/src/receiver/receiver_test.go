@@ -43,12 +43,24 @@ func makeEnvelope(numBatches int, numObservationsPerBatch int) envelopeData {
 	var expectedBucketKeys []shufflerpb.ObservationMetadata
 	for i := 1; i <= numBatches; i++ {
 		metadata := storage.NewObservationMetaData(i)
+
+		includeArchInProfile := i > numBatches/2
+		if includeArchInProfile {
+			metadata.SystemProfile.Arch = shufflerpb.SystemProfile_X86_64
+		}
 		expectedBucketKeys = append(expectedBucketKeys, *metadata)
-		// We set the SystemProfile in the ObservationMetadata to nil to simulate
-		// the fact that this is what the Encoder sends to the Shuffler in an
-		// Envelope. We want to test that the Receiver will correctly copy the SystemProfile
-		// from the Envelope into each ObservationMetadata.
-		metadata.SystemProfile = nil
+		// We either set the SystemProfile in the ObservationMetadata to be nil, or
+		// a value that is disjoint from the SystemProfile for the whole batch to
+		// simulate the fact that the encoder doesn't need to specify a
+		// SystemProfile for each batch, but if it does, the values should be
+		// merged.
+		if includeArchInProfile {
+			metadata.SystemProfile = &shufflerpb.SystemProfile{
+				Arch: shufflerpb.SystemProfile_X86_64,
+			}
+		} else {
+			metadata.SystemProfile = nil
+		}
 		batch = append(batch, &shufflerpb.ObservationBatch{
 			MetaData:             metadata,
 			EncryptedObservation: storage.MakeRandomEncryptedMsgs(numObservationsPerBatch),
