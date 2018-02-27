@@ -65,16 +65,19 @@ class HistogramAnalysisEngine {
       const MetricPart* metric_part,
       std::shared_ptr<config::AnalyzerConfig> analyzer_config);
 
-  // Process the given (day_index, ObservationPart) pair. The |day_index|
-  // indicates the day on which the ObservationPart was observed, as specified
-  // by the Encoder client. The |encoding_config_id| from the ObservationPart
-  // will be looked up in the AnalyzerConfig passed to the constructor and
-  // this will determine which decooder/analyzer is used to process the
-  // ObservationPart.
+  // Process the given (day_index, ObservationPart, SystemProfile) triple. The
+  // |day_index| indicates the day on which the ObservationPart was observed, as
+  // specified by the Encoder client. The |encoding_config_id| from the
+  // ObservationPart will be looked up in the AnalyzerConfig passed to the
+  // constructor and this will determine which decooder/analyzer is used to
+  // process the ObservationPart. The SystemProfile describes the client system
+  // on which the ObservationPart was observed. We group the ObservationParts by
+  // the SystemProfile and perform a separate analysis for each group.
   //
   // Returns true if the ObservationPart was processed without error or false
   // otherwise.
-  bool ProcessObservationPart(uint32_t day_index, const ObservationPart& obs);
+  bool ProcessObservationPart(uint32_t day_index, const ObservationPart& obs,
+                              std::unique_ptr<SystemProfile> profile);
 
   // Performs the appropriate analyses on the ObservationParts introduced
   // via ProcessObservationPart(). If the set of observations was heterogeneous
@@ -86,7 +89,8 @@ class HistogramAnalysisEngine {
  private:
   // Returns the DecoderAdapter appropriate for decoding the given
   // |observation_part|.
-  DecoderAdapter* GetDecoder(const ObservationPart& observation_part);
+  DecoderAdapter* GetDecoder(const ObservationPart& observation_part,
+                             std::unique_ptr<SystemProfile> profile);
 
   // Constructs a new DecoderAdapter appropriate for the given
   // |encoding_config|.
@@ -102,10 +106,19 @@ class HistogramAnalysisEngine {
   // Pointer to the metric part for the variable being analyzed.
   const MetricPart* metric_part_;
 
-  // The keys to this map are encoding-config IDs and the values are the
-  // DecoderAdapters adapting to the decoder/analyzer that knows how to
-  // decode the correspodning encoding.
-  std::map<uint32_t, std::unique_ptr<DecoderAdapter>> decoders_;
+  // Stores the shared SystemProfile for all decoders.
+  struct DecoderGroup {
+    // Used to group the decoders together.
+    std::unique_ptr<SystemProfile> profile;
+
+    // The keys to this map are encoding-config IDs and the values are the
+    // DecoderAdapters adapting to the decoder/analyzer that knows how to
+    // decode the correspodning encoding.
+    std::map<uint32_t, std::unique_ptr<DecoderAdapter>> decoders;
+  };
+
+  // The keys to this map are string-encoded SystemProfiles.
+  std::map<std::string, DecoderGroup> grouped_decoders_;
 
   // Contains the registry of EncodingConfigs.
   std::shared_ptr<config::AnalyzerConfig> analyzer_config_;

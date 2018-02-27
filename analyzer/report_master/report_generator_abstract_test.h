@@ -53,6 +53,7 @@ const uint32_t kProjectId = 1;
 const uint32_t kMetricId = 1;
 const uint32_t kJointReportConfigId = 1;
 const uint32_t kRawDumpReportConfigId = 1;
+const uint32_t kGroupedReportConfigId = 3;
 const uint32_t kForculusEncodingConfigId = 1;
 const uint32_t kBasicRapporEncodingConfigId = 2;
 const uint32_t kNoOpEncodingConfigId = 3;
@@ -162,6 +163,27 @@ element {
     metric_part: "Part2"
   }
   report_type: RAW_DUMP
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "BUCKET-NAME"
+    }
+  }
+}
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 3
+  metric_id: 1
+  variable {
+    metric_part: "Part1"
+  }
+  variable {
+    metric_part: "Part2"
+  }
+  system_profile_field: [BOARD_NAME]
+  report_type: JOINT
   export_configs {
     csv {}
     gcs {
@@ -292,6 +314,12 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
   // client.
   void AddObservations(std::string value, uint32_t encoding_config_id,
                        int num_clients) {
+    AddObservations(value, encoding_config_id, num_clients,
+                    std::make_unique<SystemProfile>());
+  }
+  void AddObservations(std::string value, uint32_t encoding_config_id,
+                       int num_clients,
+                       std::unique_ptr<SystemProfile> profile) {
     std::vector<Observation> observations;
     for (int i = 0; i < num_clients; i++) {
       observations.emplace_back(*MakeObservation(value, encoding_config_id));
@@ -301,6 +329,7 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     metadata.set_project_id(testing::kProjectId);
     metadata.set_metric_id(testing::kMetricId);
     metadata.set_day_index(testing::kDayIndex);
+    metadata.set_allocated_system_profile(profile.release());
     EXPECT_EQ(store::kOK,
               observation_store_->AddObservationBatch(metadata, observations));
   }
@@ -333,6 +362,25 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     EXPECT_TRUE(report_generator_->GenerateReport(report_id_).ok());
 
     // Fetch the report from the ReportStore.
+    GeneratedReport report;
+    EXPECT_EQ(store::kOK, report_store_->GetReport(report_id_, &report.metadata,
+                                                   &report.rows));
+
+    return report;
+  }
+
+  GeneratedReport GenerateGroupedHistogramReport(int variable_index,
+                                                 bool export_report,
+                                                 bool in_store) {
+    report_id_.set_report_config_id(testing::kGroupedReportConfigId);
+    report_id_.set_sequence_num(variable_index);
+    std::string export_name = export_report ? "export_name" : "";
+    EXPECT_EQ(store::kOK, report_store_->StartNewReport(
+                              testing::kDayIndex, testing::kDayIndex, true,
+                              export_name, in_store, HISTOGRAM,
+                              {(uint32_t)variable_index}, &report_id_));
+    EXPECT_TRUE(report_generator_->GenerateReport(report_id_).ok());
+
     GeneratedReport report;
     EXPECT_EQ(store::kOK, report_store_->GetReport(report_id_, &report.metadata,
                                                    &report.rows));
@@ -447,6 +495,26 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     AddObservations("Cantaloupe", testing::kBasicRapporEncodingConfigId, 300);
   }
 
+  std::unique_ptr<SystemProfile> MakeProfile(std::string board_name) {
+    auto profile = std::make_unique<SystemProfile>();
+    *profile->mutable_board_name() = board_name;
+    return profile;
+  }
+  void AddGroupedBasicRapporObservations() {
+    AddObservations("Apple", testing::kBasicRapporEncodingConfigId, 50,
+                    MakeProfile("foo"));
+    AddObservations("Apple", testing::kBasicRapporEncodingConfigId, 50,
+                    MakeProfile("bar"));
+    AddObservations("Banana", testing::kBasicRapporEncodingConfigId, 100,
+                    MakeProfile("foo"));
+    AddObservations("Banana", testing::kBasicRapporEncodingConfigId, 100,
+                    MakeProfile("bar"));
+    AddObservations("Cantaloupe", testing::kBasicRapporEncodingConfigId, 150,
+                    MakeProfile("foo"));
+    AddObservations("Cantaloupe", testing::kBasicRapporEncodingConfigId, 150,
+                    MakeProfile("bar"));
+  }
+
   void AddUnencodedObservations() {
     AddObservations("Apple", testing::kNoOpEncodingConfigId, 1);
     AddObservations("Banana", testing::kNoOpEncodingConfigId, 2);
@@ -491,6 +559,40 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
       this->fake_uploader_->upload_was_invoked = false;
       EXPECT_EQ("BUCKET-NAME", fake_uploader_->bucket);
       EXPECT_EQ("1_1_1/export_name.csv", fake_uploader_->path);
+      EXPECT_EQ("text/csv", fake_uploader_->mime_type);
+      EXPECT_FALSE(fake_uploader_->serialized_report.empty());
+    }
+  }
+
+  void CheckGroupedRapporReport(const GeneratedReport& report,
+                                uint variable_index) {
+    EXPECT_EQ(HISTOGRAM, report.metadata.report_type());
+    EXPECT_EQ(1, report.metadata.variable_indices_size());
+    EXPECT_EQ(variable_index, report.metadata.variable_indices(0));
+    int foo_count = 0;
+    int bar_count = 0;
+    if (report.metadata.in_store()) {
+      EXPECT_EQ(6, report.rows.rows_size());
+      for (const auto& report_row : report.rows.rows()) {
+        EXPECT_NE(0, report_row.histogram().std_error());
+        EXPECT_TRUE(report_row.histogram().has_value());
+        std::string board_name =
+            report_row.histogram().system_profile().board_name();
+        if (board_name == "foo") foo_count += 1;
+        if (board_name == "bar") bar_count += 1;
+      }
+      EXPECT_EQ(3, foo_count);
+      EXPECT_EQ(3, bar_count);
+    } else {
+      EXPECT_EQ(0, report.rows.rows_size());
+    }
+    if (report.metadata.export_name() == "") {
+      EXPECT_FALSE(this->fake_uploader_->upload_was_invoked);
+    } else {
+      EXPECT_TRUE(this->fake_uploader_->upload_was_invoked);
+      this->fake_uploader_->upload_was_invoked = false;
+      EXPECT_EQ("BUCKET-NAME", fake_uploader_->bucket);
+      EXPECT_EQ("1_1_3/export_name.csv", fake_uploader_->path);
       EXPECT_EQ("text/csv", fake_uploader_->mime_type);
       EXPECT_FALSE(fake_uploader_->serialized_report.empty());
     }
@@ -625,6 +727,28 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, BasicRappor) {
   }
 }
 
+TYPED_TEST_P(ReportGeneratorAbstractTest, GroupedBasicRappor) {
+  this->AddGroupedBasicRapporObservations();
+  {
+    SCOPED_TRACE("variable_index = 0");
+    int variable_index = 0;
+    // Don't export the report. Do store it to the store.
+    bool in_store = true;
+    auto report =
+        this->GenerateGroupedHistogramReport(variable_index, true, in_store);
+    this->CheckGroupedRapporReport(report, variable_index);
+  }
+  {
+    SCOPED_TRACE("variable_index = 1");
+    int variable_index = 1;
+    // Don't export the report. Do store it to the store.
+    bool in_store = true;
+    auto report =
+        this->GenerateGroupedHistogramReport(variable_index, true, in_store);
+    this->CheckGroupedRapporReport(report, variable_index);
+  }
+}
+
 TYPED_TEST_P(ReportGeneratorAbstractTest, RawDump) {
   this->AddUnencodedObservations();
   // Do exort the report. Don't store it to the store.
@@ -634,7 +758,7 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, RawDump) {
 }
 
 REGISTER_TYPED_TEST_CASE_P(ReportGeneratorAbstractTest, Forculus, BasicRappor,
-                           RawDump);
+                           RawDump, GroupedBasicRappor);
 
 }  // namespace analyzer
 }  // namespace cobalt

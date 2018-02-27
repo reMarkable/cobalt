@@ -34,24 +34,24 @@ import "google/protobuf/timestamp.proto";
 // fetch both one-off, manually-requested reports and regularly scheduled
 // reports.
 service ReportMaster {
-
   // Requests that the ReportMaster start to generate a new one-off report. The
   // |report_id| returned in the response may be used to query the progress
   // and results. Note: This method may not be used to start a RAW_DUMP
   // report. Those may only be started via Cobalt's Report Scheduler.
-  rpc StartReport (StartReportRequest) returns
-      (StartReportResponse) {}
+  rpc StartReport(StartReportRequest) returns (StartReportResponse) {
+  }
 
   // Fetches a report and its metadata by ID. If the report generation is not
   // yet complete then only the metadata is returned.
-  rpc GetReport(GetReportRequest) returns (Report) {}
+  rpc GetReport(GetReportRequest) returns (Report) {
+  }
 
   // Queries for the list of all reports that exist in the system for the
   // specified ReportConfig that were created over the specified time span.
   // Uses server streaming to return the results. The results are returned in
   // chronological order of report creation time.
-  rpc QueryReports(QueryReportsRequest)
-      returns (stream QueryReportsResponse) {}
+  rpc QueryReports(QueryReportsRequest) returns (stream QueryReportsResponse) {
+  }
 }
 
 // The request message for StartReport.
@@ -115,7 +115,7 @@ message ReportMetadata {
   // ReportConfig this is a report for.
   uint32 customer_id = 2;
   uint32 project_id = 3;
-  uint32 report_config_id= 4;
+  uint32 report_config_id = 4;
 
   // The current state of the report generation.
   ReportState state = 5;
@@ -207,6 +207,8 @@ message ReportRow {
 
 // A single row of a HISTOGRAM report.
 message HistogramReportRow {
+  // Next ID: 6
+
   // The value for this row.
   ValuePart value = 1;
 
@@ -216,6 +218,10 @@ message HistogramReportRow {
   // |value| contains an |index_value| and the ReportConfig used to generate
   // this report contained a human-readable label for the index.
   string label = 4;
+
+  // The SystemProfile for this row. This will be populated with only the fields
+  // that are specified in the |system_profile_field| entry in the ReportConfig.
+  SystemProfile system_profile = 5;
 
   // This field is the primary output of Cobalt Analysis. It is an estimate
   // of the true count of the value in the user population.
@@ -245,7 +251,6 @@ message RawDumpReportRow {
   repeated ValuePart values = 1;
 }
 
-
 // What state is the report generation in?
 enum ReportState {
   // The report generation is waiting for some condition before it can start.
@@ -271,7 +276,3 @@ message InfoMessage {
   google.protobuf.Timestamp timestamp = 1;
   string message = 2;
 }
-
-
-
-

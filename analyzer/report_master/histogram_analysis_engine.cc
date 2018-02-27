@@ -416,8 +416,9 @@ HistogramAnalysisEngine::HistogramAnalysisEngine(
       analyzer_config_(analyzer_config) {}
 
 bool HistogramAnalysisEngine::ProcessObservationPart(
-    uint32_t day_index, const ObservationPart& obs) {
-  DecoderAdapter* decoder = GetDecoder(obs);
+    uint32_t day_index, const ObservationPart& obs,
+    std::unique_ptr<SystemProfile> profile) {
+  DecoderAdapter* decoder = GetDecoder(obs, std::move(profile));
   if (!decoder) {
     return false;
   }
@@ -432,38 +433,59 @@ grpc::Status HistogramAnalysisEngine::PerformAnalysis(
     std::vector<ReportRow>* results) {
   CHECK(results);
 
-  if (decoders_.size() > 1) {
-    std::ostringstream stream;
-    stream << "Analysis aborted because more than one encoding_config_id was "
-              "found among the observations: ";
-    bool first = true;
-    for (const auto& pair : decoders_) {
-      if (!first) {
-        stream << ", ";
-      }
-      stream << pair.first;
-      first = false;
-    }
-    stream << ". This version of Cobalt does not "
-              "support heterogeneous reports. report_id="
-           << ReportStore::ToString(report_id_);
-    std::string message = stream.str();
-    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kPerformAnalysisFailure) << message;
-    return grpc::Status(grpc::UNIMPLEMENTED, message);
-  }
-
-  if (decoders_.size() == 0) {
+  if (grouped_decoders_.size() == 0) {
     LOG(INFO)
         << "Empty HISTOGRAM report. No valid observations found for report_id="
         << ReportStore::ToString(report_id_);
     return grpc::Status::OK;
   }
 
-  return decoders_.begin()->second->PerformAnalysis(results);
+  grpc::Status status;
+  for (auto& decoder_group : grouped_decoders_) {
+    if (decoder_group.second.decoders.size() > 1) {
+      std::ostringstream stream;
+      stream << "Analysis aborted because more than one encoding_config_id was "
+                "found among the observations: ";
+      bool first = true;
+      for (const auto& id : decoder_group.second.decoders) {
+        if (!first) {
+          stream << ", ";
+        }
+        stream << id.first;
+        first = false;
+      }
+      stream << ". This version of Cobalt does not support heterogeneous "
+                "reports. report_id="
+             << ReportStore::ToString(report_id_);
+      std::string message = stream.str();
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kPerformAnalysisFailure) << message;
+      return grpc::Status(grpc::UNIMPLEMENTED, message);
+    }
+
+    auto decoder = decoder_group.second.decoders.begin();
+    std::vector<ReportRow> sub_results;
+    status = decoder->second->PerformAnalysis(&sub_results);
+    if (!status.ok()) {
+      return status;
+    }
+
+    for (auto& row : sub_results) {
+      // This should always be true since this is the HistogramAnalysisEngine.
+      if (row.has_histogram()) {
+        *row.mutable_histogram()->mutable_system_profile() =
+            *decoder_group.second.profile;
+      }
+    }
+
+    results->insert(results->end(), sub_results.begin(), sub_results.end());
+  }
+
+  return status;
 }
 
 DecoderAdapter* HistogramAnalysisEngine::GetDecoder(
-    const ObservationPart& observation_part) {
+    const ObservationPart& observation_part,
+    std::unique_ptr<SystemProfile> profile) {
   uint32_t encoding_config_id = observation_part.encoding_config_id();
   const EncodingConfig* encoding_config = analyzer_config_->EncodingConfig(
       report_id_.customer_id(), report_id_.project_id(), encoding_config_id);
@@ -479,15 +501,27 @@ DecoderAdapter* HistogramAnalysisEngine::GetDecoder(
     return nullptr;
   }
 
-  auto iter = decoders_.find(encoding_config_id);
-  if (iter != decoders_.end()) {
+  std::string group_by;
+  profile->SerializeToString(&group_by);
+
+  auto group = grouped_decoders_.find(group_by);
+  if (group == grouped_decoders_.end()) {
+    // This is the first time we are seeing this SystemProfile. Create a new
+    // DecoderGroup and move the SystemProfile into it.
+    grouped_decoders_[group_by].profile = std::move(profile);
+  }
+
+  auto iter = grouped_decoders_[group_by].decoders.find(encoding_config_id);
+  if (iter != grouped_decoders_[group_by].decoders.end()) {
     return iter->second.get();
   }
-  // This is the first time we have seen the |encoding_config_id|. Make
-  // a new decoder/analyzer for it.
-  decoders_[encoding_config_id] = NewDecoder(encoding_config);
 
-  return decoders_[encoding_config_id].get();
+  // This is the first time we have seen the pair (|group_by|,
+  // |encoding_config_id|). Make a new decoder/analyzer for it.
+  grouped_decoders_[group_by].decoders[encoding_config_id] =
+      NewDecoder(encoding_config);
+
+  return grouped_decoders_[group_by].decoders[encoding_config_id].get();
 }
 
 std::unique_ptr<DecoderAdapter> HistogramAnalysisEngine::NewDecoder(

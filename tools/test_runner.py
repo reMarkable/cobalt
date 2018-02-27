@@ -146,7 +146,7 @@ def run_all_tests(test_dir,
         failure_list.append(test_executable)
       if return_code < 0:
         print
-        print "****** WARNING Process terminated by signal %d" % (- return_code)
+        print "****** WARNING Process [%s] terminated by signal %d" % (command[0], - return_code)
     finally:
       process_starter.kill_process(shuffler_process,
                                    "Shuffler")

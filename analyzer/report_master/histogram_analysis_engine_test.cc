@@ -52,6 +52,7 @@ const uint32_t kNoOpEncodingConfigId = 5;
 const uint32_t kStringReportConfigId = 1;
 const uint32_t kIndexReportConfigId = 2;
 const uint32_t kIntBucketsReportConfigId = 3;
+const uint32_t kGroupedStringReportConfigId = 4;
 const char kPartName[] = "Part1";
 const size_t kForculusThreshold = 20;
 
@@ -231,6 +232,22 @@ element {
   }
 }
 
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  metric_id: 1
+  variable {
+    metric_part: "Part1"
+    rappor_candidates {
+      candidates: "Apple"
+      candidates: "Banana"
+      candidates: "Cantaloupe"
+    }
+  }
+  system_profile_field: [BOARD_NAME]
+}
+
 )";
 
 }  // namespace
@@ -366,10 +383,16 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
   // HistogramAnalysisEngine::ProcessObservationPart().
   bool MakeAndProcessStringObservationPart(std::string string_value,
                                            uint32_t encoding_config_id) {
+    return MakeAndProcessStringObservationPart(
+        string_value, encoding_config_id, std::make_unique<SystemProfile>());
+  }
+  bool MakeAndProcessStringObservationPart(
+      std::string string_value, uint32_t encoding_config_id,
+      std::unique_ptr<SystemProfile> profile) {
     std::unique_ptr<Observation> observation =
         MakeStringObservation(string_value, encoding_config_id);
     return analysis_engine_->ProcessObservationPart(
-        kDayIndex, observation->parts().at(kPartName));
+        kDayIndex, observation->parts().at(kPartName), std::move(profile));
   }
 
   // Makes an Observation with one INDEX part which has the given
@@ -378,10 +401,16 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
   // HistogramAnalysisEngine::ProcessObservationPart().
   bool MakeAndProcessIndexObservationPart(uint32_t index,
                                           uint32_t encoding_config_id) {
+    return MakeAndProcessIndexObservationPart(
+        index, encoding_config_id, std::make_unique<SystemProfile>());
+  }
+  bool MakeAndProcessIndexObservationPart(
+      uint32_t index, uint32_t encoding_config_id,
+      std::unique_ptr<SystemProfile> profile) {
     std::unique_ptr<Observation> observation =
         MakeIndexObservation(index, encoding_config_id);
     return analysis_engine_->ProcessObservationPart(
-        kDayIndex, observation->parts().at(kPartName));
+        kDayIndex, observation->parts().at(kPartName), std::move(profile));
   }
 
   // Makes an Observation with one INT part which has the given |value|, using
@@ -390,10 +419,16 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
   // HistogramAnalysisEngine::ProcessObservationPart().
   bool MakeAndProcessBucketedIntObservationPart(int64_t value,
                                                 uint32_t encoding_config_id) {
+    return MakeAndProcessBucketedIntObservationPart(
+        value, encoding_config_id, std::make_unique<SystemProfile>());
+  }
+  bool MakeAndProcessBucketedIntObservationPart(
+      int64_t value, uint32_t encoding_config_id,
+      std::unique_ptr<SystemProfile> profile) {
     std::unique_ptr<Observation> observation =
         MakeBucketedIntObservation(value, encoding_config_id);
     return analysis_engine_->ProcessObservationPart(
-        kDayIndex, observation->parts().at(kPartName));
+        kDayIndex, observation->parts().at(kPartName), std::move(profile));
   }
 
   // Makes an Observation with one IntBucketDistribution part which has the
@@ -403,10 +438,16 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
   // HistogramAnalysisEngine::ProcessObservationPart().
   bool MakeAndProcessIntBucketDistributionObservationPart(
       const std::map<uint32_t, uint64_t>& counts, uint32_t encoding_config_id) {
+    return MakeAndProcessIntBucketDistributionObservationPart(
+        counts, encoding_config_id, std::make_unique<SystemProfile>());
+  }
+  bool MakeAndProcessIntBucketDistributionObservationPart(
+      const std::map<uint32_t, uint64_t>& counts, uint32_t encoding_config_id,
+      std::unique_ptr<SystemProfile> profile) {
     std::unique_ptr<Observation> observation =
         MakeIntBucketDistributionObservation(counts, encoding_config_id);
     return analysis_engine_->ProcessObservationPart(
-        kDayIndex, observation->parts().at(kPartName));
+        kDayIndex, observation->parts().at(kPartName), std::move(profile));
   }
 
   // Invokes MakeAndProcessStringObservationPart many times using the Forculus
@@ -618,6 +659,75 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     }
   }
 
+  std::unique_ptr<SystemProfile> MakeProfile(std::string board_name) {
+    auto profile = std::make_unique<SystemProfile>();
+    *profile->mutable_board_name() = board_name;
+    return profile;
+  }
+
+  void MakeAndProcessGroupedStringRapporObservations() {
+    for (int i = 0; i < 50; i++) {
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Apple", kStringRapporEncodingConfigId, MakeProfile("foo")));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Apple", kStringRapporEncodingConfigId, MakeProfile("bar")));
+    }
+
+    for (int i = 0; i < 100; i++) {
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Banana", kStringRapporEncodingConfigId, MakeProfile("foo")));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Banana", kStringRapporEncodingConfigId, MakeProfile("bar")));
+    }
+
+    for (int i = 0; i < 150; i++) {
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Cantaloupe", kStringRapporEncodingConfigId, MakeProfile("foo")));
+      EXPECT_TRUE(MakeAndProcessStringObservationPart(
+          "Cantaloupe", kStringRapporEncodingConfigId, MakeProfile("bar")));
+    }
+  }
+
+  void DoGroupedStringRapporTest() {
+    Init(kGroupedStringReportConfigId);
+    MakeAndProcessGroupedStringRapporObservations();
+
+    // Perform the analysis.
+    std::vector<ReportRow> report_rows;
+    auto status = analysis_engine_->PerformAnalysis(&report_rows).error_code();
+    if (grpc::OK != status) {
+      EXPECT_EQ(grpc::OK, status);
+      return;
+    }
+
+    if (6u != report_rows.size()) {
+      EXPECT_EQ(6u, report_rows.size());
+      return;
+    }
+
+    int foo_count = 0;
+    int bar_count = 0;
+    for (const auto& report_row : report_rows) {
+      // In String RAPPOR we currently do not implement std_error.
+      EXPECT_EQ(0, report_row.histogram().std_error());
+      EXPECT_GT(report_row.histogram().count_estimate(), 0);
+      ValuePart recovered_value;
+      EXPECT_TRUE(report_row.histogram().has_value());
+      recovered_value = report_row.histogram().value();
+      EXPECT_EQ(ValuePart::kStringValue, recovered_value.data_case());
+      std::string string_value = recovered_value.string_value();
+      EXPECT_TRUE(string_value == "Apple" || string_value == "Banana" ||
+                  string_value == "Cantaloupe")
+          << string_value;
+      std::string board_name =
+          report_row.histogram().system_profile().board_name();
+      if (board_name == "foo") foo_count += 1;
+      if (board_name == "bar") bar_count += 1;
+    }
+    EXPECT_EQ(3, foo_count);
+    EXPECT_EQ(3, bar_count);
+  }
+
   // Invokes MakeAndProcessStringObservationPart many times using the NoOp
   // encoding. Three strings are encoded: "hello" 20 times,
   // "goodbye" 19 times and "peace" 21 times.
@@ -801,6 +911,10 @@ TEST_F(HistogramAnalysisEngineTest, BasicRapporIndex) {
 }
 
 TEST_F(HistogramAnalysisEngineTest, StringRappor) { DoStringRapporTest(); }
+
+TEST_F(HistogramAnalysisEngineTest, GroupedStringRappor) {
+  DoGroupedStringRapporTest();
+}
 
 TEST_F(HistogramAnalysisEngineTest, UnencodedStrings) {
   DoUnencodedStringTest();

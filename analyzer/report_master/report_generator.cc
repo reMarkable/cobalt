@@ -91,6 +91,28 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
   }
 }
 
+// Constructs a new SystemProfile by moving the subset of fields specified in
+// the ReportConfig out of |profile|.
+std::unique_ptr<SystemProfile> FilterSystemProfile(
+    const ReportConfig& config, std::unique_ptr<SystemProfile> profile) {
+  auto filtered_profile = std::make_unique<SystemProfile>();
+  for (int field : config.system_profile_field()) {
+    switch (field) {
+      case SystemProfileField::OS:
+        filtered_profile->set_os(profile->os());
+        break;
+      case SystemProfileField::ARCH:
+        filtered_profile->set_arch(profile->arch());
+        break;
+      case SystemProfileField::BOARD_NAME:
+        filtered_profile->set_allocated_board_name(
+            profile->release_board_name());
+        break;
+    }
+  }
+  return filtered_profile;
+}
+
 }  // namespace
 
 ReportGenerator::ReportGenerator(
@@ -284,8 +306,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
   std::vector<std::string> parts(1);
   parts[0] = variables[0].report_variable->metric_part();
 
-  // TODO(rudominer) Support reports that include the SystemProfile.
-  bool include_system_profile = false;
+  bool include_system_profile = report_config.system_profile_field_size() > 0;
 
   // We iteratively query in batches of size 1000.
   static const size_t kMaxResultsPerIteration = 1000;
@@ -312,16 +333,21 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
     VLOG(4) << "Got " << query_response.results.size() << " observations.";
 
     // Iterate through the received batch.
-    for (const auto& query_result : query_response.results) {
+    for (auto& query_result : query_response.results) {
       CHECK_EQ(1, query_result.observation.parts_size());
       const auto& observation_part =
           query_result.observation.parts().at(parts[0]);
+      std::unique_ptr<SystemProfile> profile(
+          query_result.metadata.release_system_profile());
+      auto filtered_profile =
+          FilterSystemProfile(report_config, std::move(profile));
       // Process each ObservationPart using the HistogramAnalysisEngine.
       // TODO(rudominer) This method returns false when the Observation was
       // bad in some way. This should be kept track of through a monitoring
       // counter.
       analysis_engine.ProcessObservationPart(query_result.metadata.day_index(),
-                                             observation_part);
+                                             observation_part,
+                                             std::move(filtered_profile));
     }
   } while (!query_response.pagination_token.empty());
 

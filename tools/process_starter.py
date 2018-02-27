@@ -96,7 +96,7 @@ def execute_command(cmd, wait):
   return_code = p.wait()
   if return_code < 0:
     print
-    print "****** WARNING Process terminated by signal %d" % (- return_code)
+    print "****** WARNING Process [%s] terminated by signal %d" % (cmd[0], - return_code)
   return return_code
 
 def start_bigtable_emulator(wait=True):
