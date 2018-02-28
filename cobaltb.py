@@ -401,7 +401,6 @@ def _start_report_master(args):
   process_starter.start_report_master(port=args.port,
       bigtable_project_name=bigtable_project_name,
       bigtable_instance_id=bigtable_instance_id,
-      cobalt_config_dir=args.cobalt_config_dir,
       use_tls=_parse_bool(args.use_tls),
       tls_cert_file=args.tls_cert_file,
       tls_key_file=args.tls_key_file,
