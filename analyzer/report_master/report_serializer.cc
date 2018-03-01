@@ -379,6 +379,17 @@ grpc::Status ReportSerializer::AppendCSVHistogramHeaderRow(
     return status;
   }
 
+  if (report_config_->system_profile_field_size() > 0) {
+    num_columns_ += report_config_->system_profile_field_size();
+    (*stream) << kSeparator;
+    status = AppendCSVHeaderRowSystemProfileFields(stream);
+    if (!status.ok()) {
+      LOG_STACKDRIVER_COUNT_METRIC(ERROR, kStartSerializingReportFailure)
+          << status.error_message();
+      return status;
+    }
+  }
+
   // Append the "count" column header.
   (*stream) << kSeparator << "count";
 
@@ -453,6 +464,30 @@ grpc::Status ReportSerializer::AppendCSVHeaderRowVariableNames(
     }
     (*stream) << EscapeMetricPartNameForCSVColumHeader(
         report_config_->variable(index).metric_part());
+  }
+  return grpc::Status::OK;
+}
+
+grpc::Status ReportSerializer::AppendCSVHeaderRowSystemProfileFields(
+    std::ostream* stream) {
+  bool first = true;
+  for (const auto& field : report_config_->system_profile_field()) {
+    if (first) {
+      first = false;
+    } else {
+      (*stream) << kSeparator;
+    }
+    switch (field) {
+      case cobalt::SystemProfileField::OS:
+        (*stream) << "OS";
+        break;
+      case cobalt::SystemProfileField::ARCH:
+        (*stream) << "Arch";
+        break;
+      case cobalt::SystemProfileField::BOARD_NAME:
+        (*stream) << "Board_Name";
+        break;
+    }
   }
   return grpc::Status::OK;
 }
@@ -543,10 +578,12 @@ grpc::Status ReportSerializer::AppendCSVReportRow(const ReportRow& report_row,
 grpc::Status ReportSerializer::AppendCSVHistogramReportRow(
     const HistogramReportRow& report_row, std::ostream* stream) {
   size_t num_fixed_values = fixed_leftmost_column_values_.size();
-  if (num_columns_ != 3 + num_fixed_values) {
+  if (num_columns_ !=
+      3 + num_fixed_values + report_config_->system_profile_field_size()) {
     std::ostringstream error_stream;
     error_stream << "Histogram reports always contain 3 columns in addition to "
-                    "the fixed leftmost columns but num_columns="
+                    "the fixed leftmost columns and the "
+                    "system_profile_field_size but num_columns="
                  << num_columns_
                  << " and num_fixed_values=" << num_fixed_values;
     std::string message = error_stream.str();
@@ -563,6 +600,24 @@ grpc::Status ReportSerializer::AppendCSVHistogramReportRow(
     (*stream) << ToCSVString(report_row.label());
   } else {
     (*stream) << ValueToString(report_row.value());
+  }
+  if (report_config_->system_profile_field_size() > 0) {
+    for (const auto& field : report_config_->system_profile_field()) {
+      (*stream) << kSeparator;
+      switch (field) {
+        case SystemProfileField::OS:
+          (*stream) << ToCSVString(
+              cobalt::SystemProfile_OS_Name(report_row.system_profile().os()));
+          break;
+        case SystemProfileField::ARCH:
+          (*stream) << ToCSVString(cobalt::SystemProfile_ARCH_Name(
+              report_row.system_profile().arch()));
+          break;
+        case SystemProfileField::BOARD_NAME:
+          (*stream) << ToCSVString(report_row.system_profile().board_name());
+          break;
+      }
+    }
   }
   (*stream) << kSeparator << CountEstimateToString(report_row.count_estimate());
   (*stream) << kSeparator << StdErrToString(report_row.std_error())

@@ -27,6 +27,7 @@ const uint32_t kCityHistogramReportConfigId = 2;
 const uint32_t kJointReportConfigId = 3;
 const uint32_t kInvalidHistogramReportConfigId = 4;
 const uint32_t kRawDumpReportConfigId = 5;
+const uint32_t kGroupedFruitHistogramReportConfigId = 6;
 
 const char* kReportConfigText = R"(
 element {
@@ -106,6 +107,20 @@ element {
     csv {}
   }
 }
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  metric_id: 1
+  variable {
+    metric_part: "Fruit"
+  }
+  export_configs {
+    csv {}
+  }
+  system_profile_field: [BOARD_NAME, OS, ARCH]
+}
 )";
 
 ReportMetadataLite BuildHistogramMetadata(uint32_t variable_index) {
@@ -135,11 +150,18 @@ void AddHistogramCountAndError(float count_estimate, float std_error,
   row->set_std_error(std_error);
 }
 
+void FillSystemProfile(SystemProfile* profile) {
+  profile->set_board_name("ReportSerializerTest");
+  profile->set_arch(SystemProfile::X86_64);
+  profile->set_os(SystemProfile::FUCHSIA);
+}
+
 ReportRow HistogramReportIntValueRow(int value, float count_estimate,
                                      float std_error) {
   ReportRow report_row;
   HistogramReportRow* row = report_row.mutable_histogram();
   row->mutable_value()->set_int_value(value);
+  FillSystemProfile(row->mutable_system_profile());
   AddHistogramCountAndError(count_estimate, std_error, row);
   return report_row;
 }
@@ -149,6 +171,7 @@ ReportRow HistogramReportStringValueRow(const std::string& value,
   ReportRow report_row;
   HistogramReportRow* row = report_row.mutable_histogram();
   row->mutable_value()->set_string_value(value);
+  FillSystemProfile(row->mutable_system_profile());
   AddHistogramCountAndError(count_estimate, std_error, row);
   return report_row;
 }
@@ -158,6 +181,7 @@ ReportRow HistogramReportBlobValueRow(const std::string& value,
   ReportRow report_row;
   HistogramReportRow* row = report_row.mutable_histogram();
   row->mutable_value()->set_blob_value(value);
+  FillSystemProfile(row->mutable_system_profile());
   AddHistogramCountAndError(count_estimate, std_error, row);
   return report_row;
 }
@@ -168,6 +192,7 @@ ReportRow HistogramReportIndexValueRow(int index, const std::string& label,
   HistogramReportRow* row = report_row.mutable_histogram();
   row->mutable_value()->set_index_value(index);
   row->set_label(label);
+  FillSystemProfile(row->mutable_system_profile());
   AddHistogramCountAndError(count_estimate, std_error, row);
   return report_row;
 }
@@ -350,6 +375,14 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVNoRows) {
                                  "text/csv", kExpectedCSV);
 }
 
+TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVNoRowsWithProfile) {
+  std::vector<ReportRow> report_rows;
+  const char* kExpectedCSV = R"(date,Fruit,Board_Name,OS,Arch,count,err
+)";
+  DoSerializeHistogramReportTest(kGroupedFruitHistogramReportConfigId, 0,
+                                 report_rows, "text/csv", kExpectedCSV);
+}
+
 // Tests the function SerializeReport in the case that the
 // report is a raw dump report with zero rows added.
 TEST_F(ReportSerializerTest, SerializeRawDumpReportToCSVNoRows) {
@@ -503,6 +536,23 @@ TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIndexRows) {
 )";
   DoSerializeHistogramReportTest(kFruitHistogramReportConfigId, 0, report_rows,
                                  "text/csv", kExpectedCSV);
+}
+
+TEST_F(ReportSerializerTest, SerializeHistogramReportToCSVIndexRowsGrouped) {
+  std::vector<ReportRow> report_rows;
+  report_rows.push_back(HistogramReportIndexValueRow(0, "apple", 100, 0.1));
+  report_rows.push_back(HistogramReportIndexValueRow(1, "banana", 50, 0));
+  report_rows.push_back(HistogramReportIndexValueRow(2, "", 51, 0));
+  report_rows.push_back(HistogramReportIndexValueRow(3, "", 0, 0));
+  report_rows.push_back(HistogramReportIndexValueRow(4, "plum", 52, 0));
+  const char* kExpectedCSV = R"(date,Fruit,Board_Name,OS,Arch,count,err
+2035-10-22,"apple","ReportSerializerTest","FUCHSIA","X86_64",100.000,0.100
+2035-10-22,"banana","ReportSerializerTest","FUCHSIA","X86_64",50.000,0
+2035-10-22,<index 2>,"ReportSerializerTest","FUCHSIA","X86_64",51.000,0
+2035-10-22,"plum","ReportSerializerTest","FUCHSIA","X86_64",52.000,0
+)";
+  DoSerializeHistogramReportTest(kGroupedFruitHistogramReportConfigId, 0,
+                                 report_rows, "text/csv", kExpectedCSV);
 }
 
 // Tests the function SerializeReport in the case that the

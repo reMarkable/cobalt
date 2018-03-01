@@ -113,6 +113,8 @@ class ReportSerializer {
 
   grpc::Status AppendCSVHeaderRowVariableNames(std::ostream* stream);
 
+  grpc::Status AppendCSVHeaderRowSystemProfileFields(std::ostream* stream);
+
   grpc::Status AppendCSVReportRow(const ReportRow& report_row,
                                   std::ostream* stream);
 
