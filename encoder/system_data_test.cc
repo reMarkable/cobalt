@@ -19,35 +19,31 @@ TEST(SystemDataTest, BasicTest) {
   SystemData system_data;
   EXPECT_NE(SystemProfile::UNKNOWN_OS, system_data.system_profile().os());
   EXPECT_NE(SystemProfile::UNKNOWN_ARCH, system_data.system_profile().arch());
+  EXPECT_NE(system_data.system_profile().board_name(), "");
 
-  // TODO(zmbush) Remove this check once board_name is filled on ARM
-  if (system_data.system_profile().arch() == SystemProfile::X86_64) {
-    EXPECT_NE(system_data.system_profile().board_name(), "");
+  // Board names we expect to see.
+  std::set<std::string> expected_board_names = {"Eve", "Generic ARM"};
 
-    // Board names we expect to see.
-    std::set<std::string> expected_board_names = {"Eve"};
+  // CPU signatures we expect to see.
+  std::set<int> expected_signatures = {
+      0x0306D4,  // Intel Broadwell (model=0x3D family=0x6) stepping=0x4
+      0x0306F0,  // Intel Broadwell (model=0x3F family=0x6) stepping=0x0
+      0x0406E3,  // Intel Broadwell (model=0x4E family=0x6) stepping=0x3
+      0x0406F1,  // Intel Broadwell (model=0x4F family=0x6) stepping=0x1
+  };
 
-    // CPU signatures we expect to see.
-    std::set<int> expected_signatures = {
-        0x0306D4,  // Intel Broadwell (model=0x3D family=0x6) stepping=0x4
-        0x0306F0,  // Intel Broadwell (model=0x3F family=0x6) stepping=0x0
-        0x0406E3,  // Intel Broadwell (model=0x4E family=0x6) stepping=0x3
-        0x0406F1,  // Intel Broadwell (model=0x4F family=0x6) stepping=0x1
-    };
-
-    auto name = system_data.system_profile().board_name();
-    std::string unknown_prefix = "unknown:";
-    if (name.compare(0, unknown_prefix.size(), unknown_prefix) == 0) {
-      int signature = 0;
-      sscanf(name.c_str(), "unknown:0x%X", &signature);
-      if (expected_signatures.count(signature) == 0) {
-        LOG(WARNING) << "***** found new signature: " << signature;
-      }
-      EXPECT_GE(signature, 0x030000);
-      EXPECT_LE(signature, 0x090000);
-    } else {
-      EXPECT_NE(0ul, expected_board_names.count(name));
+  auto name = system_data.system_profile().board_name();
+  std::string unknown_prefix = "unknown:";
+  if (name.compare(0, unknown_prefix.size(), unknown_prefix) == 0) {
+    int signature = 0;
+    sscanf(name.c_str(), "unknown:0x%X", &signature);
+    if (expected_signatures.count(signature) == 0) {
+      LOG(WARNING) << "***** found new signature: " << signature;
     }
+    EXPECT_GE(signature, 0x030000);
+    EXPECT_LE(signature, 0x090000);
+  } else {
+    EXPECT_NE(0ul, expected_board_names.count(name));
   }
 }
 

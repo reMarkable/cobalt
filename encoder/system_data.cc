@@ -66,6 +66,17 @@ void PopulateBoardName(SystemProfile& profile) {
   }
 }
 
+#elif defined(__aarch64__)
+
+void PopulateBoardName(SystemProfile& profile) {
+  // TODO(zmbush): Update this to actually determine board name.
+  profile.set_board_name("Generic Arm");
+}
+
+#else
+
+void PopulateBoardName(SystemProfile& profile{}
+
 #endif
 
 }  // namespace
@@ -90,18 +101,18 @@ void SystemData::PopulateSystemProfile() {
 #if defined(__x86_64__)
 
   system_profile_.set_arch(SystemProfile::X86_64);
-  PopulateBoardName(system_profile_);
 
 #elif defined(__aarch64__)
 
   system_profile_.set_arch(SystemProfile::ARM_64);
-  // TODO(rudominer) Implement CpuInfo on ARM.
 
 #else
 
   system_profile_.set_arch(SystemProfile::UNKNOWN_ARCH);
 
 #endif
+
+  PopulateBoardName(system_profile_);
 }
 
 }  // namespace encoder
