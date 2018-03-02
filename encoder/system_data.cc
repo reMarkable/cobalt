@@ -75,7 +75,7 @@ void PopulateBoardName(SystemProfile& profile) {
 
 #else
 
-void PopulateBoardName(SystemProfile& profile{}
+void PopulateBoardName(SystemProfile& profile) {}
 
 #endif
 
