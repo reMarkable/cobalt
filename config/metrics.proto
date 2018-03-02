@@ -154,6 +154,8 @@ message MetricPart {
 // ObservationPart named "hour". On the other hand the Metric "Fuchsia Usage
 // City-and-Rating" might have two parts called "City" and "Rating".
 message Metric {
+  // Next ID: 9
+
   // These three numbers form this Metric's unique ID in the Cobalt Config
   // DB.
   uint32 customer_id = 1;
@@ -165,6 +167,11 @@ message Metric {
 
   // The keys are the names of the part.
   map<string, MetricPart> parts = 6;
+
+  // The list of SystemProfileFields to include in the metadata for each
+  // observation. When sent to the Shuffler this will be sent only once per
+  // ObservationBatch.
+  repeated SystemProfileField system_profile_field = 8;
 
   // A TimeZonePolicy specifies how the day_index of an Observation should
   // be computed based on the actual time of encoding.
