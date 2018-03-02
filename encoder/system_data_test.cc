@@ -46,7 +46,7 @@ TEST(SystemDataTest, BasicTest) {
       EXPECT_GE(signature, 0x030000);
       EXPECT_LE(signature, 0x090000);
     } else {
-      EXPECT_NE(0, expected_board_names.count(name));
+      EXPECT_NE(0ul, expected_board_names.count(name));
     }
   }
 }
