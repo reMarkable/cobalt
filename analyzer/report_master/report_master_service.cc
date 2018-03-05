@@ -736,14 +736,30 @@ grpc::Status ReportMasterService::GetAndValidateReportConfig(
     return grpc::Status(grpc::NOT_FOUND, message);
   }
 
-  // Make sure it has either one or two variables.
   size_t num_variables = (*report_config_out)->variable_size();
-  if (num_variables == 0 || num_variables > 2) {
+  auto report_type = (*report_config_out)->report_type();
+  // Histograms support exactly one variable.
+  if (report_type == ReportType::HISTOGRAM && num_variables != 1) {
     std::ostringstream stream;
     stream << "The ReportConfig with id=(" << customer_id << ", " << project_id
            << ", " << report_config_id
            << ") is invalid. Number of variables=" << num_variables
-           << ". Cobalt ReportConfigs may have either one or two variables.";
+           << ". Cobalt ReportConfigs of type HISTOGRAM must have exactly one "
+           << "variable.";
+    std::string message = stream.str();
+    LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetAndValidateReportConfigFailure)
+        << message;
+    return grpc::Status(grpc::FAILED_PRECONDITION, message);
+  }
+
+  // Joint reports support exactly two variables.
+  if (report_type == ReportType::JOINT && num_variables != 2) {
+    std::ostringstream stream;
+    stream << "The ReportConfig with id=(" << customer_id << ", " << project_id
+           << ", " << report_config_id
+           << ") is invalid. Number of variables=" << num_variables
+           << ". Cobalt ReportConfigs of type JOINT must have exactly two "
+           << "variables.";
     std::string message = stream.str();
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetAndValidateReportConfigFailure)
         << message;
