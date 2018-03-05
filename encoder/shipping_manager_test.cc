@@ -168,7 +168,7 @@ class ShippingManagerTest : public ::testing::Test {
  public:
   ShippingManagerTest()
       : project_(GetTestProject()),
-        encoder_(project_, ClientSecret::GenerateNewSecret()) {}
+        encoder_(project_, ClientSecret::GenerateNewSecret(), &system_data_) {}
 
  protected:
   void Init(std::chrono::seconds schedule_interval,

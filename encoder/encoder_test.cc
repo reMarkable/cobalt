@@ -165,6 +165,49 @@ element {
   }
 }
 
+# Metric 9 has a single string part and a system_profile_field selector.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 9
+  time_zone_policy: LOCAL
+  parts {
+    key: "Part1"
+    value {
+    }
+  }
+  system_profile_field: [BOARD_NAME]
+}
+
+# Metric 10 has a single string part and 2 system_profile_field selector.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 10
+  time_zone_policy: LOCAL
+  parts {
+    key: "Part1"
+    value {
+    }
+  }
+  system_profile_field: [BOARD_NAME, ARCH]
+}
+
+# Metric 11 has a single string part and 3 system_profile_field selector.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 11
+  time_zone_policy: LOCAL
+  parts {
+    key: "Part1"
+    value {
+    }
+  }
+  system_profile_field: [BOARD_NAME, ARCH, OS]
+}
+
+
 )";
 
 const char* kEncodingConfigText = R"(
@@ -287,6 +330,24 @@ std::shared_ptr<ProjectContext> GetTestProject() {
       kCustomerId, kProjectId, metric_registry, encoding_registry));
 }
 
+class FakeSystemData : public SystemDataInterface {
+ public:
+  FakeSystemData() {
+    system_profile_.set_os(SystemProfile::FUCHSIA);
+    system_profile_.set_arch(SystemProfile::ARM_64);
+    system_profile_.set_board_name("Testing Board");
+    system_profile_.mutable_cpu()->set_vendor_name("Fake Vendor Name");
+    system_profile_.mutable_cpu()->set_signature(1234567);
+  }
+
+  const SystemProfile& system_profile() const override {
+    return system_profile_;
+  };
+
+ private:
+  SystemProfile system_profile_;
+};
+
 }  // namespace
 
 // Checks |result|: Checks that the status is kOK, that the observation and
@@ -351,6 +412,38 @@ void CheckSinglePartResult(
   }
 }
 
+void CheckSystemProfileValid(const Encoder::Result& result,
+                             const Metric* metric) {
+  if (metric->system_profile_field_size() == 0) {
+    EXPECT_FALSE(result.metadata->has_system_profile());
+    return;
+  }
+
+  const auto& fields = metric->system_profile_field();
+  if (std::find(fields.begin(), fields.end(), SystemProfileField::OS) !=
+      fields.end()) {
+    EXPECT_EQ(SystemProfile::FUCHSIA, result.metadata->system_profile().os());
+  } else {
+    EXPECT_EQ(SystemProfile::UNKNOWN_OS,
+              result.metadata->system_profile().os());
+  }
+
+  if (std::find(fields.begin(), fields.end(), SystemProfileField::ARCH) !=
+      fields.end()) {
+    EXPECT_EQ(SystemProfile::ARM_64, result.metadata->system_profile().arch());
+  } else {
+    EXPECT_EQ(SystemProfile::UNKNOWN_ARCH,
+              result.metadata->system_profile().arch());
+  }
+
+  if (std::find(fields.begin(), fields.end(), SystemProfileField::BOARD_NAME) !=
+      fields.end()) {
+    EXPECT_EQ("Testing Board", result.metadata->system_profile().board_name());
+  } else {
+    EXPECT_EQ("", result.metadata->system_profile().board_name());
+  }
+}
+
 // Tests the EncodeString() method using the given |value| and the given
 // metric and encoding. The metric is expected to have a single part named
 // "Part1". We validate that there are no errors and that the
@@ -361,9 +454,10 @@ Observation DoEncodeStringTest(
     bool expect_utc, const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
+  FakeSystemData system_data;
 
   // Construct the Encoder.
-  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  Encoder encoder(project, ClientSecret::GenerateNewSecret(), &system_data);
   // Set a static current time so we can test the day_index computation.
   encoder.set_current_time(kSomeTimestamp);
 
@@ -374,6 +468,7 @@ Observation DoEncodeStringTest(
 
   CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
+  CheckSystemProfileValid(result, project->Metric(metric_id));
 
   return *result.observation;
 }
@@ -389,9 +484,10 @@ Observation DoEncodeIntTest(
     bool expect_utc, const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
+  FakeSystemData system_data;
 
   // Construct the Encoder.
-  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  Encoder encoder(project, ClientSecret::GenerateNewSecret(), &system_data);
   // Set a static current time so we can test the day_index computation.
   encoder.set_current_time(kSomeTimestamp);
 
@@ -402,6 +498,7 @@ Observation DoEncodeIntTest(
 
   CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
+  CheckSystemProfileValid(result, project->Metric(metric_id));
   return *result.observation;
 }
 
@@ -418,9 +515,10 @@ Observation DoEncodeDoubleTest(
     const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
+  FakeSystemData system_data;
 
   // Construct the Encoder.
-  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  Encoder encoder(project, ClientSecret::GenerateNewSecret(), &system_data);
   // Set a static current time so we can test the day_index computation.
   encoder.set_current_time(kSomeTimestamp);
 
@@ -432,6 +530,7 @@ Observation DoEncodeDoubleTest(
   if (expectOK) {
     CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                           expected_encoding);
+    CheckSystemProfileValid(result, project->Metric(metric_id));
   } else {
     EXPECT_EQ(Encoder::kInvalidArguments, result.status)
         << "encoding_config_id=" << encoding_config_id;
@@ -452,9 +551,10 @@ void DoEncodeIndexTest(bool expectOK, uint32_t index, uint32_t metric_id,
                        const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
+  FakeSystemData system_data;
 
   // Construct the Encoder.
-  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  Encoder encoder(project, ClientSecret::GenerateNewSecret(), &system_data);
   // Set a static current time so we can test the day_index computation.
   encoder.set_current_time(kSomeTimestamp);
 
@@ -466,6 +566,7 @@ void DoEncodeIndexTest(bool expectOK, uint32_t index, uint32_t metric_id,
   if (expectOK) {
     CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                           expected_encoding);
+    CheckSystemProfileValid(result, project->Metric(metric_id));
   } else {
     EXPECT_EQ(Encoder::kInvalidArguments, result.status)
         << "encoding_config_id=" << encoding_config_id;
@@ -484,9 +585,10 @@ Observation DoEncodeBlobTest(
     const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
+  FakeSystemData system_data;
 
   // Construct the Encoder.
-  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  Encoder encoder(project, ClientSecret::GenerateNewSecret(), &system_data);
   // Set a static current time so we can test the day_index computation.
   encoder.set_current_time(kSomeTimestamp);
 
@@ -497,6 +599,7 @@ Observation DoEncodeBlobTest(
 
   CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
+  CheckSystemProfileValid(result, project->Metric(metric_id));
   return *result.observation;
 }
 
@@ -514,9 +617,10 @@ Observation DoEncodeIntBucketDistributionTest(
     const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
+  FakeSystemData system_data;
 
   // Construct the Encoder.
-  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  Encoder encoder(project, ClientSecret::GenerateNewSecret(), &system_data);
   // Set a static current time so we can test the day_index computation.
   encoder.set_current_time(kSomeTimestamp);
 
@@ -528,6 +632,7 @@ Observation DoEncodeIntBucketDistributionTest(
   if (expect_ok) {
     CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                           expected_encoding);
+    CheckSystemProfileValid(result, project->Metric(metric_id));
   } else {
     EXPECT_EQ(Encoder::kInvalidArguments, result.status)
         << "encoding_config_id=" << encoding_config_id;
@@ -555,6 +660,15 @@ TEST(EncoderTest, EncodeStringBasicRappor) {
   // EncodingConfig 3 is Basic RAPPOR with string values. Here we need the
   // value to be one of the categories.
   DoEncodeStringTest("Apple", 1, 3, false, ObservationPart::kBasicRappor);
+}
+
+TEST(EncoderTest, EncodeStringForculusWithSystemProfile) {
+  // Metric 9, 10, and 11 have a single string part, with 1, 2, or 3
+  // system_profile_fields.
+  // EncodingConfig 1 is Forculus.
+  DoEncodeStringTest("Apple", 9, 1, false, ObservationPart::kForculus);
+  DoEncodeStringTest("Pear", 10, 1, false, ObservationPart::kForculus);
+  DoEncodeStringTest("Grapefruit", 11, 1, false, ObservationPart::kForculus);
 }
 
 // Tests EncodeString() with NoOp as the specified encoding.
@@ -777,8 +891,9 @@ TEST(EncoderTest, EncodeIntBucketDistributionNoOp) {
 TEST(EncoderTest, AdvancedApiNoErrors) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
+  FakeSystemData system_data;
   // Construct the Encoder.
-  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  Encoder encoder(project, ClientSecret::GenerateNewSecret(), &system_data);
 
   Observation observation;
   Encoder::Value value;
@@ -813,8 +928,9 @@ TEST(EncoderTest, AdvancedApiNoErrors) {
 TEST(EncoderTest, AdvancedApiWithErrors) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
+  FakeSystemData system_data;
   // Construct the Encoder.
-  Encoder encoder(project, ClientSecret::GenerateNewSecret());
+  Encoder encoder(project, ClientSecret::GenerateNewSecret(), &system_data);
 
   std::unique_ptr<Encoder::Value> value(new Encoder::Value());
 

@@ -57,11 +57,13 @@ std::string DataCaseToString(ValuePart::DataCase data_case) {
 }  // namespace
 
 Encoder::Encoder(std::shared_ptr<ProjectContext> project,
-                 ClientSecret client_secret)
+                 ClientSecret client_secret,
+                 const SystemDataInterface* system_data)
     : customer_id_(project->customer_id()),
       project_id_(project->project_id()),
       project_(project),
-      client_secret_(std::move(client_secret)) {}
+      client_secret_(std::move(client_secret)),
+      system_data_(system_data) {}
 
 Encoder::Status Encoder::EncodeForculus(
     uint32_t metric_id, uint32_t encoding_config_id, const ValuePart& value,
@@ -395,6 +397,26 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
   result.metadata->set_project_id(project_id_);
   result.metadata->set_metric_id(metric_id);
   result.metadata->set_day_index(day_index);
+
+  if (system_data_) {
+    // If we were provided a SystemProfile, add the subset of fields specified
+    // in system_profile_field.
+    const auto& profile = system_data_->system_profile();
+    for (const auto& metric : metric->system_profile_field()) {
+      switch (metric) {
+        case SystemProfileField::OS:
+          result.metadata->mutable_system_profile()->set_os(profile.os());
+          break;
+        case SystemProfileField::ARCH:
+          result.metadata->mutable_system_profile()->set_arch(profile.arch());
+          break;
+        case SystemProfileField::BOARD_NAME:
+          result.metadata->mutable_system_profile()->set_board_name(
+              profile.board_name());
+          break;
+      }
+    }
+  }
 
   // Iterate through the provided values.
   for (const auto& key_value : value.parts_) {

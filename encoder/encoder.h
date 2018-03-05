@@ -23,6 +23,7 @@
 #include "./observation.pb.h"
 #include "encoder/client_secret.h"
 #include "encoder/project_context.h"
+#include "encoder/system_data.h"
 #include "util/crypto_util/random.h"
 
 namespace cobalt {
@@ -81,7 +82,14 @@ class Encoder {
   // client_secret: A random secret that is generated once on the client
   //     and then persisted by the client and used repeatedly. It is used  as
   //     an input by some of the encodings.
-  Encoder(std::shared_ptr<ProjectContext> project, ClientSecret client_secret);
+  //
+  // system_data: Used to obtain the SystemProfile, a filtered copy of which
+  //     will be included in the generated ObservationMetadata. The Encoder does
+  //     not take ownership of system_data and system_data is allowed to be
+  //     NULL, in which case no SystemProfile will be added to the
+  //     ObservationMetadata.
+  Encoder(std::shared_ptr<ProjectContext> project, ClientSecret client_secret,
+          const SystemDataInterface* system_data = nullptr);
 
   enum Status {
     kOK = 0,
@@ -309,6 +317,7 @@ class Encoder {
   uint32_t customer_id_, project_id_;
   std::shared_ptr<ProjectContext> project_;
   ClientSecret client_secret_;
+  const SystemDataInterface* system_data_;  // not owned
   time_t current_time_ = 0;
   crypto::Random random_;
 };

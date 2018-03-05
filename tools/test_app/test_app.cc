@@ -666,8 +666,8 @@ bool TestApp::EncodeAsNewClient(const std::vector<uint32_t> encoding_config_ids,
   }
 
   // Construct a new Encoder.
-  std::unique_ptr<Encoder> encoder(
-      new Encoder(project_context_, ClientSecret::GenerateNewSecret()));
+  std::unique_ptr<Encoder> encoder(new Encoder(
+      project_context_, ClientSecret::GenerateNewSecret(), system_data_.get()));
 
   // Use the Encoder to encode the Value.
   auto result = encoder->Encode(metric_, value);
@@ -719,8 +719,8 @@ void TestApp::EncodeString(const std::string value) {
 // uses this Encoder to encode the string value specified by the
 // argument, and adds the resulting Observation to the ShippingManager.
 bool TestApp::EncodeStringAsNewClient(const std::string value) {
-  std::unique_ptr<Encoder> encoder(
-      new Encoder(project_context_, ClientSecret::GenerateNewSecret()));
+  std::unique_ptr<Encoder> encoder(new Encoder(
+      project_context_, ClientSecret::GenerateNewSecret(), system_data_.get()));
   auto result = encoder->EncodeString(metric_, encoding_config_id_, value);
   if (result.status != Encoder::kOK) {
     LOG(ERROR) << "EncodeString() failed with status " << result.status
@@ -756,8 +756,8 @@ void TestApp::EncodeInt(int64_t value) {
 // uses this Encoder to encode the int value specified by the
 // argument, and adds the resulting Observation to the ShippingManager.
 bool TestApp::EncodeIntAsNewClient(int64_t value) {
-  std::unique_ptr<Encoder> encoder(
-      new Encoder(project_context_, ClientSecret::GenerateNewSecret()));
+  std::unique_ptr<Encoder> encoder(new Encoder(
+      project_context_, ClientSecret::GenerateNewSecret(), system_data_.get()));
   auto result = encoder->EncodeInt(metric_, encoding_config_id_, value);
   if (result.status != Encoder::kOK) {
     LOG(ERROR) << "EncodeInt() failed with status " << result.status
@@ -786,8 +786,8 @@ void TestApp::EncodeIndex(uint32_t index) {
 }
 
 bool TestApp::EncodeIndexAsNewClient(uint32_t index) {
-  std::unique_ptr<Encoder> encoder(
-      new Encoder(project_context_, ClientSecret::GenerateNewSecret()));
+  std::unique_ptr<Encoder> encoder(new Encoder(
+      project_context_, ClientSecret::GenerateNewSecret(), system_data_.get()));
   auto result = encoder->EncodeIndex(metric_, encoding_config_id_, index);
   if (result.status != Encoder::kOK) {
     LOG(ERROR) << "EncodeIndex() failed with status " << result.status
