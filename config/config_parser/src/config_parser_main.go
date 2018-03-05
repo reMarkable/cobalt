@@ -21,18 +21,29 @@ import (
 )
 
 var (
-	repoUrl       = flag.String("repo_url", "", "URL of the repository containing the config. Exactly one of 'repo_url' or 'config_dir' must be specified.")
-	configDir     = flag.String("config_dir", "", "Directory containing the config. Exactly one of 'repo_url' or 'config_dir' must be specified.")
+	repoUrl       = flag.String("repo_url", "", "URL of the repository containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
+	configDir     = flag.String("config_dir", "", "Directory containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
+	configFile    = flag.String("config_file", "", "File containing the config for a single project. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
 	outFile       = flag.String("output_file", "", "File to which the serialized config should be written. Defaults to stdout.")
 	checkOnly     = flag.Bool("check_only", false, "Only check that the configuration is valid.")
 	gitTimeoutSec = flag.Int64("git_timeout", 60, "How many seconds should I wait on git commands?")
+	customerId    = flag.Int64("customer_id", -1, "Customer Id for the config to be read. Must be set if and only if 'config_file' is set.")
+	projectId     = flag.Int64("project_id", -1, "Project Id for the config to be read. Must be set if and only if 'config_file' is set.")
 )
 
 func main() {
 	flag.Parse()
 
-	if (*repoUrl == "") == (*configDir == "") {
-		glog.Exit("Exactly one of 'repo_url' and 'config_dir' must be set.")
+	if (*repoUrl == "") == (*configDir == "") == (*configFile == "") {
+		glog.Exit("Exactly one of 'repo_url', 'config_file' and 'config_dir' must be set.")
+	}
+
+	if *configFile == "" && (*customerId >= 0 || *projectId >= 0) {
+		glog.Exit("'customer_id' and 'project_id' must be set if and only if 'config_file' is set.")
+	}
+
+	if *configFile != "" && (*customerId < 0 || *projectId < 0) {
+		glog.Exit("If 'config_file' is set, both 'customer_id' and 'project_id' must be set.")
 	}
 
 	if *outFile != "" && *checkOnly {
@@ -47,6 +58,9 @@ func main() {
 		configLocation = *repoUrl
 		gitTimeout := time.Duration(*gitTimeoutSec) * time.Second
 		c, err = config_parser.ReadConfigFromRepo(*repoUrl, gitTimeout)
+	} else if *configFile != "" {
+		configLocation = *configFile
+		c, err = config_parser.ReadConfigFromYaml(*configFile, uint32(*customerId), uint32(*projectId))
 	} else {
 		configLocation = *configDir
 		c, err = config_parser.ReadConfigFromDir(*configDir)

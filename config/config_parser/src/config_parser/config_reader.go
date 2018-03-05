@@ -33,6 +33,28 @@ func ReadConfigFromDir(rootDir string) (c config.CobaltConfig, err error) {
 	return mergeConfigs(l), nil
 }
 
+// ReadConfigFromYaml reads the configuration for a single project from a single yaml file.
+// See project_config.go for the format.
+func ReadConfigFromYaml(yamlConfigPath string, customerId uint32, projectId uint32) (c config.CobaltConfig, err error) {
+	yamlConfig, err := ioutil.ReadFile(yamlConfigPath)
+	if err != nil {
+		return c, err
+	}
+
+	p := projectConfig{}
+	p.customerId = customerId
+	p.projectId = projectId
+	if err := parseProjectConfig(string(yamlConfig), &p); err != nil {
+		return c, err
+	}
+
+	c.EncodingConfigs = p.projectConfig.EncodingConfigs
+	c.MetricConfigs = p.projectConfig.MetricConfigs
+	c.ReportConfigs = p.projectConfig.ReportConfigs
+
+	return c, nil
+}
+
 // configReader is an interface that returns configuration data in the yaml format.
 type configReader interface {
 	// Returns the yaml representation of the customer and project list.
