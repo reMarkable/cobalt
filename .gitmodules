@@ -83,3 +83,9 @@
 [submodule "third_party/cobalt_config"]
 	path = third_party/config
 	url = https://cobalt-analytics.googlesource.com/config
+[submodule "third_party/go/src/golang.org/x/oauth2"]
+	path = third_party/go/src/golang.org/x/oauth2
+	url = https://fuchsia.googlesource.com/third_party/golang.org/x/oauth2
+[submodule "third_party/go/src/cloud.google.com/go"]
+	path = third_party/go/src/cloud.google.com/go
+	url = https://code.googlesource.com/gocloud

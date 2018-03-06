@@ -52,13 +52,5 @@ export GOPATH="${SCRIPT_DIR}/third_party/go"
 echo Building protoc-gen-go
 ${GOROOT}/bin/go build -o ${PREFIX}/bin/protoc-gen-go github.com/golang/protobuf/protoc-gen-go
 
-# Install go dependencies
-export GOPATH="${PREFIX}/go"
-if [[ ! -d "${GOPATH}/src/cloud.google.com/go/bigtable" ]] ; then
-    echo Installing the bigtable client for go
-    mkdir -p ${GOPATH}
-    ${GOROOT}/bin/go get cloud.google.com/go/bigtable
-fi
-
 echo Installing additional gcloud components
 ${GCLOUD_DIR}/google-cloud-sdk/bin/gcloud --quiet components install bigtable kubectl

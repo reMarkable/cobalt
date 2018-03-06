@@ -46,7 +46,7 @@ set(DIR_GTESTS_CLOUD_BT "${CMAKE_BINARY_DIR}/gtests_cloud_bt")
 set(DIR_PERF_TESTS "${CMAKE_BINARY_DIR}/perf_tests")
 
 # Go related defines
-set(GO_PATH env GOPATH="${DIR_SYSROOT}/go:${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen")
+set(GO_PATH env GOPATH="${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen")
 set(GO_PATH env "${GO_PATH}:${CMAKE_SOURCE_DIR}/shuffler")
 set(GO_PATH env "${GO_PATH}:${CMAKE_SOURCE_DIR}/config/config_parser")
 set(GO_PATH env "${GO_PATH}:${CMAKE_SOURCE_DIR}/tools/go")
