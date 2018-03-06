@@ -555,8 +555,8 @@ TestApp::TestApp(
           ShippingManager::ScheduleParams(ShippingManager::kMaxSeconds,
                                           std::chrono::seconds(0)),
           ShippingManager::EnvelopeMakerParams(
-              system_data_.get(), analyzer_public_key_pem, analyzer_scheme,
-              shuffler_public_key_pem, shuffler_scheme),
+              analyzer_public_key_pem, analyzer_scheme, shuffler_public_key_pem,
+              shuffler_scheme),
           ShippingManager::SendRetryerParams(kInitialRpcDeadline,
                                              kDeadlinePerSendAttempt),
           send_retryer_.get())),

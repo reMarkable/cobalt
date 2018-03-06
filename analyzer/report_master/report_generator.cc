@@ -96,18 +96,20 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
 std::unique_ptr<SystemProfile> FilterSystemProfile(
     const ReportConfig& config, std::unique_ptr<SystemProfile> profile) {
   auto filtered_profile = std::make_unique<SystemProfile>();
-  for (int field : config.system_profile_field()) {
-    switch (field) {
-      case SystemProfileField::OS:
-        filtered_profile->set_os(profile->os());
-        break;
-      case SystemProfileField::ARCH:
-        filtered_profile->set_arch(profile->arch());
-        break;
-      case SystemProfileField::BOARD_NAME:
-        filtered_profile->set_allocated_board_name(
-            profile->release_board_name());
-        break;
+  if (profile != nullptr) {
+    for (int field : config.system_profile_field()) {
+      switch (field) {
+        case SystemProfileField::OS:
+          filtered_profile->set_os(profile->os());
+          break;
+        case SystemProfileField::ARCH:
+          filtered_profile->set_arch(profile->arch());
+          break;
+        case SystemProfileField::BOARD_NAME:
+          filtered_profile->set_allocated_board_name(
+              profile->release_board_name());
+          break;
+      }
     }
   }
   return filtered_profile;

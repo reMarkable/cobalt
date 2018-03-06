@@ -107,11 +107,11 @@ class FakeSystemData : public SystemDataInterface {
   };
 
   static void CheckSystemProfile(const Envelope& envelope) {
-    EXPECT_EQ(SystemProfile::FUCHSIA, envelope.system_profile().os());
-    EXPECT_EQ(SystemProfile::ARM_64, envelope.system_profile().arch());
-    EXPECT_EQ("Fake Vendor Name",
-              envelope.system_profile().cpu().vendor_name());
-    EXPECT_EQ(1234567u, envelope.system_profile().cpu().signature());
+    // SystemProfile is not placed in the envelope at this time.
+    EXPECT_EQ(SystemProfile::UNKNOWN_OS, envelope.system_profile().os());
+    EXPECT_EQ(SystemProfile::UNKNOWN_ARCH, envelope.system_profile().arch());
+    EXPECT_EQ("", envelope.system_profile().cpu().vendor_name());
+    EXPECT_EQ(0u, envelope.system_profile().cpu().signature());
   }
 
  private:
@@ -179,8 +179,7 @@ class ShippingManagerTest : public ::testing::Test {
                                     kMaxBytesPerEnvelope, kMaxBytesTotal,
                                     kMinEnvelopeSendSize),
         ShippingManager::ScheduleParams(schedule_interval, min_interval),
-        ShippingManager::EnvelopeMakerParams(&system_data_, "",
-                                             EncryptedMessage::NONE, "",
+        ShippingManager::EnvelopeMakerParams("", EncryptedMessage::NONE, "",
                                              EncryptedMessage::NONE),
         ShippingManager::SendRetryerParams(kInitialRpcDeadline,
                                            kDeadlinePerSendAttempt),

@@ -220,5 +220,8 @@ message Envelope {
   // To minimize the data sent from a client, this is included only once
   // per Envelope. The Shuffler is responsible for copying this into the
   // individual ObservationMetadata contained in this Envelope.
-  SystemProfile system_profile = 3;
+  //
+  // Since we will now be adding filtered SystemProfiles to each Batch, we no
+  // longer need this field.
+  SystemProfile system_profile = 3 [deprecated = true];
 }

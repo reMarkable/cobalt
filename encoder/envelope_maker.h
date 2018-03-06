@@ -21,7 +21,6 @@
 
 #include "./encrypted_message.pb.h"
 #include "./observation.pb.h"
-#include "encoder/system_data.h"
 #include "util/encrypted_message_util.h"
 
 namespace cobalt {
@@ -51,11 +50,6 @@ class EnvelopeMaker {
  public:
   // Constructor
   //
-  // |system_data| is used to obtain the SystemProfile, a copy of which will
-  // be included in the generated Envelope. This method does not take ownership
-  // of system_data and system_data is allowed to be NULL, in which case
-  // no SystemProfile will be added to the Envelope.
-  //
   // |analyzer_public_key_pem| is a PEM encoding of the public key of the
   // Analyzer used for encrypting Observations that will be sent to the
   // Analyzer (by way of the Shuffler). It must be appropriate for the
@@ -81,8 +75,7 @@ class EnvelopeMaker {
   // is not too large by itself, but adding the additional observation would
   // cause the sum of the sizes of all added Observations to be greater than
   // this value.
-  EnvelopeMaker(const SystemDataInterface* system_data,
-                const std::string& analyzer_public_key_pem,
+  EnvelopeMaker(const std::string& analyzer_public_key_pem,
                 EncryptedMessage::EncryptionScheme analyzer_scheme,
                 const std::string& shuffler_public_key_pem,
                 EncryptedMessage::EncryptionScheme shuffler_scheme,
@@ -148,7 +141,6 @@ class EnvelopeMaker {
   ObservationBatch* GetBatch(std::unique_ptr<ObservationMetadata> metadata);
 
   Envelope envelope_;
-  const SystemDataInterface* system_data_;  // not owned
   util::EncryptedMessageMaker encrypt_to_analyzer_;
   util::EncryptedMessageMaker encrypt_to_shuffler_;
 

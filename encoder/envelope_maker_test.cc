@@ -160,11 +160,11 @@ class FakeSystemData : public SystemDataInterface {
   };
 
   static void CheckSystemProfile(const Envelope& envelope) {
-    EXPECT_EQ(SystemProfile::FUCHSIA, envelope.system_profile().os());
-    EXPECT_EQ(SystemProfile::ARM_64, envelope.system_profile().arch());
-    EXPECT_EQ("Fake Vendor Name",
-              envelope.system_profile().cpu().vendor_name());
-    EXPECT_EQ(1234567u, envelope.system_profile().cpu().signature());
+    // SystemProfile is not placed in the envelope at this time.
+    EXPECT_EQ(SystemProfile::UNKNOWN_OS, envelope.system_profile().os());
+    EXPECT_EQ(SystemProfile::UNKNOWN_ARCH, envelope.system_profile().arch());
+    EXPECT_EQ("", envelope.system_profile().cpu().vendor_name());
+    EXPECT_EQ(0u, envelope.system_profile().cpu().signature());
   }
 
  private:
@@ -176,11 +176,12 @@ class FakeSystemData : public SystemDataInterface {
 class EnvelopeMakerTest : public ::testing::Test {
  public:
   EnvelopeMakerTest()
-      : envelope_maker_(new EnvelopeMaker(
-            &fake_system_data_, kAnalyzerPublicKey, EncryptedMessage::NONE,
-            kShufflerPublicKey, EncryptedMessage::NONE)),
+      : envelope_maker_(
+            new EnvelopeMaker(kAnalyzerPublicKey, EncryptedMessage::NONE,
+                              kShufflerPublicKey, EncryptedMessage::NONE)),
         project_(GetTestProject()),
-        encoder_(project_, ClientSecret::GenerateNewSecret()) {
+        encoder_(project_, ClientSecret::GenerateNewSecret(),
+                 &fake_system_data_) {
     // Set a static current time so we can test the day_index computation.
     encoder_.set_current_time(kSomeTimestamp);
   }
@@ -192,9 +193,8 @@ class EnvelopeMakerTest : public ::testing::Test {
       size_t max_num_bytes = SIZE_MAX) {
     std::unique_ptr<EnvelopeMaker> return_val = std::move(envelope_maker_);
     envelope_maker_.reset(new EnvelopeMaker(
-        &fake_system_data_, kAnalyzerPublicKey, EncryptedMessage::NONE,
-        kShufflerPublicKey, EncryptedMessage::NONE, max_bytes_each_observation,
-        max_num_bytes));
+        kAnalyzerPublicKey, EncryptedMessage::NONE, kShufflerPublicKey,
+        EncryptedMessage::NONE, max_bytes_each_observation, max_num_bytes));
     return return_val;
   }
 
