@@ -72,7 +72,7 @@ void PopulateBoardName(SystemProfile* profile) {
 
 void PopulateBoardName(SystemProfile* profile) {
   // TODO(zmbush): Update this to actually determine board name.
-  profile->set_board_name("Generic Arm");
+  profile->set_board_name("Generic ARM");
 }
 
 #else
