@@ -5,6 +5,8 @@
 #include "encoder/system_data.h"
 
 #include <cstring>
+#include <map>
+#include <string>
 #include <utility>
 
 #include "./logging.h"
@@ -30,7 +32,7 @@ std::string getBoardName(int signature) {
   auto name = knownCPUSignatures.find(signature);
   if (name == knownCPUSignatures.end()) {
     char sigstr[20];
-    sprintf(sigstr, "unknown:0x%X", signature);
+    snprintf(sigstr, sizeof(sigstr), "unknown:0x%X", signature);
     return sigstr;
   } else {
     return name->second;
@@ -51,7 +53,7 @@ void Cpuid(int info_type, int cpu_info[4]) {
 }
 
 // Invokes Cpuid() to determine the board_name.
-void PopulateBoardName(SystemProfile& profile) {
+void PopulateBoardName(SystemProfile* profile) {
   // First we invoke Cpuid with info_type = 0 in order to obtain num_ids
   // and vendor_name.
   int cpu_info[4] = {-1};
@@ -62,20 +64,20 @@ void PopulateBoardName(SystemProfile& profile) {
     // Then invoke Cpuid again with info_type = 1 in order to obtain
     // |signature|.
     Cpuid(1, cpu_info);
-    profile.set_board_name(getBoardName(cpu_info[0]));
+    profile->set_board_name(getBoardName(cpu_info[0]));
   }
 }
 
 #elif defined(__aarch64__)
 
-void PopulateBoardName(SystemProfile& profile) {
+void PopulateBoardName(SystemProfile* profile) {
   // TODO(zmbush): Update this to actually determine board name.
-  profile.set_board_name("Generic Arm");
+  profile->set_board_name("Generic Arm");
 }
 
 #else
 
-void PopulateBoardName(SystemProfile& profile) {}
+void PopulateBoardName(SystemProfile* profile) {}
 
 #endif
 
@@ -116,7 +118,7 @@ void SystemData::PopulateSystemProfile() {
 
 #endif
 
-  PopulateBoardName(system_profile_);
+  PopulateBoardName(&system_profile_);
 }
 
 }  // namespace encoder
