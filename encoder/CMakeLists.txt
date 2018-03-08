@@ -24,12 +24,14 @@ add_cobalt_dependencies(client_secret)
 add_library(encoder
             encoder.cc
             envelope_maker.cc
+            project_context.cc
             send_retryer.cc
             shipping_manager.cc
             shuffler_client.cc
             system_data.cc
             ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(encoder
+                      client_config
                       client_secret
                       encrypted_message_util
                       forculus_encrypter

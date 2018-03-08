@@ -1,16 +1,6 @@
-// Copyright 2016 The Fuchsia Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2016 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 #ifndef COBALT_ENCODER_PROJECT_CONTEXT_H_
 #define COBALT_ENCODER_PROJECT_CONTEXT_H_
@@ -18,6 +8,7 @@
 #include <memory>
 #include <utility>
 
+#include "config/client_config.h"
 #include "config/encoding_config.h"
 #include "config/metric_config.h"
 
@@ -30,27 +21,25 @@ class ProjectContext {
  public:
   // Constructs a ProjectContext for the project with the given IDs
   // and containing the given metric and endoding registries.
+  // DEPRECATED. Use the constructor that takes a ClientConfig instead.
   ProjectContext(uint32_t customer_id, uint32_t project_id,
                  std::shared_ptr<config::MetricRegistry> metric_registry,
-                 std::shared_ptr<config::EncodingRegistry> encoding_registry)
-      : customer_id_(customer_id),
-        project_id_(project_id),
-        metric_registry_(metric_registry),
-        encoding_registry_(encoding_registry) {}
+                 std::shared_ptr<config::EncodingRegistry> encoding_registry);
+
+  // Constructs a ProjectContext for the project with the given IDs
+  // and ClientConfig.
+  ProjectContext(uint32_t customer_id, uint32_t project_id,
+                 std::shared_ptr<config::ClientConfig> client_config);
 
   // Returns the Metric with the given ID in the project, or nullptr if there is
   // no such Metric. The caller does not take ownership of the returned
   // pointer.
-  const Metric* Metric(uint32_t id) const {
-    return metric_registry_->Get(customer_id_, project_id_, id);
-  }
+  const Metric* Metric(uint32_t id) const;
 
   // Returns the EncodingConfig with the given ID in the project, or nullptr if
   // there is no such EncodingConfig. The caller does not take ownership of the
   // returned pointer.
-  const EncodingConfig* EncodingConfig(uint32_t id) const {
-    return encoding_registry_->Get(customer_id_, project_id_, id);
-  }
+  const EncodingConfig* EncodingConfig(uint32_t id) const;
 
   uint32_t customer_id() const { return customer_id_; }
 
@@ -58,6 +47,11 @@ class ProjectContext {
 
  private:
   const uint32_t customer_id_, project_id_;
+
+  // Either client_config_ will be null or else
+  // metric_registry_ and encoding_registry_ will be null, depending on
+  // which constructor was used.
+  std::shared_ptr<config::ClientConfig> client_config_;
   std::shared_ptr<config::MetricRegistry> metric_registry_;
   std::shared_ptr<config::EncodingRegistry> encoding_registry_;
 };
