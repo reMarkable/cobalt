@@ -55,20 +55,19 @@ class ObservationStoreAbstractTest : public ::testing::Test {
     EXPECT_EQ(kOK, data_store_->DeleteAllRows(DataStore::kObservations));
   }
 
-  // If vendor_name is non-empty then we add a SystemProfile to the
-  // ObservationMetadata with the given vendor_name, otherwise we do not
+  // If board_name is non-empty then we add a SystemProfile to the
+  // ObservationMetadata with the given board_name, otherwise we do not
   // add a SystemProfile to the ObservationMetadata.
   void AddObservationBatch(uint32_t metric_id, uint32_t day_index,
                            size_t num_parts, size_t num_observations,
-                           const std::string& vendor_name) {
+                           const std::string& board_name) {
     ObservationMetadata metadata;
     metadata.set_customer_id(kCustomerId);
     metadata.set_project_id(kProjectId);
     metadata.set_metric_id(metric_id);
     metadata.set_day_index(day_index);
-    if (!vendor_name.empty()) {
-      metadata.mutable_system_profile()->mutable_cpu()->set_vendor_name(
-          vendor_name);
+    if (!board_name.empty()) {
+      metadata.mutable_system_profile()->set_board_name(board_name);
     }
     std::vector<Observation> observations;
     for (size_t i = 0; i < num_observations; i++) {
@@ -97,16 +96,16 @@ class ObservationStoreAbstractTest : public ::testing::Test {
               observation_store_->AddObservationBatch(metadata, observations));
   }
 
-  // If vendor_name is non-empty then we add a SystemProfile to the
-  // ObservationMetadata with the given vendor_name, otherwise we do not
+  // If board_name is non-empty then we add a SystemProfile to the
+  // ObservationMetadata with the given board_name, otherwise we do not
   // add a SystemProfile to the ObservationMetadata.
   void AddObservations(uint32_t metric_id, uint32_t first_day_index,
                        uint32_t last_day_index, int num_per_day, int num_parts,
-                       const std::string& vendor_name) {
+                       const std::string& board_name) {
     for (uint32_t day_index = first_day_index; day_index <= last_day_index;
          day_index++) {
       AddObservationBatch(metric_id, day_index, num_parts, num_per_day,
-                          vendor_name);
+                          board_name);
     }
   }
 
@@ -114,7 +113,8 @@ class ObservationStoreAbstractTest : public ::testing::Test {
   // the results have been obtained. Returns the full list of results.
   std::vector<ObservationStore::QueryResult> QueryFullResults(
       uint32_t metric_id, uint32_t first_day_index, int32_t last_day_index,
-      int num_parts, bool include_system_profile, size_t max_results) {
+      int num_parts, const SystemProfileFields& system_profile_fields,
+      size_t max_results) {
     std::vector<std::string> parts;
     for (int part_index = 0; part_index < num_parts; part_index++) {
       parts.push_back(PartName(part_index));
@@ -125,7 +125,7 @@ class ObservationStoreAbstractTest : public ::testing::Test {
       ObservationStore::QueryResponse query_response =
           observation_store_->QueryObservations(
               kCustomerId, kProjectId, metric_id, first_day_index,
-              last_day_index, parts, include_system_profile, max_results,
+              last_day_index, parts, system_profile_fields, max_results,
               pagination_token);
       EXPECT_EQ(kOK, query_response.status);
       for (auto& result : query_response.results) {
@@ -143,19 +143,19 @@ class ObservationStoreAbstractTest : public ::testing::Test {
       const std::vector<ObservationStore::QueryResult>& full_results,
       size_t expected_num_results, size_t expected_num_results_per_day,
       size_t expected_num_parts, uint32_t expected_first_day_index,
-      const std::string& expected_vendor_name) {
+      const std::string& expected_board_name) {
     EXPECT_EQ(expected_num_results, full_results.size());
     uint result_index = 0;
     uint32_t expected_day_index = expected_first_day_index;
     for (const auto& result : full_results) {
       EXPECT_EQ(expected_day_index, result.metadata.day_index());
       EXPECT_EQ(expected_num_parts, result.observation.parts().size());
-      if (expected_vendor_name.empty()) {
+      if (expected_board_name.empty()) {
         EXPECT_FALSE(result.metadata.has_system_profile());
       } else {
         EXPECT_TRUE(result.metadata.has_system_profile());
-        EXPECT_EQ(expected_vendor_name,
-                  result.metadata.system_profile().cpu().vendor_name());
+        EXPECT_EQ(expected_board_name,
+                  result.metadata.system_profile().board_name());
       }
       for (size_t part_index = 0; part_index < expected_num_parts;
            part_index++) {
@@ -212,20 +212,20 @@ TYPED_TEST_CASE_P(ObservationStoreAbstractTest);
 
 TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   // For metric 1, add 100 observations with 2 parts each for each day in the
-  // range [100, 109]. We also specify a vendor_name which will cause the
+  // range [100, 109]. We also specify a board_name which will cause the
   // Observations to be stored in the ObservationStore with a SystemProfile
   // that contains that vendor name.
   uint32_t metric_id = 1;
-  std::string vendor_name = "fake vendor name";
-  this->AddObservations(metric_id, 100, 109, 100, 2, vendor_name);
+  std::string board_name = "fake board name";
+  this->AddObservations(metric_id, 100, 109, 100, 2, board_name);
 
   // For metric 2, add 200 observations with 1 part each for each day in the
-  // range [101, 110]. Here we specify an empty vendor_name which will cause
+  // range [101, 110]. Here we specify an empty board_name which will cause
   // the Observations to be stored in the ObservationStore without a
   // SystemProfile.
   metric_id = 2;
-  vendor_name = "";
-  this->AddObservations(metric_id, 101, 110, 200, 1, vendor_name);
+  board_name = "";
+  this->AddObservations(metric_id, 101, 110, 200, 1, board_name);
 
   /////////////////////////////////////////////////////////////////
   // Queries for metric 1
@@ -237,13 +237,13 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   // Impose a maximum of 100 results.
   int requested_num_parts = 2;
   // We specify that the SystemProfile should not be returned by the query.
-  // By setting expected_vendor_name = "" we indicate that we expect the
+  // By setting expected_board_name = "" we indicate that we expect the
   // QueryResult to not contain a SystemProfile.
-  bool include_system_profile = false;
-  std::string expected_vendor_name = "";
+  SystemProfileFields system_profile_fields;
+  std::string expected_board_name = "";
   std::vector<ObservationStore::QueryResult> full_results =
       this->QueryFullResults(metric_id, 50, 150, requested_num_parts,
-                             include_system_profile, 100);
+                             system_profile_fields, 100);
 
   // Expect to find 1000 results as 100 results per day for 10 days starting
   // with day 100.
@@ -254,54 +254,54 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   int expected_num_parts = 2;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
-  // Same query as above except set include_system_profile = true.
-  include_system_profile = true;
+  // Same query as above except set system_profile_fields = true.
+  system_profile_fields.Add(SystemProfileField::BOARD_NAME);
   full_results = this->QueryFullResults(metric_id, 50, 150, requested_num_parts,
-                                        include_system_profile, 100);
+                                        system_profile_fields, 100);
 
   // Expect the same results as above except with a SystemProfile.
-  expected_vendor_name = "fake vendor name";
+  expected_board_name = "fake board name";
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   // Reset the values
-  include_system_profile = false;
-  expected_vendor_name = "";
+  system_profile_fields = {};
+  expected_board_name = "";
 
   //------------------------------------------------------------
 
   // Query for observations for days in the range [0, UINT32_MAX].
   full_results =
       this->QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts,
-                             include_system_profile, 100);
+                             system_profile_fields, 100);
 
   // Expect the same results as above.
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
   // Query for observations for days in the range [100, 105].
   full_results = this->QueryFullResults(
-      metric_id, 100, 105, requested_num_parts, include_system_profile, 100);
+      metric_id, 100, 105, requested_num_parts, system_profile_fields, 100);
 
   // Expect to find 600 results as 100 results per day for 6 days.
   expected_num_results = 600;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
   // Query for observations for days in the range [105, 110].
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect to find 500 results as 100 results per day for 5 days starting
   // with day 105.
@@ -309,7 +309,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   expected_first_day_index = 105;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
@@ -319,7 +319,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
 
   // Query for observations for days in the range [105, 110].
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect to find 500 results as 100 results per day for 5 days starting
   // with day 105.
@@ -327,24 +327,24 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   expected_first_day_index = 105;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
-  // Same query as above except set include_system_profile = true.
-  include_system_profile = true;
+  // Same query as above except set system_profile_fields = true.
+  system_profile_fields.Add(SystemProfileField::BOARD_NAME);
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect the same results as above except with a SystemProfile.
-  expected_vendor_name = "fake vendor name";
+  expected_board_name = "fake board name";
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   // Reset the values
-  include_system_profile = false;
-  expected_vendor_name = "";
+  system_profile_fields = {};
+  expected_board_name = "";
 
   //------------------------------------------------------------
 
@@ -355,7 +355,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
 
   // Query for observations for days in the range [105, 110].
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect to find 500 results as 100 results per day for 5 days starting
   // with day 105.
@@ -363,24 +363,24 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   expected_first_day_index = 105;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
-  // Same query as above except set include_system_profile = true.
-  include_system_profile = true;
+  // Same query as above except set system_profile_fields = true.
+  system_profile_fields.Add(SystemProfileField::BOARD_NAME);
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect the same results as above except with a SystemProfile.
-  expected_vendor_name = "fake vendor name";
+  expected_board_name = "fake board name";
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   // Reset the values
-  include_system_profile = false;
-  expected_vendor_name = "";
+  system_profile_fields = {};
+  expected_board_name = "";
 
   /////////////////////////////////////////////////////////////////
   // Queries for metric 2
@@ -389,7 +389,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
 
   // Query for observations for days in the range [50, 150].
   full_results = this->QueryFullResults(metric_id, 50, 150, requested_num_parts,
-                                        include_system_profile, 100);
+                                        system_profile_fields, 100);
 
   // Expect to find 2000 results as 200 results per day for 10 days starting
   // with day 101.
@@ -400,55 +400,55 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   expected_first_day_index = 101;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
-  // Same query as above except set include_system_profile = true.
-  include_system_profile = true;
+  // Same query as above except set system_profile_fields = true.
+  system_profile_fields.Add(SystemProfileField::BOARD_NAME);
   full_results = this->QueryFullResults(metric_id, 50, 150, requested_num_parts,
-                                        include_system_profile, 100);
+                                        system_profile_fields, 100);
 
   // Expect the same results including *no* SystemProfile because we never
   // wrote one to the database.
-  expected_vendor_name = "";
+  expected_board_name = "";
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   // Reset the values
-  include_system_profile = false;
-  expected_vendor_name = "";
+  system_profile_fields = {};
+  expected_board_name = "";
 
   //------------------------------------------------------------
 
   // Query for observations for days in the range [0, UINT32_MAX].
   full_results =
       this->QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts,
-                             include_system_profile, 100);
+                             system_profile_fields, 100);
 
   // Expect the same results as above.
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
   // Query for observations for days in the range [100, 105].
   full_results = this->QueryFullResults(
-      metric_id, 100, 105, requested_num_parts, include_system_profile, 100);
+      metric_id, 100, 105, requested_num_parts, system_profile_fields, 100);
 
   // Expect to find 1000 results as 200 results per day for 5 days.
   expected_num_results = 1000;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
   // Query for observations for days in the range [105, 110].
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect to find 1200 results as 200 results per day for 6 days starting
   // with day 105.
@@ -456,7 +456,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   expected_first_day_index = 105;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
@@ -466,7 +466,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
 
   // Query for observations for days in the range [105, 110].
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect to find 1200 results as 200 results per day for 6 days starting
   // with day 105.
@@ -474,25 +474,25 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   expected_first_day_index = 105;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
-  // Same query as above except set include_system_profile = true.
-  include_system_profile = true;
+  // Same query as above except set system_profile_fields = true.
+  system_profile_fields.Add(SystemProfileField::BOARD_NAME);
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect the same results including *no* SystemProfile because we never
   // wrote one to the database.
-  expected_vendor_name = "";
+  expected_board_name = "";
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   // Reset the values
-  include_system_profile = false;
-  expected_vendor_name = "";
+  system_profile_fields = {};
+  expected_board_name = "";
 
   //------------------------------------------------------------
 
@@ -501,7 +501,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
 
   // Query for observations for days in the range [105, 110].
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect to find 1200 results as 200 results per day for 6 days starting
   // with day 105.
@@ -509,25 +509,25 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   expected_first_day_index = 105;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   //------------------------------------------------------------
 
-  // Same query as above except set include_system_profile = true.
-  include_system_profile = true;
+  // Same query as above except set system_profile_fields = true.
+  system_profile_fields.Add(SystemProfileField::BOARD_NAME);
   full_results = this->QueryFullResults(
-      metric_id, 105, 110, requested_num_parts, include_system_profile, 100);
+      metric_id, 105, 110, requested_num_parts, system_profile_fields, 100);
 
   // Expect the same results including *no* SystemProfile because we never
   // wrote one to the database.
-  expected_vendor_name = "";
+  expected_board_name = "";
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 
   // Reset the values
-  include_system_profile = false;
-  expected_vendor_name = "";
+  system_profile_fields = {};
+  expected_board_name = "";
 
   /////////////////////////////////////////////////////////////////
   // Queries for metric 3
@@ -537,7 +537,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   metric_id = 3;
   full_results =
       this->QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts,
-                             include_system_profile, 100);
+                             system_profile_fields, 100);
   EXPECT_EQ(0u, full_results.size());
 
   /////////////////////////////////////////////////////////////////
@@ -548,7 +548,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   metric_id = 0;
   full_results =
       this->QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts,
-                             include_system_profile, 100);
+                             system_profile_fields, 100);
   EXPECT_EQ(0u, full_results.size());
 
   /////////////////////////////////////////////////////////////////
@@ -559,7 +559,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   // For metric 1 expect to find 0 results.
   full_results =
       this->QueryFullResults(metric_id, 0, UINT32_MAX, requested_num_parts,
-                             include_system_profile, 100);
+                             system_profile_fields, 100);
   EXPECT_EQ(0u, full_results.size());
 
   // For metric 2 the results should be the same as above.
@@ -567,7 +567,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
 
   // Query for observations for days in the range [50, 150].
   full_results = this->QueryFullResults(metric_id, 50, 150, requested_num_parts,
-                                        include_system_profile, 100);
+                                        system_profile_fields, 100);
 
   // Expect to find 2000 results as 200 results per day for 10 days starting
   // with day 101.
@@ -578,7 +578,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, AddAndQuery) {
   expected_first_day_index = 101;
   this->CheckFullResults(full_results, expected_num_results,
                          expected_num_results_per_day, expected_num_parts,
-                         expected_first_day_index, expected_vendor_name);
+                         expected_first_day_index, expected_board_name);
 }
 
 TYPED_TEST_P(ObservationStoreAbstractTest, QueryWithInvalidArguments) {
@@ -597,7 +597,7 @@ TYPED_TEST_P(ObservationStoreAbstractTest, QueryWithInvalidArguments) {
   ObservationStore::QueryResponse query_response =
       this->observation_store_->QueryObservations(
           customer_id, project_id, metric_id, first_day_index, last_day_index,
-          parts, false, 0, pagination_token);
+          parts, {}, 0, pagination_token);
 
   EXPECT_EQ(kInvalidArguments, query_response.status);
 
@@ -607,21 +607,21 @@ TYPED_TEST_P(ObservationStoreAbstractTest, QueryWithInvalidArguments) {
                                       first_day_index, 0, 0);
   query_response = this->observation_store_->QueryObservations(
       customer_id, project_id, metric_id, first_day_index, last_day_index,
-      parts, false, 100, pagination_token);
+      parts, {}, 100, pagination_token);
   EXPECT_EQ(kOK, query_response.status);
 
   // Try to use a last_day_index < first_day_index. Expect kInvalidArguments.
   last_day_index = first_day_index - 1;
   query_response = this->observation_store_->QueryObservations(
       customer_id, project_id, metric_id, first_day_index, last_day_index,
-      parts, false, 100, "");
+      parts, {}, 100, "");
   EXPECT_EQ(kInvalidArguments, query_response.status);
 
   // Switch to last_day_index = first_day_index. Expect kOK.
   last_day_index = first_day_index;
   query_response = this->observation_store_->QueryObservations(
       customer_id, project_id, metric_id, first_day_index, last_day_index,
-      parts, false, 100, "");
+      parts, {}, 100, "");
   EXPECT_EQ(kOK, query_response.status);
 }
 

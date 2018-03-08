@@ -471,7 +471,7 @@ grpc::Status HistogramAnalysisEngine::PerformAnalysis(
 
     for (auto& row : sub_results) {
       // This should always be true since this is the HistogramAnalysisEngine.
-      if (row.has_histogram()) {
+      if (row.has_histogram() && decoder_group.second.profile != nullptr) {
         *row.mutable_histogram()->mutable_system_profile() =
             *decoder_group.second.profile;
       }
@@ -502,7 +502,9 @@ DecoderAdapter* HistogramAnalysisEngine::GetDecoder(
   }
 
   std::string group_by;
-  profile->SerializeToString(&group_by);
+  if (profile != nullptr) {
+    profile->SerializeToString(&group_by);
+  }
 
   auto group = grouped_decoders_.find(group_by);
   if (group == grouped_decoders_.end()) {

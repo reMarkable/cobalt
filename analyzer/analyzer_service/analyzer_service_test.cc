@@ -19,6 +19,7 @@
 
 #include "analyzer/store/bigtable_store.h"
 #include "analyzer/store/memory_store.h"
+#include "config/metric_config.h"
 #include "util/encrypted_message_util.h"
 
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
@@ -31,9 +32,10 @@ using grpc::Status;
 namespace cobalt {
 namespace analyzer {
 
+using config::SystemProfileFields;
+using store::DataStore;
 using store::MemoryStore;
 using store::MemoryStoreSingleton;
-using store::DataStore;
 using store::ObservationStore;
 
 const int kAnalyzerPort = 8080;
@@ -109,10 +111,10 @@ TEST_F(AnalyzerServiceTest, TestGRPC) {
 
   // Query the ObservationStore
   std::vector<std::string> parts;
-  bool include_system_profile = false;
+  SystemProfileFields included_system_profile_fields = {};
   auto query_response = observation_store_->QueryObservations(
       kCustomerId, kProjectId, kMetricId, 0, UINT32_MAX, parts,
-      include_system_profile, UINT32_MAX, "");
+      included_system_profile_fields, UINT32_MAX, "");
   ASSERT_EQ(store::kOK, query_response.status);
 
   // There should be one Observation in the response.

@@ -25,6 +25,7 @@
 #include "./observation.pb.h"
 #include "analyzer/store/bigtable_store.h"
 #include "analyzer/store/observation_store.h"
+#include "config/metric_config.h"
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "util/crypto_util/base64.h"
@@ -33,6 +34,7 @@ namespace cobalt {
 
 using analyzer::store::BigtableStore;
 using analyzer::store::ObservationStore;
+using config::SystemProfileFields;
 using crypto::Base64Encode;
 
 DEFINE_uint32(customer, 1, "Customer ID");
@@ -286,9 +288,11 @@ void ObservationQuerier::CountObservations() {
   const size_t batch_size = std::min(FLAGS_max_num - num_observations, 10000ul);
   std::string pagination_token = "";
   do {
+    SystemProfileFields fields;
+    fields.Add(SystemProfileField::BOARD_NAME);
     auto query_response = observation_store_->QueryObservations(
         customer_, project_, FLAGS_metric, 0, INT32_MAX,
-        std::vector<std::string>(), true, batch_size, pagination_token);
+        std::vector<std::string>(), fields, batch_size, pagination_token);
     if (query_response.status != analyzer::store::kOK) {
       LOG(FATAL) << "Query failed with code: " << query_response.status;
       return;
@@ -355,9 +359,11 @@ void ObservationQuerier::Query(const std::vector<std::string>& command) {
     return;
   }
 
+  SystemProfileFields fields;
+  fields.Add(SystemProfileField::BOARD_NAME);
   auto query_response = observation_store_->QueryObservations(
       customer_, project_, metric_, 0, INT32_MAX, std::vector<std::string>(),
-      true, max_num, "");
+      fields, max_num, "");
 
   if (query_response.status != analyzer::store::kOK) {
     *ostream_ << "Query failed with code: " << query_response.status

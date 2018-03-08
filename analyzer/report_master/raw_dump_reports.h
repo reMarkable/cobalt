@@ -17,6 +17,8 @@
 namespace cobalt {
 namespace analyzer {
 
+using config::SystemProfileFields;
+
 // An implementation of ReportRowIterator that yields the rows of a RAW_DUMP
 // report. Each yielded report row is essentially a copy of a subset of a raw
 // unencoded Observation from the Observation Store. A RawDumpReportRowIterator
@@ -27,18 +29,18 @@ class RawDumpReportRowIterator : public ReportRowIterator {
  public:
   // Constructor.
   // The first seven parameters, (customer_id, project_id, metric_id,
-  // start_day_index, end_day_index, parts, include_system_profiles) are passed
-  // directly to ObservationStore::QueryObservations() and define the query
-  // that this iterator wraps.
-  // |report_id_string| is used only for log messages. It should be a string
-  // that identifies the ReportId that this iterator is in service of.
-  // |observation_store| The ObservationStore
+  // start_day_index, end_day_index, parts, included_system_profile_fields) are
+  // passed directly to ObservationStore::QueryObservations() and define the
+  // query that this iterator wraps. |report_id_string| is used only for log
+  // messages. It should be a string that identifies the ReportId that this
+  // iterator is in service of. |observation_store| The ObservationStore
   // |analyzer_config| The current version of Cobalt's metric, encoding and
   //                   report configuration.
   RawDumpReportRowIterator(
       uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
       uint32_t start_day_index, uint32_t end_day_index,
-      std::vector<std::string> parts, bool include_system_profiles,
+      std::vector<std::string> parts,
+      const SystemProfileFields& included_system_profile_fields,
       std::string report_id_string_,
       std::shared_ptr<store::ObservationStore> observation_store,
       std::shared_ptr<config::AnalyzerConfig> analyzer_config);
@@ -107,7 +109,7 @@ class RawDumpReportRowIterator : public ReportRowIterator {
   const uint32_t start_day_index_;
   const uint32_t end_day_index_;
   const std::vector<std::string> parts_;
-  const bool include_system_profiles_;
+  const SystemProfileFields included_system_profile_fields_;
   std::shared_ptr<store::ObservationStore> observation_store_;
   // The data types of the metric parts from the Metric configuration,
   // in the order specified by parts_. We expect each input Observation

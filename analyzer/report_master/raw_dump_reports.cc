@@ -26,7 +26,8 @@ const char kRawDumpReportError[] = "raw-dump-report-error";
 RawDumpReportRowIterator::RawDumpReportRowIterator(
     uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
     uint32_t start_day_index, uint32_t end_day_index,
-    std::vector<std::string> parts, bool include_system_profiles,
+    std::vector<std::string> parts,
+    const SystemProfileFields& included_system_profile_fields,
     std::string report_id_string,
     std::shared_ptr<store::ObservationStore> observation_store,
     std::shared_ptr<AnalyzerConfig> analyzer_config)
@@ -37,7 +38,7 @@ RawDumpReportRowIterator::RawDumpReportRowIterator(
       start_day_index_(start_day_index),
       end_day_index_(end_day_index),
       parts_(std::move(parts)),
-      include_system_profiles_(include_system_profiles),
+      included_system_profile_fields_(included_system_profile_fields),
       observation_store_(observation_store) {
   std::ostringstream stream;
   stream << "(" << customer_id << ", " << project_id << ", " << metric_id
@@ -251,7 +252,8 @@ void RawDumpReportRowIterator::QueryObservations(std::string pagination_token) {
   static const size_t kMaxResultsPerQuery = 1000;
   query_response_ = observation_store_->QueryObservations(
       customer_id_, project_id_, metric_id_, start_day_index_, end_day_index_,
-      parts_, include_system_profiles_, kMaxResultsPerQuery, pagination_token);
+      parts_, included_system_profile_fields_, kMaxResultsPerQuery,
+      pagination_token);
   if (query_response_.status != store::kOK) {
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
         << "QueryObservations() returned error "

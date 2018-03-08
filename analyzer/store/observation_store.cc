@@ -217,6 +217,28 @@ bool ParseEncryptedSystemProfile(SystemProfile* system_profile,
   return system_profile->ParseFromString(bytes);
 }
 
+// Copies SystemProfile fields from |src| to |dst| based on the list of
+// SystemProfileFields.
+void WriteFilteredSystemProfile(SystemProfile* dst,
+                                std::unique_ptr<SystemProfile> src,
+                                const SystemProfileFields& fields) {
+  if (src != nullptr && dst != nullptr) {
+    for (int field : fields) {
+      switch (field) {
+        case SystemProfileField::OS:
+          dst->set_os(src->os());
+          break;
+        case SystemProfileField::ARCH:
+          dst->set_arch(src->arch());
+          break;
+        case SystemProfileField::BOARD_NAME:
+          dst->set_allocated_board_name(src->release_board_name());
+          break;
+      }
+    }
+  }
+}
+
 }  // namespace internal
 
 ObservationStore::ObservationStore(std::shared_ptr<DataStore> store)
@@ -260,8 +282,9 @@ Status ObservationStore::AddObservationBatch(
 ObservationStore::QueryResponse ObservationStore::QueryObservations(
     uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
     uint32_t start_day_index, uint32_t end_day_index,
-    std::vector<std::string> parts, bool include_system_profiles,
-    size_t max_results, std::string pagination_token) {
+    std::vector<std::string> parts,
+    const SystemProfileFields& system_profile_fields, size_t max_results,
+    std::string pagination_token) {
   ObservationStore::QueryResponse query_response;
   std::string start_row;
   bool inclusive = true;
@@ -288,7 +311,7 @@ ObservationStore::QueryResponse ObservationStore::QueryObservations(
     return query_response;
   }
 
-  if (!parts.empty() && include_system_profiles) {
+  if (!parts.empty() && system_profile_fields.size() > 0) {
     // If parts is empty this will indicate to the underlying DataStore that
     // we wish to retrieve all columns and so we don't want to append the
     // column name for SystemProfile because this would change the meaning
@@ -320,13 +343,15 @@ ObservationStore::QueryResponse ObservationStore::QueryObservations(
       const std::string& column_name = pair.first;
       const std::string& column_value = pair.second;
       if (column_name == kSystemProfileColumnName) {
-        if (include_system_profiles) {
-          if (!ParseEncryptedSystemProfile(
-                  query_result.metadata.mutable_system_profile(),
-                  column_value)) {
+        if (system_profile_fields.size() > 0) {
+          auto profile = std::make_unique<SystemProfile>();
+          if (!ParseEncryptedSystemProfile(profile.get(), column_value)) {
             query_response.status = kOperationFailed;
             return query_response;
           }
+          internal::WriteFilteredSystemProfile(
+              query_result.metadata.mutable_system_profile(),
+              std::move(profile), system_profile_fields);
         }
       } else {
         // The column name is a metric part name so we add an ObservationPart

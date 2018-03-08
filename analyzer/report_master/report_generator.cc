@@ -91,30 +91,6 @@ grpc::Status CheckStatusFromGet(Status status, const ReportId& report_id) {
   }
 }
 
-// Constructs a new SystemProfile by moving the subset of fields specified in
-// the ReportConfig out of |profile|.
-std::unique_ptr<SystemProfile> FilterSystemProfile(
-    const ReportConfig& config, std::unique_ptr<SystemProfile> profile) {
-  auto filtered_profile = std::make_unique<SystemProfile>();
-  if (profile != nullptr) {
-    for (int field : config.system_profile_field()) {
-      switch (field) {
-        case SystemProfileField::OS:
-          filtered_profile->set_os(profile->os());
-          break;
-        case SystemProfileField::ARCH:
-          filtered_profile->set_arch(profile->arch());
-          break;
-        case SystemProfileField::BOARD_NAME:
-          filtered_profile->set_allocated_board_name(
-              profile->release_board_name());
-          break;
-      }
-    }
-  }
-  return filtered_profile;
-}
-
 }  // namespace
 
 ReportGenerator::ReportGenerator(
@@ -308,8 +284,6 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
   std::vector<std::string> parts(1);
   parts[0] = variables[0].report_variable->metric_part();
 
-  bool include_system_profile = report_config.system_profile_field_size() > 0;
-
   // We iteratively query in batches of size 1000.
   static const size_t kMaxResultsPerIteration = 1000;
   do {
@@ -319,7 +293,7 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
     query_response = observation_store_->QueryObservations(
         report_config.customer_id(), report_config.project_id(),
         report_config.metric_id(), first_day_index, last_day_index, parts,
-        include_system_profile, kMaxResultsPerIteration,
+        report_config.system_profile_field(), kMaxResultsPerIteration,
         query_response.pagination_token);
 
     if (query_response.status != store::kOK) {
@@ -339,17 +313,14 @@ grpc::Status ReportGenerator::GenerateHistogramReport(
       CHECK_EQ(1, query_result.observation.parts_size());
       const auto& observation_part =
           query_result.observation.parts().at(parts[0]);
-      std::unique_ptr<SystemProfile> profile(
-          query_result.metadata.release_system_profile());
-      auto filtered_profile =
-          FilterSystemProfile(report_config, std::move(profile));
       // Process each ObservationPart using the HistogramAnalysisEngine.
       // TODO(rudominer) This method returns false when the Observation was
       // bad in some way. This should be kept track of through a monitoring
       // counter.
-      analysis_engine.ProcessObservationPart(query_result.metadata.day_index(),
-                                             observation_part,
-                                             std::move(filtered_profile));
+      analysis_engine.ProcessObservationPart(
+          query_result.metadata.day_index(), observation_part,
+          std::unique_ptr<SystemProfile>(
+              query_result.metadata.release_system_profile()));
     }
   } while (!query_response.pagination_token.empty());
 
@@ -417,15 +388,14 @@ grpc::Status ReportGenerator::GenerateRawDumpReport(
   }
 
   // TODO(rudominer) Support reports that include the SystemProfile.
-  bool include_system_profile = false;
+  SystemProfileFields system_profile_fields = {};
 
   CHECK(row_iterator);
   row_iterator->reset(new RawDumpReportRowIterator(
       report_config.customer_id(), report_config.project_id(),
       report_config.metric_id(), first_day_index, last_day_index,
-      std::move(parts), include_system_profile,
-      ReportStore::ToString(report_id), observation_store_,
-      config_manager_->GetCurrent()));
+      std::move(parts), system_profile_fields, ReportStore::ToString(report_id),
+      observation_store_, config_manager_->GetCurrent()));
 
   return grpc::Status::OK;
 }

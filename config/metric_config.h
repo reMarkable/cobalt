@@ -25,6 +25,8 @@ namespace config {
 // is used only on the Analyzer.
 typedef Registry<RegisteredMetrics> MetricRegistry;
 
+typedef google::protobuf::RepeatedField<int> SystemProfileFields;
+
 // For ease of understanding we specify the interfaces below as if
 // MetricRegistry were not a template specializations but a stand-alone class.
 

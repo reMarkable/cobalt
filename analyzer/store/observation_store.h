@@ -21,10 +21,14 @@
 
 #include "./observation.pb.h"
 #include "analyzer/store/data_store.h"
+#include "config/metric_config.h"
+#include "config/report_configs.pb.h"
 
 namespace cobalt {
 namespace analyzer {
 namespace store {
+
+using cobalt::config::SystemProfileFields;
 
 // An ObservationStore is used for storing and retrieving Observations.
 // Observations are added to the store by the Analyzer Service when they
@@ -104,8 +108,11 @@ class ObservationStore {
   // the specified parts. If |parts| is empty there will be no restriction
   // on observation parts.
   //
-  // |include_system_profiles| Determines whether the SystemProfile associated
-  // with each Observation should be included in the result. The
+  // |system_profile_fields| specifies which SystemProfile fields should be
+  // included in the ObservationMetadata of each returned QueryResult. The
+  // requested fields may not be available if they were not sent by the encoder
+  // client.
+  //
   // |system_profile| field within the |metadata| field of QueryResult may be
   // NULL even if this parameter is true, if the encoder client did not send
   // a SystemProfile with the Observation.
@@ -127,13 +134,12 @@ class ObservationStore {
   //
   // See the comments on |QueryResponse| for an explanation of how
   // to interpret the response.
-  QueryResponse QueryObservations(uint32_t customer_id, uint32_t project_id,
-                                  uint32_t metric_id, uint32_t start_day_index,
-                                  uint32_t end_day_index,
-                                  std::vector<std::string> parts,
-                                  bool include_system_profiles,
-                                  size_t max_results,
-                                  std::string pagination_token);
+  QueryResponse QueryObservations(
+      uint32_t customer_id, uint32_t project_id, uint32_t metric_id,
+      uint32_t start_day_index, uint32_t end_day_index,
+      std::vector<std::string> parts,
+      const SystemProfileFields& system_profile_fields, size_t max_results,
+      std::string pagination_token);
 
   // Permanently deletes all observations in the observation store for the
   // given metric.

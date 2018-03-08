@@ -229,7 +229,7 @@ class RawDumpReportRowIteratorTest : public testing::Test {
       parts[i] = PartName(part_nums[i]);
     }
     iterator_.reset(new RawDumpReportRowIterator(
-        kCustomerId, kProjectId, metric_id, kDayIndex, kDayIndex, parts, false,
+        kCustomerId, kProjectId, metric_id, kDayIndex, kDayIndex, parts, {},
         "report_id_string", observation_store_, analyzer_config_));
   }
 
