@@ -54,6 +54,7 @@ const uint32_t kMetricId = 1;
 const uint32_t kJointReportConfigId = 1;
 const uint32_t kRawDumpReportConfigId = 1;
 const uint32_t kGroupedReportConfigId = 3;
+const uint32_t kGroupedRawDumpReportConfigId = 4;
 const uint32_t kForculusEncodingConfigId = 1;
 const uint32_t kBasicRapporEncodingConfigId = 2;
 const uint32_t kNoOpEncodingConfigId = 3;
@@ -191,6 +192,28 @@ element {
     }
   }
 }
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 4
+  metric_id: 1
+  variable {
+    metric_part: "Part1"
+  }
+  variable {
+    metric_part: "Part2"
+  }
+  system_profile_field: [BOARD_NAME]
+  report_type: RAW_DUMP
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "BUCKET-NAME"
+    }
+  }
+}
+
 
 )";
 
@@ -410,6 +433,29 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     return report;
   }
 
+  GeneratedReport GenerateGroupedRawDumpReport(bool export_report,
+                                               bool in_store) {
+    report_id_.set_report_config_id(testing::kGroupedRawDumpReportConfigId);
+    report_id_.set_sequence_num(0);
+    // Start a report for the specified variable, for the interval of days
+    // [kDayIndex, kDayIndex].
+    std::string export_name = export_report ? "export_name" : "";
+    EXPECT_EQ(store::kOK,
+              report_store_->StartNewReport(
+                  testing::kDayIndex, testing::kDayIndex, true, export_name,
+                  in_store, RAW_DUMP, {0, 1}, &report_id_));
+
+    // Generate the report
+    EXPECT_TRUE(report_generator_->GenerateReport(report_id_).ok());
+
+    // Fetch the report from the ReportStore.
+    GeneratedReport report;
+    EXPECT_EQ(store::kOK, report_store_->GetReport(report_id_, &report.metadata,
+                                                   &report.rows));
+
+    return report;
+  }
+
   // Adds to the ObservationStore a bunch of Observations of our test metric
   // that use our test Forculus encoding config in which the Forculus threshold
   // is 20. Each Observation is generated as if from a different client.
@@ -519,6 +565,21 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
     AddObservations("Apple", testing::kNoOpEncodingConfigId, 1);
     AddObservations("Banana", testing::kNoOpEncodingConfigId, 2);
     AddObservations("Cantaloupe", testing::kNoOpEncodingConfigId, 3);
+  }
+
+  void AddGroupedUnencodedObservations() {
+    AddObservations("Apple", testing::kNoOpEncodingConfigId, 1,
+                    MakeProfile("foo"));
+    AddObservations("Apple", testing::kNoOpEncodingConfigId, 1,
+                    MakeProfile("bar"));
+    AddObservations("Banana", testing::kNoOpEncodingConfigId, 2,
+                    MakeProfile("foo"));
+    AddObservations("Banana", testing::kNoOpEncodingConfigId, 2,
+                    MakeProfile("bar"));
+    AddObservations("Cantaloupe", testing::kNoOpEncodingConfigId, 3,
+                    MakeProfile("foo"));
+    AddObservations("Cantaloupe", testing::kNoOpEncodingConfigId, 3,
+                    MakeProfile("bar"));
   }
 
   // This method should be invoked after invoking AddBasicRapporObservations()
@@ -632,18 +693,86 @@ class ReportGeneratorAbstractTest : public ::testing::Test {
       size_t apple_lines = 0;
       size_t banana_lines = 0;
       size_t cantaloupe_lines = 0;
-      for (auto i = 1; i < 7; i++) {
+      for (auto i = 1ul; i < csv_lines.size(); i++) {
         if (csv_lines[i] == "2016-12-2,\"Apple\",\"Apple\"") {
           apple_lines++;
         } else if (csv_lines[i] == "2016-12-2,\"Banana\",\"Banana\"") {
           banana_lines++;
-        } else if ("2016-12-2,\"Cantaloupe\",\"Cantaloupe\"") {
+        } else if (csv_lines[i] == "2016-12-2,\"Cantaloupe\",\"Cantaloupe\"") {
           cantaloupe_lines++;
         }
       }
       EXPECT_EQ(1u, apple_lines);
       EXPECT_EQ(2u, banana_lines);
       EXPECT_EQ(3u, cantaloupe_lines);
+    }
+  }
+
+  void CheckGroupedRawDumpReport(const GeneratedReport& report) {
+    EXPECT_EQ(RAW_DUMP, report.metadata.report_type());
+    EXPECT_EQ(2, report.metadata.variable_indices_size());
+    EXPECT_EQ(0u, report.metadata.variable_indices(0));
+    EXPECT_EQ(1u, report.metadata.variable_indices(1));
+    if (report.metadata.in_store()) {
+      EXPECT_EQ(6, report.rows.rows_size());
+    } else {
+      EXPECT_EQ(0, report.rows.rows_size());
+    }
+    if (report.metadata.export_name() == "") {
+      EXPECT_FALSE(this->fake_uploader_->upload_was_invoked);
+    } else {
+      EXPECT_TRUE(this->fake_uploader_->upload_was_invoked);
+      // Reset for next time
+      this->fake_uploader_->upload_was_invoked = false;
+      EXPECT_EQ("BUCKET-NAME", fake_uploader_->bucket);
+      EXPECT_EQ("1_1_4/export_name.csv", fake_uploader_->path);
+      EXPECT_EQ("text/csv", fake_uploader_->mime_type);
+      LOG(INFO) << "COUNT OF ROWS: " << report.rows.rows_size();
+      for (const auto& row : report.rows.rows()) {
+        LOG(INFO) << row.raw_dump().system_profile().board_name();
+      }
+      // Take the export CSV file and split it into lines.
+      std::stringstream csv_stream(fake_uploader_->serialized_report);
+      std::vector<std::string> csv_lines;
+      std::string line;
+      while (std::getline(csv_stream, line)) {
+        csv_lines.push_back(line);
+      }
+      EXPECT_EQ(13u, csv_lines.size());
+      // Check the header line.
+      EXPECT_EQ("date,Part1,Part2,Board_Name", csv_lines[0]);
+      // Check the body of the report. They are in random order so we
+      // need to count them and check the totals.
+      size_t apple_foo_lines = 0;
+      size_t banana_foo_lines = 0;
+      size_t cantaloupe_foo_lines = 0;
+      size_t apple_bar_lines = 0;
+      size_t banana_bar_lines = 0;
+      size_t cantaloupe_bar_lines = 0;
+      for (auto i = 1ul; i < csv_lines.size(); i++) {
+        LOG(INFO) << csv_lines[i];
+        if (csv_lines[i] == "2016-12-2,\"Apple\",\"Apple\",\"foo\"") {
+          apple_foo_lines++;
+        } else if (csv_lines[i] == "2016-12-2,\"Banana\",\"Banana\",\"foo\"") {
+          banana_foo_lines++;
+        } else if (csv_lines[i] ==
+                   "2016-12-2,\"Cantaloupe\",\"Cantaloupe\",\"foo\"") {
+          cantaloupe_foo_lines++;
+        } else if (csv_lines[i] == "2016-12-2,\"Apple\",\"Apple\",\"bar\"") {
+          apple_bar_lines++;
+        } else if (csv_lines[i] == "2016-12-2,\"Banana\",\"Banana\",\"bar\"") {
+          banana_bar_lines++;
+        } else if (csv_lines[i] ==
+                   "2016-12-2,\"Cantaloupe\",\"Cantaloupe\",\"bar\"") {
+          cantaloupe_bar_lines++;
+        }
+      }
+      EXPECT_EQ(1u, apple_foo_lines);
+      EXPECT_EQ(2u, banana_foo_lines);
+      EXPECT_EQ(3u, cantaloupe_foo_lines);
+      EXPECT_EQ(1u, apple_bar_lines);
+      EXPECT_EQ(2u, banana_bar_lines);
+      EXPECT_EQ(3u, cantaloupe_bar_lines);
     }
   }
 
@@ -757,8 +886,16 @@ TYPED_TEST_P(ReportGeneratorAbstractTest, RawDump) {
   this->CheckRawDumpReport(report);
 }
 
+TYPED_TEST_P(ReportGeneratorAbstractTest, GroupedRawDump) {
+  this->AddGroupedUnencodedObservations();
+  // Do exort the report. Don't store it to the store.
+  bool in_store = false;
+  auto report = this->GenerateGroupedRawDumpReport(true, in_store);
+  this->CheckGroupedRawDumpReport(report);
+}
+
 REGISTER_TYPED_TEST_CASE_P(ReportGeneratorAbstractTest, Forculus, BasicRappor,
-                           RawDump, GroupedBasicRappor);
+                           RawDump, GroupedBasicRappor, GroupedRawDump);
 
 }  // namespace analyzer
 }  // namespace cobalt

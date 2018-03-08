@@ -428,6 +428,15 @@ grpc::Status ReportSerializer::AppendCSVRawDumpHeaderRow(std::ostream* stream) {
     return status;
   }
 
+  if (report_config_->system_profile_field_size() > 0) {
+    num_columns_ += report_config_->system_profile_field_size();
+    (*stream) << kSeparator;
+    status = AppendCSVHeaderRowSystemProfileFields(stream);
+    if (!status.ok()) {
+      return status;
+    }
+  }
+
   (*stream) << std::endl;
 
   return grpc::Status::OK;
@@ -575,6 +584,28 @@ grpc::Status ReportSerializer::AppendCSVReportRow(const ReportRow& report_row,
   return grpc::Status::OK;
 }
 
+grpc::Status ReportSerializer::AppendCSVSystemProfileFields(
+    const SystemProfile& profile, std::ostream* stream) {
+  if (report_config_->system_profile_field_size() > 0) {
+    for (const auto& field : report_config_->system_profile_field()) {
+      (*stream) << kSeparator;
+      switch (field) {
+        case SystemProfileField::OS:
+          (*stream) << ToCSVString(cobalt::SystemProfile_OS_Name(profile.os()));
+          break;
+        case SystemProfileField::ARCH:
+          (*stream) << ToCSVString(
+              cobalt::SystemProfile_ARCH_Name(profile.arch()));
+          break;
+        case SystemProfileField::BOARD_NAME:
+          (*stream) << ToCSVString(profile.board_name());
+          break;
+      }
+    }
+  }
+  return grpc::Status::OK;
+}
+
 grpc::Status ReportSerializer::AppendCSVHistogramReportRow(
     const HistogramReportRow& report_row, std::ostream* stream) {
   size_t num_fixed_values = fixed_leftmost_column_values_.size();
@@ -601,24 +632,7 @@ grpc::Status ReportSerializer::AppendCSVHistogramReportRow(
   } else {
     (*stream) << ValueToString(report_row.value());
   }
-  if (report_config_->system_profile_field_size() > 0) {
-    for (const auto& field : report_config_->system_profile_field()) {
-      (*stream) << kSeparator;
-      switch (field) {
-        case SystemProfileField::OS:
-          (*stream) << ToCSVString(
-              cobalt::SystemProfile_OS_Name(report_row.system_profile().os()));
-          break;
-        case SystemProfileField::ARCH:
-          (*stream) << ToCSVString(cobalt::SystemProfile_ARCH_Name(
-              report_row.system_profile().arch()));
-          break;
-        case SystemProfileField::BOARD_NAME:
-          (*stream) << ToCSVString(report_row.system_profile().board_name());
-          break;
-      }
-    }
-  }
+  AppendCSVSystemProfileFields(report_row.system_profile(), stream);
   (*stream) << kSeparator << CountEstimateToString(report_row.count_estimate());
   (*stream) << kSeparator << StdErrToString(report_row.std_error())
             << std::endl;
@@ -629,7 +643,8 @@ grpc::Status ReportSerializer::AppendCSVRawDumpReportRow(
     const RawDumpReportRow& report_row, std::ostream* stream) {
   size_t num_fixed_values = fixed_leftmost_column_values_.size();
   size_t num_values_this_row = report_row.values_size();
-  if (num_columns_ != num_values_this_row + num_fixed_values) {
+  if (num_columns_ != num_values_this_row + num_fixed_values +
+                          report_config_->system_profile_field_size()) {
     std::ostringstream error_stream;
     error_stream << "Encountered a RawDumpReportRow with the wrong number of "
                     "values. Expecting "
@@ -647,8 +662,9 @@ grpc::Status ReportSerializer::AppendCSVRawDumpReportRow(
   for (size_t i = 0; i < num_values_this_row - 1; i++) {
     (*stream) << ValueToString(report_row.values(i)) << kSeparator;
   }
-  (*stream) << ValueToString(report_row.values(num_values_this_row - 1))
-            << std::endl;
+  (*stream) << ValueToString(report_row.values(num_values_this_row - 1));
+  AppendCSVSystemProfileFields(report_row.system_profile(), stream);
+  (*stream) << std::endl;
   return grpc::Status::OK;
 }
 

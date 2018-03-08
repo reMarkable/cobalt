@@ -387,15 +387,13 @@ grpc::Status ReportGenerator::GenerateRawDumpReport(
     parts[i] = variables[i].report_variable->metric_part();
   }
 
-  // TODO(rudominer) Support reports that include the SystemProfile.
-  SystemProfileFields system_profile_fields = {};
-
   CHECK(row_iterator);
   row_iterator->reset(new RawDumpReportRowIterator(
       report_config.customer_id(), report_config.project_id(),
       report_config.metric_id(), first_day_index, last_day_index,
-      std::move(parts), system_profile_fields, ReportStore::ToString(report_id),
-      observation_store_, config_manager_->GetCurrent()));
+      std::move(parts), report_config.system_profile_field(),
+      ReportStore::ToString(report_id), observation_store_,
+      config_manager_->GetCurrent()));
 
   return grpc::Status::OK;
 }

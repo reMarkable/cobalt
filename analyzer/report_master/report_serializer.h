@@ -118,6 +118,9 @@ class ReportSerializer {
   grpc::Status AppendCSVReportRow(const ReportRow& report_row,
                                   std::ostream* stream);
 
+  grpc::Status AppendCSVSystemProfileFields(const SystemProfile& profile,
+                                            std::ostream* stream);
+
   grpc::Status AppendCSVHistogramReportRow(const HistogramReportRow& report_row,
                                            std::ostream* stream);
 

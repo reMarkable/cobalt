@@ -249,6 +249,10 @@ message RawDumpReportRow {
   // have used the NoOp encoding. The order of the values here corresponds to
   // the order of the |variable|s in the ReportConfig.
   repeated ValuePart values = 1;
+
+  // The SystemProfile for this row. This will be populated with only the fields
+  // that are specified in the |system_profile_field| entry in the ReportConfig.
+  SystemProfile system_profile = 5;
 }
 
 // What state is the report generation in?

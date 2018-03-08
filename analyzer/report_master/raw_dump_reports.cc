@@ -178,6 +178,8 @@ void RawDumpReportRowIterator::TryBuildNextRow() {
   next_row_.Clear();
   RawDumpReportRow* dump = next_row_.mutable_raw_dump();
   Observation& observation = query_response_.results[result_index_].observation;
+  dump->set_allocated_system_profile(
+      query_response_.results[result_index_].metadata.release_system_profile());
   size_t part_index = 0;
   for (const auto& part_name : parts_) {
     auto part_iter = observation.parts().find(part_name);
