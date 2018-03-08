@@ -44,6 +44,14 @@ target_link_libraries(analyzer_config
     config_proto_lib)
 add_cobalt_dependencies(analyzer_config)
 
+# Build the client_config library
+add_library(client_config
+            client_config.cc
+            ${CONFIG_PROTO_HDRS})
+target_link_libraries(client_config
+    config_proto_lib cobalt_crypto)
+add_cobalt_dependencies(client_config)
+
 # Build the config_gen tool
 add_executable(config_gen config_gen.cc ${CONFIG_PROTO_HDRS})
 add_cobalt_dependencies(config_gen)
@@ -51,10 +59,12 @@ add_cobalt_dependencies(config_gen)
 # Build the tests
 add_executable(config_tests
                analyzer_config_test.cc
+               client_config_test.cc
                config_test.cc
                buckets_config_test.cc
                ${CONFIG_PROTO_HDRS})
 target_link_libraries(config_tests
+                      client_config
                       analyzer_config
                       buckets_config)
 add_cobalt_test_dependencies(config_tests ${DIR_GTESTS})
