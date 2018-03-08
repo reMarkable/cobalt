@@ -60,6 +60,8 @@ static const uint32_t kReportConfigId1 = 1;
 static const uint32_t kReportConfigId2 = 2;
 static const uint32_t kReportConfigId3 = 3;
 static const uint32_t kReportConfigId4 = 4;
+static const uint32_t kReportConfigId5 = 5;
+static const uint32_t kReportConfigId6 = 6;
 static const uint32_t kForculusEncodingConfigId = 1;
 static const uint32_t kBasicRapporStringEncodingConfigId = 2;
 static const uint32_t kBasicRapporIntEncodingConfigId = 3;
@@ -114,6 +116,7 @@ element {
       data_type: INT
     }
   }
+  system_profile_field: [BOARD_NAME]
 }
 
 # Metric 3 has one INDEX part.
@@ -128,6 +131,7 @@ element {
       data_type: INDEX
     }
   }
+  system_profile_field: [BOARD_NAME]
 }
 
 )";
@@ -296,6 +300,70 @@ element {
   }
 }
 
+# ReportConfig 5 specifies a RAW_DUMP report of both variables of Metric 2,
+# grouped by BOARD_NAME.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 5
+  metric_id: 2
+  variable {
+    metric_part: "Part1"
+  }
+  variable {
+    metric_part: "Part2"
+  }
+  report_type: RAW_DUMP
+  scheduling {
+    # report_finalization_days will default to 0.
+    # aggregation_epoch_type will default to DAY.
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "bucket.name.5"
+    }
+  }
+  system_profile_field: [BOARD_NAME]
+}
+
+# ReportConfig 6 is for metric 3 and gives labels for encoding config 4, grouped
+# by BOARD_NAME.
+element {
+  customer_id: 1
+  project_id: 1
+  id: 6
+  metric_id: 3
+  variable {
+    metric_part: "Part1"
+    index_labels {
+      labels {
+         key: 0
+         value: "Event A"
+      }
+      labels {
+         key: 1
+         value: "Event B"
+      }
+      labels {
+         key: 25
+         value: "Event Z"
+      }
+    }
+  }
+  scheduling {
+    # report_finalization_days will default to 0.
+    # aggregation_epoch_type will default to DAY.
+  }
+  export_configs {
+    csv {}
+    gcs {
+      bucket: "bucket.name.6"
+    }
+  }
+system_profile_field: [BOARD_NAME]
+}
+
 )";
 
 // An implementation of grpc::Writer that keeps a copy of each object
@@ -361,23 +429,22 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
               data_store_->DeleteAllRows(store::DataStore::kReportRows));
 
     // Parse the metric config string
-    auto metric_parse_result = config::FromString<RegisteredMetrics>(
-        kMetricConfigText, nullptr);
+    auto metric_parse_result =
+        config::FromString<RegisteredMetrics>(kMetricConfigText, nullptr);
     EXPECT_EQ(config::kOK, metric_parse_result.second);
     std::shared_ptr<config::MetricRegistry> metric_registry(
         metric_parse_result.first.release());
 
     // Parse the encoding config string
     auto encoding_parse_result =
-        config::FromString<RegisteredEncodings>(kEncodingConfigText,
-                                                        nullptr);
+        config::FromString<RegisteredEncodings>(kEncodingConfigText, nullptr);
     EXPECT_EQ(config::kOK, encoding_parse_result.second);
     std::shared_ptr<config::EncodingRegistry> encoding_config_registry(
         encoding_parse_result.first.release());
 
     // Parse the report config string
-    auto report_parse_result = config::FromString<RegisteredReports>(
-        kReportConfigText, nullptr);
+    auto report_parse_result =
+        config::FromString<RegisteredReports>(kReportConfigText, nullptr);
     EXPECT_EQ(config::kOK, report_parse_result.second);
     std::shared_ptr<config::ReportRegistry> report_config_registry(
         report_parse_result.first.release());
@@ -478,6 +545,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     metadata.set_project_id(kProjectId);
     metadata.set_metric_id(metric_id);
     metadata.set_day_index(day_index);
+    metadata.mutable_system_profile()->set_board_name("DummyBoard");
     EXPECT_EQ(store::kOK,
               observation_store_->AddObservationBatch(metadata, observations));
   }
@@ -498,6 +566,7 @@ class ReportMasterServiceAbstractTest : public ::testing::Test {
     metadata.set_project_id(kProjectId);
     metadata.set_metric_id(metric_id);
     metadata.set_day_index(day_index);
+    metadata.mutable_system_profile()->set_board_name("DummyBoard");
     EXPECT_EQ(store::kOK,
               observation_store_->AddObservationBatch(metadata, observations));
   }
@@ -1184,11 +1253,28 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
 <DATE>,"c",3
 )";
 
+  static const char kExpectedReport5[] = R"(date,Part1,Part2,Board_Name
+<DATE>,"a",1,"DummyBoard"
+<DATE>,"b",2,"DummyBoard"
+<DATE>,"b",2,"DummyBoard"
+<DATE>,"c",3,"DummyBoard"
+<DATE>,"c",3,"DummyBoard"
+<DATE>,"c",3,"DummyBoard"
+)";
+
+  static const char kExpectedReport6[] = R"(date,Part1,Board_Name,count,err
+<DATE>,"Event A","DummyBoard",5.000,0
+<DATE>,"Event B","DummyBoard",0,0
+<DATE>,"Event Z","DummyBoard",0,0
+)";
+
   // The keys to these maps are day indices and the values are the number of
   // reports found for that day.
   std::map<uint32_t, size_t> day_counts_for_report_1;
   std::map<uint32_t, size_t> day_counts_for_report_3;
   std::map<uint32_t, size_t> day_counts_for_report_4;
+  std::map<uint32_t, size_t> day_counts_for_report_5;
+  std::map<uint32_t, size_t> day_counts_for_report_6;
 
   size_t num_reports = this->fake_uploader_->buckets.size();
   ASSERT_TRUE(num_reports >= 120) << num_reports;
@@ -1213,6 +1299,14 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
       report_config_id = kReportConfigId4;
       day_counts = &day_counts_for_report_4;
       expected_report = std::string(kExpectedReport4);
+    } else if (this->fake_uploader_->buckets[i] == "bucket.name.5") {
+      report_config_id = kReportConfigId5;
+      day_counts = &day_counts_for_report_5;
+      expected_report = std::string(kExpectedReport5);
+    } else if (this->fake_uploader_->buckets[i] == "bucket.name.6") {
+      report_config_id = kReportConfigId6;
+      day_counts = &day_counts_for_report_6;
+      expected_report = std::string(kExpectedReport6);
     } else {
       FAIL() << this->fake_uploader_->buckets[i];
     }
@@ -1222,7 +1316,8 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
     ASSERT_LE(day_index, kDayIndex + 100);
     expected_report =
         this->ReplaceDateTokens(expected_report, kDateToken, day_index);
-    if (report_config_id == kReportConfigId4) {
+    if (report_config_id == kReportConfigId4 ||
+        report_config_id == kReportConfigId5) {
       this->CheckRawDumpReport(expected_report,
                                this->fake_uploader_->reports[i]);
     } else {
@@ -1244,7 +1339,7 @@ TYPED_TEST_P(ReportMasterServiceAbstractTest, EnableReportScheduling) {
     EXPECT_EQ(1u, day_counts_for_report_3[day_index]) << day_index;
     EXPECT_EQ(1u, day_counts_for_report_4[day_index]) << day_index;
   }
-}
+}  // namespace analyzer
 
 REGISTER_TYPED_TEST_CASE_P(ReportMasterServiceAbstractTest, StartAndGetReports,
                            E2EWithIndexLabels, QueryReportsTest,
