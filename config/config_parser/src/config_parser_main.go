@@ -10,6 +10,7 @@ package main
 import (
 	"config"
 	"config_parser"
+	"config_validator"
 	"flag"
 	"fmt"
 	"github.com/golang/glog"
@@ -91,6 +92,10 @@ func main() {
 	}
 
 	if err != nil {
+		glog.Exit(err)
+	}
+
+	if err = config_validator.ValidateConfig(&c); err != nil {
 		glog.Exit(err)
 	}
 

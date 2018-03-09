@@ -33,11 +33,17 @@ set(CONFIG_PARSER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/git.go
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/output.go
                       ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/config_reader.go)
+
+set(CONFIG_VALIDATOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/validator.go
+                         ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/system_profile_field.go
+                         ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/metrics.go
+                         ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/reports.go)
 add_custom_command(OUTPUT ${CONFIG_PARSER_BINARY}
     # Compiles config_parser_main and all its dependencies.
     COMMAND ${GO_BIN} build -o ${CONFIG_PARSER_BINARY} config_parser_main.go
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser_main.go
     DEPENDS ${CONFIG_PARSER_SRC}
+    DEPENDS ${CONFIG_VALIDATOR_SRC}
     DEPENDS ${CONFIG_PB_GO_FILES}
     DEPENDS ${YAMLPB_SRC}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -49,6 +55,7 @@ set(CONFIG_PARSER_TEST_BIN ${GO_TESTS}/config_parser_test)
 set(CONFIG_PARSER_TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list_test.go
                             ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/config_reader_test.go
                             ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_config_test.go)
+
 add_custom_command(OUTPUT ${CONFIG_PARSER_TEST_BIN}
     COMMAND ${GO_BIN} test -c -o ${CONFIG_PARSER_TEST_BIN} ${CONFIG_PARSER_TEST_SRC} ${CONFIG_PARSER_SRC}
     DEPENDS ${CONFIG_PARSER_SRC}
@@ -58,9 +65,23 @@ add_custom_command(OUTPUT ${CONFIG_PARSER_TEST_BIN}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+set(CONFIG_VALIDATOR_TEST_BIN ${GO_TESTS}/config_validator_tests)
+set(CONFIG_VALIDATOR_TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/system_profile_field_test.go
+                              ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/reports_test.go
+                              ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/metrics_test.go
+                              ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/testutil.go)
+add_custom_command(OUTPUT ${CONFIG_VALIDATOR_TEST_BIN}
+  COMMAND ${GO_BIN} test -c -o ${CONFIG_VALIDATOR_TEST_BIN} ${CONFIG_VALIDATOR_TEST_SRC} ${CONFIG_VALIDATOR_SRC}
+  DEPENDS ${CONFIG_VALIDATOR_SRC}
+  DEPENDS ${CONFIG_VALIDATOR_TEST_SRC}
+  DEPENDS ${CONFIG_PB_GO_FILES}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 # Force the build to occur.
 add_custom_target(build_config_parser ALL
     DEPENDS ${YAMLPB_TEST_BIN}
     DEPENDS ${CONFIG_PARSER_TEST_BIN}
     DEPENDS ${CONFIG_PARSER_BINARY}
+    DEPENDS ${CONFIG_VALIDATOR_TEST_BIN}
 )

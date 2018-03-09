@@ -17,6 +17,10 @@ go_binary("bin") {
       source = "//third_party/cobalt/config/config_parser/src/config_parser"
     },
     {
+      package = "config_validator"
+      source = "//third_party/cobalt/config/config_parser/src/config_validator"
+    },
+    {
       package = "yamlpb"
       source = "//third_party/cobalt/config/config_parser/src/yamlpb"
     },
