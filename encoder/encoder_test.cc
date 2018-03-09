@@ -336,8 +336,6 @@ class FakeSystemData : public SystemDataInterface {
     system_profile_.set_os(SystemProfile::FUCHSIA);
     system_profile_.set_arch(SystemProfile::ARM_64);
     system_profile_.set_board_name("Testing Board");
-    system_profile_.mutable_cpu()->set_vendor_name("Fake Vendor Name");
-    system_profile_.mutable_cpu()->set_signature(1234567);
   }
 
   const SystemProfile& system_profile() const override {

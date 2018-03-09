@@ -32,10 +32,8 @@ var r = util.NewDeterministicRandom(int64(1))
 
 func NewFakeSystemProfile() *cobalt.SystemProfile {
 	return &cobalt.SystemProfile{
-		Os: cobalt.SystemProfile_FUCHSIA,
-		Cpu: &cobalt.SystemProfile_CPU{
-			VendorName: "FakeVendorName",
-		},
+		Os:        cobalt.SystemProfile_FUCHSIA,
+		BoardName: "FakeBoardName",
 	}
 }
 

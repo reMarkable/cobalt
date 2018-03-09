@@ -25,7 +25,6 @@ import (
 	"io"
 	"math"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -294,12 +293,6 @@ func SystemProfileToStrings(profile *cobalt.SystemProfile) []string {
 		}
 		if profile.Arch != cobalt.SystemProfile_UNKNOWN_ARCH {
 			fields = append(fields, profile.Arch.String())
-		}
-		if profile.GetCpu() != nil {
-			fields = append(fields, profile.GetCpu().VendorName)
-			if profile.GetCpu().Signature != 0 {
-				fields = append(fields, strconv.FormatInt(int64(profile.GetCpu().Signature), 10))
-			}
 		}
 		if profile.BoardName != "" {
 			fields = append(fields, profile.BoardName)

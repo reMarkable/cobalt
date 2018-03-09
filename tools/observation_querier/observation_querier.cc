@@ -222,17 +222,11 @@ std::string ToString(const SystemProfile::ARCH arch) {
   }
 }
 
-std::string ToString(const SystemProfile::CPU cpu) {
-  std::ostringstream stream;
-  stream << cpu.vendor_name() << " " << cpu.signature();
-  return stream.str();
-}
-
 std::string ToString(const SystemProfile& system_profile) {
   std::ostringstream stream;
   stream << "<" << ToString(system_profile.os()) << "|"
          << ToString(system_profile.arch()) << "|"
-         << ToString(system_profile.cpu()) << ">";
+         << system_profile.board_name() << ">";
   return stream.str();
 }
 

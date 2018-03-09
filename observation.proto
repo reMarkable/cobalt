@@ -120,6 +120,8 @@ message ObservationPart {
 // A SystemProfile describes the client system on which an Observation
 // is collected.
 message SystemProfile {
+  reserved 3;
+
   enum OS {
     UNKNOWN_OS = 0;
     FUCHSIA = 1;
@@ -132,18 +134,8 @@ message SystemProfile {
     ARM_64 = 2;
   }
 
-  // Information on the CPU (obtained by CPUID on X86).
-  message CPU {
-    // A 12 character string naming the vendor, e.g. "GeniuneIntel".
-    string vendor_name = 1;
-
-    // The signature reported by CPUID (from EAX).
-    uint32 signature = 2;
-  }
-
   OS os = 1;
   ARCH arch = 2;
-  CPU cpu = 3 [deprecated = true];
 
   // This is a string representing the board name of the device. If a board name
   // cannot be determined, then this field will be 'unknown:<cpu signature>'.

@@ -151,8 +151,7 @@ class FakeSystemData : public SystemDataInterface {
   FakeSystemData() {
     system_profile_.set_os(SystemProfile::FUCHSIA);
     system_profile_.set_arch(SystemProfile::ARM_64);
-    system_profile_.mutable_cpu()->set_vendor_name("Fake Vendor Name");
-    system_profile_.mutable_cpu()->set_signature(1234567);
+    system_profile_.set_board_name("Fake Board Name");
   }
 
   const SystemProfile& system_profile() const override {
@@ -163,8 +162,7 @@ class FakeSystemData : public SystemDataInterface {
     // SystemProfile is not placed in the envelope at this time.
     EXPECT_EQ(SystemProfile::UNKNOWN_OS, envelope.system_profile().os());
     EXPECT_EQ(SystemProfile::UNKNOWN_ARCH, envelope.system_profile().arch());
-    EXPECT_EQ("", envelope.system_profile().cpu().vendor_name());
-    EXPECT_EQ(0u, envelope.system_profile().cpu().signature());
+    EXPECT_EQ("", envelope.system_profile().board_name());
   }
 
  private:
