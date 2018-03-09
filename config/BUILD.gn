@@ -28,3 +28,16 @@ proto_library("cobalt_config_proto") {
 
   extra_configs = [ "//third_party/cobalt:cobalt_config" ]
 }
+
+static_library("client_config") {
+  sources = [
+    "client_config.cc",
+    "client_config.h",
+  ]
+  configs += [ "//third_party/cobalt:cobalt_config" ]
+
+  deps = [
+    "//garnet/public/lib/fxl",
+    "//third_party/cobalt:cobalt_proto",
+  ]
+}
