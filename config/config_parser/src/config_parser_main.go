@@ -53,6 +53,15 @@ func main() {
 		glog.Exit("'output_file' does not make sense if 'check_only' is set.")
 	}
 
+	var configLocation string
+	if *repoUrl != "" {
+		configLocation = *repoUrl
+	} else if *configFile != "" {
+		configLocation = *configFile
+	} else {
+		configLocation = *configDir
+	}
+
 	var outputFormatter config_parser.OutputFormatter
 	switch *outFormat {
 	case "bin":
@@ -64,24 +73,20 @@ func main() {
 		if *namespace != "" {
 			namespaceList = strings.Split(*namespace, ",")
 		}
-		outputFormatter = config_parser.CppOutputFactory(*varName, namespaceList)
+		outputFormatter = config_parser.CppOutputFactory(*varName, namespaceList, configLocation)
 	default:
 		glog.Exitf("'%v' is an invalid out_format parameter. 'bin', 'b64' and 'cpp' are the only valid values for out_format.", *outFormat)
 	}
 
 	// First, we parse the configuration from the specified location.
 	var c config.CobaltConfig
-	var configLocation string
 	var err error
 	if *repoUrl != "" {
-		configLocation = *repoUrl
 		gitTimeout := time.Duration(*gitTimeoutSec) * time.Second
 		c, err = config_parser.ReadConfigFromRepo(*repoUrl, gitTimeout)
 	} else if *configFile != "" {
-		configLocation = *configFile
 		c, err = config_parser.ReadConfigFromYaml(*configFile, uint32(*customerId), uint32(*projectId))
 	} else {
-		configLocation = *configDir
 		c, err = config_parser.ReadConfigFromDir(*configDir)
 	}
 
