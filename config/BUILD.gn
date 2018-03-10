@@ -37,6 +37,7 @@ static_library("client_config") {
   configs += [ "//third_party/cobalt:cobalt_config" ]
 
   deps = [
+    ":cobalt_config_proto",
     "//garnet/public/lib/fxl",
     "//third_party/cobalt:cobalt_proto",
   ]
