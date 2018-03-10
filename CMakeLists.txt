@@ -561,6 +561,50 @@ macro(cobalt_protobuf_generate_go TARGET_NAME SRCS_OUT USE_GRPC)
   set(${SRCS_OUT} ${_generated_srcs})
 endmacro()
 
+set(CONFIG_PARSER_BINARY "${CMAKE_BINARY_DIR}/config/config_parser/config_parser")
+
+# Runs the Cobalt config parser on a .yaml file containing Cobalt configuration
+# for a single project. Generates a C++ header file containing the definition
+# of a string containing the base64 encoding of the bytes of a serialized
+# CobaltConfig proto message containing the data specified in the YAML.
+# This is intended for use in tests.
+#
+# Args:
+# INPUT_YAML: Path to the YAML config file for the test
+# OUTFILE: Path to the .h file to produce
+# CUSTOMER_ID, PROJECTID: These are inserted into the generated CobaltConfig.
+# STRING_VAR_NAME: The C++ variable name to use in the .h file.
+#
+# example usage:
+#
+# set(ENCODER_TEST_CONFIG_H "${CMAKE_CURRENT_BINARY_DIR}/encoder_test_config.h")
+# generate_test_config_h(${CMAKE_CURRENT_SOURCE_DIR}/encoder_test_config.yaml
+#     ${ENCODER_TEST_CONFIG_H} 1 1 "cobalt_config_base64")
+#
+# This will parse the file "encoder_test_config.yaml" in the current source
+# directory and generate a C++ .h file in the current binary out directory
+# named "encoder_test_config.h". The header file will contain the definition of
+# a variable named |cobalt_config_base64| of type "const char[]" containing
+# the base64 encoded bytes of a serialized CobaltConfig proto message
+# corresponding to the configuration described in the YAML file, and for
+# customer_id=1, project_id=1.
+#
+# To use this in a test one would #include encoder_test_config.h and then
+# type something like the following:
+#
+# std::unique_ptr<ClientConfig> client_config =
+#      ClientConfig::CreateFromCobaltConfigBase64(cobalt_config_base64);
+macro(generate_test_config_h INPUT_YAML OUTFILE CUSTOMER_ID PROJECT_ID STRING_VAR_NAME)
+  set_source_files_properties(${OUTFILE} PROPERTIES GENERATED TRUE)
+  message("OUTFILE=${OUTFILE}")
+  add_custom_command(OUTPUT ${OUTFILE}
+    COMMAND ${CONFIG_PARSER_BINARY} -config_file=${INPUT_YAML} -customer_id=${CUSTOMER_ID} -project_id=${PROJECT_ID} -out_format=cpp -var_name=${STRING_VAR_NAME} -output_file=${OUTFILE}
+    DEPENDS ${INPUT_YAML}
+    DEPENDS ${CONFIG_PARSER_BINARY}
+  )
+endmacro()
+
+
 # Generate the C++ bindings for the Cobalt proto files in the root directory.
 # Also compile the generated C++ files into a static library.
 cobalt_make_protobuf_cpp_lib(cobalt_proto_lib

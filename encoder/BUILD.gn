@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//third_party/cobalt/cobalt_config_header.gni")
 import("//third_party/protobuf/proto_library.gni")
 
 static_library("encoder") {
@@ -53,12 +54,21 @@ static_library("client_secret") {
   ]
 }
 
+# Generate encoder_test_config.h containing the defintion of a string containing
+# the base64-encoded bytes of a serialized CobaltConfig proto message compiled
+# from encoder_test_config.yaml.
+cobalt_config_header("generate_encoder_test_config") {
+  input_yaml = "encoder_test_config.yaml"
+  output_file = "encoder_test_config.h"
+}
+
 source_set("unittests") {
   testonly = true
 
   sources = [
     "client_secret_test.cc",
     "encoder_test.cc",
+    "encoder_test_config.h",
     "envelope_maker_test.cc",
     "send_retryer_test.cc",
     "shipping_manager_test.cc",
@@ -68,6 +78,7 @@ source_set("unittests") {
 
   deps = [
     ":encoder",
+    ":generate_encoder_test_config",
     "//third_party/gflags",
     "//third_party/gtest",
 

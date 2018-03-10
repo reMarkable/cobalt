@@ -15,6 +15,10 @@
 set_source_files_properties(${COBALT_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 
+set(ENCODER_TEST_CONFIG_H "${CMAKE_CURRENT_BINARY_DIR}/encoder_test_config.h")
+generate_test_config_h(${CMAKE_CURRENT_SOURCE_DIR}/encoder_test_config.yaml
+      ${ENCODER_TEST_CONFIG_H} 1 1 "cobalt_config_base64")
+
 # client_secret library
 add_library(client_secret client_secret.cc)
 target_link_libraries(client_secret cobalt_crypto)
@@ -40,6 +44,7 @@ target_link_libraries(encoder
 add_cobalt_dependencies(encoder)
 
 add_executable(encoder_tests
+               ${ENCODER_TEST_CONFIG_H}
                client_secret_test.cc encoder_test.cc envelope_maker_test.cc
                send_retryer_test.cc shipping_manager_test.cc
                shuffler_client_test.cc system_data_test.cc)
@@ -47,3 +52,4 @@ target_link_libraries(encoder_tests
                       client_secret
                       encoder)
 add_cobalt_test_dependencies(encoder_tests ${DIR_GTESTS})
+add_dependencies(encoder_tests build_config_parser)

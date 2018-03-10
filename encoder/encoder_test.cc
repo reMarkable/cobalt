@@ -1,16 +1,6 @@
-// Copyright 2016 The Fuchsia Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2016 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 #include "encoder/encoder.h"
 
@@ -18,19 +8,21 @@
 
 #include "./gtest.h"
 #include "./logging.h"
-#include "config/config_text_parser.h"
+#include "config/client_config.h"
 #include "encoder/client_secret.h"
+// Generated from encoder_test_config.yaml
+#include "encoder/encoder_test_config.h"
 #include "encoder/project_context.h"
 #include "third_party/gflags/include/gflags/gflags.h"
 
 namespace cobalt {
 namespace encoder {
 
-using config::EncodingRegistry;
-using config::MetricRegistry;
+using config::ClientConfig;
 
 namespace {
 
+// These must match values specified in the build files.
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
 
@@ -42,292 +34,21 @@ const uint32_t kUtcDayIndex = 17137;
 // This is the day index for Thurs Dec 1, 2016
 const uint32_t kPacificDayIndex = 17136;
 
-const char* kMetricConfigText = R"(
-# Metric 1 has one string part, and local time_zone_policy.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 1
-  time_zone_policy: LOCAL
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-}
-
-# Metric 2 has one integer part, and UTC time_zone_policy.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 2
-  time_zone_policy: UTC
-  parts {
-    key: "Part1"
-    value {
-      data_type: INT
-    }
-  }
-}
-
-
-# Metric 3 has one blob part, and local time_zone_policy.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 3
-  time_zone_policy: LOCAL
-  parts {
-    key: "Part1"
-    value {
-      data_type: BLOB
-    }
-  }
-}
-
-# Metric 4 has one String part and one int part, and UTC time_zone_policy.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 4
-  time_zone_policy: UTC
-  parts {
-    key: "city"
-    value {
-    }
-  }
-  parts {
-    key: "rating"
-    value {
-      data_type: INT
-    }
-  }
-}
-
-# Metric 5 is missing a time_zone_policy
-element {
-  customer_id: 1
-  project_id: 1
-  id: 5
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-}
-
-# Metric 6 has an INDEX part.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 6
-  time_zone_policy: UTC
-  parts {
-    key: "Part1"
-    value {
-      data_type: INDEX
-    }
-  }
-}
-
-# Metric 7 has a DOUBLE part.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 7
-  time_zone_policy: UTC
-  parts {
-    key: "Part1"
-    value {
-      data_type: DOUBLE
-    }
-  }
-}
-
-# Metric 8 has an int distribution part.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 8
-  time_zone_policy: UTC
-  parts {
-    key: "Part1"
-    value {
-      data_type: INT
-      int_buckets: {
-        linear: {
-          floor: 0
-          num_buckets: 10
-          step_size: 5
-        }
-      }
-    }
-  }
-}
-
-# Metric 9 has a single string part and a system_profile_field selector.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 9
-  time_zone_policy: LOCAL
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-  system_profile_field: [BOARD_NAME]
-}
-
-# Metric 10 has a single string part and 2 system_profile_field selector.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 10
-  time_zone_policy: LOCAL
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-  system_profile_field: [BOARD_NAME, ARCH]
-}
-
-# Metric 11 has a single string part and 3 system_profile_field selector.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 11
-  time_zone_policy: LOCAL
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-  system_profile_field: [BOARD_NAME, ARCH, OS]
-}
-
-
-)";
-
-const char* kEncodingConfigText = R"(
-# EncodingConfig 1 is Forculus.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 1
-  forculus {
-    threshold: 20
-  }
-}
-
-# EncodingConfig 2 is String RAPPOR.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 2
-  rappor {
-    num_bloom_bits: 8
-    num_hashes: 2
-    num_cohorts: 20
-    prob_0_becomes_1: 0.25
-    prob_1_stays_1: 0.75
-  }
-}
-
-# EncodingConfig 3 is Basic RAPPOR with string categories.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 3
-  basic_rappor {
-    prob_0_becomes_1: 0.25
-    prob_1_stays_1: 0.75
-    string_categories: {
-      category: "Apple"
-      category: "Banana"
-      category: "Cantaloupe"
-    }
-  }
-}
-
-# EncodingConfig 4 is Basic RAPPOR with int categories.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 4
-  basic_rappor {
-    prob_0_becomes_1: 0.25
-    prob_1_stays_1: 0.75
-    int_range_categories: {
-      first: 123
-      last:  234
-    }
-  }
-}
-
-# EncodingConfig 5 is Forculus with a missing threshold.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 5
-  forculus {
-  }
-}
-
-# EncodingConfig 6 is String RAPPOR with many missing values.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 6
-  rappor {
-  }
-}
-
-# EncodingConfig 7 is the NoOp encoding.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 7
-  no_op_encoding {
-  }
-}
-
-# EncodingConfig 8 is Basic RAPPOR with 5 INDEXed categories.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 8
-  basic_rappor {
-    prob_0_becomes_1: 0.25
-    prob_1_stays_1: 0.75
-    indexed_categories: {
-      num_categories: 5,
-    }
-  }
-}
-
-)";
-
-// Returns a ProjectContext obtained by parsing the above configuration
-// text strings.
+// Returns a ProjectContext obtained by parsing the configuration specified
+// in envelope_maker_test_config.yaml
 std::shared_ptr<ProjectContext> GetTestProject() {
-  // Parse the metric config string
-  auto metric_parse_result =
-      config::FromString<RegisteredMetrics>(kMetricConfigText, nullptr);
-  EXPECT_EQ(config::kOK, metric_parse_result.second);
-  std::shared_ptr<MetricRegistry> metric_registry(
-      metric_parse_result.first.release());
-
-  // Parse the encoding config string
-  auto encoding_parse_result =
-      config::FromString<RegisteredEncodings>(kEncodingConfigText, nullptr);
-  EXPECT_EQ(config::kOK, encoding_parse_result.second);
-  std::shared_ptr<EncodingRegistry> encoding_registry(
-      encoding_parse_result.first.release());
+  // Parse the base64-encoded, serialized CobaltConfig in
+  // encoder_test_config.h. This is generated from encoder_test_config.yaml.
+  // Edit encoder_test_config.yaml to make changes. The variable name
+  // below, |cobalt_config_base64|, must match what is specified in the
+  // invocation of generate_test_config_h() in CMakeLists.txt.
+  std::unique_ptr<ClientConfig> client_config =
+      ClientConfig::CreateFromCobaltConfigBase64(cobalt_config_base64);
+  EXPECT_NE(nullptr, client_config);
 
   return std::shared_ptr<ProjectContext>(new ProjectContext(
-      kCustomerId, kProjectId, metric_registry, encoding_registry));
+      kCustomerId, kProjectId,
+      std::shared_ptr<ClientConfig>(client_config.release())));
 }
 
 class FakeSystemData : public SystemDataInterface {
@@ -354,8 +75,10 @@ class FakeSystemData : public SystemDataInterface {
 // |expect_utc| should be true to indicate that it is expected that the
 // day index was computed using UTC.
 void CheckSinglePartResult(
-    const Encoder::Result& result, uint32_t expected_metric_id,
-    uint32_t expected_encoding_config_id, bool expect_utc,
+    const Encoder::Result& result,
+    uint32_t expected_metric_id,
+    uint32_t expected_encoding_config_id,
+    bool expect_utc,
     const ObservationPart::ValueCase& expected_encoding) {
   ASSERT_EQ(Encoder::kOK, result.status);
   ASSERT_NE(nullptr, result.observation);
@@ -412,6 +135,7 @@ void CheckSinglePartResult(
 
 void CheckSystemProfileValid(const Encoder::Result& result,
                              const Metric* metric) {
+  ASSERT_EQ(Encoder::kOK, result.status);
   if (metric->system_profile_field_size() == 0) {
     EXPECT_FALSE(result.metadata->has_system_profile());
     return;
@@ -448,8 +172,11 @@ void CheckSystemProfileValid(const Encoder::Result& result,
 // produced Observation has the |expected_type| and is non-empty.
 // Returns the encoded Observation.
 Observation DoEncodeStringTest(
-    std::string value, uint32_t metric_id, uint32_t encoding_config_id,
-    bool expect_utc, const ObservationPart::ValueCase& expected_encoding) {
+    std::string value,
+    uint32_t metric_id,
+    uint32_t encoding_config_id,
+    bool expect_utc,
+    const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
   FakeSystemData system_data;
@@ -463,11 +190,14 @@ Observation DoEncodeStringTest(
   // expected to have a single part.
   Encoder::Result result =
       encoder.EncodeString(metric_id, encoding_config_id, value);
-
   CheckSinglePartResult(result, metric_id, encoding_config_id, expect_utc,
                         expected_encoding);
   CheckSystemProfileValid(result, project->Metric(metric_id));
-
+  // In case the encode operation failed
+  // we CHECK fail here because Google Test doesn't allow us to FAIL() from
+  // a method that has a return value and if we do nothing the following line
+  // will cause Protobuf to CHECK fail in a more mysterious way.
+  CHECK(result.status == Encoder::kOK);
   return *result.observation;
 }
 
@@ -478,8 +208,11 @@ Observation DoEncodeStringTest(
 // produced Observation has the |expected_type| and is non-empty.
 // Returns the encoded Observation.
 Observation DoEncodeIntTest(
-    int64_t value, uint32_t metric_id, uint32_t encoding_config_id,
-    bool expect_utc, const ObservationPart::ValueCase& expected_encoding) {
+    int64_t value,
+    uint32_t metric_id,
+    uint32_t encoding_config_id,
+    bool expect_utc,
+    const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
   FakeSystemData system_data;
@@ -508,8 +241,11 @@ Observation DoEncodeIntTest(
 // produced Observation has the |expected_type| and is non-empty. Otherwise
 // we verify that kInvalidArguments is returned.
 Observation DoEncodeDoubleTest(
-    bool expectOK, double value, uint32_t metric_id,
-    uint32_t encoding_config_id, bool expect_utc,
+    bool expectOK,
+    double value,
+    uint32_t metric_id,
+    uint32_t encoding_config_id,
+    bool expect_utc,
     const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
@@ -544,8 +280,11 @@ Observation DoEncodeDoubleTest(
 // If expectOK is true then we verify that there are no errors and that the
 // produced Observation has the |expected_type| and is non-empty. Otherwise
 // we verify that kInvalidArguments is returned.
-void DoEncodeIndexTest(bool expectOK, uint32_t index, uint32_t metric_id,
-                       uint32_t encoding_config_id, bool expect_utc,
+void DoEncodeIndexTest(bool expectOK,
+                       uint32_t index,
+                       uint32_t metric_id,
+                       uint32_t encoding_config_id,
+                       bool expect_utc,
                        const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
@@ -578,8 +317,11 @@ void DoEncodeIndexTest(bool expectOK, uint32_t index, uint32_t metric_id,
 // produced Observation has the |expected_type| and is non-empty.
 // Returns the encoded Observation.
 Observation DoEncodeBlobTest(
-    const void* data, size_t num_bytes, uint32_t metric_id,
-    uint32_t encoding_config_id, bool expect_utc,
+    const void* data,
+    size_t num_bytes,
+    uint32_t metric_id,
+    uint32_t encoding_config_id,
+    bool expect_utc,
     const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
@@ -610,8 +352,11 @@ Observation DoEncodeBlobTest(
 // produced Observation has the |expected_type| and is non-empty. Otherwise
 // we verify that kInvalidArguments is returned.
 Observation DoEncodeIntBucketDistributionTest(
-    bool expect_ok, const std::map<uint32_t, uint64_t>& distribution,
-    uint32_t metric_id, uint32_t encoding_config_id, bool expect_utc,
+    bool expect_ok,
+    const std::map<uint32_t, uint64_t>& distribution,
+    uint32_t metric_id,
+    uint32_t encoding_config_id,
+    bool expect_utc,
     const ObservationPart::ValueCase& expected_encoding) {
   // Build the ProjectContext encapsulating our test config data.
   std::shared_ptr<ProjectContext> project = GetTestProject();
