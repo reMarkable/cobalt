@@ -1,16 +1,6 @@
-// Copyright 2016 The Fuchsia Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2016 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 #include "encoder/envelope_maker.h"
 
@@ -18,24 +8,29 @@
 
 #include "./gtest.h"
 #include "./logging.h"
-#include "config/config_text_parser.h"
+#include "config/client_config.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
 #include "encoder/system_data.h"
+// Generated from envelope_maker_test_config.yaml
+#include "encoder/envelope_maker_test_config.h"
 #include "third_party/gflags/include/gflags/gflags.h"
 #include "util/encrypted_message_util.h"
 
 namespace cobalt {
 namespace encoder {
 
-using config::EncodingRegistry;
-using config::MetricRegistry;
+using config::ClientConfig;
 
 namespace {
 
+// These values must match the values specified in the invocation of
+// generate_test_config_h() in CMakeLists.txt. and in the invocation of
+// cobalt_config_header("generate_envelope_maker_test_config") in BUILD.gn.
 static const uint32_t kCustomerId = 1;
 static const uint32_t kProjectId = 1;
+
 static const char* kAnalyzerPublicKey = "analyzer-public-key";
 static const char* kShufflerPublicKey = "shuffler-public-key";
 
@@ -46,104 +41,22 @@ const time_t kSomeTimestamp = 1480647356;
 const uint32_t kUtcDayIndex = 17137;
 const size_t kNoOpEncodingByteOverhead = 30;
 
-const char* kMetricConfigText = R"(
-# Metric 1 has one string part.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 1
-  time_zone_policy: UTC
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-}
 
-# Metric 2 has one string part.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 2
-  time_zone_policy: UTC
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-}
-
-# Metric 3 has one string part.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 3
-  time_zone_policy: UTC
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-}
-)";
-
-const char* kEncodingConfigText = R"(
-# EncodingConfig 1 is Forculus.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 1
-  forculus {
-    threshold: 20
-  }
-}
-
-# EncodingConfig 2 is Basic RAPPOR with string categories.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 2
-  basic_rappor {
-    prob_0_becomes_1: 0.25
-    prob_1_stays_1: 0.75
-    string_categories: {
-      category: "Apple"
-      category: "Banana"
-      category: "Cantaloupe"
-    }
-  }
-}
-
-# EncodingConfig 3 is NoOp.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 3
-  no_op_encoding {
-  }
-}
-
-)";
-
-// Returns a ProjectContext obtained by parsing the above configuration
-// text strings.
+// Returns a ProjectContext obtained by parsing the configuration specified
+// in envelope_maker_test_config.yaml
 std::shared_ptr<ProjectContext> GetTestProject() {
-  // Parse the metric config string
-  auto metric_parse_result =
-      config::FromString<RegisteredMetrics>(kMetricConfigText, nullptr);
-  EXPECT_EQ(config::kOK, metric_parse_result.second);
-  std::shared_ptr<MetricRegistry> metric_registry(
-      metric_parse_result.first.release());
-
-  // Parse the encoding config string
-  auto encoding_parse_result =
-      config::FromString<RegisteredEncodings>(kEncodingConfigText, nullptr);
-  EXPECT_EQ(config::kOK, encoding_parse_result.second);
-  std::shared_ptr<EncodingRegistry> encoding_registry(
-      encoding_parse_result.first.release());
+  // Parse the base64-encoded, serialized CobaltConfig in
+  // envelope_maker_test_config.h. This is generated from
+  // envelope_maker_test_config.yaml. Edit that yaml file to make changes. The
+  // variable name below, |cobalt_config_base64|, must match what is
+  // specified in the build files.
+  std::unique_ptr<ClientConfig> client_config =
+      ClientConfig::CreateFromCobaltConfigBase64(cobalt_config_base64);
+  EXPECT_NE(nullptr, client_config);
 
   return std::shared_ptr<ProjectContext>(new ProjectContext(
-      kCustomerId, kProjectId, metric_registry, encoding_registry));
+      kCustomerId, kProjectId,
+      std::shared_ptr<ClientConfig>(client_config.release())));
 }
 
 class FakeSystemData : public SystemDataInterface {

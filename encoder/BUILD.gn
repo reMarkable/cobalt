@@ -54,12 +54,16 @@ static_library("client_secret") {
   ]
 }
 
-# Generate encoder_test_config.h containing the defintion of a string containing
-# the base64-encoded bytes of a serialized CobaltConfig proto message compiled
-# from encoder_test_config.yaml.
+# Generate encoder_test_config.h from encoder_test_config.yaml.
 cobalt_config_header("generate_encoder_test_config") {
   input_yaml = "encoder_test_config.yaml"
   output_file = "encoder_test_config.h"
+}
+
+# Generate envelope_maker_test_config.h from envelope_maker_test_config.yaml.
+cobalt_config_header("generate_envelope_maker_test_config") {
+  input_yaml = "envelope_maker_test_config.yaml"
+  output_file = "envelope_maker_test_config.h"
 }
 
 source_set("unittests") {
@@ -70,6 +74,7 @@ source_set("unittests") {
     "encoder_test.cc",
     "encoder_test_config.h",
     "envelope_maker_test.cc",
+    "envelope_maker_test_config.h"
     "send_retryer_test.cc",
     "shipping_manager_test.cc",
     "shuffler_client_test.cc",
@@ -79,6 +84,7 @@ source_set("unittests") {
   deps = [
     ":encoder",
     ":generate_encoder_test_config",
+    ":generate_envelope_maker_test_config",
     "//third_party/gflags",
     "//third_party/gtest",
 
