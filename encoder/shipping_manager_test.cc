@@ -12,26 +12,32 @@
 
 #include "./gtest.h"
 #include "./logging.h"
-#include "config/config_text_parser.h"
+#include "config/client_config.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
 #include "encoder/project_context.h"
+// Generated from shipping_manager_test_config.yaml
+#include "encoder/shipping_manager_test_config.h"
 #include "third_party/gflags/include/gflags/gflags.h"
 
 namespace cobalt {
 namespace encoder {
 
-using config::EncodingRegistry;
-using config::MetricRegistry;
+using config::ClientConfig;
 using send_retryer::CancelHandle;
 using send_retryer::SendRetryer;
 
 namespace {
 
+// These values must match the values specified in the invocation of
+// generate_test_config_h() in CMakeLists.txt. and in the invocation of
+// cobalt_config_header("generate_shipping_manager_test_config") in BUILD.gn.
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
+
 const uint32_t kMetricId = 1;
 const uint32_t kEncodingConfigId = 1;
+
 const size_t kNoOpEncodingByteOverhead = 30;
 const size_t kMaxBytesPerObservation = 50;
 const size_t kMaxBytesPerEnvelope = 200;
@@ -45,52 +51,21 @@ const std::chrono::seconds kInitialRpcDeadline(10);
 const std::chrono::seconds kDeadlinePerSendAttempt(60);
 const std::chrono::seconds kMaxSeconds = ShippingManager::kMaxSeconds;
 
-const char* kMetricConfigText = R"(
-# Metric 1 has one string part.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 1
-  time_zone_policy: UTC
-  parts {
-    key: "Part1"
-    value {
-    }
-  }
-}
-)";
-
-const char* kEncodingConfigText = R"(
-# EncodingConfig 2 is NoOp.
-element {
-  customer_id: 1
-  project_id: 1
-  id: 1
-  no_op_encoding {
-  }
-}
-
-)";
-
-// Returns a ProjectContext obtained by parsing the above configuration
-// text strings.
+// Returns a ProjectContext obtained by parsing the configuration specified
+// in shipping_manager_test_config.yaml
 std::shared_ptr<ProjectContext> GetTestProject() {
-  // Parse the metric config string
-  auto metric_parse_result =
-      config::FromString<RegisteredMetrics>(kMetricConfigText, nullptr);
-  EXPECT_EQ(config::kOK, metric_parse_result.second);
-  std::shared_ptr<MetricRegistry> metric_registry(
-      metric_parse_result.first.release());
-
-  // Parse the encoding config string
-  auto encoding_parse_result =
-      config::FromString<RegisteredEncodings>(kEncodingConfigText, nullptr);
-  EXPECT_EQ(config::kOK, encoding_parse_result.second);
-  std::shared_ptr<EncodingRegistry> encoding_registry(
-      encoding_parse_result.first.release());
+  // Parse the base64-encoded, serialized CobaltConfig in
+  // shipping_manager_test_config.h. This is generated from
+  // shipping_manager_test_config.yaml. Edit that yaml file to make changes. The
+  // variable name below, |cobalt_config_base64|, must match what is
+  // specified in the build files.
+  std::unique_ptr<ClientConfig> client_config =
+      ClientConfig::CreateFromCobaltConfigBase64(cobalt_config_base64);
+  EXPECT_NE(nullptr, client_config);
 
   return std::shared_ptr<ProjectContext>(new ProjectContext(
-      kCustomerId, kProjectId, metric_registry, encoding_registry));
+      kCustomerId, kProjectId,
+      std::shared_ptr<ClientConfig>(client_config.release())));
 }
 
 class FakeSystemData : public SystemDataInterface {

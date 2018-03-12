@@ -1,0 +1,30 @@
+# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+################################################################################
+# This file contains the Metrics and EncodingConfigs used in
+# shipping_manager_test.cc
+#
+# It is compiled into shipping_manager_test_config.h which is included into the
+# test.
+################################################################################
+
+################################################################################
+#  Metrics
+################################################################################
+metric_configs:
+# Metric 1 has one string part, and local time_zone_policy.
+- id: 1
+  time_zone_policy: UTC
+  parts:
+    "Part1":
+
+################################################################################
+#  EncodingConfigs
+################################################################################
+encoding_configs:
+
+# EncodingConfig 1 is the NoOp encoding.
+- id: 1
+  no_op_encoding:
