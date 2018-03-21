@@ -22,17 +22,18 @@ import (
 )
 
 var (
-	repoUrl       = flag.String("repo_url", "", "URL of the repository containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
-	configDir     = flag.String("config_dir", "", "Directory containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
-	configFile    = flag.String("config_file", "", "File containing the config for a single project. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
-	outFile       = flag.String("output_file", "", "File to which the serialized config should be written. Defaults to stdout.")
-	checkOnly     = flag.Bool("check_only", false, "Only check that the configuration is valid.")
-	gitTimeoutSec = flag.Int64("git_timeout", 60, "How many seconds should I wait on git commands?")
-	customerId    = flag.Int64("customer_id", -1, "Customer Id for the config to be read. Must be set if and only if 'config_file' is set.")
-	projectId     = flag.Int64("project_id", -1, "Project Id for the config to be read. Must be set if and only if 'config_file' is set.")
-	outFormat     = flag.String("out_format", "bin", "Specifies the output format. Supports 'bin' (serialized proto), 'b64' (serialized proto to base 64) and 'cpp' (ta C++ file containing a variable with a base64-encoded serialized proto.)")
-	varName       = flag.String("var_name", "config", "When using the 'cpp' output format, this will specify the variable name to be used in the output.")
-	namespace     = flag.String("namespace", "", "When using the 'cpp' output format, this will specify the comma-separated namespace within which the config variable must be places.")
+	repoUrl        = flag.String("repo_url", "", "URL of the repository containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
+	configDir      = flag.String("config_dir", "", "Directory containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
+	configFile     = flag.String("config_file", "", "File containing the config for a single project. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
+	outFile        = flag.String("output_file", "", "File to which the serialized config should be written. Defaults to stdout.")
+	checkOnly      = flag.Bool("check_only", false, "Only check that the configuration is valid.")
+	skipValidation = flag.Bool("skip_validation", false, "Skip validating the config, write it no matter what.")
+	gitTimeoutSec  = flag.Int64("git_timeout", 60, "How many seconds should I wait on git commands?")
+	customerId     = flag.Int64("customer_id", -1, "Customer Id for the config to be read. Must be set if and only if 'config_file' is set.")
+	projectId      = flag.Int64("project_id", -1, "Project Id for the config to be read. Must be set if and only if 'config_file' is set.")
+	outFormat      = flag.String("out_format", "bin", "Specifies the output format. Supports 'bin' (serialized proto), 'b64' (serialized proto to base 64) and 'cpp' (ta C++ file containing a variable with a base64-encoded serialized proto.)")
+	varName        = flag.String("var_name", "config", "When using the 'cpp' output format, this will specify the variable name to be used in the output.")
+	namespace      = flag.String("namespace", "", "When using the 'cpp' output format, this will specify the comma-separated namespace within which the config variable must be places.")
 )
 
 func main() {
@@ -95,8 +96,10 @@ func main() {
 		glog.Exit(err)
 	}
 
-	if err = config_validator.ValidateConfig(&c); err != nil {
-		glog.Exit(err)
+	if !*skipValidation {
+		if err = config_validator.ValidateConfig(&c); err != nil {
+			glog.Exit(err)
+		}
 	}
 
 	// Then, we serialize the configuration.

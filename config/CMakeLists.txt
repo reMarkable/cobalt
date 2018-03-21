@@ -13,7 +13,10 @@
 # limitations under the License.
 
 set(CONFIG_PARSER_BINARY "${CMAKE_CURRENT_BINARY_DIR}/config_parser/config_parser")
+set(CONFIG_VALIDATOR_BINARY "${CMAKE_CURRENT_BINARY_DIR}/validation/validate")
+
 add_subdirectory(config_parser)
+add_subdirectory(validation)
 
 # Generate the C++ bindings for the config .proto files.
 # Also compile the generated C++ files into a static library.
@@ -72,8 +75,12 @@ add_cobalt_test_dependencies(config_tests ${DIR_GTESTS})
 set(CONFIG_DIR "${CMAKE_SOURCE_DIR}/third_party/config")
 set(CONFIG_PROTO "${CMAKE_BINARY_DIR}/third_party/config/cobalt_config.binproto")
 add_custom_command(OUTPUT ${CONFIG_PROTO}
-    COMMAND ${CONFIG_PARSER_BINARY} --config_dir ${CONFIG_DIR} --output_file ${CONFIG_PROTO}
+    COMMAND ${CONFIG_PARSER_BINARY}
+    ARGS --config_dir ${CONFIG_DIR}
+    ARGS --output_file ${CONFIG_PROTO}
+    ARGS --config_validator_bin ${CONFIG_VALIDATOR_BINARY}
     DEPENDS ${CONFIG_PARSER_BINARY}
+    DEPENDS ${CONFIG_VALIDATOR_BINARY}
 )
 
 add_custom_target(build_config_proto ALL

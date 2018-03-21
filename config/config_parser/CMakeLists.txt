@@ -37,16 +37,19 @@ set(CONFIG_PARSER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list
 set(CONFIG_VALIDATOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/validator.go
                          ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/system_profile_field.go
                          ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/metrics.go
+                         ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/common_validator.go
                          ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/reports.go)
+
 add_custom_command(OUTPUT ${CONFIG_PARSER_BINARY}
-    # Compiles config_parser_main and all its dependencies.
-    COMMAND ${GO_BIN} build -o ${CONFIG_PARSER_BINARY} config_parser_main.go
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser_main.go
-    DEPENDS ${CONFIG_PARSER_SRC}
-    DEPENDS ${CONFIG_VALIDATOR_SRC}
-    DEPENDS ${CONFIG_PB_GO_FILES}
-    DEPENDS ${YAMLPB_SRC}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
+  # Compiles config_parser_main and all its dependencies.
+  COMMAND ${GO_BIN} build -o ${CONFIG_PARSER_BINARY} config_parser_main.go
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser_main.go
+  DEPENDS ${CONFIG_PARSER_SRC}
+  DEPENDS ${CONFIG_VALIDATOR_SRC}
+  DEPENDS ${CONFIG_PB_GO_FILES}
+  DEPENDS ${YAMLPB_SRC}
+  DEPENDS ../validation/validator
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 
@@ -69,6 +72,7 @@ set(CONFIG_VALIDATOR_TEST_BIN ${GO_TESTS}/config_validator_tests)
 set(CONFIG_VALIDATOR_TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/system_profile_field_test.go
                               ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/reports_test.go
                               ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/metrics_test.go
+                              ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/common_validator_test.go
                               ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/testutil.go)
 add_custom_command(OUTPUT ${CONFIG_VALIDATOR_TEST_BIN}
   COMMAND ${GO_BIN} test -c -o ${CONFIG_VALIDATOR_TEST_BIN} ${CONFIG_VALIDATOR_TEST_SRC} ${CONFIG_VALIDATOR_SRC}

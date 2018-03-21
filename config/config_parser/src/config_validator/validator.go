@@ -26,5 +26,9 @@ func ValidateConfig(config *config.CobaltConfig) (err error) {
 		return
 	}
 
+	if err = runCommonValidations(config); err != nil {
+		return
+	}
+
 	return nil
 }

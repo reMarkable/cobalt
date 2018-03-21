@@ -598,7 +598,14 @@ macro(generate_test_config_h INPUT_YAML OUTFILE CUSTOMER_ID PROJECT_ID STRING_VA
   set_source_files_properties(${OUTFILE} PROPERTIES GENERATED TRUE)
   message("OUTFILE=${OUTFILE}")
   add_custom_command(OUTPUT ${OUTFILE}
-    COMMAND ${CONFIG_PARSER_BINARY} -config_file=${INPUT_YAML} -customer_id=${CUSTOMER_ID} -project_id=${PROJECT_ID} -out_format=cpp -var_name=${STRING_VAR_NAME} -output_file=${OUTFILE}
+    COMMAND ${CONFIG_PARSER_BINARY}
+    ARGS -config_file=${INPUT_YAML}
+    ARGS -customer_id=${CUSTOMER_ID}
+    ARGS -project_id=${PROJECT_ID}
+    ARGS -out_format=cpp
+    ARGS -var_name=${STRING_VAR_NAME}
+    ARGS -output_file=${OUTFILE}
+    ARGS -skip_validation # We want to be able to have invalid configs in tests.
     DEPENDS ${INPUT_YAML}
     DEPENDS ${CONFIG_PARSER_BINARY}
   )

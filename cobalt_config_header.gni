@@ -76,7 +76,8 @@ template("cobalt_config_header") {
       "$project_id",
       "-out_format=cpp",
       "-var_name",
-      string_var_name
+      string_var_name,
+      "-skip_validation",
     ]
 
     deps = [
