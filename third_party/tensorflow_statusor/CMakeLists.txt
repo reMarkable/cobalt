@@ -1,0 +1,2 @@
+add_library(tensorflow_statusor statusor.cc status_macros.cc)
+add_cobalt_dependencies(tensorflow_statusor)

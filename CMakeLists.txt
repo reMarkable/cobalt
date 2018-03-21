@@ -672,3 +672,4 @@ add_compile_options(-Wno-sign-compare
 
 # Third-party directories that we include using the simpler add_subdirectory method
 add_subdirectory(third_party/lossmin/lossmin)
+add_subdirectory(third_party/tensorflow_statusor)
