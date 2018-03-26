@@ -15,19 +15,17 @@ limitations under the License.
 
 #include "third_party/tensorflow_statusor/statusor.h"
 #include "glog/logging.h"
-#include "grpc++/grpc++.h"
+#include "util/status.h"
 
 namespace tensorflow_statusor {
 namespace internal_statusor {
-
-using grpc::Status;
 
 void Helper::HandleInvalidStatusCtorArg(Status* status) {
   const char* kMessage =
       "An OK status is not a valid constructor argument to StatusOr<T>";
   LOG(ERROR) << kMessage;
-  // Fall back to grpc::StatusCode::INTERNAL.
-  *status = grpc::Status(grpc::StatusCode::INTERNAL, kMessage);
+  // Fall back to cobalt::util::StatusCode::INTERNAL.
+  *status = cobalt::util::Status(cobalt::util::StatusCode::INTERNAL, kMessage);
 }
 
 void Helper::Crash(const Status& status) {

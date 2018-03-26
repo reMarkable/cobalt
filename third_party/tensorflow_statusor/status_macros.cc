@@ -14,19 +14,20 @@ limitations under the License.
 ==============================================================================*/
 
 #include "third_party/tensorflow_statusor/status_macros.h"
+#include "util/status.h"
 
 #include <google/protobuf/stubs/strutil.h>
 #include <algorithm>
 
 #include "glog/logging.h"
-#include "grpc++/grpc++.h"
 
 namespace tensorflow_statusor {
 namespace status_macros {
 
-using grpc::Status;
+using cobalt::util::Status;
 
-static Status MakeStatus(grpc::StatusCode code, const std::string& message) {
+static Status MakeStatus(cobalt::util::StatusCode code,
+                         const std::string& message) {
   return Status(code, message);
 }
 
@@ -63,12 +64,13 @@ static void LogError(const Status& status, const char* filename, int line,
 // NUM_SEVERITIES).  If should_log_stack_trace is true, the stack
 // trace is included in the log message (ignored if should_log is
 // false).
-static Status MakeError(const char* filename, int line, grpc::StatusCode code,
+static Status MakeError(const char* filename, int line,
+                        cobalt::util::StatusCode code,
                         const std::string& message, bool should_log,
                         int log_severity, bool should_log_stack_trace) {
-  if (code == grpc::StatusCode::OK) {
+  if (code == cobalt::util::StatusCode::OK) {
     LOG(ERROR) << "Cannot create error with status OK";
-    code = grpc::StatusCode::UNKNOWN;
+    code = cobalt::util::StatusCode::UNKNOWN;
   }
   const Status status = MakeStatus(code, message);
   if (should_log) {
@@ -81,7 +83,8 @@ static Status MakeError(const char* filename, int line, grpc::StatusCode code,
 // generating a lot of inline code for error cases in all callers.
 void MakeErrorStream::CheckNotDone() const { impl_->CheckNotDone(); }
 
-MakeErrorStream::Impl::Impl(const char* file, int line, grpc::StatusCode code,
+MakeErrorStream::Impl::Impl(const char* file, int line,
+                            cobalt::util::StatusCode code,
                             MakeErrorStream* error_stream,
                             bool is_logged_by_default)
     : file_(file),
@@ -100,7 +103,8 @@ MakeErrorStream::Impl::Impl(const Status& status,
     : file_(file),
       line_(line),
       // Make sure we show some error, even if the call is incorrect.
-      code_(!status.ok() ? status.error_code() : grpc::StatusCode::UNKNOWN),
+      code_(!status.ok() ? status.error_code()
+                         : cobalt::util::StatusCode::UNKNOWN),
       prior_message_handling_(prior_message_handling),
       prior_message_(status.error_message()),
       is_done_(false),

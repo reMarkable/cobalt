@@ -30,3 +30,9 @@ add_cobalt_test_dependencies(util_tests ${DIR_GTESTS})
 
 add_subdirectory(crypto_util)
 add_subdirectory(gcs)
+
+add_library(status
+            status.cc
+            status_codes.h
+            status.h)
+add_cobalt_dependencies(status)

@@ -18,12 +18,12 @@ limitations under the License.
 
 #include <utility>
 
-#include "grpc++/grpc++.h"
+#include "util/status.h"
 
 namespace tensorflow_statusor {
 namespace internal_statusor {
 
-using grpc::Status;
+using cobalt::util::Status;
 
 class Helper {
  public:

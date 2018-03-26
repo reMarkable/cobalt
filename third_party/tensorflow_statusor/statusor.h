@@ -72,12 +72,12 @@ limitations under the License.
 #define TENSORFLOW_COMPILER_XLA_STATUSOR_H_
 
 #include <utility>
-#include "grpc++/grpc++.h"
 #include "third_party/tensorflow_statusor/statusor_internals.h"
+#include "util/status.h"
 
 namespace tensorflow_statusor {
 
-using grpc::Status;
+using cobalt::util::Status;
 
 template <typename T>
 class StatusOr : private internal_statusor::StatusOrData<T>,
@@ -202,7 +202,7 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
 // Implementation details for StatusOr<T>
 
 template <typename T>
-StatusOr<T>::StatusOr() : Base(Status(grpc::StatusCode::UNKNOWN, "")) {}
+StatusOr<T>::StatusOr() : Base(Status(cobalt::util::StatusCode::UNKNOWN, "")) {}
 
 template <typename T>
 StatusOr<T>::StatusOr(const T& value) : Base(value) {}

@@ -28,6 +28,8 @@ limitations under the License.
 namespace tensorflow_statusor {
 namespace status_macros {
 
+using cobalt::util::Status;
+
 // Stream object used to collect error messages in MAKE_ERROR macros
 // or append error messages with APPEND_ERROR.  It accepts any
 // arguments with operator<< to build an error string, and then has an
@@ -104,7 +106,7 @@ class MakeErrorStream {
  private:
   class Impl {
    public:
-    Impl(const char* file, int line, grpc::StatusCode code,
+    Impl(const char* file, int line, cobalt::util::StatusCode code,
          MakeErrorStream* error_stream, bool is_logged_by_default = true);
     Impl(const Status& status, PriorMessageHandling prior_message_handling,
          const char* file, int line, MakeErrorStream* error_stream);
@@ -119,7 +121,7 @@ class MakeErrorStream {
    private:
     const char* file_;
     int line_;
-    grpc::StatusCode code_;
+    cobalt::util::StatusCode code_;
 
     PriorMessageHandling prior_message_handling_ = kAppendToPriorMessage;
     std::string prior_message_;
