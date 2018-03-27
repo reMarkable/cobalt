@@ -234,6 +234,9 @@ void WriteFilteredSystemProfile(SystemProfile* dst,
         case SystemProfileField::BOARD_NAME:
           dst->set_allocated_board_name(src->release_board_name());
           break;
+        case SystemProfileField::PRODUCT_NAME:
+          dst->set_allocated_product_name(src->release_product_name());
+          break;
       }
     }
   }

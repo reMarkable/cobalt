@@ -140,6 +140,13 @@ message SystemProfile {
   // This is a string representing the board name of the device. If a board name
   // cannot be determined, then this field will be 'unknown:<cpu signature>'.
   string board_name = 4;
+
+  // This is a string representing the source of the observation.
+  // For now, this is going to refer to layers of the Fuchsia cake such as
+  // "garnet", "zircon", "topaz", etc... In the future, we will use something
+  // related to what sort of device we are running on, such as
+  // "Google Lightbulb X" or "Android Laptop III".
+  string product_name = 5;
 }
 
 // An Observation consists of one or more ObservationParts.

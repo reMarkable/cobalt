@@ -83,7 +83,10 @@ void PopulateBoardName(SystemProfile* profile) {}
 
 }  // namespace
 
-SystemData::SystemData() { PopulateSystemProfile(); }
+SystemData::SystemData(const std::string& product_name) {
+  system_profile_.set_product_name(product_name);
+  PopulateSystemProfile();
+}
 
 void SystemData::OverrideSystemProfile(const SystemProfile& profile) {
   system_profile_ = profile;

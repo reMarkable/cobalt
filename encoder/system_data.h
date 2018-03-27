@@ -5,6 +5,8 @@
 #ifndef COBALT_ENCODER_SYSTEM_DATA_H_
 #define COBALT_ENCODER_SYSTEM_DATA_H_
 
+#include <string>
+
 #include "./observation.pb.h"
 
 namespace cobalt {
@@ -25,8 +27,8 @@ class SystemDataInterface {
 class SystemData : public SystemDataInterface {
  public:
   // Constructor: Populuates system_profile_ with the real SystemProfile
-  // of the actual running system.
-  SystemData();
+  // of the actual running system and the specified product name.
+  explicit SystemData(const std::string& product_name);
 
   virtual ~SystemData() = default;
 

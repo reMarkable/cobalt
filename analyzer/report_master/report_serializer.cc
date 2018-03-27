@@ -496,6 +496,9 @@ grpc::Status ReportSerializer::AppendCSVHeaderRowSystemProfileFields(
       case cobalt::SystemProfileField::BOARD_NAME:
         (*stream) << "Board_Name";
         break;
+      case cobalt::SystemProfileField::PRODUCT_NAME:
+        (*stream) << "Product_Name";
+        break;
     }
   }
   return grpc::Status::OK;
@@ -599,6 +602,9 @@ grpc::Status ReportSerializer::AppendCSVSystemProfileFields(
           break;
         case SystemProfileField::BOARD_NAME:
           (*stream) << ToCSVString(profile.board_name());
+          break;
+        case SystemProfileField::PRODUCT_NAME:
+          (*stream) << ToCSVString(profile.product_name());
           break;
       }
     }

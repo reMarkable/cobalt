@@ -99,6 +99,17 @@ metric_configs:
     - ARCH
     - OS
 
+# Metric 12 has a single string part and 4 system_profile_field selectors.
+- id: 12
+  time_zone_policy: LOCAL
+  parts:
+    "Part1":
+  system_profile_field:
+    - BOARD_NAME
+    - ARCH
+    - OS
+    - PRODUCT_NAME
+
 ################################################################################
 #  EncodingConfigs
 ################################################################################

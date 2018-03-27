@@ -30,6 +30,7 @@ const uint32_t kRawDumpReportConfigId = 5;
 const uint32_t kGroupedFruitHistogramReportConfigId = 6;
 const uint32_t kGroupedRawDumpReportConfigId = 7;
 const uint32_t kGroupedByBoardNameRawDumpReportConfigId = 8;
+const uint32_t kGroupedByProductNameRawDumpReportConfigId = 9;
 
 const char* kReportConfigText = R"(
 element {
@@ -171,6 +172,31 @@ element {
   }
   system_profile_field: [BOARD_NAME]
 }
+
+element {
+  customer_id: 1
+  project_id: 1
+  id: 9
+  metric_id: 1
+  report_type: RAW_DUMP
+  variable {
+    metric_part: "City"
+  }
+  variable {
+    metric_part: "Fruit"
+  }
+  variable  {
+    metric_part: "Minutes"
+  }
+  variable  {
+    metric_part: "Rating"
+  }
+  export_configs {
+    csv {}
+  }
+  system_profile_field: [PRODUCT_NAME]
+}
+
 )";
 
 ReportMetadataLite BuildHistogramMetadata(uint32_t variable_index) {
@@ -201,6 +227,7 @@ void AddHistogramCountAndError(float count_estimate, float std_error,
 }
 
 void FillSystemProfile(SystemProfile* profile) {
+  profile->set_product_name("ReportSerializerTest");
   profile->set_board_name("ReportSerializerTest");
   profile->set_arch(SystemProfile::X86_64);
   profile->set_os(SystemProfile::FUCHSIA);
@@ -386,7 +413,7 @@ class ReportSerializerTest : public ::testing::Test {
     std::string mime_type;
     std::string report;
 
-    // Test firt using the method SerializeReport().
+    // Test first using the method SerializeReport().
     auto status = SerializeRawDumpReport(report_config_id, variable_indices,
                                          report_rows, &report, &mime_type);
     EXPECT_TRUE(status.ok()) << status.error_message() << " ";
@@ -517,6 +544,25 @@ TEST_F(ReportSerializerTest, SerializeGroupedByBoardNameRawDumpReportToCSV) {
 2035-10-22,"Miami","Coconut",9999999,1.414,"ReportSerializerTest"
 )";
   DoSerializeRawDumpReportTest(kGroupedByBoardNameRawDumpReportConfigId,
+                               {0, 1, 2, 3}, report_rows, "text/csv",
+                               kExpectedCSV);
+}
+
+// Tests the function SerializeReport in the case that the
+// report is a raw dump report with several row added and system profile set.
+TEST_F(ReportSerializerTest, SerializeGroupedByProductNameRawDumpReportToCSV) {
+  std::vector<ReportRow> report_rows;
+  report_rows.push_back(BuildRawDumpReportRow("New York", "Apple", 42, 3.14));
+  report_rows.push_back(BuildRawDumpReportRow("Chicago", "Pear", -1, 2.718281));
+  report_rows.push_back(
+      BuildRawDumpReportRow("Miami", "Coconut", 9999999, 1.41421356237309504));
+  const char* kExpectedCSV =
+      R"(date,City,Fruit,Minutes,Rating,Product_Name
+2035-10-22,"New York","Apple",42,3.140,"ReportSerializerTest"
+2035-10-22,"Chicago","Pear",-1,2.718,"ReportSerializerTest"
+2035-10-22,"Miami","Coconut",9999999,1.414,"ReportSerializerTest"
+)";
+  DoSerializeRawDumpReportTest(kGroupedByProductNameRawDumpReportConfigId,
                                {0, 1, 2, 3}, report_rows, "text/csv",
                                kExpectedCSV);
 }

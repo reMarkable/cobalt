@@ -510,7 +510,7 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
     shuffler_encryption_scheme = EncryptedMessage::HYBRID_ECDH_V1;
   }
 
-  std::unique_ptr<SystemData> system_data(new SystemData());
+  std::unique_ptr<SystemData> system_data(new SystemData("test_app"));
   if (!FLAGS_override_board_name.empty()) {
     SystemProfile profile;
     profile.set_os(SystemProfile::FUCHSIA);

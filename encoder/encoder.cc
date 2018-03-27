@@ -414,6 +414,10 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
           result.metadata->mutable_system_profile()->set_board_name(
               profile.board_name());
           break;
+        case SystemProfileField::PRODUCT_NAME:
+          result.metadata->mutable_system_profile()->set_product_name(
+              profile.product_name());
+          break;
       }
     }
   }

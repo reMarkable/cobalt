@@ -57,6 +57,7 @@ class FakeSystemData : public SystemDataInterface {
     system_profile_.set_os(SystemProfile::FUCHSIA);
     system_profile_.set_arch(SystemProfile::ARM_64);
     system_profile_.set_board_name("Testing Board");
+    system_profile_.set_product_name("Testing Product");
   }
 
   const SystemProfile& system_profile() const override {
@@ -163,6 +164,14 @@ void CheckSystemProfileValid(const Encoder::Result& result,
     EXPECT_EQ("Testing Board", result.metadata->system_profile().board_name());
   } else {
     EXPECT_EQ("", result.metadata->system_profile().board_name());
+  }
+
+  if (std::find(fields.begin(), fields.end(),
+                SystemProfileField::PRODUCT_NAME) != fields.end()) {
+    EXPECT_EQ("Testing Product",
+              result.metadata->system_profile().product_name());
+  } else {
+    EXPECT_EQ("", result.metadata->system_profile().product_name());
   }
 }
 
