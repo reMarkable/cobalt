@@ -4,12 +4,12 @@
 
 # Build file for the Cobalt client-side library.
 
-add_library(metrics
-            metrics.cc)
-add_cobalt_dependencies(metrics)
+add_library(observations_collector
+            observations_collector.cc)
+add_cobalt_dependencies(observations_collector)
 
 # Build the tests
 add_executable(client_tests
-               metrics_test.cc)
-target_link_libraries(client_tests metrics)
+               observations_collector_test.cc)
+target_link_libraries(client_tests observations_collector)
 add_cobalt_test_dependencies(client_tests ${DIR_GTESTS})

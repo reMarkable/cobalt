@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "client/metrics.h"
+#include "client/observations_collector.h"
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -56,8 +56,8 @@ TEST(Counter, Normal) {
   // Metric id.
   const int64_t id = 10;
   Sink sink;
-  MetricsCollector collector(
-      std::bind(&Sink::SendObservations, &sink, std::placeholders::_1));
+  ObservationsCollector collector(
+      std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
   auto counter = collector.MakeCounter(id, "part_name");
 
   // Each thread will add kPeriodSize * kPeriodCount to the counter.
@@ -70,7 +70,7 @@ TEST(Counter, Normal) {
   }
 
   // Start the collection thread.
-  collector.StartCollecting(std::chrono::microseconds(10));
+  collector.Start(std::chrono::microseconds(10));
 
   // Wait until all the incrementer threads have finished.
   for (auto iter = threads.begin(); iter != threads.end(); iter++) {
@@ -82,16 +82,24 @@ TEST(Counter, Normal) {
   std::this_thread::sleep_for(std::chrono::microseconds(11));
 
   // Stop the collection thread.
-  collector.StopCollecting();
+  collector.Stop();
 
   // Add up all the observations in the sink.
   int64_t actual = 0;
   for (auto iter = sink.observations.begin(); sink.observations.end() != iter;
        iter++) {
-    actual += (*iter).parts[0].value;
+    actual += (*iter).parts[0].value.GetIntValue();
   }
 
   EXPECT_EQ(expected, actual);
+}
+
+// Check that the integer value part work correctly.
+TEST(ValuePart, IntValuePart) {
+  ValuePart value = ValuePart::MakeIntValuePart(10);
+  EXPECT_EQ(10, value.GetIntValue());
+  EXPECT_TRUE(value.IsIntValue());
+  EXPECT_EQ(ValuePart::INT, value.Which());
 }
 }  // namespace client
 }  // namespace cobalt
