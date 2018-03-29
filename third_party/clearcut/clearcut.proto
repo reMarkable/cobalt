@@ -1,0 +1,23 @@
+// Copyright 2018 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+syntax = "proto2";
+
+message ClientInfo {
+  optional int32 client_type = 1;
+}
+
+message LogEvent {
+  optional int32 event_code = 11;
+}
+
+message LogRequest {
+  optional ClientInfo client_info = 1;
+  optional int32 log_source = 2 [default = -1];
+  repeated LogEvent log_event = 3;
+}
+
+message LogResponse {
+  optional int64 next_request_wait_millis = 1 [default = -1];
+}
