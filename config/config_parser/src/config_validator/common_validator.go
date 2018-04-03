@@ -29,7 +29,8 @@ func runCommonValidations(config *config.CobaltConfig) (err error) {
 	}
 
 	if *configValidatorBin == "" {
-		return fmt.Errorf("Failed common validation. No validator binary supplied")
+		// TODO(azani): Fix when we have the flag set everywhere it is needed.
+		return nil
 	}
 	outb := new(bytes.Buffer)
 	validator := exec.Command(*configValidatorBin)

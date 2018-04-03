@@ -10,6 +10,7 @@ import (
 )
 
 func TestRunCommonValidations(t *testing.T) {
+	t.Skip("TODO(azani): Re-enable when the C++ validation is reenabled.")
 	config := &config.CobaltConfig{}
 	if err := runCommonValidations(config); err == nil {
 		t.Error("Empty config was accepted.")
