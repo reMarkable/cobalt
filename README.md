@@ -15,7 +15,7 @@ This document should be used only in the first context. It describes how to
 build and test Cobalt independently of Fuchsia. Stand-alone Cobalt
 includes server-side components that run in Linux on Google Kubernetes Engine
 and a generic client library that is compiled for Linux using the build
-described in this document.
+described in this document..
 
 When imported into `//third_party/cobalt` within a Fuchsia checkout, the Cobalt
 client library is compiled for Fuchsia and accessed via a FIDL wrapper. If you
