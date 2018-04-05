@@ -145,7 +145,7 @@ message SystemProfile {
   // For now, this is going to refer to layers of the Fuchsia cake such as
   // "garnet", "zircon", "topaz", etc... In the future, we will use something
   // related to what sort of device we are running on, such as
-  // "Google Lightbulb X" or "Android Laptop III".
+  // "Acme Lightbulb X" or "Machine Corp. Laptop III".
   string product_name = 5;
 }
 
