@@ -55,6 +55,30 @@ func ReadConfigFromYaml(yamlConfigPath string, customerId uint32, projectId uint
 	return c, nil
 }
 
+// GetConfigFilesListFromConfigDir reads the configuration for Cobalt from a
+// directory on the file system (See ReadConfigFromDir) and returns the list
+// of files which constitute the configuration. The purpose is generating a
+// list of dependencies.
+func GetConfigFilesListFromConfigDir(rootDir string) (files []string, err error) {
+	r, err := newConfigDirReader(rootDir)
+	if err != nil {
+		return files, err
+	}
+
+	l := []projectConfig{}
+	if err := readProjectsList(r, &l); err != nil {
+		return files, err
+	}
+
+	files = append(files, r.customersFilePath())
+
+	for i, _ := range l {
+		c := &(l[i])
+		files = append(files, r.projectFilePath(c.customerName, c.projectName))
+	}
+	return files, nil
+}
+
 // configReader is an interface that returns configuration data in the yaml format.
 type configReader interface {
 	// Returns the yaml representation of the customer and project list.
@@ -71,9 +95,9 @@ type configDirReader struct {
 	configDir string
 }
 
-// newConfigReaderForDir returns a configReader which will read the cobalt
-// configuration stored in the provided directory.
-func newConfigReaderForDir(configDir string) (r configReader, err error) {
+// newConfigDirReader returns a pointer to a configReader which will read the
+// Cobalt configuration stored in the provided directory.
+func newConfigDirReader(configDir string) (r *configDirReader, err error) {
 	info, err := os.Stat(configDir)
 	if err != nil {
 		return nil, err
@@ -86,26 +110,39 @@ func newConfigReaderForDir(configDir string) (r configReader, err error) {
 	return &configDirReader{configDir: configDir}, nil
 }
 
-func (r *configDirReader) Customers() (string, error) {
+// newConfigReaderForDir returns a configReader which will read the Cobalt
+// configuration stored in the provided directory.
+func newConfigReaderForDir(configDir string) (r configReader, err error) {
+	return newConfigDirReader(configDir)
+}
+
+func (r *configDirReader) customersFilePath() string {
 	// The customer and project list is at <rootDir>/projects.yaml
-	customerList, err := ioutil.ReadFile(filepath.Join(r.configDir, "projects.yaml"))
+	return filepath.Join(r.configDir, "projects.yaml")
+}
+
+func (r *configDirReader) Customers() (string, error) {
+	customerList, err := ioutil.ReadFile(r.customersFilePath())
 	if err != nil {
 		return "", err
 	}
 	return string(customerList), nil
 }
 
-func (r *configDirReader) Project(customerName string, projectName string) (string, error) {
+func (r *configDirReader) projectFilePath(customerName string, projectName string) string {
 	// A project's config is at <rootDir>/<customerName>/<projectName>/config.yaml
-	projectConfig, err := ioutil.ReadFile(filepath.Join(r.configDir, customerName, projectName, "config.yaml"))
+	return filepath.Join(r.configDir, customerName, projectName, "config.yaml")
+}
+
+func (r *configDirReader) Project(customerName string, projectName string) (string, error) {
+	projectConfig, err := ioutil.ReadFile(r.projectFilePath(customerName, projectName))
 	if err != nil {
 		return "", err
 	}
 	return string(projectConfig), nil
 }
 
-// readConfig reads and parses the configuration for all projects from a configReader.
-func readConfig(r configReader, l *[]projectConfig) (err error) {
+func readProjectsList(r configReader, l *[]projectConfig) (err error) {
 	// First, we get and parse the customer list.
 	customerListYaml, err := r.Customers()
 	if err != nil {
@@ -113,6 +150,15 @@ func readConfig(r configReader, l *[]projectConfig) (err error) {
 	}
 
 	if err = parseCustomerList(customerListYaml, l); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// readConfig reads and parses the configuration for all projects from a configReader.
+func readConfig(r configReader, l *[]projectConfig) (err error) {
+	if err = readProjectsList(r, l); err != nil {
 		return err
 	}
 
