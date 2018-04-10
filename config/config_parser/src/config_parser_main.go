@@ -22,20 +22,33 @@ import (
 )
 
 var (
-	repoUrl         = flag.String("repo_url", "", "URL of the repository containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
-	configDir       = flag.String("config_dir", "", "Directory containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
-	configFile      = flag.String("config_file", "", "File containing the config for a single project. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
-	outFile         = flag.String("output_file", "", "File to which the serialized config should be written. Defaults to stdout.")
-	checkOnly       = flag.Bool("check_only", false, "Only check that the configuration is valid.")
-	skipValidation  = flag.Bool("skip_validation", false, "Skip validating the config, write it no matter what.")
-	gitTimeoutSec   = flag.Int64("git_timeout", 60, "How many seconds should I wait on git commands?")
-	customerId      = flag.Int64("customer_id", -1, "Customer Id for the config to be read. Must be set if and only if 'config_file' is set.")
-	projectId       = flag.Int64("project_id", -1, "Project Id for the config to be read. Must be set if and only if 'config_file' is set.")
-	outFormat       = flag.String("out_format", "bin", "Specifies the output format. Supports 'bin' (serialized proto), 'b64' (serialized proto to base 64) and 'cpp' (ta C++ file containing a variable with a base64-encoded serialized proto.)")
-	varName         = flag.String("var_name", "config", "When using the 'cpp' output format, this will specify the variable name to be used in the output.")
-	namespace       = flag.String("namespace", "", "When using the 'cpp' output format, this will specify the comma-separated namespace within which the config variable must be places.")
-	listConfigFiles = flag.Bool("list_config_files", false, "List the files that comprise the configuration of Cobalt. This should be used in conjunction with the 'config_dir' flag only.")
+	repoUrl        = flag.String("repo_url", "", "URL of the repository containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
+	configDir      = flag.String("config_dir", "", "Directory containing the config. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
+	configFile     = flag.String("config_file", "", "File containing the config for a single project. Exactly one of 'repo_url', 'config_file' or 'config_dir' must be specified.")
+	outFile        = flag.String("output_file", "", "File to which the serialized config should be written. Defaults to stdout.")
+	checkOnly      = flag.Bool("check_only", false, "Only check that the configuration is valid.")
+	skipValidation = flag.Bool("skip_validation", false, "Skip validating the config, write it no matter what.")
+	gitTimeoutSec  = flag.Int64("git_timeout", 60, "How many seconds should I wait on git commands?")
+	customerId     = flag.Int64("customer_id", -1, "Customer Id for the config to be read. Must be set if and only if 'config_file' is set.")
+	projectId      = flag.Int64("project_id", -1, "Project Id for the config to be read. Must be set if and only if 'config_file' is set.")
+	outFormat      = flag.String("out_format", "bin", "Specifies the output format. Supports 'bin' (serialized proto), 'b64' (serialized proto to base 64) and 'cpp' (ta C++ file containing a variable with a base64-encoded serialized proto.)")
+	varName        = flag.String("var_name", "config", "When using the 'cpp' output format, this will specify the variable name to be used in the output.")
+	namespace      = flag.String("namespace", "", "When using the 'cpp' output format, this will specify the comma-separated namespace within which the config variable must be places.")
+	genDepFile     = flag.Bool("gen_dep_file", false, "Generate a depfile (see gn documentation) that lists all the project configuration files. This should be used in conjunction with the 'config_dir' and 'output_file' flags only.")
 )
+
+// Write a depfile listing the files in 'files' at the location specified by
+// outFile.
+func writeDepFile(files []string, outFile string) error {
+	w, err := os.OpenFile(outFile, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	_, err = io.WriteString(w, fmt.Sprintf("%s: %s", outFile, strings.Join(files, " ")))
+	return err
+}
 
 func main() {
 	flag.Parse()
@@ -56,8 +69,12 @@ func main() {
 		glog.Exit("'output_file' does not make sense if 'check_only' is set.")
 	}
 
-	if *listConfigFiles && *configDir == "" {
-		glog.Exit("'list_config_files' is only compatible with 'config_dir' being set.")
+	if *genDepFile && *configDir == "" {
+		glog.Exit("'gen_dep_file' is only compatible with 'config_dir' being set.")
+	}
+
+	if *genDepFile && *outFile == "" {
+		glog.Exit("'gen_dep_file' requires that 'output_file' be set.")
 	}
 
 	var configLocation string
@@ -69,13 +86,16 @@ func main() {
 		configLocation = *configDir
 	}
 
-	if *listConfigFiles {
+	if *genDepFile {
 		files, err := config_parser.GetConfigFilesListFromConfigDir(configLocation)
 		if err != nil {
 			glog.Exit(err)
 		}
 
-		fmt.Println(strings.Join(files, "\n"))
+		if err := writeDepFile(files, *outFile); err != nil {
+			glog.Exit(err)
+		}
+
 		os.Exit(0)
 	}
 
