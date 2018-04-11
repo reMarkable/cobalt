@@ -4,6 +4,8 @@
 
 syntax = "proto2";
 
+package clearcut;
+
 message ClientInfo {
   optional int32 client_type = 1;
 }

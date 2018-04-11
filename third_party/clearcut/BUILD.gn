@@ -12,3 +12,18 @@ proto_library("clearcut_proto") {
   generate_python = false
   cc_generator_options = "lite"
 }
+
+static_library("clearcut") {
+  sources = [
+    "http_client.h",
+    "uploader.cc",
+    "uploader.h",
+  ]
+  configs += [
+    "//third_party/cobalt:cobalt_config",
+  ]
+  public_deps = [
+    ":clearcut_proto",
+    "//third_party/cobalt/third_party/tensorflow_statusor:statusor",
+  ]
+}
