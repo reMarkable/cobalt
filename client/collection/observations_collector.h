@@ -29,8 +29,8 @@
 //   ...
 // }
 
-#ifndef COBALT_CLIENT_OBSERVATIONS_COLLECTOR_H_
-#define COBALT_CLIENT_OBSERVATIONS_COLLECTOR_H_
+#ifndef COBALT_CLIENT_COLLECTION_OBSERVATIONS_COLLECTOR_H_
+#define COBALT_CLIENT_COLLECTION_OBSERVATIONS_COLLECTOR_H_
 
 #include <atomic>
 #include <chrono>
@@ -44,7 +44,7 @@
 #include <utility>
 #include <vector>
 
-#include "client/observation.h"
+#include "client/collection/observation.h"
 
 namespace cobalt {
 namespace client {
@@ -169,4 +169,4 @@ class ObservationsCollector {
 }  // namespace client
 }  // namespace cobalt
 
-#endif  // COBALT_CLIENT_OBSERVATIONS_COLLECTOR_H_
+#endif  // COBALT_CLIENT_COLLECTION_OBSERVATIONS_COLLECTOR_H_

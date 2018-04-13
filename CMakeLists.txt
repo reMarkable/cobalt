@@ -663,7 +663,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/lossmin)
 # Project directories
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)
-add_subdirectory(client)
+add_subdirectory(client/collection)
 add_subdirectory(config)
 add_subdirectory(encoder)
 add_subdirectory(end_to_end_tests)

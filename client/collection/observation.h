@@ -7,8 +7,8 @@
 // correspond to the identically-named protobuf messages found in
 // observation.proto.
 
-#ifndef COBALT_CLIENT_OBSERVATION_H_
-#define COBALT_CLIENT_OBSERVATION_H_
+#ifndef COBALT_CLIENT_COLLECTION_OBSERVATION_H_
+#define COBALT_CLIENT_COLLECTION_OBSERVATION_H_
 
 #include <functional>
 #include <string>
@@ -86,4 +86,4 @@ struct Observation {
 }  // namespace client
 }  // namespace cobalt
 
-#endif  // COBALT_CLIENT_OBSERVATION_H_
+#endif  // COBALT_CLIENT_COLLECTION_OBSERVATION_H_
