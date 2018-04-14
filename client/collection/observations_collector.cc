@@ -43,6 +43,11 @@ Observation MetricObservers::GetObservation() {
   return observation;
 }
 
+template <>
+ValuePart Sampler<int64_t>::GetValuePart(size_t idx) {
+  return ValuePart::MakeIntValuePart(reservoir_[idx]);
+}
+
 std::shared_ptr<Counter> ObservationsCollector::MakeCounter(
     uint32_t metric_id, const std::string& part_name, uint32_t encoding_id) {
   return GetMetricObservers(metric_id)->MakeCounter(part_name, encoding_id);
@@ -51,6 +56,24 @@ std::shared_ptr<Counter> ObservationsCollector::MakeCounter(
 std::shared_ptr<Counter> ObservationsCollector::MakeCounter(
     uint32_t metric_id, const std::string& part_name) {
   return MakeCounter(metric_id, part_name, default_encoding_id_);
+}
+
+std::shared_ptr<IntegerSampler> ObservationsCollector::MakeIntegerSampler(
+    uint32_t metric_id, const std::string& part_name, uint32_t encoding_id,
+    size_t samples) {
+  auto reservoir_sampler =
+      Sampler<int64_t>::Make(metric_id, part_name, encoding_id, samples);
+  reservoir_samplers_.push_back(
+      [reservoir_sampler](std::vector<Observation>* observations) {
+        reservoir_sampler->AppendObservations(observations);
+      });
+  return reservoir_sampler;
+}
+
+std::shared_ptr<IntegerSampler> ObservationsCollector::MakeIntegerSampler(
+    uint32_t metric_id, const std::string& part_name, size_t samples) {
+  return MakeIntegerSampler(metric_id, part_name, default_encoding_id_,
+                            samples);
 }
 
 std::shared_ptr<MetricObservers> ObservationsCollector::GetMetricObservers(
@@ -77,6 +100,11 @@ void ObservationsCollector::CollectAll() {
   std::vector<Observation> observations;
   for (auto iter = metrics_.begin(); iter != metrics_.end(); iter++) {
     observations.push_back(iter->second->GetObservation());
+  }
+
+  for (auto iter = reservoir_samplers_.begin();
+       iter != reservoir_samplers_.end(); iter++) {
+    (*iter)(&observations);
   }
   auto errors = send_observations_(&observations);
 

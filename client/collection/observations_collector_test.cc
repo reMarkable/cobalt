@@ -30,13 +30,15 @@ void DoIncrement(std::shared_ptr<Counter> counter) {
 
 // Sink is used to gather all the observations sent by the MetricFactory.
 struct Sink {
+  explicit Sink(bool with_errors) : with_errors(with_errors) {}
+
   std::vector<size_t> SendObservations(std::vector<Observation>* obs) {
     std::vector<size_t> errors;
 
     for (auto iter = std::make_move_iterator(obs->begin());
          std::make_move_iterator(obs->end()) != iter; iter++) {
       // Randomly fail to "send" some observations.
-      if (std::rand() % 5 == 0) {
+      if (with_errors && std::rand() % 5 == 0) {
         errors.push_back(
             std::distance(std::make_move_iterator(obs->begin()), iter));
         continue;
@@ -47,6 +49,7 @@ struct Sink {
   }
 
   std::vector<Observation> observations;
+  bool with_errors;
 };
 
 }  // namespace
@@ -55,7 +58,7 @@ struct Sink {
 TEST(Counter, Normal) {
   // Metric id.
   const int64_t id = 10;
-  Sink sink;
+  Sink sink(true);
   ObservationsCollector collector(
       std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
   auto counter = collector.MakeCounter(id, "part_name");
@@ -89,6 +92,37 @@ TEST(Counter, Normal) {
   for (auto iter = sink.observations.begin(); sink.observations.end() != iter;
        iter++) {
     actual += (*iter).parts[0].value.GetIntValue();
+  }
+
+  EXPECT_EQ(expected, actual);
+}
+
+TEST(Sampler, IntegerNoErrors) {
+  // Metric id.
+  const int64_t id = 10;
+  Sink sink(false);
+  ObservationsCollector collector(
+      std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
+
+  auto int_sampler = collector.MakeIntegerSampler(id, "part_name", 10);
+
+  int64_t primes[] = {2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37,
+                      41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83};
+  int64_t expected = 1;
+  for (size_t i = 0; i < 10; i++) {
+    expected *= primes[i];
+  }
+
+  for (size_t i = 0; i < 15; i++) {
+    int_sampler->LogObservation(primes[i]);
+  }
+
+  collector.CollectAll();
+
+  int64_t actual = 1;
+  for (auto iter = sink.observations.begin(); sink.observations.end() != iter;
+       iter++) {
+    actual *= (*iter).parts[0].value.GetIntValue();
   }
 
   EXPECT_EQ(expected, actual);
