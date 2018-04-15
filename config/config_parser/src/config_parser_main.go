@@ -13,12 +13,13 @@ import (
 	"config_validator"
 	"flag"
 	"fmt"
-	"github.com/golang/glog"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -34,13 +35,13 @@ var (
 	outFormat      = flag.String("out_format", "bin", "Specifies the output format. Supports 'bin' (serialized proto), 'b64' (serialized proto to base 64) and 'cpp' (ta C++ file containing a variable with a base64-encoded serialized proto.)")
 	varName        = flag.String("var_name", "config", "When using the 'cpp' output format, this will specify the variable name to be used in the output.")
 	namespace      = flag.String("namespace", "", "When using the 'cpp' output format, this will specify the comma-separated namespace within which the config variable must be places.")
-	genDepFile     = flag.Bool("gen_dep_file", false, "Generate a depfile (see gn documentation) that lists all the project configuration files. This should be used in conjunction with the 'config_dir' and 'output_file' flags only.")
+	depFile        = flag.String("dep_file", "", "Generate a depfile (see gn documentation) that lists all the project configuration files. Requires -output_file and -config_dir.")
 )
 
 // Write a depfile listing the files in 'files' at the location specified by
 // outFile.
-func writeDepFile(files []string, outFile string) error {
-	w, err := os.OpenFile(outFile, os.O_CREATE|os.O_WRONLY, 0644)
+func writeDepFile(outFile string, files []string, depFile string) error {
+	w, err := os.Create(depFile)
 	if err != nil {
 		return err
 	}
@@ -69,12 +70,12 @@ func main() {
 		glog.Exit("'output_file' does not make sense if 'check_only' is set.")
 	}
 
-	if *genDepFile && *configDir == "" {
-		glog.Exit("'gen_dep_file' is only compatible with 'config_dir' being set.")
+	if *depFile != "" && *configDir == "" {
+		glog.Exit("-dep_file requires -config_dir")
 	}
 
-	if *genDepFile && *outFile == "" {
-		glog.Exit("'gen_dep_file' requires that 'output_file' be set.")
+	if *depFile != "" && *outFile == "" {
+		glog.Exit("-dep_file requires -output_file")
 	}
 
 	var configLocation string
@@ -86,17 +87,15 @@ func main() {
 		configLocation = *configDir
 	}
 
-	if *genDepFile {
+	if *depFile != "" {
 		files, err := config_parser.GetConfigFilesListFromConfigDir(configLocation)
 		if err != nil {
 			glog.Exit(err)
 		}
 
-		if err := writeDepFile(files, *outFile); err != nil {
+		if err := writeDepFile(*outFile, files, *depFile); err != nil {
 			glog.Exit(err)
 		}
-
-		os.Exit(0)
 	}
 
 	var outputFormatter config_parser.OutputFormatter
