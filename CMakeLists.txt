@@ -109,7 +109,7 @@ ExternalProject_Add(glog_external_project
                     CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
                                 -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                                 -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -Dgflags_DIR=${GFLAGS_INSTALL_DIR}
+                                -Dcobalt_gflags_DIR=${GFLAGS_INSTALL_DIR}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GLOG_INSTALL_DIR}
                     DEPENDS     gflags_external_project
                    )
