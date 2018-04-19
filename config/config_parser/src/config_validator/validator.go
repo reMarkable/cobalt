@@ -14,6 +14,10 @@ func formatId(customer, project, id uint32) string {
 }
 
 func ValidateConfig(config *config.CobaltConfig) (err error) {
+	if err = validateConfiguredEncodings(config); err != nil {
+		return
+	}
+
 	if err = validateConfiguredMetrics(config); err != nil {
 		return
 	}

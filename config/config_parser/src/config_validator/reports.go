@@ -22,6 +22,10 @@ func validateConfiguredReports(config *config.CobaltConfig) (err error) {
 	}
 
 	for i, report := range config.ReportConfigs {
+		if report.Id == 0 {
+			return fmt.Errorf("Error validating report %v: Report id '0' is invalid.", report.Name)
+		}
+
 		reportKey := formatId(report.CustomerId, report.ProjectId, report.Id)
 		if reportIds[reportKey] {
 			return fmt.Errorf("Report id %s is repeated in report config entry number %v. Report ids must be unique.", reportKey, i+1)

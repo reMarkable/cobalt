@@ -38,6 +38,19 @@ func TestValidateMetricInvalidMetricPartName(t *testing.T) {
 	}
 }
 
+// Tests that we catch encodings with id = 0.
+func TestValidateNoZeroMetricIds(t *testing.T) {
+	config := &config.CobaltConfig{
+		MetricConfigs: []*config.Metric{
+			makeMetric(0, nil),
+		},
+	}
+
+	if err := validateConfiguredMetrics(config); err == nil {
+		t.Error("Accepted metric config with id of 0.")
+	}
+}
+
 // Tests that we catch non-unique metric ids.
 func TestValidateUniqueMetricIds(t *testing.T) {
 	config := &config.CobaltConfig{

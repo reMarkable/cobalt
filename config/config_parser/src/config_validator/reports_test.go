@@ -37,6 +37,7 @@ func TestValidateReportVariables(t *testing.T) {
 		},
 		ReportConfigs: []*config.ReportConfig{
 			&config.ReportConfig{
+				Id: 1,
 				Variable: []*config.ReportVariable{
 					&config.ReportVariable{
 						MetricPart: "int_part",
@@ -132,6 +133,19 @@ func TestValidateReportVarialesRapporCandidatesNonStringMetric(t *testing.T) {
 
 	if err := validateConfiguredReports(config); err == nil {
 		t.Error("Report with with rappor candidates specified for a non-string metric part accepted.")
+	}
+}
+
+// Tests that we catch reports with id = 0.
+func TestValidateNoZeroReportIds(t *testing.T) {
+	config := &config.CobaltConfig{
+		ReportConfigs: []*config.ReportConfig{
+			makeReport(0, 1, nil),
+		},
+	}
+
+	if err := validateConfiguredReports(config); err == nil {
+		t.Error("Accepted report config with id of 0.")
 	}
 }
 

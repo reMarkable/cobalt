@@ -37,6 +37,10 @@ func validateConfiguredMetrics(config *config.CobaltConfig) (err error) {
 }
 
 func validateMetric(m *config.Metric) (err error) {
+	if m.Id == 0 {
+		return fmt.Errorf("Metric id '0' is invalid.")
+	}
+
 	for name, v := range m.Parts {
 		if v == nil {
 			return fmt.Errorf("Metric part '%v' is null. This is not allowed.", name)

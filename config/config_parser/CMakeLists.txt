@@ -36,6 +36,7 @@ set(CONFIG_PARSER_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_parser/project_list
 
 set(CONFIG_VALIDATOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/validator.go
                          ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/system_profile_field.go
+                         ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/encodings.go
                          ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/metrics.go
                          ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/common_validator.go
                          ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/reports.go)
@@ -70,6 +71,7 @@ add_custom_command(OUTPUT ${CONFIG_PARSER_TEST_BIN}
 
 set(CONFIG_VALIDATOR_TEST_BIN ${GO_TESTS}/config_validator_tests)
 set(CONFIG_VALIDATOR_TEST_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/system_profile_field_test.go
+                              ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/encodings_test.go
                               ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/reports_test.go
                               ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/metrics_test.go
                               ${CMAKE_CURRENT_SOURCE_DIR}/src/config_validator/common_validator_test.go
