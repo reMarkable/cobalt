@@ -579,11 +579,10 @@ def _deploy_build(args):
 
 def _deploy_production_build(args):
   if not args.production_dir:
-    print("You are running production_build on a non production configuration. "
-          "If you are using this to validate a new build on your personal dev "
-          "cluster feel free to continue, but be aware that this will not "
-          "push the build to production.")
-    answer = raw_input("Continue anyway? (y/N) ")
+    print("Notice that you have not passed the flag --production_dir and so "
+      "you will be pushing the built containers to your personal devel "
+      "cluster, not a production cluster.")
+    answer = raw_input("Continue? (y/N) ")
     if not _parse_bool(answer):
       return
   full_ref = production_util.build_and_push_production_docker_images(
@@ -1663,7 +1662,7 @@ def main():
 
   sub_parser = deploy_subparsers.add_parser('production_build',
       parents=[parent_parser], help='Clean rebuild of binaries followed by '
-           'a build of all Docker images.')
+           'a build and push of all Docker images.')
   sub_parser.set_defaults(func=_deploy_production_build)
   _add_cloud_access_args(sub_parser, cluster_settings)
   sub_parser.add_argument('--shuffler_config_file',
