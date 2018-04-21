@@ -21,8 +21,8 @@
 // auto foo_call_time_sampler = collector.MakeIntegerSampler(
 //     kFooCallTimeMetricId, kFooCallTimeMetricPartName, kNumberOfSamples);
 //
-// // Perform aggregation and send to Cobalt FIDL service every 1 second.
-// collector.Start(std::chrono::seconds(1));
+// // Perform aggregation and send to Cobalt FIDL service every 1 minute.
+// collector.Start(std::chrono::minutes(1));
 //
 // void Foo() {
 //   int64_t start = getCurTime();
@@ -46,11 +46,13 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <map>
 #include <memory>
+#include <random>
 #include <string>
 #include <thread>
 #include <utility>
@@ -109,15 +111,40 @@ template <class T>
 class Sampler {
  public:
   void LogObservation(const T& value) {
-    uint64_t idx = num_seen_++;
+    size_t idx = num_seen_++;
     // idx should now be a unique number.
 
     if (idx < size_) {
+      // Race Condition Note: If a thread is pre-empted here, a race condition
+      // can occur.
+      // t1: Thread1 calls LogObservation(10), is assigned idx=5 < size_ and is
+      // pre-empted here.
+      // t2: Thread2 calls LogObservation(20), is assigned idx=10 > size_ and
+      // satisfies the condition gap_-- == 0. Let index = 5. So now,
+      // reservoir_[5] == 20.
+      // t3: Thread1 resumes and sets reservoir_[5] == 10.
+      // This condition alters the sampling such that the first size_ values
+      // that were logged will be slightly more likely to be sampled than ideal.
+      // This is considered benign.
       reservoir_[idx] = value;
-      num_written_++;
+      written_[idx] = true;
+      return;
     }
 
-    // TODO(azani): Handle the case where num_seen_ > size_.
+    // Race Condition Note: If thread1 and thread2 are racing to decrement gap_,
+    // then gap_ could end up being negative. This is why we choose to check
+    // gap_ == 0. In the above case, exactly one of thread1 or thread2 will see
+    // gap_ == 0. Unless there is significant bias in scheduling and in the data
+    // provided by thread1 and thread2, this should be unimportant.
+    //
+    // More problematic, until UpdateGap terminates, no observation can be
+    // selected for sampling. However, because the gap is randomly generated,
+    // it is highly unlikely that a bias would emerge from this particular race.
+    if (gap_-- == 0) {
+      UpdateGap(num_seen_);
+      size_t index = uniform_index_(rnd_gen_);
+      reservoir_[index] = value;
+    }
   }
 
  private:
@@ -127,44 +154,98 @@ class Sampler {
                                           const std::string& part_name,
                                           uint32_t encoding_id,
                                           size_t samples) {
+    std::random_device rd;
     return std::shared_ptr<Sampler<T>>(
-        new Sampler(metric_id, part_name, encoding_id, samples));
+        new Sampler(metric_id, part_name, encoding_id, samples, rd()));
   }
 
   Sampler(uint32_t metric_id, const std::string& part_name,
-          uint32_t encoding_id, size_t samples)
+          uint32_t encoding_id, size_t samples, unsigned int random_seed)
       : metric_id_(metric_id),
         part_name_(part_name),
         encoding_id_(encoding_id),
         size_(samples),
         reservoir_(new std::atomic<T>[size_]),
+        written_(new std::atomic<bool>[size_]),
         num_seen_(0),
-        num_written_(0) {}
+        rnd_gen_(random_seed),
+        uniform_zero_to_one_(1.0, 0.0),
+        uniform_index_(0, samples - 1) {
+    for (size_t i = 0; i < size_; i++) {
+      written_[i] = false;
+    }
+    UpdateGap(size_);
+  }
 
   ValuePart GetValuePart(size_t idx);
 
   void AppendObservations(std::vector<Observation>* observations) {
-    for (size_t i = 0; i < num_written_; i++) {
-      Observation observation;
-      observation.metric_id = metric_id_;
-      // TODO(azani): Figure out how to do the undo function.
-      observation.parts.push_back(
-          ObservationPart(part_name_, encoding_id_, GetValuePart(i), []() {}));
-      observations->push_back(observation);
+    for (size_t i = 0; i < size_; i++) {
+      if (written_[i]) {
+        Observation observation;
+        observation.metric_id = metric_id_;
+        // TODO(azani): Figure out how to do the undo function.
+        observation.parts.push_back(ObservationPart(part_name_, encoding_id_,
+                                                    GetValuePart(i), []() {}));
+        observations->push_back(observation);
+      }
+      written_[i] = false;
     }
-    num_written_ = 0;
+
+    // We want to make sure that UpdateGap(num_seen_) in LogObservation is not
+    // executed after we call UpdateGap(size_) lower down. (This would result in
+    // a potentially too large first gap in the new collection period.)
+    for (;;) {
+      int64_t gap_val = gap_;
+      // If gap_ is negative, that means UpdateGap(num_seen_) in LogObservation
+      // might be running. We want to wait until that is over.
+      if (gap_val <= -1) {
+        continue;
+      }
+      // If gap_val has not changed, we set it to a negative value (to prevent
+      // any new thread from entering the gap_-- == 0 if statement in
+      // LogObservation.) This effectively locks gap_ until we run UpdateGap.
+      if (gap_.compare_exchange_strong(gap_val, -1)) {
+        break;
+      }
+    }
     num_seen_ = 0;
+    // Resume sampling.
+    UpdateGap(size_);
   }
 
-  uint32_t metric_id_;
-  std::string part_name_;
-  uint32_t encoding_id_;
+  void UpdateGap(size_t num_seen) {
+    // In order to speed up reservoir sampling, we compute the gaps between
+    // samples. The distribution of the gaps can be well approximated by the
+    // geometric distribution. See
+    // https://erikerlandson.github.io/blog/2015/11/20/very-fast-reservoir-sampling/
+    double p;
+    double u;
+    p = static_cast<double>(size_) / static_cast<double>(num_seen);
+    u = uniform_zero_to_one_(rnd_gen_);
+    gap_ = std::floor(std::log(u) / std::log(1 - p));
+  }
+
+  const uint32_t metric_id_;
+  const std::string part_name_;
+  const uint32_t encoding_id_;
   // Reservoir size.
-  size_t size_;
+  const size_t size_;
   std::unique_ptr<std::atomic<T>[]> reservoir_;
+  std::unique_ptr<std::atomic<bool>[]> written_;
   std::atomic<size_t> num_seen_;
-  // num_written_ is used to determin how many values are available to be read.
-  std::atomic<size_t> num_written_;
+  // gap_ is the number of observations to skip before selecting the next
+  // observation to sample.
+  // When gap_ is negative, sampling is paused. The thread that sets gap_ to -1
+  // is responsible for calling UpdateGap. Threads that decrement gap_ below -1
+  // should not call UpdateGap.
+  std::atomic<int64_t> gap_;
+  std::default_random_engine rnd_gen_;
+  std::uniform_real_distribution<double> uniform_zero_to_one_;
+  std::uniform_int_distribution<size_t> uniform_index_;
+  // This condition variable is notified when an observation is written before
+  // the reservoir is filled.
+  std::condition_variable write_notification_;
 };
 
 using IntegerSampler = Sampler<int64_t>;

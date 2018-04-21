@@ -11,6 +11,7 @@
 const int64_t kPeriodSize = 1000;
 const int64_t kPeriodCount = 1000;
 const int64_t kThreadNum = 100;
+const int64_t kSamplerMaxInt = 20;
 
 namespace cobalt {
 namespace client {
@@ -97,35 +98,133 @@ TEST(Counter, Normal) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(Sampler, IntegerNoErrors) {
+// Function that logs kPeriodSize * kPeriodCount random integers to an
+// IntegerSampler in kPeriodCount increments with some random jitter in between.
+void DoLogObservation(std::shared_ptr<IntegerSampler> int_sampler) {
+  std::random_device rd;
+  std::default_random_engine gen(rd());
+  // Uniformly sample from the set [0...kSamplerMaxInt].
+  std::uniform_int_distribution<> dis(0, kSamplerMaxInt);
+
+  for (int64_t i = 0; i < kPeriodCount; i++) {
+    for (int64_t j = 0; j < kPeriodSize; j++) {
+      int_sampler->LogObservation(dis(gen));
+    }
+    // Introduce jitter to test.
+    std::this_thread::sleep_for(std::chrono::microseconds(std::rand() % 100));
+  }
+}
+
+// Test that the average of the samples is within an expected range of the
+// theoretical average.
+TEST(IntegerSampler, IntegerAverage) {
   // Metric id.
   const int64_t id = 10;
   Sink sink(false);
   ObservationsCollector collector(
       std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
 
-  auto int_sampler = collector.MakeIntegerSampler(id, "part_name", 10);
+  // The IntegerSampler will collect at most 100 elements at a time.
+  size_t sample_size = 100;
+  auto int_sampler = collector.MakeIntegerSampler(id, "part_name", sample_size);
 
-  int64_t primes[] = {2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37,
-                      41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83};
-  int64_t expected = 1;
-  for (size_t i = 0; i < 10; i++) {
-    expected *= primes[i];
+  // Each thread will log kPeriodSize * kPeriodCount times to the
+  // IntegerSampler.
+  std::vector<std::thread> threads;
+  for (int i = 0; i < kThreadNum; i++) {
+    threads.push_back(std::thread(DoLogObservation, int_sampler));
   }
 
-  for (size_t i = 0; i < 15; i++) {
-    int_sampler->LogObservation(primes[i]);
+  // Start the collection thread.
+  collector.Start(std::chrono::microseconds(10));
+
+  // Wait until all the logging threads have finished.
+  for (auto iter = threads.begin(); iter != threads.end(); iter++) {
+    iter->join();
+  }
+
+  // Wait just a bit more than one collection period after the last incrementer
+  // thread is done in order to ensure all the data is collected before we stop
+  // collection.
+  std::this_thread::sleep_for(std::chrono::microseconds(11));
+
+  // Stop the collection thread.
+  collector.Stop();
+
+  // In the worst case scenario, the number of collected observations is
+  // kPeriodSize * kPeriodCount * kThreadNum.
+  // In the worst case scenario, where every generated number is 20, the total
+  // is 2*10^9. This comfortably fits in a 64 bits signed integer.
+  int64_t total = 0;
+  int64_t num_obs = 0;
+  for (auto iter = sink.observations.begin(); sink.observations.end() != iter;
+       iter++) {
+    num_obs++;
+    total += (*iter).parts[0].value.GetIntValue();
+  }
+  double sample_mean =
+      static_cast<double>(total) / static_cast<double>(num_obs);
+
+  // We sample num_obs elements from the uniform distribution
+  // [0...kSamplerMaxInt]. The central limit theorem tells us the average of
+  // these num_obs samples will be normally distributed with the same mean as
+  // the uniform distribution and a variance equal to 1/num_obs times the
+  // uniform distribution's variance.
+  double expected_mean = kSamplerMaxInt / 2;
+  double expected_stddev =
+      std::sqrt((kSamplerMaxInt + 1) * (kSamplerMaxInt) / 12.0 / num_obs);
+  // We test to see if the sample mean is within 4.5 standard deviations of
+  // the expected mean. This should prevent false positives at least 99.999% of
+  // the time.
+  EXPECT_NEAR(expected_mean, sample_mean, expected_stddev * 4.5);
+}
+
+// Test that if a source of data has a very strong time-dependent bias, the
+// IntegerSampler does not reflect that time-dependency.
+TEST(IntegerSampler, CheckUniformity) {
+  // Metric id.
+  const int64_t id = 10;
+  Sink sink(false);
+  ObservationsCollector collector(
+      std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
+
+  // The IntegerSampler will collect at most 100 elements at a time.
+  size_t sample_size = 100;
+  auto int_sampler = collector.MakeIntegerSampler(id, "part_name", sample_size);
+
+  // We log integers in increasing order. This is to check that the ordering of
+  // the logged observations is not related to the distribution of the sampled
+  // observations.
+  for (int64_t val = 0; val <= kSamplerMaxInt; val++) {
+    for (size_t i = 0; i < sample_size * 10; i++) {
+      int_sampler->LogObservation(val);
+    }
   }
 
   collector.CollectAll();
 
-  int64_t actual = 1;
+  int64_t total = 0;
+  int64_t num_obs = 0;
   for (auto iter = sink.observations.begin(); sink.observations.end() != iter;
        iter++) {
-    actual *= (*iter).parts[0].value.GetIntValue();
+    num_obs++;
+    total += (*iter).parts[0].value.GetIntValue();
   }
+  double sample_mean =
+      static_cast<double>(total) / static_cast<double>(num_obs);
 
-  EXPECT_EQ(expected, actual);
+  // We sample num_obs elements from the uniform distribution
+  // [0...kSamplerMaxInt]. The central limit theorem tells us the average of
+  // these num_obs samples will be normally distributed with the same mean as
+  // the uniform distribution and a variance equal to 1/num_obs times the
+  // uniform distribution's variance.
+  double expected_mean = kSamplerMaxInt / 2;
+  double expected_stddev =
+      std::sqrt((kSamplerMaxInt + 1) * (kSamplerMaxInt) / 12.0 / num_obs);
+  // We test to see if the sample mean is within 4.5 standard deviations of
+  // the expected mean. This should prevent false positives at least 99.999% of
+  // the time.
+  EXPECT_NEAR(expected_mean, sample_mean, expected_stddev * 4.5);
 }
 
 // Check that the integer value part work correctly.
