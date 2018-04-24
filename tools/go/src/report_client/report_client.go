@@ -420,6 +420,20 @@ func CompareValueParts(v1, v2 *cobalt.ValuePart) int {
 }
 
 func compareSystemProfile(a, b *cobalt.SystemProfile) int {
+	// If both values are missing they are equal.
+	if (a == nil) && (b == nil) {
+		return 0
+	}
+
+	// A nil is less than a non-nil
+	if a == nil {
+		return -1
+	}
+
+	if b == nil {
+		return 1
+	}
+
 	if a.Os > b.Os {
 		return 1
 	} else if a.Os < b.Os {
