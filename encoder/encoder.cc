@@ -402,8 +402,8 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
     // If we were provided a SystemProfile, add the subset of fields specified
     // in system_profile_field.
     const auto& profile = system_data_->system_profile();
-    for (const auto& metric : metric->system_profile_field()) {
-      switch (metric) {
+    for (const auto& field : metric->system_profile_field()) {
+      switch (field) {
         case SystemProfileField::OS:
           result.metadata->mutable_system_profile()->set_os(profile.os());
           break;

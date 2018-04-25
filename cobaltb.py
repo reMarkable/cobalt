@@ -298,11 +298,11 @@ def _test(args):
         ]
         bigtable_project_name = bigtable_project_name_from_args
         bigtable_instance_id = args.bigtable_instance_id
-      if args.production_dir:
-        # When running the end-to-end test against the production instance of
-        # Cobalt, it may not be true that the Shuffler has been configured
-        # to use a threshold of 100 so skip the part of the test that
-        # verifies that.
+      if args.production_dir or args.cobalt_on_personal_cluster:
+        # Currently thresholding in the Shuffler is disabled when we run the Shuffler in either
+        # production or devel because in both cases we deploy two Shuffler instances but the 
+        # Shuffler thresholding logic was not written to support that. When we run the Shuffler
+        # locally on the test machine then we still use and test thresholding.
         test_args = test_args + [
           "-do_shuffler_threshold_test=false",
         ]
