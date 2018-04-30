@@ -10,16 +10,10 @@ namespace client {
 ObservationPart Counter::GetObservationPart() {
   // Atomically swaps the value in counter_ for 0 and puts the former value of
   // counter_ in value.
-  ValuePart value = ValuePart::MakeIntValuePart(counter_.exchange(0));
+  ValuePart value = ValuePart::Make(counter_.exchange(0));
   // If the undo function is called, it adds |value| back to the counter_.
   return ObservationPart(part_name_, encoding_id_, value,
                          [this, value]() { counter_ += value.GetIntValue(); });
-}
-
-std::shared_ptr<MetricObservers> MetricObservers::Make(uint32_t id) {
-  // An empty string for the collection period part name disables the collection
-  // timer.
-  return std::shared_ptr<MetricObservers>(new MetricObservers(id));
 }
 
 std::shared_ptr<Counter> MetricObservers::MakeCounter(
@@ -27,7 +21,7 @@ std::shared_ptr<Counter> MetricObservers::MakeCounter(
   if (counters_.count(part_name) != 0) {
     return nullptr;
   }
-  auto counter = Counter::Make(part_name, encoding_id);
+  auto counter = std::shared_ptr<Counter>(new Counter(part_name, encoding_id));
   counters_[part_name] = counter;
   return counter;
 }
@@ -43,9 +37,35 @@ Observation MetricObservers::GetObservation() {
   return observation;
 }
 
+Observation EventLogger::GetEventObservation() {
+  Observation observation;
+  observation.metric_id = event_metric_id_;
+  auto now = std::chrono::steady_clock::now();
+  auto collection_duration =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_time_);
+  start_time_ = now;
+
+  std::map<uint32_t, int64_t> status_histogram;
+  int64_t total = 0;
+  for (size_t status = 0; status <= max_status_; status++) {
+    int64_t status_num = status_histogram_[status].exchange(0);
+    status_histogram[status] = status_num;
+    total += status_num;
+  }
+  observation.parts.push_back(ObservationPart(
+      "status", encoding_id_, ValuePart::Make(status_histogram), []() {}));
+  observation.parts.push_back(
+      ObservationPart("total", encoding_id_, ValuePart::Make(total), []() {}));
+  observation.parts.push_back(
+      ObservationPart("collection_duration_ns", encoding_id_,
+                      ValuePart::Make(collection_duration.count()), []() {}));
+
+  return observation;
+}
+
 template <>
 ValuePart Sampler<int64_t>::GetValuePart(size_t idx) {
-  return ValuePart::MakeIntValuePart(reservoir_[idx]);
+  return ValuePart::Make(reservoir_[idx]);
 }
 
 std::shared_ptr<Counter> ObservationsCollector::MakeCounter(
@@ -61,8 +81,8 @@ std::shared_ptr<Counter> ObservationsCollector::MakeCounter(
 std::shared_ptr<IntegerSampler> ObservationsCollector::MakeIntegerSampler(
     uint32_t metric_id, const std::string& part_name, uint32_t encoding_id,
     size_t samples) {
-  auto reservoir_sampler =
-      Sampler<int64_t>::Make(metric_id, part_name, encoding_id, samples);
+  auto reservoir_sampler = std::shared_ptr<Sampler<int64_t>>(
+      new Sampler<int64_t>(metric_id, part_name, encoding_id, samples));
   reservoir_samplers_.push_back(
       [reservoir_sampler](std::vector<Observation>* observations) {
         reservoir_sampler->AppendObservations(observations);
@@ -76,10 +96,21 @@ std::shared_ptr<IntegerSampler> ObservationsCollector::MakeIntegerSampler(
                             samples);
 }
 
+std::shared_ptr<EventLogger> ObservationsCollector::MakeEventLogger(
+    uint32_t event_metric_id, uint32_t max_status,
+    uint32_t event_timing_metric_id, size_t samples) {
+  auto event_logger = std::shared_ptr<EventLogger>(
+      new EventLogger(event_metric_id, max_status, event_timing_metric_id,
+                      default_encoding_id_, samples));
+  event_loggers_.push_back(event_logger);
+  return event_logger;
+}
+
 std::shared_ptr<MetricObservers> ObservationsCollector::GetMetricObservers(
     uint32_t metric_id) {
   if (metrics_.count(metric_id) == 0) {
-    metrics_[metric_id] = MetricObservers::Make(metric_id);
+    metrics_[metric_id] =
+        std::shared_ptr<MetricObservers>(new MetricObservers(metric_id));
   }
   return metrics_[metric_id];
 }
@@ -106,6 +137,11 @@ void ObservationsCollector::CollectAll() {
        iter != reservoir_samplers_.end(); iter++) {
     (*iter)(&observations);
   }
+
+  for (auto iter = event_loggers_.begin(); event_loggers_.end() != iter;
+       iter++) {
+    (*iter)->AppendObservations(&observations);
+  }
   auto errors = send_observations_(&observations);
 
   // Undo failed observations.
@@ -124,6 +160,8 @@ void ObservationsCollector::CollectLoop(
     // TODO(azani): Add jitter.
     std::this_thread::sleep_for(collection_interval);
   }
+  // Collect one more time after being told to stop.
+  CollectAll();
 }
 }  // namespace client
 }  // namespace cobalt

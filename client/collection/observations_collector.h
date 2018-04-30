@@ -4,39 +4,45 @@
 
 // This file contains a library to be used by users of Cobalt in order to
 // collect metrics at a high frequency. The main building blocks are the
-// ObservationsCollector, Counter and IntegerSampler classes.
+// ObservationsCollector, EventLogger, Counter and IntegerSampler classes.
 //
 // Example: counting and timing function calls
 //
 // ObservationsCollector collector(send_to_cobalt_function_pointer,
 //                                 kDefaultEncodingId);
 //
-// auto foo_calls = collector.MakeCounter(kFooCallsMetricId,
-//                                        kFooCallsMetricPartName);
+// auto foo_calls = collector.MakeEventLogger(kFooCallsMetricId,
+//                                            1, // Success = 0, Failure = 1
+//                                            kFooCallsTimerMetricId,
+//                                            kNumberOfSamples);
 //
 // auto bar_calls = collector.MakeCounter(kBarCallsMetricId,
 //                                        kBarCallsMetricPartName);
 //
+// auto bar_input_size = collector.MakeIntegerSampler(kBarInputSizeMetricId,
+//                                                    kBarInputSizePartName,
+//                                                    kNumberOfSamples);
 //
-// auto foo_call_time_sampler = collector.MakeIntegerSampler(
-//     kFooCallTimeMetricId, kFooCallTimeMetricPartName, kNumberOfSamples);
 //
 // // Perform aggregation and send to Cobalt FIDL service every 1 minute.
 // collector.Start(std::chrono::minutes(1));
 //
-// void Foo() {
+// int Foo() {
 //   int64_t start = getCurTime();
-//   foo_calls.Increment();
 //   DoSomeFooWork
 //   ...
-//   // Logs the amount of time Foo took to execute to the foo_call_sampler
-//   // which will randomly select kNumberOfSamples observations to be sent to
-//   // Cobalt.
-//   foo_call_time_sampler.LogObservation(getCurTime() - start);
+//   // Logs the amount of time Foo took to execute, and what the return
+//   // status was.
+//   foo_calls.LogEvent(getCurTime() - start, return_status);
+//   return return_status;
 // }
 //
-// void Bar() {
+// void Bar(std::vector<int> input) {
 //   bar_calls.Increment();
+//   // Logs the size of the input to Bar. bar_input_size is an integer
+//   // sampler that will randomly select kNumberOfSamples logged
+//   // observations to be sent to Cobalt.
+//   bar_input_size.LogObservation(input.size());
 //   DoSomeBarWork
 //   ...
 // }
@@ -82,13 +88,7 @@ class Counter {
  private:
   friend class MetricObservers;
 
-  // Make a counter with the specified part name.
-  static std::shared_ptr<Counter> Make(const std::string& part_name,
-                                       uint32_t encoding_id) {
-    return std::shared_ptr<Counter>(new Counter(part_name, encoding_id));
-  }
-
-  explicit Counter(const std::string& part_name, uint32_t encoding_id)
+  Counter(const std::string& part_name, uint32_t encoding_id)
       : counter_(0), part_name_(part_name), encoding_id_(encoding_id) {}
 
   // Returns an integer ObservationPart and sets the counter's value to 0.
@@ -149,18 +149,10 @@ class Sampler {
 
  private:
   friend class ObservationsCollector;
-
-  static std::shared_ptr<Sampler<T>> Make(uint32_t metric_id,
-                                          const std::string& part_name,
-                                          uint32_t encoding_id,
-                                          size_t samples) {
-    std::random_device rd;
-    return std::shared_ptr<Sampler<T>>(
-        new Sampler(metric_id, part_name, encoding_id, samples, rd()));
-  }
+  friend class EventLogger;
 
   Sampler(uint32_t metric_id, const std::string& part_name,
-          uint32_t encoding_id, size_t samples, unsigned int random_seed)
+          uint32_t encoding_id, size_t samples)
       : metric_id_(metric_id),
         part_name_(part_name),
         encoding_id_(encoding_id),
@@ -168,7 +160,7 @@ class Sampler {
         reservoir_(new std::atomic<T>[size_]),
         written_(new std::atomic<bool>[size_]),
         num_seen_(0),
-        rnd_gen_(random_seed),
+        rnd_gen_(random_device_()),
         uniform_zero_to_one_(1.0, 0.0),
         uniform_index_(0, samples - 1) {
     for (size_t i = 0; i < size_; i++) {
@@ -240,6 +232,8 @@ class Sampler {
   // is responsible for calling UpdateGap. Threads that decrement gap_ below -1
   // should not call UpdateGap.
   std::atomic<int64_t> gap_;
+  // Used only to initialize the random engine: rnd_gen_.
+  std::random_device random_device_;
   std::default_random_engine rnd_gen_;
   std::uniform_real_distribution<double> uniform_zero_to_one_;
   std::uniform_int_distribution<size_t> uniform_index_;
@@ -249,6 +243,57 @@ class Sampler {
 };
 
 using IntegerSampler = Sampler<int64_t>;
+
+// EventLogger logs
+class EventLogger {
+ public:
+  // time is the duration of the event being logged in a unit of your choice.
+  // status is a numeric status less than equal to max_status.
+  void LogEvent(int64_t time, uint32_t status) {
+    status_histogram_[status]++;
+    timing_sampler_->LogObservation(time);
+  }
+
+ private:
+  friend class ObservationsCollector;
+
+  // event_metric_id has three parts:
+  // "collection_period": integer length of the collection period in
+  // nanoseconds.
+  // "status": Distribution mapping the status enum to integer.
+  // "total": integer number of events logged during collection period.
+  // event_timing_metric_id is implemented by a sampler with samples samples.
+  EventLogger(uint32_t event_metric_id, uint32_t max_status,
+              uint32_t event_timing_metric_id, uint32_t encoding_id,
+              size_t samples)
+      : event_metric_id_(event_metric_id),
+        max_status_(max_status),
+        encoding_id_(encoding_id),
+        status_histogram_(new std::atomic<int64_t>[max_status_ + 1]),
+        timing_sampler_(new Sampler<int64_t>(event_timing_metric_id, "",
+                                             encoding_id, samples)),
+        start_time_(std::chrono::steady_clock::now()) {
+    for (size_t status = 0; status <= max_status_; status++) {
+      status_histogram_[status] = 0;
+    }
+  }
+
+  // Gets the Observation.
+  Observation GetEventObservation();
+
+  void AppendObservations(std::vector<Observation>* observations) {
+    timing_sampler_->AppendObservations(observations);
+    observations->push_back(GetEventObservation());
+  }
+
+  const uint32_t event_metric_id_;
+  const uint32_t max_status_;
+  const uint32_t encoding_id_;
+  std::unique_ptr<std::atomic<int64_t>[]> status_histogram_;
+  std::shared_ptr<IntegerSampler> timing_sampler_;
+  // Beginning of the current collection period.
+  std::chrono::steady_clock::time_point start_time_;
+};
 
 // A MetricObservers allows you to group together several observers that
 // correspond to metric parts.
@@ -264,8 +309,6 @@ class MetricObservers {
  private:
   friend class ObservationsCollector;
 
-  static std::shared_ptr<MetricObservers> Make(uint32_t id);
-
   explicit MetricObservers(uint32_t id) : id_(id) {}
 
   // Gets the Observation.
@@ -277,8 +320,12 @@ class MetricObservers {
   std::map<std::string, std::shared_ptr<Counter>> counters_;
 };
 
-// A ObservationsCollector tracks various metrics, collects their values into
+// An ObservationsCollector tracks various metrics, collects their values into
 // observations and sends them.
+// ObservationsCollector is responsible for collecting from the observers
+// returned by the Make* methods. If the ObservationCollector that made an
+// observer is deleted, the observers it made will still accept data but this
+// data will not be collected.
 class ObservationsCollector {
  public:
   // send_observations will be used to send the collected observations.
@@ -313,6 +360,24 @@ class ObservationsCollector {
   std::shared_ptr<IntegerSampler> MakeIntegerSampler(
       uint32_t metric_id, const std::string& part_name, size_t samples);
 
+  // MakeEventLogger creates an event logger for the specified metrics.
+  // event_metric_id must refer to a metric with the following required parts:
+  //   "status": An enum type with a Distribution configured. It will reflect
+  //   the number of times LogEvent was called with the specified status codes
+  //   in a collection period.
+  //   "total": An integer which is the number of times LogEvent was called in a
+  //   collection period.
+  //   "collection_duration_ns": An integer which is the length of the
+  //   collection period in nanoseconds.
+  // max_status is the largest value you might pass as a status to LogEvent.
+  // event_timing_metric_id refers to a metric with a single integer part which
+  // is a sampling of the |time| parameter passed to LogEvent. At most |samples|
+  // samples will be sent per collection period.
+  std::shared_ptr<EventLogger> MakeEventLogger(uint32_t event_metric_id,
+                                               uint32_t max_status,
+                                               uint32_t event_timing_metric_id,
+                                               size_t samples);
+
   // Starts a new thread that collects and attempts to send metrics every
   // |collection_interval|.
   // Calling Start more than once without first calling Stop has undefined
@@ -320,7 +385,7 @@ class ObservationsCollector {
   void Start(std::chrono::nanoseconds collection_interval);
 
   // Instructs the collection thread started by Start to stop and joins that
-  // thread.
+  // thread after doing one last collection.
   void Stop();
 
   // CollectAll attempts to collect observations for all MetricObservers
@@ -336,6 +401,7 @@ class ObservationsCollector {
   std::map<uint32_t, std::shared_ptr<MetricObservers>> metrics_;
   std::vector<std::function<void(std::vector<Observation>*)>>
       reservoir_samplers_;
+  std::vector<std::shared_ptr<EventLogger>> event_loggers_;
   // Thread on which the collection loop is run.
   std::thread collection_loop_;
   // Set to false to stop collection.

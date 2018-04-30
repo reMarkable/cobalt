@@ -58,11 +58,11 @@ struct Sink {
 // Checks that Counters work correctly with many threads updating them.
 TEST(Counter, Normal) {
   // Metric id.
-  const int64_t id = 10;
+  const int64_t kMetricId = 10;
   Sink sink(true);
   ObservationsCollector collector(
       std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
-  auto counter = collector.MakeCounter(id, "part_name");
+  auto counter = collector.MakeCounter(kMetricId, "part_name");
 
   // Each thread will add kPeriodSize * kPeriodCount to the counter.
   int64_t expected = kPeriodSize * kPeriodCount * kThreadNum;
@@ -80,10 +80,6 @@ TEST(Counter, Normal) {
   for (auto iter = threads.begin(); iter != threads.end(); iter++) {
     iter->join();
   }
-  // Wait just a bit more than one collection period after the last incrementer
-  // thread is done in order to ensure all the data is collected before we stop
-  // collection.
-  std::this_thread::sleep_for(std::chrono::microseconds(11));
 
   // Stop the collection thread.
   collector.Stop();
@@ -119,14 +115,15 @@ void DoLogObservation(std::shared_ptr<IntegerSampler> int_sampler) {
 // theoretical average.
 TEST(IntegerSampler, IntegerAverage) {
   // Metric id.
-  const int64_t id = 10;
+  const int64_t kMetricId = 10;
   Sink sink(false);
   ObservationsCollector collector(
       std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
 
   // The IntegerSampler will collect at most 100 elements at a time.
   size_t sample_size = 100;
-  auto int_sampler = collector.MakeIntegerSampler(id, "part_name", sample_size);
+  auto int_sampler =
+      collector.MakeIntegerSampler(kMetricId, "part_name", sample_size);
 
   // Each thread will log kPeriodSize * kPeriodCount times to the
   // IntegerSampler.
@@ -142,11 +139,6 @@ TEST(IntegerSampler, IntegerAverage) {
   for (auto iter = threads.begin(); iter != threads.end(); iter++) {
     iter->join();
   }
-
-  // Wait just a bit more than one collection period after the last incrementer
-  // thread is done in order to ensure all the data is collected before we stop
-  // collection.
-  std::this_thread::sleep_for(std::chrono::microseconds(11));
 
   // Stop the collection thread.
   collector.Stop();
@@ -183,14 +175,15 @@ TEST(IntegerSampler, IntegerAverage) {
 // IntegerSampler does not reflect that time-dependency.
 TEST(IntegerSampler, CheckUniformity) {
   // Metric id.
-  const int64_t id = 10;
+  const int64_t kMetricId = 10;
   Sink sink(false);
   ObservationsCollector collector(
       std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
 
   // The IntegerSampler will collect at most 100 elements at a time.
   size_t sample_size = 100;
-  auto int_sampler = collector.MakeIntegerSampler(id, "part_name", sample_size);
+  auto int_sampler =
+      collector.MakeIntegerSampler(kMetricId, "part_name", sample_size);
 
   // We log integers in increasing order. This is to check that the ordering of
   // the logged observations is not related to the distribution of the sampled
@@ -227,12 +220,97 @@ TEST(IntegerSampler, CheckUniformity) {
   EXPECT_NEAR(expected_mean, sample_mean, expected_stddev * 4.5);
 }
 
+void DoLogEvent(std::shared_ptr<EventLogger> logger, uint32_t status) {
+  std::random_device rd;
+  std::default_random_engine gen(rd());
+  // Uniformly sample from the set [0...kSamplerMaxInt].
+  std::uniform_int_distribution<> time(0, kSamplerMaxInt);
+
+  for (int64_t i = 0; i < kPeriodCount; i++) {
+    for (int64_t j = 0; j < kPeriodSize; j++) {
+      logger->LogEvent(time(gen), status);
+    }
+    // Introduce jitter to test.
+    std::this_thread::sleep_for(std::chrono::microseconds(std::rand() % 100));
+  }
+}
+
+TEST(EventLogger, Normal) {
+  const uint32_t kEventMetricId = 1;
+  const uint32_t kMaxStatus = 4;
+  const uint32_t kEventTimingMetricId = 2;
+  const size_t kThreadNum = 100;
+  ASSERT_EQ(kThreadNum % (kMaxStatus + 1), size_t(0))
+      << "kThreadNum must be divisible by the number of statuses.";
+  size_t samples = 100;
+  Sink sink(false);
+  ObservationsCollector collector(
+      std::bind(&Sink::SendObservations, &sink, std::placeholders::_1), 1);
+  auto logger = collector.MakeEventLogger(kEventMetricId, kMaxStatus,
+                                          kEventTimingMetricId, samples);
+
+  std::vector<std::thread> threads;
+  for (size_t i = 0; i < kThreadNum; i++) {
+    uint32_t status = i % (kMaxStatus + 1);
+    threads.push_back(std::thread(DoLogEvent, logger, status));
+  }
+
+  // Start the collection thread.
+  collector.Start(std::chrono::microseconds(10));
+
+  // Wait until all the logging threads have finished.
+  for (auto iter = threads.begin(); iter != threads.end(); iter++) {
+    iter->join();
+  }
+
+  // Stop the collection thread.
+  collector.Stop();
+
+  // We sum up the distributions and check the sum is as expected.
+  int64_t histogram[kMaxStatus + 1] = {0, 0, 0, 0, 0};
+  for (auto iter = sink.observations.begin(); sink.observations.end() != iter;
+       iter++) {
+    if (iter->metric_id != kEventMetricId) continue;
+
+    for (auto part_iter = iter->parts.begin(); iter->parts.end() != part_iter;
+         part_iter++) {
+      if (part_iter->part_name == "status") {
+        auto dist = part_iter->value.GetDistribution();
+        for (auto status_iter = dist.begin(); dist.end() != status_iter;
+             status_iter++) {
+          histogram[status_iter->first] += status_iter->second;
+        }
+      }
+    }
+  }
+
+  int64_t expected_histogram_value =
+      kThreadNum / (kMaxStatus + 1) * kPeriodSize * kPeriodCount;
+  for (size_t status = 0; status <= kMaxStatus; status++) {
+    EXPECT_EQ(histogram[status], expected_histogram_value);
+  }
+}
+
 // Check that the integer value part work correctly.
 TEST(ValuePart, IntValuePart) {
-  ValuePart value = ValuePart::MakeIntValuePart(10);
+  ValuePart value = ValuePart::Make(10);
   EXPECT_EQ(10, value.GetIntValue());
   EXPECT_TRUE(value.IsIntValue());
   EXPECT_EQ(ValuePart::INT, value.Which());
+}
+
+TEST(ValuePart, DistributionValuePart) {
+  std::map<uint32_t, int64_t> distribution = {{0, 1}, {1, 2}, {2, 4}};
+  ValuePart value = ValuePart::Make(distribution);
+  EXPECT_EQ(distribution.size(), value.GetDistribution().size());
+  EXPECT_TRUE(value.IsDistribution());
+  EXPECT_EQ(ValuePart::DISTRIBUTION, value.Which());
+
+  // Check that the copy constructor works.
+  ValuePart copy = value;
+  EXPECT_EQ(distribution.size(), copy.GetDistribution().size());
+  EXPECT_TRUE(copy.IsDistribution());
+  EXPECT_EQ(ValuePart::DISTRIBUTION, copy.Which());
 }
 }  // namespace client
 }  // namespace cobalt
