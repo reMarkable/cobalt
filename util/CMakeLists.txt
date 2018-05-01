@@ -28,6 +28,7 @@ target_link_libraries(util_tests
                       datetime_util encrypted_message_util)
 add_cobalt_test_dependencies(util_tests ${DIR_GTESTS})
 
+add_subdirectory(clearcut)
 add_subdirectory(crypto_util)
 add_subdirectory(gcs)
 

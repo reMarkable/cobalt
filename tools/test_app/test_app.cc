@@ -36,6 +36,7 @@
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 #include "grpc++/grpc++.h"
+#include "util/clearcut/curl_http_client.h"
 #include "util/pem_util.h"
 
 namespace cobalt {
@@ -43,6 +44,7 @@ namespace cobalt {
 using analyzer::Analyzer;
 using config::EncodingRegistry;
 using config::MetricRegistry;
+using encoder::ClearcutV1ShippingManager;
 using encoder::ClientSecret;
 using encoder::Encoder;
 using encoder::EnvelopeMaker;
@@ -552,24 +554,33 @@ TestApp::TestApp(
       system_data_(std::move(system_data)),
       shipping_dispatcher_(new ShippingDispatcher()),
       ostream_(ostream) {
+  auto size_params =
+      ShippingManager::SizeParams(kMaxBytesPerObservation, kMaxBytesPerEnvelope,
+                                  kMaxBytesTotal, kMinEnvelopeSendSize);
+  // By using (kMaxSeconds, 0) here we are effectively putting the
+  // ShippingDispatcher in manual mode. It will never send
+  // automatically and it will send immediately in response to
+  // RequestSendSoon().
+  auto schedule_params = ShippingManager::ScheduleParams(
+      ShippingManager::kMaxSeconds, std::chrono::seconds(0));
+  auto envelope_maker_params = ShippingManager::EnvelopeMakerParams(
+      analyzer_public_key_pem, analyzer_scheme, shuffler_public_key_pem,
+      shuffler_scheme);
+  auto send_retryer_params = ShippingManager::SendRetryerParams(
+      kInitialRpcDeadline, kDeadlinePerSendAttempt);
   shipping_dispatcher_->Register(
       ObservationMetadata::LEGACY_BACKEND,
       std::make_unique<LegacyShippingManager>(
-          ShippingManager::SizeParams(kMaxBytesPerObservation,
-                                      kMaxBytesPerEnvelope, kMaxBytesTotal,
-                                      kMinEnvelopeSendSize),
-          // By using (kMaxSeconds, 0) here we are effectively putting the
-          // ShippingManager in manual mode. It will never send
-          // automatically and it will send immediately in response to
-          // RequestSendSoon().
-          ShippingManager::ScheduleParams(ShippingManager::kMaxSeconds,
-                                          std::chrono::seconds(0)),
-          ShippingManager::EnvelopeMakerParams(
-              analyzer_public_key_pem, analyzer_scheme, shuffler_public_key_pem,
-              shuffler_scheme),
-          ShippingManager::SendRetryerParams(kInitialRpcDeadline,
-                                             kDeadlinePerSendAttempt),
-          send_retryer_.get()));
+          size_params, schedule_params, envelope_maker_params,
+          send_retryer_params, send_retryer_.get()));
+  shipping_dispatcher_->Register(
+      ObservationMetadata::V1_BACKEND,
+      std::make_unique<ClearcutV1ShippingManager>(
+          size_params, schedule_params, envelope_maker_params,
+          send_retryer_params, send_retryer_.get(),
+          std::make_unique<clearcut::ClearcutUploader>(
+              FLAGS_clearcut_endpoint,
+              std::make_unique<util::clearcut::CurlHTTPClient>())));
   shipping_dispatcher_->Start();
 }
 

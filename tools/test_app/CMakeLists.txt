@@ -17,7 +17,8 @@ add_library(test_app test_app.cc)
 target_link_libraries(test_app
                       analyzer_grpc_client
                       encoder
-                      pem_util)
+                      pem_util
+                      curl_http_client)
 add_cobalt_dependencies(test_app)
 
 # Build the cobalt_test_app executable.

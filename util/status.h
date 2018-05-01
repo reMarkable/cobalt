@@ -46,6 +46,17 @@ class Status {
   std::string error_details_;
 };
 
+// Early-returns the status if it is an error, otherwise it proceeds.
+//
+// The argument expression is evaluated only once.
+#define RETURN_IF_ERROR(__status) \
+  do {                            \
+    auto status = (__status);     \
+    if (!status.ok()) {           \
+      return status;              \
+    }                             \
+  } while (false)
+
 }  // namespace util
 }  // namespace cobalt
 
