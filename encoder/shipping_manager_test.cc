@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -18,6 +19,7 @@
 #include "encoder/project_context.h"
 // Generated from shipping_manager_test_config.yaml
 #include "encoder/shipping_manager_test_config.h"
+#include "third_party/clearcut/clearcut.pb.h"
 #include "third_party/gflags/include/gflags/gflags.h"
 
 namespace cobalt {
@@ -26,6 +28,7 @@ namespace encoder {
 using config::ClientConfig;
 using send_retryer::CancelHandle;
 using send_retryer::SendRetryer;
+using tensorflow_statusor::StatusOr;
 
 namespace {
 
@@ -89,6 +92,9 @@ class FakeSystemData : public SystemDataInterface {
 };
 
 struct FakeSendRetryer : public SendRetryerInterface {
+  explicit FakeSendRetryer(uint32_t metric_id = kDefaultMetricId)
+      : SendRetryerInterface(), metric_id(metric_id) {}
+
   grpc::Status SendToShuffler(
       std::chrono::seconds initial_rpc_deadline,
       std::chrono::seconds overerall_deadline,
@@ -101,8 +107,7 @@ struct FakeSendRetryer : public SendRetryerInterface {
     EXPECT_TRUE(
         decrypter.DecryptMessage(encrypted_message, &recovered_envelope));
     EXPECT_EQ(1, recovered_envelope.batch_size());
-    EXPECT_EQ(kDefaultMetricId,
-              recovered_envelope.batch(0).meta_data().metric_id());
+    EXPECT_EQ(metric_id, recovered_envelope.batch(0).meta_data().metric_id());
     FakeSystemData::CheckSystemProfile(recovered_envelope);
 
     std::unique_lock<std::mutex> lock(mutex);
@@ -131,8 +136,36 @@ struct FakeSendRetryer : public SendRetryerInterface {
   grpc::Status status_to_return = grpc::Status::OK;
   int send_call_count = 0;
   int observation_count = 0;
+  uint32_t metric_id;
 };
 
+class FakeHTTPClient : public clearcut::HTTPClient {
+ public:
+  explicit FakeHTTPClient(std::set<uint32_t>* seen_event_codes)
+      : clearcut::HTTPClient(), seen_event_codes_(seen_event_codes) {}
+
+  std::future<StatusOr<clearcut::HTTPResponse>> Post(
+      clearcut::HTTPRequest request,
+      std::chrono::steady_clock::time_point _ignored) {
+    clearcut::LogRequest req;
+    req.ParseFromString(request.body);
+    for (auto event : req.log_event()) {
+      seen_event_codes_->insert(event.event_code());
+    }
+
+    clearcut::HTTPResponse response = {.http_code = 200};
+    clearcut::LogResponse resp;
+    resp.SerializeToString(&response.response);
+
+    std::promise<StatusOr<clearcut::HTTPResponse>> response_promise;
+    response_promise.set_value(response);
+
+    return response_promise.get_future();
+  }
+
+ private:
+  std::set<uint32_t>* seen_event_codes_;
+};
 }  // namespace
 
 class ShippingManagerTest : public ::testing::Test {
@@ -143,25 +176,38 @@ class ShippingManagerTest : public ::testing::Test {
 
  protected:
   void Init(std::chrono::seconds schedule_interval,
-            std::chrono::seconds min_interval) {
-    send_retryer_.reset(new FakeSendRetryer());
-    shipping_manager_.reset(new ShippingManager(
-        ShippingManager::SizeParams(kMaxBytesPerObservation,
-                                    kMaxBytesPerEnvelope, kMaxBytesTotal,
-                                    kMinEnvelopeSendSize),
-        ShippingManager::ScheduleParams(schedule_interval, min_interval),
-        ShippingManager::EnvelopeMakerParams("", EncryptedMessage::NONE, "",
-                                             EncryptedMessage::NONE),
-        ShippingManager::SendRetryerParams(kInitialRpcDeadline,
-                                           kDeadlinePerSendAttempt),
-        send_retryer_.get()));
+            std::chrono::seconds min_interval,
+            uint32_t metric_id = kDefaultMetricId) {
+    send_retryer_.reset(new FakeSendRetryer(metric_id));
+    ShippingManager::SizeParams size_params(
+        kMaxBytesPerObservation, kMaxBytesPerEnvelope, kMaxBytesTotal,
+        kMinEnvelopeSendSize);
+    ShippingManager::ScheduleParams schedule_params(schedule_interval,
+                                                    min_interval);
+    ShippingManager::EnvelopeMakerParams envelope_maker_params(
+        "", EncryptedMessage::NONE, "", EncryptedMessage::NONE);
+    ShippingManager::SendRetryerParams send_retryer_params(
+        kInitialRpcDeadline, kDeadlinePerSendAttempt);
+    if (metric_id == kDefaultMetricId) {
+      shipping_manager_.reset(new LegacyShippingManager(
+          size_params, schedule_params, envelope_maker_params,
+          send_retryer_params, send_retryer_.get()));
+    } else {
+      shipping_manager_.reset(new ClearcutV1ShippingManager(
+          size_params, schedule_params, envelope_maker_params,
+          send_retryer_params, send_retryer_.get(),
+          std::make_unique<clearcut::ClearcutUploader>(
+              "https://test.com",
+              std::make_unique<FakeHTTPClient>(&seen_clearcut_event_codes_))));
+    }
     shipping_manager_->Start();
   }
 
-  ShippingManager::Status AddObservation(size_t num_bytes) {
+  ShippingManager::Status AddObservation(
+      size_t num_bytes, uint32_t metric_id = kDefaultMetricId) {
     CHECK(num_bytes > kNoOpEncodingByteOverhead) << " num_bytes=" << num_bytes;
     Encoder::Result result = encoder_.EncodeString(
-        kDefaultMetricId, kNoOpEncodingId,
+        metric_id, kNoOpEncodingId,
         std::string("x", num_bytes - kNoOpEncodingByteOverhead));
     return shipping_manager_->AddObservation(*result.observation,
                                              std::move(result.metadata));
@@ -173,7 +219,13 @@ class ShippingManagerTest : public ::testing::Test {
     EXPECT_EQ(expected_observation_count, send_retryer_->observation_count);
   }
 
+  bool SawEventCode(uint32_t event_code) {
+    return seen_clearcut_event_codes_.find(event_code) !=
+           seen_clearcut_event_codes_.end();
+  }
+
   FakeSystemData system_data_;
+  std::set<uint32_t> seen_clearcut_event_codes_;
   std::unique_ptr<FakeSendRetryer> send_retryer_;
   std::unique_ptr<ShippingManager> shipping_manager_;
   std::shared_ptr<ProjectContext> project_;
@@ -261,8 +313,8 @@ TEST_F(ShippingManagerTest, ObservationTooBig) {
   EXPECT_EQ(ShippingManager::kObservationTooBig, AddObservation(60));
 }
 
-// The value of |envelope_send_threshold_size_| is 60% * max_bytes_per_envelope
-// = 60% * 200 = 120 bytes.
+// The value of |envelope_send_threshold_size_| is 60% *
+// max_bytes_per_envelope = 60% * 200 = 120 bytes.
 //
 // We add two 40 byte observations and expect them not be be sent.
 // Then we add the third 40 byte observation pushing the byte count
@@ -352,16 +404,16 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
   // setting temporarily_full_ true.
   //
   // Add 26 Observations. We want to do this in such a way that we don't
-  // exceed max_bytes_per_envelope_.  Each time we will invoke RequestSendSoon()
-  // and then WaitUntilWorkerWaiting() so that we know that between
-  // invocations of AddObservtion() the worker thread will complete one
-  // execution of SendAllEnvelopes().
+  // exceed max_bytes_per_envelope_.  Each time we will invoke
+  // RequestSendSoon() and then WaitUntilWorkerWaiting() so that we know that
+  // between invocations of AddObservtion() the worker thread will complete
+  // one execution of SendAllEnvelopes().
   for (int i = 0; i < 26; i++) {
     EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
     if (i < 15) {
       // After having added 15 Observations we have exceeded
-      // total_bytes_send_threshold (see the test TotalBytesSendThreshold below
-      // for that computation) and this means that each invocation of
+      // total_bytes_send_threshold (see the test TotalBytesSendThreshold
+      // below for that computation) and this means that each invocation of
       // AddObservation() automatically invokes RequestSendSoon() and so we
       // don't want to invoke it again here.
       shipping_manager_->RequestSendSoon();
@@ -380,11 +432,11 @@ TEST_F(ShippingManagerTest, ExceedMaxBytesTotal) {
   // file on kMinEnvelopeSendSize. There it is explained that the
   // ShippingManager will attempt to bundle together up to 5 Observations into
   // a single Envelope before sending. None of the sends succeed so the
-  // ShippingManager keeps accumulating more Envelopes containing 5 Observations
-  // that failed to send. Below is the complete pattern of send attempts. Each
-  // set in braces represents one execution of SendAllEnvelopes(). The numbers
-  // in each set represent the invocations of SendOneEnvelope() with an
-  // Envelope that contains that many Observations.
+  // ShippingManager keeps accumulating more Envelopes containing 5
+  // Observations that failed to send. Below is the complete pattern of send
+  // attempts. Each set in braces represents one execution of
+  // SendAllEnvelopes(). The numbers in each set represent the invocations of
+  // SendOneEnvelope() with an Envelope that contains that many Observations.
   //
   // Thus the total number of send attempts is the total number of numbers:
   // 5 * (1 + 2 + 3 + 4 + 5) + 6 = 5 * 15 + 6 = 81.
@@ -443,8 +495,8 @@ TEST_F(ShippingManagerTest, TotalBytesSendThreshold) {
   // zero for the minimum interval so the test doesn't have to wait.
   Init(kMaxSeconds, std::chrono::seconds::zero());
 
-  // Configure the FakeSendRetryer to fail every time so that we can accumulate
-  // Observation data in memory.
+  // Configure the FakeSendRetryer to fail every time so that we can
+  // accumulate Observation data in memory.
   {
     std::unique_lock<std::mutex> lock(send_retryer_->mutex);
     send_retryer_->status_to_return = grpc::Status::CANCELLED;
@@ -456,10 +508,10 @@ TEST_F(ShippingManagerTest, TotalBytesSendThreshold) {
   // Observation that causes us to exceed total_bytes_send_threshold_ is #16.
   //
   // Add 15 Observations. We want to do this in such a way that we don't
-  // exceed max_bytes_per_envelope_.  Each time we will invoke RequestSendSoon()
-  // and then WaitUntilWorkerWaiting() so that we know that between
-  // invocations of AddObservtion() the worker thread will complete one
-  // execution of SendAllEnvelopes().
+  // exceed max_bytes_per_envelope_.  Each time we will invoke
+  // RequestSendSoon() and then WaitUntilWorkerWaiting() so that we know that
+  // between invocations of AddObservtion() the worker thread will complete
+  // one execution of SendAllEnvelopes().
   for (int i = 0; i < 15; i++) {
     EXPECT_EQ(ShippingManager::kOk, AddObservation(40));
     shipping_manager_->RequestSendSoon();
@@ -472,11 +524,11 @@ TEST_F(ShippingManagerTest, TotalBytesSendThreshold) {
   // file on kMinEnvelopeSendSize. There it is explained that the
   // ShippingManager will attempt to bundle together up to 5 Observations into
   // a single Envelope before sending. None of the sends succeed so the
-  // ShippingManager keeps accumulating more Envelopes containing 5 Observations
-  // that failed to send. Below is the complete pattern of send attempts. Each
-  // set in braces represents one execution of SendAllEnvelopes(). The numbers
-  // in each set represent the invocations of SendOneEnvelope() with an
-  // Envelope that contains that many Observations.
+  // ShippingManager keeps accumulating more Envelopes containing 5
+  // Observations that failed to send. Below is the complete pattern of send
+  // attempts. Each set in braces represents one execution of
+  // SendAllEnvelopes(). The numbers in each set represent the invocations of
+  // SendOneEnvelope() with an Envelope that contains that many Observations.
   //
   // Thus the total number of send attempts is the total number of numbers:
   // 5 * (1 + 2 + 3 ) = 30
@@ -515,7 +567,8 @@ TEST_F(ShippingManagerTest, TotalBytesSendThreshold) {
 TEST_F(ShippingManagerTest, RequestSendSoonWithCallback) {
   Init(kMaxSeconds, std::chrono::seconds::zero());
 
-  // Invoke RequestSendSoon() with a callback before any Observations are added.
+  // Invoke RequestSendSoon() with a callback before any Observations are
+  // added.
   bool captured_success_arg = false;
   shipping_manager_->RequestSendSoon([&captured_success_arg](bool success) {
     captured_success_arg = success;
@@ -553,7 +606,8 @@ TEST_F(ShippingManagerTest, RequestSendSoonWithCallback) {
     send_retryer_->status_to_return = grpc::Status::OK;
   }
 
-  // Don't add another Observation but invoke RequestSendSoon() with a callback.
+  // Don't add another Observation but invoke RequestSendSoon() with a
+  // callback.
   shipping_manager_->RequestSendSoon([&captured_success_arg](bool success) {
     captured_success_arg = success;
   });
@@ -647,8 +701,8 @@ TEST_F(ShippingManagerTest,
         lock, [this] { return send_retryer_->is_blocking; });
   }
 
-  // Add an Observation and invoke RequestSendSoon() while the worker thread is
-  // busy sending the first Observation.
+  // Add an Observation and invoke RequestSendSoon() while the worker thread
+  // is busy sending the first Observation.
   EXPECT_EQ(ShippingManager::kOk,
             AddObservation(kNoOpEncodingByteOverhead + 1));
   bool success2;
@@ -671,6 +725,46 @@ TEST_F(ShippingManagerTest,
   // was invoked with success = false.
   EXPECT_TRUE(success1);
   EXPECT_FALSE(success2);
+}
+
+TEST_F(ShippingManagerTest, SendObservationToClearcut) {
+  // Init with a very long time for the regular schedule interval but
+  // zero for the minimum interval so the test doesn't have to wait.
+  Init(kMaxSeconds, std::chrono::seconds::zero(), kClearcutMetricId);
+
+  // Add some observations for clearcut
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(40, kClearcutMetricId));
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(41, kClearcutMetricId));
+
+  // Request send soon.
+  shipping_manager_->RequestSendSoon();
+
+  // Wait for both Observations to be sent.
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
+
+  // We should see the clearcut events
+  EXPECT_TRUE(SawEventCode(40));
+  EXPECT_TRUE(SawEventCode(41));
+}
+
+TEST_F(ShippingManagerTest, EnsureObservationsNotSentToClearcut) {
+  // Init with a very long time for the regular schedule interval but
+  // zero for the minimum interval so the test doesn't have to wait.
+  Init(kMaxSeconds, std::chrono::seconds::zero(), kDefaultMetricId);
+
+  // Add some observations *not* for clearcut
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(40, kDefaultMetricId));
+  EXPECT_EQ(ShippingManager::kOk, AddObservation(41, kDefaultMetricId));
+
+  // Request send soon.
+  shipping_manager_->RequestSendSoon();
+
+  // Wait for both Observations to be sent.
+  shipping_manager_->WaitUntilIdle(kMaxSeconds);
+
+  // We should not see the clearcut events
+  EXPECT_FALSE(SawEventCode(40));
+  EXPECT_FALSE(SawEventCode(41));
 }
 
 }  // namespace encoder

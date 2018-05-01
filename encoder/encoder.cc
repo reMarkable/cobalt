@@ -15,6 +15,7 @@
 #include "encoder/encoder.h"
 
 #include <ctime>
+#include <set>
 #include <utility>
 
 #include "./logging.h"
@@ -397,6 +398,19 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
   result.metadata->set_project_id(project_id_);
   result.metadata->set_metric_id(metric_id);
   result.metadata->set_day_index(day_index);
+  switch (metric->backend()) {
+    case Metric::LEGACY_BACKEND:
+      result.metadata->set_backend(ObservationMetadata::LEGACY_BACKEND);
+      break;
+    case Metric::V1_BACKEND:
+      result.metadata->set_backend(ObservationMetadata::V1_BACKEND);
+      break;
+    default:
+      LOG(ERROR) << "Metric config included a backend (" << metric->backend()
+                 << ") that is not recognized.";
+      result.status = kInvalidConfig;
+      return result;
+  }
 
   if (system_data_) {
     // If we were provided a SystemProfile, add the subset of fields specified

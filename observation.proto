@@ -192,6 +192,16 @@ message ObservationMetadata {
   // per Envelope and the Shuffler copies it into individual
   // ObservationMetadata.
   SystemProfile system_profile = 5;
+
+  // A ShufflerBackend specifies which backend to use.
+  enum ShufflerBackend {
+    // The legacy GRPC GKE backend
+    LEGACY_BACKEND = 0;
+    // The first version of the clearcut backend.
+    V1_BACKEND = 1;
+  }
+  // Specifies a destination where observations should be sent.
+  ShufflerBackend backend = 6;
 }
 
 // A batch of encrypted Observations with common metadata. This is the unit

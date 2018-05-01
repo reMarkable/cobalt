@@ -15,6 +15,8 @@ static_library("encoder") {
     "project_context.h",
     "send_retryer.cc",
     "send_retryer.h",
+    "shipping_dispatcher.cc",
+    "shipping_dispatcher.h",
     "shipping_manager.cc",
     "shipping_manager.h",
     "shuffler_client.cc",
@@ -36,6 +38,7 @@ static_library("encoder") {
     "//third_party/cobalt/config:client_config",
     "//third_party/cobalt/config:cobalt_config_proto",
     "//third_party/cobalt/shuffler:shuffler_service",
+    "//third_party/cobalt/third_party/clearcut:clearcut",
     "//third_party/cobalt/util:clock",
     "//third_party/cobalt/util:encrypted_message_util",
     "//third_party/grpc:grpc++",
@@ -73,6 +76,13 @@ cobalt_config_header("generate_shipping_manager_test_config") {
   output_file = "shipping_manager_test_config.h"
 }
 
+# Generate shipping_dispatcher_test_config.h from
+# shipping_dispatcher_test_config.yaml.
+cobalt_config_header("generate_shipping_dispatcher_test_config") {
+  input_yaml = "shipping_dispatcher_test_config.yaml"
+  output_file = "shipping_dispatcher_test_config.h"
+}
+
 
 source_set("unittests") {
   testonly = true
@@ -86,6 +96,8 @@ source_set("unittests") {
     "send_retryer_test.cc",
     "shipping_manager_test.cc",
     "shipping_manager_test_config.h",
+    "shipping_dispatcher_test.cc",
+    "shipping_dispatcher_test_config.h",
     "shuffler_client_test.cc",
     "system_data_test.cc",
   ]
@@ -95,6 +107,7 @@ source_set("unittests") {
     ":generate_encoder_test_config",
     ":generate_envelope_maker_test_config",
     ":generate_shipping_manager_test_config",
+    ":generate_shipping_dispatcher_test_config",
     "//third_party/gflags",
     "//third_party/gtest",
 

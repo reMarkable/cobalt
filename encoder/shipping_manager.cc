@@ -362,13 +362,27 @@ void ShippingManager::SendOneEnvelope(
     VLOG(3) << "ShippingManager worker: There are no Observations to send.";
     return;
   }
+
+  SendEnvelopeToBackend(std::move(envelope_to_send), envelopes_that_failed);
+}
+
+LegacyShippingManager::LegacyShippingManager(
+    const SizeParams& size_params, const ScheduleParams& scheduling_params,
+    const EnvelopeMakerParams& envelope_maker_params,
+    const SendRetryerParams send_retryer_params,
+    SendRetryerInterface* send_retryer)
+    : ShippingManager(size_params, scheduling_params, envelope_maker_params,
+                      send_retryer_params, send_retryer) {}
+
+void LegacyShippingManager::SendEnvelopeToBackend(
+    std::unique_ptr<EnvelopeMaker> envelope_to_send,
+    std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) {
   EncryptedMessage encrypted_envelope;
   if (!envelope_to_send->MakeEncryptedEnvelope(&encrypted_envelope)) {
     // TODO(rudominer) log
     // Drop on floor.
     return;
   }
-
   VLOG(5) << "ShippingManager worker: Sending Envelope of size "
           << envelope_to_send->size() << " bytes.";
   auto status = send_retryer_->SendToShuffler(
@@ -385,6 +399,43 @@ void ShippingManager::SendOneEnvelope(
   }
   if (status.ok()) {
     VLOG(4) << "ShippingManager::SendOneEnvelope: OK";
+    return;
+  }
+
+  VLOG(1) << "Cobalt send to Shuffler failed: (" << status.error_code() << ") "
+          << status.error_message()
+          << ". Observations have been re-enqueued for later.";
+  envelopes_that_failed->emplace_back(std::move(envelope_to_send));
+}
+
+ClearcutV1ShippingManager::ClearcutV1ShippingManager(
+    const SizeParams& size_params, const ScheduleParams& scheduling_params,
+    const EnvelopeMakerParams& envelope_maker_params,
+    const SendRetryerParams send_retryer_params,
+    SendRetryerInterface* send_retryer,
+    std::unique_ptr<clearcut::ClearcutUploader> clearcut)
+    : ShippingManager(size_params, scheduling_params, envelope_maker_params,
+                      send_retryer_params, send_retryer),
+      clearcut_(std::move(clearcut)) {}
+
+void ClearcutV1ShippingManager::SendEnvelopeToBackend(
+    std::unique_ptr<EnvelopeMaker> envelope_to_send,
+    std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) {
+  const Envelope& clearcut_envelope = envelope_to_send->envelope();
+  clearcut::LogRequest request;
+  request.set_log_source(clearcut::kClearcutDemoSource);
+  for (auto batch : clearcut_envelope.batch()) {
+    for (auto message : batch.encrypted_observation()) {
+      request.add_log_event()->set_event_code(message.ciphertext().size() + 1);
+    }
+  }
+  util::Status status;
+  {
+    std::lock_guard<std::mutex> lock(clearcut_mutex_);
+    status = clearcut_->UploadEvents(&request);
+  }
+  if (status.ok()) {
+    VLOG(4) << "ShippingManager::SendEnvelopeToBackend: OK";
     return;
   }
 

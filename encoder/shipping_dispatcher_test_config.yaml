@@ -4,10 +4,10 @@
 
 ################################################################################
 # This file contains the Metrics and EncodingConfigs used in
-# shipping_manager_test.cc
+# shipping_dispatcher_test.cc
 #
-# It is compiled into shipping_manager_test_config.h which is included into the
-# test.
+# It is compiled into shipping_dispatcher_test_config.h which is included into
+# the test.
 ################################################################################
 
 ################################################################################
@@ -28,6 +28,13 @@ metric_configs:
   parts:
     Part1:
 
+- id: 3
+  name: "Legacy"
+  time_zone_policy: UTC
+  backend: LEGACY_BACKEND
+  parts:
+    Part1:
+
 ################################################################################
 #  EncodingConfigs
 ################################################################################
@@ -35,5 +42,5 @@ encoding_configs:
 
 # EncodingConfig 1 is the NoOp encoding.
 - id: 1
-  name: "NoOp"
+  name: "No Op"
   no_op_encoding:

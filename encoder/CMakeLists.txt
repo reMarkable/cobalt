@@ -27,6 +27,10 @@ set(SHIPPING_MANAGER_TEST_CONFIG_H "${CMAKE_CURRENT_BINARY_DIR}/shipping_manager
 generate_test_config_h(${CMAKE_CURRENT_SOURCE_DIR}/shipping_manager_test_config.yaml
       ${SHIPPING_MANAGER_TEST_CONFIG_H} 1 1 "cobalt_config_base64")
 
+set(SHIPPING_DISPATCHER_TEST_CONFIG_H "${CMAKE_CURRENT_BINARY_DIR}/shipping_dispatcher_test_config.h")
+generate_test_config_h(${CMAKE_CURRENT_SOURCE_DIR}/shipping_dispatcher_test_config.yaml
+      ${SHIPPING_DISPATCHER_TEST_CONFIG_H} 1 1 "cobalt_config_base64")
+
 # client_secret library
 add_library(client_secret client_secret.cc)
 target_link_libraries(client_secret cobalt_crypto)
@@ -38,6 +42,7 @@ add_library(encoder
             envelope_maker.cc
             project_context.cc
             send_retryer.cc
+            shipping_dispatcher.cc
             shipping_manager.cc
             shuffler_client.cc
             system_data.cc
@@ -48,7 +53,8 @@ target_link_libraries(encoder
                       encrypted_message_util
                       forculus_encrypter
                       rappor_encoder
-                      shuffler_grpc_client)
+                      shuffler_grpc_client
+                      clearcut)
 add_cobalt_dependencies(encoder)
 
 add_executable(encoder_tests
@@ -60,6 +66,8 @@ add_executable(encoder_tests
                send_retryer_test.cc
                shipping_manager_test.cc
                ${SHIPPING_MANAGER_TEST_CONFIG_H}
+               shipping_dispatcher_test.cc
+               ${SHIPPING_DISPATCHER_TEST_CONFIG_H}
                shuffler_client_test.cc system_data_test.cc)
 target_link_libraries(encoder_tests
                       client_secret

@@ -19,6 +19,7 @@
 #include "encoder/envelope_maker.h"
 #include "encoder/send_retryer.h"
 #include "encoder/shuffler_client.h"
+#include "third_party/clearcut/uploader.h"
 
 namespace cobalt {
 namespace encoder {
@@ -170,6 +171,8 @@ class ShippingManager {
 
    private:
     friend class ShippingManager;
+    friend class LegacyShippingManager;
+    friend class ClearcutV1ShippingManager;
     std::chrono::seconds initial_rpc_deadline_;
     std::chrono::seconds deadline_per_send_attempt_;
   };
@@ -199,7 +202,7 @@ class ShippingManager {
 
   // The destructor will stop the worker thread and wait for it to stop
   // before exiting.
-  ~ShippingManager();
+  virtual ~ShippingManager();
 
   // Starts the worker thread. Destruct this object to stop the worker thread.
   // This method must be invoked exactly once.
@@ -304,6 +307,10 @@ class ShippingManager {
   void SendOneEnvelope(
       std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed);
 
+  virtual void SendEnvelopeToBackend(
+      std::unique_ptr<EnvelopeMaker> envelope_to_send,
+      std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) = 0;
+
   const SizeParams size_params_;
 
   // When the active EnvelopeMaker surpasses this size (in bytes) we invoke
@@ -320,17 +327,24 @@ class ShippingManager {
 
   const ScheduleParams schedule_params_;
   const EnvelopeMakerParams envelope_maker_params_;
+
+ protected:
   const SendRetryerParams send_retryer_params_;
 
   SendRetryerInterface* send_retryer_;  // not owned
 
+ private:
   // Variables accessed only by the worker thread. These are not
   // protected by a mutex.
   std::chrono::system_clock::time_point next_scheduled_send_time_;
 
   std::deque<std::unique_ptr<EnvelopeMaker>> envelopes_to_send_;
-  send_retryer::CancelHandle cancel_handle_;
 
+ protected:
+  send_retryer::CancelHandle cancel_handle_;  // Not protected by a mutex. Only
+                                              // accessed by the worker thread.
+
+ private:
   // The background worker thread that runs the method "Run()."
   std::thread worker_thread_;
 
@@ -414,6 +428,7 @@ class ShippingManager {
   // locked->fields->[field_name].
   MutexProtectedFields _mutex_protected_fields_do_not_access_directly_;
 
+ protected:
   // Provides access to the fields that are protected by a mutex while
   // acquiring a lock on the mutex. Destroy the returned std::unique_ptr to
   // release the mutex.
@@ -422,6 +437,7 @@ class ShippingManager {
         new LockedFields(&_mutex_protected_fields_do_not_access_directly_));
   }
 
+ private:
   // Does the work of TakeActiveEnvelopeMaker() and assumes that the
   // fields->mutex lock is held.
   std::unique_ptr<EnvelopeMaker> TakeActiveEnvelopeMakerLockHeld(
@@ -433,6 +449,38 @@ class ShippingManager {
 
   // Helper method used by Run(). Assumes the fields->mutex lock is held.
   void PrepareForSendLockHeld(MutexProtectedFields* fields);
+};
+
+class LegacyShippingManager : public ShippingManager {
+ public:
+  LegacyShippingManager(const SizeParams& size_params,
+                        const ScheduleParams& scheduling_params,
+                        const EnvelopeMakerParams& envelope_maker_params,
+                        const SendRetryerParams send_retryer_params,
+                        SendRetryerInterface* send_retryer);
+
+ private:
+  void SendEnvelopeToBackend(
+      std::unique_ptr<EnvelopeMaker> envelope_to_send,
+      std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed);
+};
+
+class ClearcutV1ShippingManager : public ShippingManager {
+ public:
+  ClearcutV1ShippingManager(
+      const SizeParams& size_params, const ScheduleParams& scheduling_params,
+      const EnvelopeMakerParams& envelope_maker_params,
+      const SendRetryerParams send_retryer_params,
+      SendRetryerInterface* send_retryer,
+      std::unique_ptr<clearcut::ClearcutUploader> clearcut);
+
+ private:
+  void SendEnvelopeToBackend(
+      std::unique_ptr<EnvelopeMaker> envelope_to_send,
+      std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed);
+
+  std::mutex clearcut_mutex_;
+  std::unique_ptr<clearcut::ClearcutUploader> clearcut_;
 };
 
 }  // namespace encoder
