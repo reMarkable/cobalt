@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/golang/protobuf/proto"
+	"strings"
 )
 
 type OutputFormatter func(c *config.CobaltConfig) (outputBytes []byte, err error)
@@ -33,6 +34,25 @@ func Base64Output(c *config.CobaltConfig) (outputBytes []byte, err error) {
 	outputBytes = make([]byte, outLen, outLen)
 	encoder.Encode(outputBytes, configBytes)
 	return outputBytes, nil
+}
+
+// writeIdConstants prints out a list of constants to be used in testing. It
+// uses the Name attribute of each Metric, Report, and Encoding to construct the
+// constants.
+//
+// For a metric named "SingleString" the constant would be kSingleStringMetricId
+// For a report named "Test" the constant would be kTestReportId
+// For an encoding named "Forculus" the canstant would be kForculusEncodingId
+func writeIdConstants(out *bytes.Buffer, constType string, entries map[string]uint32) {
+	if len(entries) == 0 {
+		return
+	}
+	out.WriteString(fmt.Sprintf("// %s ID Constants\n", constType))
+	for name, id := range entries {
+		name = strings.Join(strings.Split(name, " "), "")
+		out.WriteString(fmt.Sprintf("const uint32_t k%s%sId = %d;\n", name, constType, id))
+	}
+	out.WriteString("\n")
 }
 
 // Returns an output formatter that will output the contents of a C++ header
@@ -64,6 +84,42 @@ func CppOutputFactory(varName string, namespace []string, configLocation string)
 			out.WriteString(name)
 			out.WriteString(" {\n")
 		}
+
+		metrics := make(map[string]uint32)
+		for _, metric := range c.MetricConfigs {
+			if metric.Name != "" {
+				if _, ok := metrics[metric.Name]; ok {
+					return outputBytes, fmt.Errorf("Duplicate metric name found %v", metric.Name)
+				}
+				metrics[metric.Name] = metric.Id
+			}
+		}
+		// Write out the 'Metric' constants (e.g. kTestMetricId)
+		writeIdConstants(out, "Metric", metrics)
+
+		reports := make(map[string]uint32)
+		for _, report := range c.ReportConfigs {
+			if report.Name != "" {
+				if _, ok := reports[report.Name]; ok {
+					return outputBytes, fmt.Errorf("Duplicate report name found %v", report.Name)
+				}
+				reports[report.Name] = report.Id
+			}
+		}
+		// Write out the 'Report' constants (e.g. kTestReportId)
+		writeIdConstants(out, "Report", reports)
+
+		encodings := make(map[string]uint32)
+		for _, encoding := range c.EncodingConfigs {
+			if encoding.Name != "" {
+				if _, ok := encodings[encoding.Name]; ok {
+					return outputBytes, fmt.Errorf("Duplicate encoding name found %v", encoding.Name)
+				}
+				encodings[encoding.Name] = encoding.Id
+			}
+		}
+		// Write out the 'Encoding' constants (e.g. kTestEncodingId)
+		writeIdConstants(out, "Encoding", encodings)
 
 		out.WriteString("// The base64 encoding of the bytes of a serialized CobaltConfig proto message.\n")
 		out.WriteString("const char ")

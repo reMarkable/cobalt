@@ -35,9 +35,6 @@ namespace {
 const uint32_t kCustomerId = 1;
 const uint32_t kProjectId = 1;
 
-const uint32_t kMetricId = 1;
-const uint32_t kEncodingConfigId = 1;
-
 const size_t kNoOpEncodingByteOverhead = 30;
 const size_t kMaxBytesPerObservation = 50;
 const size_t kMaxBytesPerEnvelope = 200;
@@ -104,7 +101,8 @@ struct FakeSendRetryer : public SendRetryerInterface {
     EXPECT_TRUE(
         decrypter.DecryptMessage(encrypted_message, &recovered_envelope));
     EXPECT_EQ(1, recovered_envelope.batch_size());
-    EXPECT_EQ(kMetricId, recovered_envelope.batch(0).meta_data().metric_id());
+    EXPECT_EQ(kDefaultMetricId,
+              recovered_envelope.batch(0).meta_data().metric_id());
     FakeSystemData::CheckSystemProfile(recovered_envelope);
 
     std::unique_lock<std::mutex> lock(mutex);
@@ -163,7 +161,7 @@ class ShippingManagerTest : public ::testing::Test {
   ShippingManager::Status AddObservation(size_t num_bytes) {
     CHECK(num_bytes > kNoOpEncodingByteOverhead) << " num_bytes=" << num_bytes;
     Encoder::Result result = encoder_.EncodeString(
-        kMetricId, kEncodingConfigId,
+        kDefaultMetricId, kNoOpEncodingId,
         std::string("x", num_bytes - kNoOpEncodingByteOverhead));
     return shipping_manager_->AddObservation(*result.observation,
                                              std::move(result.metadata));

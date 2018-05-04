@@ -33,7 +33,6 @@ enum EpochType {
   MONTH = 2;
 }
 
-
 ///////////////////////////////////////////////////////////////
 // Messages that describe the configuration of an encoding.
 // These are registered in the Cobalt Config Database and consumed
@@ -144,9 +143,11 @@ message NoOpEncodingConfig {
 }
 
 message EncodingConfig {
+  // Next ID: 101
   uint32 customer_id = 1;
   uint32 project_id = 2;
   uint32 id = 3;
+  string name = 100;
   oneof config {
     ForculusConfig forculus = 4;
     RapporConfig rappor = 5;

@@ -16,6 +16,7 @@
 metric_configs:
 # Metric 1 has one string part, and local time_zone_policy.
 - id: 1
+  name: "Default"
   time_zone_policy: UTC
   parts:
     "Part1":
@@ -27,4 +28,5 @@ encoding_configs:
 
 # EncodingConfig 1 is the NoOp encoding.
 - id: 1
+  name: "NoOp"
   no_op_encoding:
