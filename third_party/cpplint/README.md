@@ -10,3 +10,4 @@ An extensible, privacy-preserving, user-data analysis pipeline.
   * Allow `#include <mutex>`
   * Allow `#include <thread>`
   * Allow `#include <chrono>`
+  * Use the specified root flag to find the root of the repository.

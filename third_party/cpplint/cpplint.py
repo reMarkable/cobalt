@@ -1005,6 +1005,12 @@ class FileInfo(object):
     if os.path.exists(fullname):
       project_dir = os.path.dirname(fullname)
 
+      # If the user was kind-enough to provide the root directory, just use it.
+      if _root and os.path.exists(_root):
+        root_dir = _root
+        prefix = os.path.commonprefix([root_dir, project_dir])
+        return fullname[len(prefix) + 1:]
+
       if os.path.exists(os.path.join(project_dir, ".svn")):
         # If there's a .svn file in the current directory, we recursively look
         # up the directory tree for the top of the SVN checkout

@@ -43,8 +43,8 @@ def main():
     for f in files:
       if f.endswith('.h') or f.endswith('.cc'):
         full_path = os.path.join(root, f)
-        cmd = subprocess.Popen([CPP_LINT,  full_path], stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+        cmd = subprocess.Popen([CPP_LINT, '--root', SRC_ROOT_DIR, full_path],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = cmd.communicate()
 
         if cmd.returncode:
