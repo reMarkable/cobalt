@@ -13,6 +13,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 )
 
 // ReadConfigFromDir reads the whole configuration for Cobalt from a directory on the file system.
@@ -182,6 +184,34 @@ func readProjectConfig(r configReader, c *projectConfig) (err error) {
 	return parseProjectConfig(configYaml, c)
 }
 
+// cmpConfigEntry takes two protobuf pointers that must have the fields
+// "CustomerId", "ProjectId", and "Id". It is used in generically sorting the
+// config entries in the CobaltConfig proto.
+func cmpConfigEntry(i, j interface{}) bool {
+	a := reflect.ValueOf(i).Elem()
+	b := reflect.ValueOf(j).Elem()
+
+	aCi := a.FieldByName("CustomerId").Uint()
+	bCi := b.FieldByName("CustomerId").Uint()
+	if aCi != bCi {
+		return aCi < bCi
+	}
+
+	aPi := a.FieldByName("ProjectId").Uint()
+	bPi := b.FieldByName("ProjectId").Uint()
+	if aPi != bPi {
+		return aPi < bPi
+	}
+
+	ai := a.FieldByName("Id").Uint()
+	bi := b.FieldByName("Id").Uint()
+	if ai != bi {
+		return ai < bi
+	}
+
+	return false
+}
+
 // mergeConfigs accepts a list of projectConfigs each of which contains the
 // encoding, metric and report configs for a particular project and aggregates
 // all those into a single CobaltConfig proto.
@@ -191,6 +221,18 @@ func mergeConfigs(l []projectConfig) (s config.CobaltConfig) {
 		s.MetricConfigs = append(s.MetricConfigs, c.projectConfig.MetricConfigs...)
 		s.ReportConfigs = append(s.ReportConfigs, c.projectConfig.ReportConfigs...)
 	}
+
+	// In order to ensure that we output a stable order in the binary protobuf, we
+	// sort each slice of config entries.
+	sort.SliceStable(s.EncodingConfigs, func(i, j int) bool {
+		return cmpConfigEntry(s.EncodingConfigs[i], s.EncodingConfigs[j])
+	})
+	sort.SliceStable(s.MetricConfigs, func(i, j int) bool {
+		return cmpConfigEntry(s.MetricConfigs[i], s.MetricConfigs[j])
+	})
+	sort.SliceStable(s.ReportConfigs, func(i, j int) bool {
+		return cmpConfigEntry(s.ReportConfigs[i], s.ReportConfigs[j])
+	})
 
 	return s
 }
