@@ -32,14 +32,12 @@ spec:
       - name: endpoint
         image: gcr.io/endpoints-release/endpoints-runtime:1
         args: [
-          '-P', '8000',
           '-S', '443',
           '-s', '$$ENDPOINT_NAME$$',
           '-v', '$$ENDPOINT_CONFIG_ID$$',
           '-a', 'grpc://127.0.0.1:5000'
           ]
         ports:
-          - containerPort: 8000
           - containerPort: 443
         volumeMounts:
           - mountPath: /etc/nginx/ssl

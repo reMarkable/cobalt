@@ -41,7 +41,6 @@ spec:
           '-a', 'grpc://127.0.0.1:7000'
           ]
         ports:
-          - containerPort: 8000
           - containerPort: 443
         volumeMounts:
           - mountPath: /etc/nginx/ssl
