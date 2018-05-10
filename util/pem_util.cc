@@ -18,7 +18,7 @@
 #include <streambuf>
 #include <string>
 
-#include "glog/logging.h"
+#include "./logging.h"
 
 namespace cobalt {
 namespace util {

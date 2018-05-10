@@ -39,6 +39,7 @@ static_library("pem_util") {
   ]
   configs += [ "//third_party/cobalt:cobalt_config" ]
   deps = [
+    "//garnet/public/lib/fxl",
     "//third_party/cobalt/util/crypto_util",
   ]
 }
