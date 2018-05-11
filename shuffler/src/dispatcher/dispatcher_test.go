@@ -23,32 +23,43 @@ import (
 	"cobalt"
 	"shuffler"
 	"storage"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
 
 // This is a fake Analyzer transport client that just caches the Observations
 // in the order they are received. This lets us verify the output of the
 // dispatcher.
 type fakeAnalyzerTransport struct {
-	obBatch []*cobalt.ObservationBatch
-	numSent int
+	obBatch          []*cobalt.ObservationBatch
+	numSent          int
+	errorsToReturn   []error
+	sendCallCount    int
+	closeCallCount   int
+	connectCallCount int
 }
 
 func (a *fakeAnalyzerTransport) send(obBatch *cobalt.ObservationBatch) error {
+	a.sendCallCount++
+	if a.errorsToReturn != nil && a.sendCallCount-1 < len(a.errorsToReturn) {
+		return a.errorsToReturn[a.sendCallCount-1]
+	}
 	if obBatch == nil {
 		return nil
 	}
-
 	a.numSent++
 	a.obBatch = append(a.obBatch, obBatch)
 	return nil
 }
 
 func (a *fakeAnalyzerTransport) close() {
-	// do nothing
+	a.closeCallCount++
 }
 
-func (a *fakeAnalyzerTransport) reconnect() {
-	// do nothing
+func (a *fakeAnalyzerTransport) connect() error {
+	a.connectCallCount++
+	return nil
 }
 
 // makeTestStore returns a sample test store with |numObservations| for a single
@@ -471,4 +482,122 @@ func TestMakeBatch(t *testing.T) {
 		t.Errorf("got error while releasing iterator: %v", err)
 		return
 	}
+}
+
+// makeFakeAnalyzerTransport makes an anlayzer transport that will return
+// the given sequence of status codes.
+func makeFakeAnalyzerTransport(codes []codes.Code) fakeAnalyzerTransport {
+	var errors []error
+	for _, code := range codes {
+		errors = append(errors, grpc.Errorf(code, ""))
+	}
+	transport := fakeAnalyzerTransport{errorsToReturn: errors}
+	return transport
+}
+
+// expectCounts() checks that the counts of sends, closes and connects is
+// as expected.
+func expectCounts(sends, closes, connects int, transport *fakeAnalyzerTransport, t *testing.T) {
+	if transport.sendCallCount != sends {
+		t.Errorf("sends: expected=%v, got=%v", sends, transport.sendCallCount)
+	}
+	if transport.closeCallCount != closes {
+		t.Errorf("closes: expected=%v, got=%v", closes, transport.closeCallCount)
+	}
+	if transport.connectCallCount != connects {
+		t.Errorf("connects: expected=%v, got=%v", connects, transport.connectCallCount)
+	}
+}
+
+// TestSendToAnalyzer tests the function dispatcher.sendToAnalzyer()
+func TestSendToAnalyzer(t *testing.T) {
+	// The expected behavior is
+	// send fails -> retry
+	// send fails -> reconnect and retry
+	// send fails -> retry
+	// send succeeds
+	transport := makeFakeAnalyzerTransport(
+		[]codes.Code{
+			codes.DeadlineExceeded,
+			codes.Internal,
+			codes.DeadlineExceeded,
+			codes.OK})
+	batch := cobalt.ObservationBatch{}
+	err := sendToAnalyzer(&transport, &batch, 4, 1)
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+	expectCounts(4, 1, 1, &transport, t)
+
+	// The expected behavior is
+	// send fails -> retry
+	// send fails -> reconnect and retry
+	// send fails -> retry
+	// send fails -> give up
+	transport = makeFakeAnalyzerTransport(
+		[]codes.Code{
+			codes.Aborted,
+			codes.Internal,
+			codes.Canceled,
+			codes.Internal})
+	err = sendToAnalyzer(&transport, &batch, 4, 1)
+	if err == nil {
+		t.Errorf("Expected an error")
+	}
+	if grpc.Code(err) != codes.Internal {
+		t.Errorf("Got %v expected %v", err, codes.Internal)
+	}
+	expectCounts(4, 1, 1, &transport, t)
+
+	// The expected behavior is
+	// send fails -> retry
+	// send fails -> give up
+	transport = makeFakeAnalyzerTransport(
+		[]codes.Code{
+			codes.Aborted,
+			codes.InvalidArgument,
+			codes.Canceled,
+			codes.Internal})
+	err = sendToAnalyzer(&transport, &batch, 4, 1)
+	if err == nil {
+		t.Errorf("Expected an error")
+	}
+	if grpc.Code(err) != codes.InvalidArgument {
+		t.Errorf("Got %v expected %v", err, codes.InvalidArgument)
+	}
+	expectCounts(2, 0, 0, &transport, t)
+
+	// The expected behavior is
+	// send fails -> reconnect and retry
+	// send fails -> reconnect and retry
+	// send fails -> reconnect and retry
+	// send fails -> give up
+	transport = makeFakeAnalyzerTransport(
+		[]codes.Code{
+			codes.Internal,
+			codes.Internal,
+			codes.Internal,
+			codes.Internal})
+	err = sendToAnalyzer(&transport, &batch, 4, 1)
+	if err == nil {
+		t.Errorf("Expected an error")
+	}
+	if grpc.Code(err) != codes.Internal {
+		t.Errorf("Got %v expected %v", err, codes.Internal)
+	}
+	expectCounts(4, 3, 3, &transport, t)
+
+	// The expected behavior is
+	// send succeeds
+	transport = makeFakeAnalyzerTransport(
+		[]codes.Code{
+			codes.OK,
+			codes.Internal,
+			codes.Internal,
+			codes.Internal})
+	err = sendToAnalyzer(&transport, &batch, 4, 1)
+	if err != nil {
+		t.Errorf("Got unexpected error: %v", err)
+	}
+	expectCounts(1, 0, 0, &transport, t)
 }

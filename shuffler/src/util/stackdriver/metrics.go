@@ -54,7 +54,7 @@ func LogCountMetric(metric string, args ...interface{}) {
 	LogMetric(metric, args)
 }
 func LogCountMetricf(metric, format string, args ...interface{}) {
-	LogCountMetric(metric, fmt.Sprintf(format, args))
+	LogCountMetric(metric, fmt.Sprintf(format, args...))
 }
 func LogCountMetricln(metric string, args ...interface{}) {
 	LogCountMetric(metric, fmt.Sprintln(args))

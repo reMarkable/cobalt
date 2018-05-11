@@ -56,7 +56,7 @@ const (
 type AnalyzerTransport interface {
 	send(obBatch *cobalt.ObservationBatch) error
 	close()
-	reconnect()
+	connect() error
 }
 
 // GrpcClientConfig lists the grpc client configuration parameters required to
@@ -96,39 +96,41 @@ type GrpcAnalyzerTransport struct {
 // Panics if |clientConfig| is nil or if the underlying grpc connection cannot
 // be established.
 func NewGrpcAnalyzerTransport(clientConfig *GrpcClientConfig) *GrpcAnalyzerTransport {
-	conn := connect(clientConfig)
-
-	return &GrpcAnalyzerTransport{
+	transport := GrpcAnalyzerTransport{
 		clientConfig: clientConfig,
-		conn:         conn,
-		client:       analyzer_service.NewAnalyzerClient(conn),
 	}
+	err := transport.connect()
+	if err != nil {
+		glog.Fatalf("Unable to establish initial connection to the Analyzer: %v", err)
+	}
+	return &transport
 }
 
-// connect returns a Grpc |ClientConn| handle after successfully establishing
-// a connection to the analyzer endpoint using |cc| config parameters.
+// connect attempts to establish a connection to the analyzer endpoint using
+// the configuration specified in |g|'s |client_config| and panics if it is not
+// set.
 //
-// If |cc.EnableTLS| is false an insecure connection is used, and the remaining
+// If |EnableTLS| is false an insecure connection is used, and the remaining
 // parameters or ignored, otherwise TLS is used.
 //
-// |cc.CAFile| is optional. If non-empty it should specify the path to a file
+// |CAFile| is optional. If non-empty it should specify the path to a file
 // containing a PEM encoding of root certificates to use for TLS.
 //
-// Logs and crashes on any grpc failure, and panics if |cc| is not set.
-func connect(cc *GrpcClientConfig) *grpc.ClientConn {
-	if cc == nil {
-		panic("Grpc client configuration is not set.")
+// Returns a non-nil error on failure.
+func (g *GrpcAnalyzerTransport) connect() (err error) {
+	if g.clientConfig == nil {
+		panic("clientConfig is not set.")
 	}
 
-	glog.V(3).Infoln("Connecting to analyzer at:", cc.URL)
+	glog.V(3).Infoln("Connecting to analyzer at:", g.clientConfig.URL)
 	var opts []grpc.DialOption
-	if cc.EnableTLS {
+	if g.clientConfig.EnableTLS {
 		var creds credentials.TransportCredentials
-		if cc.CAFile != "" {
+		if g.clientConfig.CAFile != "" {
 			var err error
-			creds, err = credentials.NewClientTLSFromFile(cc.CAFile, "")
+			creds, err = credentials.NewClientTLSFromFile(g.clientConfig.CAFile, "")
 			if err != nil {
-				glog.Fatalf("Failed to create TLS credentials %v", err)
+				return grpc.Errorf(codes.Internal, "Failed to create TLS credentials %v", err)
 			}
 		} else {
 			creds = credentials.NewClientTLSFromCert(nil, "")
@@ -138,60 +140,114 @@ func connect(cc *GrpcClientConfig) *grpc.ClientConn {
 		opts = append(opts, grpc.WithInsecure())
 	}
 	opts = append(opts, grpc.WithBlock())
-	opts = append(opts, grpc.WithTimeout(cc.Timeout))
+	opts = append(opts, grpc.WithTimeout(g.clientConfig.Timeout))
 
-	glog.V(4).Infoln("Dialing", cc.URL, "...")
-	conn, err := grpc.Dial(cc.URL, opts...)
+	glog.V(4).Infoln("Dialing", g.clientConfig.URL, "...")
+	g.conn, err = grpc.Dial(g.clientConfig.URL, opts...)
 	if err != nil {
-		glog.Fatalf("Error in establishing connection to Analyzer [%v]: %v", cc.URL, err)
+		return grpc.Errorf(codes.Internal, "Error in establishing connection to Analyzer [%v]: %v", g.clientConfig.URL, err)
 	}
 
-	return conn
+	g.client = analyzer_service.NewAnalyzerClient(g.conn)
+
+	return nil
 }
 
 // close closes all the grpc underlying connections to Analyzer.
 func (g *GrpcAnalyzerTransport) close() {
-	if g == nil {
-		panic("GrpcAnalyzerTransport is not set.")
-	}
-
 	if g.conn != nil {
 		g.conn.Close()
-		g.conn = nil
 	}
+	g.conn = nil
+	g.client = nil
 }
 
-// reconnect re-establishes the Grpc client connection to the Analyzer using the
-// existing parameters from |g.clientConfig| and updates |g| accordingly.
-func (g *GrpcAnalyzerTransport) reconnect() {
-	if g == nil {
-		panic("GrpcAnalyzerTransport is not set.")
+// shouldRetry returns true just in case the gRPC status code embedded in |err|
+// indicates a failure for which retrying is appropriate.
+func shouldRetry(err error) bool {
+	// Note that a switch statement in Go does not fall through.
+	switch grpc.Code(err) {
+	case codes.Aborted:
+	case codes.Canceled:
+	case codes.DeadlineExceeded:
+	case codes.Internal:
+	case codes.Unavailable:
+	default:
+		return false
 	}
+	return true
+}
 
-	if g.conn == nil {
-		g.conn = connect(g.clientConfig)
-		g.client = analyzer_service.NewAnalyzerClient(g.conn)
+// shouldReconnect returns true just in case the gRPC status code embedded in
+// |err| indiates a failure for which breaking and re-establishing the
+// connection to the server may be appropriate. We are basing this on
+// empirical evidence. If the Analyzer Service restarts but the Shuffler
+// does not restart then sometimes the Shuffler gets into a state where
+// it's connection to the analyzer is invalid and the Go gRPC library is
+// unable to recover. We are working around this by reconnecting.
+// See issue CB-132.
+func shouldReconnect(err error) bool {
+	switch grpc.Code(err) {
+	case codes.Internal:
+		return true
 	}
+	return false
+}
+
+// sendToAnalyzer sends |obBatch| using the given AnalyzerTransport. It
+// implements a simple retry and reconnect logic: In case of a send failure,
+// depending on the returned error code, it may try up to |numAttempts| times
+// with a sleep between attempts of |sleepMillis| ms. Also depending on the
+// error code it may disconnect and reconnect.
+func sendToAnalyzer(t AnalyzerTransport, obBatch *cobalt.ObservationBatch,
+	numAttempts int, sleepMillis int) (err error) {
+	// We implement a simple-minded retry strategy: Try a few times with a
+	// few seconds wait in between attempts. We don't bother with exponential
+	// backoff or jitter or anything else fancy. This strategy is sufficient
+	// given that if the send fails then in the next iteration of the Shuffler's
+	// Run() loop it will attempt to send all unsent observations.
+	for i := 0; i < numAttempts; i++ {
+		err = t.send(obBatch)
+		if err == nil || i == (numAttempts-1) || !shouldRetry(err) {
+			return err
+		}
+		if shouldReconnect(err) {
+			t.close()
+			err = t.connect()
+			if err != nil {
+				glog.Errorf("Unable to reestablish a connection to the Analyzer: %v", err)
+			}
+		}
+		glog.V(3).Infof("send attempt failed. Sleeping for %v milliseconds", sleepMillis)
+		time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
+	}
+	// Control never reaches this point
+	return nil
 }
 
 // send forwards a given ObservationBatch to Analyzer using the AddObservations
 // interface.
 func (g *GrpcAnalyzerTransport) send(obBatch *cobalt.ObservationBatch) error {
 	if g == nil {
-		panic("GrpcAnalyzerTransport is not set.")
+		panic("g is nil.")
 	}
 
 	if obBatch == nil {
 		return grpc.Errorf(codes.InvalidArgument, "ObservationBatch is not set.")
 	}
 
-	// Analyzer forwards a new context, so as to break the context correlation
+	if g.conn == nil || g.client == nil {
+		return grpc.Errorf(codes.Internal, "Cannot send: Not currently connected to Analyzer")
+	}
+
+	// Shuffler forwards a new context, so as to break the context correlation
 	// between originating request and the shuffled request that is being
 	// forwarded.
-	glog.V(3).Infof("Sending batch of %d observations to the analyzer.", len(obBatch.GetEncryptedObservation()))
+	glog.V(3).Infof("sending batch of %d observations to the analyzer.", len(obBatch.GetEncryptedObservation()))
 	_, err := g.client.AddObservations(context.Background(), obBatch)
 	if err != nil {
-		return grpc.Errorf(codes.Internal, "AddObservations call failed with error: %v", err)
+		glog.Errorf("AddObservations call failed with error: %v", err)
+		return err
 	}
 
 	glog.V(4).Infoln("ObservationBatch dispatched successfully.")
@@ -272,7 +328,11 @@ func (d *Dispatcher) Run() {
 
 		if shouldDisconnectWhileSleeping {
 			glog.V(3).Infoln("Re-establish grpc connection to Analyzer before the next dispatch...")
-			d.analyzerTransport.reconnect()
+			err := d.analyzerTransport.connect()
+			if err != nil {
+				glog.Errorf("Unable to reconnect to the Analyzer: %v", err)
+				break
+			}
 		}
 
 		d.lastDispatchTime = time.Now()
@@ -382,18 +442,18 @@ func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata, sleepDurati
 		return err
 	}
 
-	// Send the shuffled bucket to Analyzer in chunks. If the bucket is too
+	// send the shuffled bucket to Analyzer in chunks. If the bucket is too
 	// big, send it in multiple chunks of size |batchSize|.
 	batchID := 0
 	for {
 		batchID++
-		glog.V(4).Infof("Sending observations to Analyzer in chunks, batch [%d] in progress...", batchID)
-		obVals, batchToSend := makeBatch(key, iterator, d.batchSize)
+		glog.V(4).Infof("sending observations to Analyzer in chunks, batch [%d] in progress...", batchID)
+		obVals, batchTosend := makeBatch(key, iterator, d.batchSize)
 		if len(obVals) == 0 {
 			// If makeBatch() returned an empty batch then the iteration is done.
 			break
 		}
-		sendErr := d.analyzerTransport.send(batchToSend)
+		sendErr := sendToAnalyzer(d.analyzerTransport, batchTosend, 4, 2500)
 		if sendErr == nil {
 			// After successful send, delete the observations from the local
 			// datastore.
@@ -401,8 +461,6 @@ func (d *Dispatcher) dispatchBucket(key *cobalt.ObservationMetadata, sleepDurati
 				stackdriver.LogCountMetricf(dispatchBucketFailed, "Error in deleting dispatched observations from the store for key: %v", key)
 			}
 		} else {
-			// TODO(ukode): Add retry behaviour for 3 or more attempts or use
-			// exponential backoff for errors relating to network issues.
 			stackdriver.LogCountMetricf(dispatchBucketFailed, "Error in transmitting data to Analyzer for key [%v]: %v", key, sendErr)
 		}
 		time.Sleep(sleepDuration)

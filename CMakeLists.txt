@@ -596,7 +596,6 @@ set(CONFIG_PARSER_BINARY "${CMAKE_BINARY_DIR}/config/config_parser/config_parser
 #      ClientConfig::CreateFromCobaltConfigBase64(cobalt_config_base64);
 macro(generate_test_config_h INPUT_YAML OUTFILE CUSTOMER_ID PROJECT_ID STRING_VAR_NAME)
   set_source_files_properties(${OUTFILE} PROPERTIES GENERATED TRUE)
-  message("OUTFILE=${OUTFILE}")
   add_custom_command(OUTPUT ${OUTFILE}
     COMMAND ${CONFIG_PARSER_BINARY}
     ARGS -config_file=${INPUT_YAML}
