@@ -83,8 +83,7 @@ void ShippingDispatcher::RequestSendSoon(
   auto cb = std::make_shared<RequestSendCallback>(send_callback,
                                                   shipping_managers_.size());
   for (auto& manager : shipping_managers_) {
-    manager.second->RequestSendSoon(
-        [this, cb](bool success) { cb->Call(success); });
+    manager.second->RequestSendSoon([cb](bool success) { cb->Call(success); });
   }
 }
 
