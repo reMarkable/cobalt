@@ -244,11 +244,13 @@ class Sampler {
 
 using IntegerSampler = Sampler<int64_t>;
 
-// EventLogger logs
+// EventLogger tracks the rate at which a particular event occurs as well
+// as how long an event takes and what status it results in.
 class EventLogger {
  public:
   // time is the duration of the event being logged in a unit of your choice.
-  // status is a numeric status less than equal to max_status.
+  // status is a numeric status less than equal to the max_status specified
+  // when creating an EventLogger.
   void LogEvent(int64_t time, uint32_t status) {
     status_histogram_[status]++;
     timing_sampler_->LogObservation(time);
@@ -278,13 +280,11 @@ class EventLogger {
     }
   }
 
-  // Gets the Observation.
-  Observation GetEventObservation();
+  // Returns an observation which contains the status distribution, collection
+  // period, total number of events collected and average time.
+  Observation GetEventObservation(double average_time);
 
-  void AppendObservations(std::vector<Observation>* observations) {
-    timing_sampler_->AppendObservations(observations);
-    observations->push_back(GetEventObservation());
-  }
+  void AppendObservations(std::vector<Observation>* observations);
 
   const uint32_t event_metric_id_;
   const uint32_t max_status_;

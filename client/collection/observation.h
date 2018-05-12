@@ -27,14 +27,22 @@ typedef std::function<void()> UndoFunction;
 class ValuePart {
  public:
   // Returns an integer value part.
-  static const ValuePart Make(int64_t value) {
+  static const ValuePart MakeInt(int64_t value) {
     Value val;
     val.int_value = value;
     return ValuePart(INT, val);
   }
 
+  // Returns a double value part.
+  static const ValuePart MakeDouble(double value) {
+    Value val;
+    val.double_value = value;
+    return ValuePart(DOUBLE, val);
+  }
+
   // Returns a distribution value part.
-  static const ValuePart Make(const std::map<uint32_t, int64_t>& value) {
+  static const ValuePart MakeDistribution(
+      const std::map<uint32_t, int64_t>& value) {
     Value val;
     val.distribution =
         new std::map<uint32_t, int64_t>(value.begin(), value.end());
@@ -43,6 +51,7 @@ class ValuePart {
 
   enum Type {
     INT,
+    DOUBLE,
     DISTRIBUTION,
   };
 
@@ -52,12 +61,19 @@ class ValuePart {
   // Returns true if the value part is an integer.
   bool IsIntValue() const { return type_ == INT; }
 
+  // Returns true if the value part is a double.
+  bool IsDoubleValue() const { return type_ == DOUBLE; }
+
   // Returns true if the value part is a distribution.
   bool IsDistribution() const { return type_ == DISTRIBUTION; }
 
   // Returns the integer value of an integer value part. If the value part is
   // not an integer, the behavior is undefined.
   int64_t GetIntValue() const { return value_.int_value; }
+
+  // Returns the double value of a double value part. If the value part is
+  // not a double, the behavior is undefined.
+  double GetDoubleValue() const { return value_.double_value; }
 
   // Returns the distribution value of a distribution value part. If the value
   // part is not a distribution, the behavior is undefined.
@@ -77,6 +93,7 @@ class ValuePart {
  private:
   union Value {
     int64_t int_value;
+    double double_value;
     // This is deleted in the constructor.
     std::map<uint32_t, int64_t>* distribution;
   };

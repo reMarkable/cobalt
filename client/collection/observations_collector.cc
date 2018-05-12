@@ -10,7 +10,7 @@ namespace client {
 ObservationPart Counter::GetObservationPart() {
   // Atomically swaps the value in counter_ for 0 and puts the former value of
   // counter_ in value.
-  ValuePart value = ValuePart::Make(counter_.exchange(0));
+  ValuePart value = ValuePart::MakeInt(counter_.exchange(0));
   // If the undo function is called, it adds |value| back to the counter_.
   return ObservationPart(part_name_, encoding_id_, value,
                          [this, value]() { counter_ += value.GetIntValue(); });
@@ -37,7 +37,7 @@ Observation MetricObservers::GetObservation() {
   return observation;
 }
 
-Observation EventLogger::GetEventObservation() {
+Observation EventLogger::GetEventObservation(double average_time) {
   Observation observation;
   observation.metric_id = event_metric_id_;
   auto now = std::chrono::steady_clock::now();
@@ -52,20 +52,39 @@ Observation EventLogger::GetEventObservation() {
     status_histogram[status] = status_num;
     total += status_num;
   }
+  observation.parts.push_back(
+      ObservationPart("status", encoding_id_,
+                      ValuePart::MakeDistribution(status_histogram), []() {}));
   observation.parts.push_back(ObservationPart(
-      "status", encoding_id_, ValuePart::Make(status_histogram), []() {}));
+      "total", encoding_id_, ValuePart::MakeInt(total), []() {}));
+  observation.parts.push_back(ObservationPart(
+      "collection_duration_ns", encoding_id_,
+      ValuePart::MakeInt(collection_duration.count()), []() {}));
   observation.parts.push_back(
-      ObservationPart("total", encoding_id_, ValuePart::Make(total), []() {}));
-  observation.parts.push_back(
-      ObservationPart("collection_duration_ns", encoding_id_,
-                      ValuePart::Make(collection_duration.count()), []() {}));
+      ObservationPart("average_time", encoding_id_,
+                      ValuePart::MakeDouble(average_time), []() {}));
 
   return observation;
 }
 
+void EventLogger::AppendObservations(std::vector<Observation>* observations) {
+  std::vector<Observation> sampler_observations;
+  timing_sampler_->AppendObservations(&sampler_observations);
+  int64_t total = 0;
+  for (auto iter = sampler_observations.begin();
+       sampler_observations.end() != iter; iter++) {
+    total += iter->parts[0].value.GetIntValue();
+  }
+  observations->insert(observations->end(), sampler_observations.begin(),
+                       sampler_observations.end());
+  observations->push_back(
+      GetEventObservation(static_cast<double>(total) /
+                          static_cast<double>(sampler_observations.size())));
+}
+
 template <>
 ValuePart Sampler<int64_t>::GetValuePart(size_t idx) {
-  return ValuePart::Make(reservoir_[idx]);
+  return ValuePart::MakeInt(reservoir_[idx]);
 }
 
 std::shared_ptr<Counter> ObservationsCollector::MakeCounter(

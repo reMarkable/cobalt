@@ -293,15 +293,22 @@ TEST(EventLogger, Normal) {
 
 // Check that the integer value part work correctly.
 TEST(ValuePart, IntValuePart) {
-  ValuePart value = ValuePart::Make(10);
+  ValuePart value = ValuePart::MakeInt(10);
   EXPECT_EQ(10, value.GetIntValue());
   EXPECT_TRUE(value.IsIntValue());
   EXPECT_EQ(ValuePart::INT, value.Which());
 }
 
+TEST(ValuePart, DoubleValuePart) {
+  ValuePart value = ValuePart::MakeDouble(10.5);
+  EXPECT_DOUBLE_EQ(10.5, value.GetDoubleValue());
+  EXPECT_TRUE(value.IsDoubleValue());
+  EXPECT_EQ(ValuePart::DOUBLE, value.Which());
+}
+
 TEST(ValuePart, DistributionValuePart) {
   std::map<uint32_t, int64_t> distribution = {{0, 1}, {1, 2}, {2, 4}};
-  ValuePart value = ValuePart::Make(distribution);
+  ValuePart value = ValuePart::MakeDistribution(distribution);
   EXPECT_EQ(distribution.size(), value.GetDistribution().size());
   EXPECT_TRUE(value.IsDistribution());
   EXPECT_EQ(ValuePart::DISTRIBUTION, value.Which());
