@@ -10,10 +10,8 @@ static_library("statusor") {
     "statusor.h",
     "statusor_internals.h",
   ]
-  configs += [
-    "//third_party/cobalt:cobalt_config",
-    "//build/config:shared_library_config",
-  ]
+
+  public_configs = [ "//third_party/cobalt:cobalt_config" ]
 
   public_deps = [
     "//third_party/cobalt/util:status",

@@ -472,7 +472,7 @@ class ClearcutV1ShippingManager : public ShippingManager {
       const EnvelopeMakerParams& envelope_maker_params,
       const SendRetryerParams send_retryer_params,
       SendRetryerInterface* send_retryer,
-      std::unique_ptr<clearcut::ClearcutUploader> clearcut);
+      std::unique_ptr<::clearcut::ClearcutUploader> clearcut);
 
  private:
   void SendEnvelopeToBackend(
@@ -480,7 +480,7 @@ class ClearcutV1ShippingManager : public ShippingManager {
       std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed);
 
   std::mutex clearcut_mutex_;
-  std::unique_ptr<clearcut::ClearcutUploader> clearcut_;
+  std::unique_ptr<::clearcut::ClearcutUploader> clearcut_;
 };
 
 }  // namespace encoder
