@@ -15,11 +15,13 @@ proto_library("cobalt_proto") {
   sources = [
     "encrypted_message.proto",
     "observation.proto",
+    "clearcut_extensions.proto",
   ]
   import_dirs = [ "//third_party/protobuf/src" ]
   generate_python = false
   cc_generator_options = "lite"
   deps = [
     "//third_party/boringssl",
+    "//third_party/cobalt/third_party/clearcut:clearcut_proto",
   ]
 }

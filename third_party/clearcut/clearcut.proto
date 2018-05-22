@@ -12,6 +12,8 @@ message ClientInfo {
 
 message LogEvent {
   optional int32 event_code = 11;
+
+  extensions 1000 to max;
 }
 
 message LogRequest {

@@ -617,14 +617,18 @@ cobalt_make_protobuf_cpp_lib(cobalt_proto_lib
                              COBALT_PROTO_HDRS
                              false
                              encrypted_message
-                             observation)
+                             observation
+                             clearcut_extensions)
 
 # Generate the go bindings for the Cobalt proto files in the root directory.
 cobalt_protobuf_generate_go(generate_cobalt_pb_go_files
                             COBALT_PB_GO_FILES
                             false
                             encrypted_message
-                            observation)
+                            observation
+                            clearcut_extensions)
+add_dependencies(generate_cobalt_pb_go_files
+                 generate_clearcut_pb_go_files)
 
 # Analagous targets to the two above also appear in the config directory for
 # the config protos. But the variables that are generated there are not

@@ -7,6 +7,10 @@ cobalt_make_protobuf_cpp_lib(clearcut_proto_lib
                              false
                              clearcut)
 
+cobalt_protobuf_generate_go(generate_clearcut_pb_go_files
+                            CLEARCUT_PB_GO_FILES
+                            false
+                            clearcut)
 add_library(clearcut
             http_client.h
             uploader.h

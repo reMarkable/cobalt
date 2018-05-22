@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "./clearcut_extensions.pb.h"
 #include "./gtest.h"
 #include "./logging.h"
 #include "config/client_config.h"
@@ -25,6 +26,7 @@
 namespace cobalt {
 namespace encoder {
 
+using cobalt::clearcut_extensions::LogEventExtension;
 using config::ClientConfig;
 using send_retryer::CancelHandle;
 using send_retryer::SendRetryer;
@@ -141,17 +143,28 @@ struct FakeSendRetryer : public SendRetryerInterface {
 
 class FakeHTTPClient : public clearcut::HTTPClient {
  public:
-  explicit FakeHTTPClient(std::set<uint32_t>* seen_event_codes)
-      : clearcut::HTTPClient(), seen_event_codes_(seen_event_codes) {}
-
   std::future<StatusOr<clearcut::HTTPResponse>> Post(
       clearcut::HTTPRequest request,
       std::chrono::steady_clock::time_point _ignored) {
+    util::MessageDecrypter decrypter("");
+
     clearcut::LogRequest req;
     req.ParseFromString(request.body);
+    EXPECT_GT(req.log_event_size(), 0);
     for (auto event : req.log_event()) {
-      seen_event_codes_->insert(event.event_code());
+      EXPECT_TRUE(event.HasExtension(LogEventExtension::ext));
+      auto log_event = event.GetExtension(LogEventExtension::ext);
+      Envelope recovered_envelope;
+      EXPECT_TRUE(decrypter.DecryptMessage(
+          log_event.cobalt_encrypted_envelope(), &recovered_envelope));
+      EXPECT_EQ(1, recovered_envelope.batch_size());
+      EXPECT_EQ(kClearcutMetricId,
+                recovered_envelope.batch(0).meta_data().metric_id());
+      FakeSystemData::CheckSystemProfile(recovered_envelope);
+      observation_count +=
+          recovered_envelope.batch(0).encrypted_observation_size();
     }
+    send_call_count++;
 
     clearcut::HTTPResponse response = {.http_code = 200};
     clearcut::LogResponse resp;
@@ -163,8 +176,8 @@ class FakeHTTPClient : public clearcut::HTTPClient {
     return response_promise.get_future();
   }
 
- private:
-  std::set<uint32_t>* seen_event_codes_;
+  int send_call_count = 0;
+  int observation_count = 0;
 };
 }  // namespace
 
@@ -193,11 +206,12 @@ class ShippingManagerTest : public ::testing::Test {
           size_params, schedule_params, envelope_maker_params,
           send_retryer_params, send_retryer_.get()));
     } else {
+      auto http_client = std::make_unique<FakeHTTPClient>();
+      http_client_ = http_client.get();
       shipping_manager_.reset(new ClearcutV1ShippingManager(
           size_params, schedule_params, envelope_maker_params,
           std::make_unique<clearcut::ClearcutUploader>(
-              "https://test.com",
-              std::make_unique<FakeHTTPClient>(&seen_clearcut_event_codes_))));
+              "https://test.com", std::move(http_client))));
     }
     shipping_manager_->Start();
   }
@@ -218,16 +232,17 @@ class ShippingManagerTest : public ::testing::Test {
     EXPECT_EQ(expected_observation_count, send_retryer_->observation_count);
   }
 
-  bool SawEventCode(uint32_t event_code) {
-    return seen_clearcut_event_codes_.find(event_code) !=
-           seen_clearcut_event_codes_.end();
+  void CheckHTTPCallCount(int expected_call_count,
+                          int expected_observation_count) {
+    EXPECT_EQ(expected_call_count, http_client_->send_call_count);
+    EXPECT_EQ(expected_observation_count, http_client_->observation_count);
   }
 
   FakeSystemData system_data_;
-  std::set<uint32_t> seen_clearcut_event_codes_;
   std::unique_ptr<FakeSendRetryer> send_retryer_;
   std::unique_ptr<ShippingManager> shipping_manager_;
   std::shared_ptr<ProjectContext> project_;
+  FakeHTTPClient* http_client_;
   Encoder encoder_;
 };
 
@@ -741,9 +756,11 @@ TEST_F(ShippingManagerTest, SendObservationToClearcut) {
   // Wait for both Observations to be sent.
   shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
-  // We should see the clearcut events
-  EXPECT_TRUE(SawEventCode(40));
-  EXPECT_TRUE(SawEventCode(41));
+  // Ensure we sent stuff to clearcut.
+  CheckHTTPCallCount(1, 2);
+
+  // Ensure nothing was sent to legacy.
+  CheckCallCount(0, 0);
 }
 
 TEST_F(ShippingManagerTest, EnsureObservationsNotSentToClearcut) {
@@ -761,9 +778,11 @@ TEST_F(ShippingManagerTest, EnsureObservationsNotSentToClearcut) {
   // Wait for both Observations to be sent.
   shipping_manager_->WaitUntilIdle(kMaxSeconds);
 
-  // We should not see the clearcut events
-  EXPECT_FALSE(SawEventCode(40));
-  EXPECT_FALSE(SawEventCode(41));
+  // Ensure nothing was sent to clearcut.
+  CheckHTTPCallCount(0, 0);
+
+  // Ensure we sent to legacy.
+  CheckCallCount(1, 2);
 }
 
 }  // namespace encoder

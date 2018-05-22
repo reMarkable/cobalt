@@ -5,11 +5,14 @@
 #include <mutex>
 #include <utility>
 
+#include "./clearcut_extensions.pb.h"
 #include "./logging.h"
 #include "encoder/shipping_manager.h"
 
 namespace cobalt {
 namespace encoder {
+
+using cobalt::clearcut_extensions::LogEventExtension;
 
 namespace {
 std::string ToString(const std::chrono::system_clock::time_point& t) {
@@ -382,7 +385,7 @@ void LegacyShippingManager::SendEnvelopeToBackend(
     return;
   }
   VLOG(5) << "ShippingManager worker: Sending Envelope of size "
-          << envelope_to_send->size() << " bytes.";
+          << envelope_to_send->size() << " bytes to legacy backend.";
   auto status = send_retryer_->SendToShuffler(
       send_retryer_params_.initial_rpc_deadline_,
       send_retryer_params_.deadline_per_send_attempt_, &cancel_handle_,
@@ -416,14 +419,21 @@ ClearcutV1ShippingManager::ClearcutV1ShippingManager(
 void ClearcutV1ShippingManager::SendEnvelopeToBackend(
     std::unique_ptr<EnvelopeMaker> envelope_to_send,
     std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) {
-  const Envelope& clearcut_envelope = envelope_to_send->envelope();
-  clearcut::LogRequest request;
-  request.set_log_source(clearcut::kClearcutDemoSource);
-  for (auto batch : clearcut_envelope.batch()) {
-    for (auto message : batch.encrypted_observation()) {
-      request.add_log_event()->set_event_code(message.ciphertext().size() + 1);
-    }
+  auto log_extension = std::make_unique<LogEventExtension>();
+  if (!envelope_to_send->MakeEncryptedEnvelope(
+          log_extension->mutable_cobalt_encrypted_envelope())) {
+    // TODO(rudominer) log
+    // Drop on floor.
+    return;
   }
+  VLOG(5) << "ShippingManager worker: Sending Envelope of size "
+          << envelope_to_send->size() << " bytes to clearcut.";
+
+  clearcut::LogRequest request;
+  request.set_log_source(clearcut::kFuchsiaCobaltShufflerInputDevel);
+  request.add_log_event()->SetAllocatedExtension(LogEventExtension::ext,
+                                                 log_extension.release());
+
   util::Status status;
   {
     std::lock_guard<std::mutex> lock(clearcut_mutex_);

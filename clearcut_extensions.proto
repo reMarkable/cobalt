@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+package cobalt.clearcut_extensions;
+
+import "encrypted_message.proto";
+import "third_party/clearcut/clearcut.proto";
+
+message LogEventExtension {
+  extend clearcut.LogEvent {
+    optional LogEventExtension ext = 66566376;
+  }
+
+  oneof value {
+    cobalt.EncryptedMessage cobalt_encrypted_envelope = 705;
+  }
+}
