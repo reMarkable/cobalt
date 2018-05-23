@@ -42,8 +42,6 @@ const size_t kMaxBytesTotal = 1000;
 // 40 bytes, the worker thread will attempt to send Envelopes that contain
 // exactly 5, 40-byte Observations. (4 * 40 < 170 and 6 * 40 > 200 ).
 const size_t kMinEnvelopeSendSize = 170;
-const std::chrono::seconds kInitialRpcDeadline(10);
-const std::chrono::seconds kDeadlinePerSendAttempt(60);
 const std::chrono::seconds kMaxSeconds = ShippingManager::kMaxSeconds;
 
 // Returns a ProjectContext obtained by parsing the configuration specified
@@ -86,51 +84,6 @@ class FakeSystemData : public SystemDataInterface {
   SystemProfile system_profile_;
 };
 
-struct FakeSendRetryer : public SendRetryerInterface {
-  FakeSendRetryer() : SendRetryerInterface() {}
-
-  grpc::Status SendToShuffler(
-      std::chrono::seconds initial_rpc_deadline,
-      std::chrono::seconds overerall_deadline,
-      send_retryer::CancelHandle* cancel_handle,
-      const EncryptedMessage& encrypted_message) override {
-    // Decrypt encrypted_message. (No actual decryption is involved since
-    // we used the NONE encryption scheme.)
-    util::MessageDecrypter decrypter("");
-    Envelope recovered_envelope;
-    EXPECT_TRUE(
-        decrypter.DecryptMessage(encrypted_message, &recovered_envelope));
-    EXPECT_EQ(1, recovered_envelope.batch_size());
-    FakeSystemData::CheckSystemProfile(recovered_envelope);
-
-    std::unique_lock<std::mutex> lock(mutex);
-    send_call_count++;
-    observation_count +=
-        recovered_envelope.batch(0).encrypted_observation_size();
-    // We grab the return value before we block. This allows the test
-    // thread to wait for us to block, then change the value of
-    // status_to_return for the *next* send without changing it for
-    // the currently blocking send.
-    grpc::Status status = status_to_return;
-    if (should_block) {
-      is_blocking = true;
-      send_is_blocking_notifier.notify_all();
-      send_can_exit_notifier.wait(lock, [this] { return !should_block; });
-      is_blocking = false;
-    }
-    return status;
-  }
-
-  std::mutex mutex;
-  bool should_block = false;
-  std::condition_variable send_can_exit_notifier;
-  bool is_blocking = false;
-  std::condition_variable send_is_blocking_notifier;
-  grpc::Status status_to_return = grpc::Status::OK;
-  int send_call_count = 0;
-  int observation_count = 0;
-};
-
 class FakeHTTPClient : public clearcut::HTTPClient {
  public:
   explicit FakeHTTPClient(std::set<uint32_t>* seen_event_codes)
@@ -162,18 +115,14 @@ class FakeHTTPClient : public clearcut::HTTPClient {
 class FakeShippingManager : public ShippingManager {
  public:
   FakeShippingManager(std::chrono::seconds schedule_interval,
-                      std::chrono::seconds min_interval,
-                      SendRetryerInterface* send_retryer)
+                      std::chrono::seconds min_interval)
       : ShippingManager(
             ShippingManager::SizeParams(kMaxBytesPerObservation,
                                         kMaxBytesPerEnvelope, kMaxBytesTotal,
                                         kMinEnvelopeSendSize),
             ShippingManager::ScheduleParams(schedule_interval, min_interval),
             ShippingManager::EnvelopeMakerParams("", EncryptedMessage::NONE, "",
-                                                 EncryptedMessage::NONE),
-            ShippingManager::SendRetryerParams(kInitialRpcDeadline,
-                                               kDeadlinePerSendAttempt),
-            send_retryer),
+                                                 EncryptedMessage::NONE)),
         envelopes_sent_(0) {}
 
   void SendEnvelopeToBackend(
@@ -205,15 +154,12 @@ class ShippingDispatcherTest : public ::testing::Test {
  protected:
   void Init(std::chrono::seconds schedule_interval,
             std::chrono::seconds min_interval) {
-    send_retryer_.reset(new FakeSendRetryer());
     shipping_dispatcher_->Register(
         ObservationMetadata::LEGACY_BACKEND,
-        std::make_unique<FakeShippingManager>(schedule_interval, min_interval,
-                                              send_retryer_.get()));
+        std::make_unique<FakeShippingManager>(schedule_interval, min_interval));
     shipping_dispatcher_->Register(
         ObservationMetadata::V1_BACKEND,
-        std::make_unique<FakeShippingManager>(schedule_interval, min_interval,
-                                              send_retryer_.get()));
+        std::make_unique<FakeShippingManager>(schedule_interval, min_interval));
     shipping_dispatcher_->Start();
   }
 
@@ -233,7 +179,6 @@ class ShippingDispatcherTest : public ::testing::Test {
 
   FakeSystemData system_data_;
   std::set<uint32_t> seen_clearcut_event_codes_;
-  std::unique_ptr<FakeSendRetryer> send_retryer_;
   std::unique_ptr<ShippingDispatcher> shipping_dispatcher_;
   std::shared_ptr<ProjectContext> project_;
   Encoder encoder_;

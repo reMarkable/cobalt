@@ -577,7 +577,6 @@ TestApp::TestApp(
       ObservationMetadata::V1_BACKEND,
       std::make_unique<ClearcutV1ShippingManager>(
           size_params, schedule_params, envelope_maker_params,
-          send_retryer_params, send_retryer_.get(),
           std::make_unique<clearcut::ClearcutUploader>(
               FLAGS_clearcut_endpoint,
               std::make_unique<util::clearcut::CurlHTTPClient>())));

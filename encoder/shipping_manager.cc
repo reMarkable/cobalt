@@ -26,20 +26,15 @@ const std::chrono::seconds ShippingManager::kMaxSeconds(999999999);
 
 ShippingManager::ShippingManager(
     const SizeParams& size_params, const ScheduleParams& schedule_params,
-    const EnvelopeMakerParams& envelope_maker_params,
-    const SendRetryerParams send_retryer_params,
-    SendRetryerInterface* send_retryer)
+    const EnvelopeMakerParams& envelope_maker_params)
     : size_params_(size_params),
       envelope_send_threshold_size_(
           size_t(0.6 * size_params.max_bytes_per_envelope_)),
       total_bytes_send_threshold_(size_t(0.6 * size_params.max_bytes_total_)),
       schedule_params_(schedule_params),
       envelope_maker_params_(envelope_maker_params),
-      send_retryer_params_(send_retryer_params),
-      send_retryer_(send_retryer),
       next_scheduled_send_time_(std::chrono::system_clock::now() +
                                 schedule_params_.schedule_interval_) {
-  CHECK(send_retryer);
   _mutex_protected_fields_do_not_access_directly_.active_envelope_maker.reset(
       new EnvelopeMaker(envelope_maker_params.analyzer_public_key_pem_,
                         envelope_maker_params.analyzer_scheme_,
@@ -92,7 +87,7 @@ ShippingManager::Status ShippingManager::AddObservation(
     case EnvelopeMaker::kOk:
       VLOG(4) << "ShippingManager::AddObservation: OK";
       // Set idle_ false because any thread that invokes WaitUntilIdle() after
-      // this should wait until the Observatoin just added has been sent.
+      // this should wait until the Observation just added has been sent.
       locked->fields->idle = false;
       break;
 
@@ -371,8 +366,11 @@ LegacyShippingManager::LegacyShippingManager(
     const EnvelopeMakerParams& envelope_maker_params,
     const SendRetryerParams send_retryer_params,
     SendRetryerInterface* send_retryer)
-    : ShippingManager(size_params, scheduling_params, envelope_maker_params,
-                      send_retryer_params, send_retryer) {}
+    : ShippingManager(size_params, scheduling_params, envelope_maker_params),
+      send_retryer_params_(send_retryer_params),
+      send_retryer_(send_retryer) {
+  CHECK(send_retryer_);
+}
 
 void LegacyShippingManager::SendEnvelopeToBackend(
     std::unique_ptr<EnvelopeMaker> envelope_to_send,
@@ -411,11 +409,8 @@ void LegacyShippingManager::SendEnvelopeToBackend(
 ClearcutV1ShippingManager::ClearcutV1ShippingManager(
     const SizeParams& size_params, const ScheduleParams& scheduling_params,
     const EnvelopeMakerParams& envelope_maker_params,
-    const SendRetryerParams send_retryer_params,
-    SendRetryerInterface* send_retryer,
     std::unique_ptr<clearcut::ClearcutUploader> clearcut)
-    : ShippingManager(size_params, scheduling_params, envelope_maker_params,
-                      send_retryer_params, send_retryer),
+    : ShippingManager(size_params, scheduling_params, envelope_maker_params),
       clearcut_(std::move(clearcut)) {}
 
 void ClearcutV1ShippingManager::SendEnvelopeToBackend(

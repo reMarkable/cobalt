@@ -195,7 +195,6 @@ class ShippingManagerTest : public ::testing::Test {
     } else {
       shipping_manager_.reset(new ClearcutV1ShippingManager(
           size_params, schedule_params, envelope_maker_params,
-          send_retryer_params, send_retryer_.get(),
           std::make_unique<clearcut::ClearcutUploader>(
               "https://test.com",
               std::make_unique<FakeHTTPClient>(&seen_clearcut_event_codes_))));

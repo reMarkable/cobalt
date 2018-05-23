@@ -187,18 +187,9 @@ class ShippingManager {
   //
   // envelope_maker_params: Used when the ShippingManager needs to construct
   // and EnvelopeMaker.
-  //
-  // send_retryer_params: Used when the ShippingManager needs to invoke
-  // SendRetryer::SendToShuffler().
-  //
-  // send_retryer: The instance of |SendRetryerInterface| encapsulated by
-  // this ShippingManager. ShippingManager does not take ownership of
-  // send_retryer which must outlive ShippingManager.
   ShippingManager(const SizeParams& size_params,
                   const ScheduleParams& scheduling_params,
-                  const EnvelopeMakerParams& envelope_maker_params,
-                  const SendRetryerParams send_retryer_params,
-                  SendRetryerInterface* send_retryer);
+                  const EnvelopeMakerParams& envelope_maker_params);
 
   // The destructor will stop the worker thread and wait for it to stop
   // before exiting.
@@ -328,11 +319,6 @@ class ShippingManager {
   const ScheduleParams schedule_params_;
   const EnvelopeMakerParams envelope_maker_params_;
 
- protected:
-  const SendRetryerParams send_retryer_params_;
-
-  SendRetryerInterface* send_retryer_;  // not owned
-
  private:
   // Variables accessed only by the worker thread. These are not
   // protected by a mutex.
@@ -453,6 +439,12 @@ class ShippingManager {
 
 class LegacyShippingManager : public ShippingManager {
  public:
+  // send_retryer_params: Used when the ShippingManager needs to invoke
+  // SendRetryer::SendToShuffler().
+  //
+  // send_retryer: The instance of |SendRetryerInterface| encapsulated by
+  // this ShippingManager. ShippingManager does not take ownership of
+  // send_retryer which must outlive ShippingManager.
   LegacyShippingManager(const SizeParams& size_params,
                         const ScheduleParams& scheduling_params,
                         const EnvelopeMakerParams& envelope_maker_params,
@@ -460,6 +452,10 @@ class LegacyShippingManager : public ShippingManager {
                         SendRetryerInterface* send_retryer);
 
  private:
+  const SendRetryerParams send_retryer_params_;
+
+  SendRetryerInterface* send_retryer_;  // not owned
+
   void SendEnvelopeToBackend(
       std::unique_ptr<EnvelopeMaker> envelope_to_send,
       std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed);
@@ -470,8 +466,6 @@ class ClearcutV1ShippingManager : public ShippingManager {
   ClearcutV1ShippingManager(
       const SizeParams& size_params, const ScheduleParams& scheduling_params,
       const EnvelopeMakerParams& envelope_maker_params,
-      const SendRetryerParams send_retryer_params,
-      SendRetryerInterface* send_retryer,
       std::unique_ptr<::clearcut::ClearcutUploader> clearcut);
 
  private:
