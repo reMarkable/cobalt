@@ -16,16 +16,42 @@ namespace clearcut {
 using cobalt::util::Status;
 using tensorflow_statusor::StatusOr;
 
-struct HTTPResponse {
+// HTTPResponse contains the response from the server.
+//
+// This class is move-only since response may be large.
+class HTTPResponse {
+ public:
   std::string response;
   Status status;
   int64_t http_code;
+
+  HTTPResponse() {}
+  HTTPResponse(std::string response, Status status, int64_t http_code)
+      : response(std::move(response)), status(status), http_code(http_code) {}
+
+  HTTPResponse(HTTPResponse&&) = default;
+  HTTPResponse& operator=(HTTPResponse&&) = default;
+
+  HTTPResponse(const HTTPResponse&) = delete;
+  HTTPResponse& operator=(const HTTPResponse&) = delete;
 };
 
-struct HTTPRequest {
-  std::string body;
+// HTTPRequest contains information used to make a Post request to clearcut.
+//
+// This class is non-copyable since url/body may be large.
+class HTTPRequest {
+ public:
   std::string url;
+  std::string body;
   std::map<std::string, std::string> headers;
+
+  HTTPRequest(std::string url, std::string body = "")
+      : url(std::move(url)), body(std::move(body)) {}
+  HTTPRequest(HTTPRequest&&) = default;
+  HTTPRequest& operator=(HTTPRequest&&) = default;
+
+  HTTPRequest(const HTTPRequest&) = delete;
+  HTTPRequest& operator=(const HTTPRequest&) = delete;
 };
 
 class HTTPClient {

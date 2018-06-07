@@ -30,7 +30,7 @@ class CurlHandle {
 
   template <class Param>
   Status Setopt(CURLoption option, Param parameter);
-  Status SetHeaders(std::map<std::string, std::string> headers);
+  Status SetHeaders(const std::map<std::string, std::string> &headers);
   Status SetTimeout(int64_t timeout_ms);
 
   static StatusOr<std::unique_ptr<CurlHandle>> Init();

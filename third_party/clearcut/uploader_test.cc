@@ -53,7 +53,8 @@ class TestHTTPClient : public HTTPClient {
       seen_event_codes.insert(event.event_code());
     }
 
-    HTTPResponse response = {.http_code = 200};
+    HTTPResponse response;
+    response.http_code = 200;
     LogResponse resp;
     if (next_request_wait_millis != -1) {
       resp.set_next_request_wait_millis(next_request_wait_millis);
@@ -61,7 +62,7 @@ class TestHTTPClient : public HTTPClient {
     resp.SerializeToString(&response.response);
 
     std::promise<StatusOr<HTTPResponse>> response_promise;
-    response_promise.set_value(response);
+    response_promise.set_value(std::move(response));
 
     return response_promise.get_future();
   }

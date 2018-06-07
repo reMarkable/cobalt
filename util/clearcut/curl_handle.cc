@@ -56,7 +56,8 @@ Status CurlHandle::Setopt(CURLoption option, Param parameter) {
   return Status::OK;
 }
 
-Status CurlHandle::SetHeaders(std::map<std::string, std::string> headers) {
+Status CurlHandle::SetHeaders(
+    const std::map<std::string, std::string> &headers) {
   if (!headers.empty()) {
     struct curl_slist *header_list = nullptr;
     for (const auto &header : headers) {
@@ -95,11 +96,7 @@ StatusOr<HTTPResponse> CurlHandle::Post(std::string url, std::string body) {
     case CURLE_OK:
       int64_t response_code;
       curl_easy_getinfo(handle_, CURLINFO_RESPONSE_CODE, &response_code);
-      return HTTPResponse{
-          .response = response_body_,
-          .status = Status::OK,
-          .http_code = response_code,
-      };
+      return HTTPResponse(response_body_, Status::OK, response_code);
     case CURLE_OPERATION_TIMEDOUT:
       return Status(StatusCode::DEADLINE_EXCEEDED, "Post request timed out.");
     default:

@@ -75,10 +75,10 @@ Status ClearcutUploader::TryUploadEvents(
                   "clearcut server");
   }
 
-  HTTPRequest request = {.url = url_};
+  HTTPRequest request(url_);
   log_request->mutable_client_info()->set_client_type(kFuchsiaClientType);
   log_request->SerializeToString(&request.body);
-  auto response_future = client_->Post(request, deadline);
+  auto response_future = client_->Post(std::move(request), deadline);
   auto response_or = response_future.get();
   if (!response_or.ok()) {
     return response_or.status();

@@ -166,12 +166,13 @@ class FakeHTTPClient : public clearcut::HTTPClient {
     }
     send_call_count++;
 
-    clearcut::HTTPResponse response = {.http_code = 200};
+    clearcut::HTTPResponse response;
+    response.http_code = 200;
     clearcut::LogResponse resp;
     resp.SerializeToString(&response.response);
 
     std::promise<StatusOr<clearcut::HTTPResponse>> response_promise;
-    response_promise.set_value(response);
+    response_promise.set_value(std::move(response));
 
     return response_promise.get_future();
   }
