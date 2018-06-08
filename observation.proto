@@ -136,10 +136,11 @@ message SystemProfile {
 
   enum BuildLevel {
     UNKNOWN = 0;
-    DEBUG = 1;
-    TEST = 2;
-    FISHFOOD = 3;
-    DOGFOOD = 4;
+
+    // These should all be the same as BuildLevel in config/metrics.proto.
+    DEBUG = 10;
+    FISHFOOD = 20;
+    DOGFOOD = 30;
     PROD = 99;
   }
 

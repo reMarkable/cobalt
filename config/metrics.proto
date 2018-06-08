@@ -155,7 +155,7 @@ message MetricPart {
 // ObservationPart named "hour". On the other hand the Metric "Fuchsia Usage
 // City-and-Rating" might have two parts called "City" and "Rating".
 message Metric {
-  // Next ID: 10
+  // Next ID: 11
 
   // These three numbers form this Metric's unique ID in the Cobalt Config
   // DB.
@@ -200,6 +200,37 @@ message Metric {
   // Which TimeZonePolicy should Encoders use when encoding Observations for
   // this metric?
   TimeZonePolicy time_zone_policy = 7;
+
+  message Metadata {
+    // The time after which this metric is no longer valid. If this field is not
+    // supplied, the metric is considered currently expired, and is not
+    // guaranteed to be reported by cobalt.
+    //
+    // Note: This should be a date encoded as yyyy/mm/dd and should not be
+    // further than 1 year in the future.
+    string expires_after = 1;
+
+    // Primary contact for questions/bugs regarding this metric (may be a
+    // group). This should be a fully qualified email address (e.g.
+    // my-group@test.com)
+    string owner = 2;
+
+    // This represents the highest stage of build for which a metric will be
+    // reported. A DEBUG metric will not be reported in FISHFOOD or above, etc.
+    // A metric that should always be reported should have a value of PROD.
+    // The list of metrics with this value should be kept as small as feasible.
+    enum BuildLevel {
+      NEVER_REPORT = 0;
+
+      // These should all be the same as BuildLevel in observation.proto.
+      DEBUG = 10;
+      FISHFOOD = 20;
+      DOGFOOD = 40;
+      PROD = 99;
+    }
+    BuildLevel max_build_level = 4;
+  }
+  Metadata meta_data = 10;
 }
 
 // Constains the list of all Metrics that are registered in the
