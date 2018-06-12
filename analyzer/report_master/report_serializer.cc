@@ -125,7 +125,8 @@ std::string FloatToString(float x) {
   return s;
 }
 
-std::string ValueToString(const ValuePart& value) {
+std::string ValueToString(const ValuePart& value,
+                          const IndexLabels* index_labels = nullptr) {
   switch (value.data_case()) {
     case ValuePart::kStringValue:
       return ToCSVString(value.string_value());
@@ -148,6 +149,14 @@ std::string ValueToString(const ValuePart& value) {
     }
 
     case ValuePart::kIndexValue: {
+      // Replace the index value with a string if such a string is available.
+      if (index_labels != nullptr) {
+        auto iter = index_labels->labels().find(value.index_value());
+        if (iter != index_labels->labels().end()) {
+          return iter->second;
+        }
+      }
+      // Return <index kIndexValue> if no string mapping is available.
       std::ostringstream stream;
       stream << "<index " << value.index_value() << ">";
       return stream.str();
@@ -664,11 +673,19 @@ grpc::Status ReportSerializer::AppendCSVRawDumpReportRow(
   for (const std::string& v : fixed_leftmost_column_values_) {
     (*stream) << v << kSeparator;
   }
-  // TODO(rudominer) Handle labels for indices in RAW_DUMP reports.
-  for (size_t i = 0; i < num_values_this_row - 1; i++) {
-    (*stream) << ValueToString(report_row.values(i)) << kSeparator;
+
+  for (size_t i = 0; i < num_values_this_row; i++) {
+    const IndexLabels* index_labels = nullptr;
+    if (i < (size_t) report_config_->variable_size() &&
+        report_config_->variable(i).has_index_labels()) {
+      index_labels = &(report_config_->variable(i).index_labels());
+    }
+    if (i != 0) {
+      (*stream) << kSeparator;
+    }
+    (*stream) << ValueToString(report_row.values(i), index_labels);
   }
-  (*stream) << ValueToString(report_row.values(num_values_this_row - 1));
+
   AppendCSVSystemProfileFields(report_row.system_profile(), stream);
   (*stream) << std::endl;
   return grpc::Status::OK;
