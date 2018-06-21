@@ -134,6 +134,15 @@ message SystemProfile {
     ARM_64 = 2;
   }
 
+  enum BuildLevel {
+    UNKNOWN = 0;
+    DEBUG = 1;
+    TEST = 2;
+    FISHFOOD = 3;
+    DOGFOOD = 4;
+    PROD = 99;
+  }
+
   OS os = 1;
   ARCH arch = 2;
 
@@ -147,6 +156,10 @@ message SystemProfile {
   // related to what sort of device we are running on, such as
   // "Acme Lightbulb X" or "Machine Corp. Laptop III".
   string product_name = 5;
+
+  // This represents the build state of the system artifact.
+  // Currently assumed to be the build version of the package calling Cobalt.
+  BuildLevel build_level = 6;
 }
 
 // An Observation consists of one or more ObservationParts.
