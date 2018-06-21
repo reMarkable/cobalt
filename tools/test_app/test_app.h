@@ -36,6 +36,7 @@
 
 #include "analyzer/analyzer_service/analyzer.grpc.pb.h"
 #include "encoder/envelope_maker.h"
+#include "encoder/observation_store_dispatcher.h"
 #include "encoder/project_context.h"
 #include "encoder/send_retryer.h"
 #include "encoder/shipping_dispatcher.h"
@@ -206,6 +207,9 @@ class TestApp {
   std::shared_ptr<encoder::ShufflerClientInterface> shuffler_client_;
   std::unique_ptr<encoder::send_retryer::SendRetryer> send_retryer_;
   std::unique_ptr<encoder::SystemData> system_data_;
+  std::unique_ptr<util::EncryptedMessageMaker> encrypt_to_shuffler_;
+  std::unique_ptr<util::EncryptedMessageMaker> encrypt_to_analyzer_;
+  std::unique_ptr<encoder::ObservationStoreDispatcher> store_dispatcher_;
   std::unique_ptr<encoder::ShippingDispatcher> shipping_dispatcher_;
   std::ostream* ostream_;
 };

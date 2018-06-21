@@ -47,6 +47,9 @@ add_library(encoder
             shipping_manager.cc
             shuffler_client.cc
             system_data.cc
+            observation_store.cc
+            observation_store_dispatcher.cc
+            memory_observation_store.cc
             ${COBALT_PROTO_HDRS} ${CONFIG_PROTO_HDRS})
 target_link_libraries(encoder
                       client_config

@@ -12,9 +12,15 @@
 namespace cobalt {
 namespace encoder {
 
+typedef ObservationStore::EnvelopeHolder EnvelopeHolder;
 using cobalt::clearcut_extensions::LogEventExtension;
 
 namespace {
+
+// The number of upload failures after which ShippingManager will bail out of an
+// invocation of SendAllEnvelopes().
+static size_t kMaxFailuresWithoutSuccess = 3;
+
 std::string ToString(const std::chrono::system_clock::time_point& t) {
   std::time_t time_struct = std::chrono::system_clock::to_time_t(t);
   return std::ctime(&time_struct);
@@ -28,23 +34,15 @@ std::string ToString(const std::chrono::system_clock::time_point& t) {
 const std::chrono::seconds ShippingManager::kMaxSeconds(999999999);
 
 ShippingManager::ShippingManager(
-    const SizeParams& size_params, const ScheduleParams& schedule_params,
-    const EnvelopeMakerParams& envelope_maker_params)
-    : size_params_(size_params),
-      envelope_send_threshold_size_(
-          size_t(0.6 * size_params.max_bytes_per_envelope_)),
-      total_bytes_send_threshold_(size_t(0.6 * size_params.max_bytes_total_)),
-      schedule_params_(schedule_params),
-      envelope_maker_params_(envelope_maker_params),
+    const ScheduleParams& schedule_params, ObservationStore* observation_store,
+    util::EncryptedMessageMaker* encrypt_to_shuffler)
+    : schedule_params_(schedule_params),
       next_scheduled_send_time_(std::chrono::system_clock::now() +
-                                schedule_params_.schedule_interval_) {
-  _mutex_protected_fields_do_not_access_directly_.active_envelope_maker.reset(
-      new EnvelopeMaker(envelope_maker_params.analyzer_public_key_pem_,
-                        envelope_maker_params.analyzer_scheme_,
-                        envelope_maker_params.shuffler_public_key_pem_,
-                        envelope_maker_params.shuffler_scheme_,
-                        size_params.max_bytes_per_observation_,
-                        size_params_.max_bytes_per_envelope_));
+                                schedule_params_.schedule_interval_),
+      encrypt_to_shuffler_(encrypt_to_shuffler) {
+  CHECK(observation_store);
+  _mutex_protected_fields_do_not_access_directly_.observation_store =
+      observation_store;
 }
 
 ShippingManager::~ShippingManager() {
@@ -70,88 +68,21 @@ void ShippingManager::Start() {
   worker_thread_ = std::move(t);
 }
 
-std::string ShippingManager::StatusDebugString(Status status) {
-  switch (status) {
-    case kOk:
-      return "kOk";
-
-    case kObservationTooBig:
-      return "kObservationTooBig";
-
-    case kFull:
-      return "kFull";
-
-    case kShutDown:
-      return "kShutdown";
-
-    case kEncryptionFailed:
-      return "kEncryptionFailed";
-  }
-}
-
-ShippingManager::Status ShippingManager::AddObservation(
-    const Observation& observation,
-    std::unique_ptr<ObservationMetadata> metadata) {
+void ShippingManager::NotifyObservationsAdded() {
   auto locked = lock();
-  if (locked->fields->shut_down) {
-    return kShutDown;
-  }
-  if (locked->fields->temporarily_full) {
-    // Not just the current EnvelopeMaker, but the ShippingManager in
-    // general is full. This should be very rare. Unless there is a problem
-    // with sending Observations to the server we should never be full.
-    // The dynamics of when this might happen will be different once we
-    // implement local persistence of Observations.
-    LOG(WARNING) << "The ShippingManager's in-memory buffer is full. Rejecting "
-                    "an observation.";
-    return kFull;
-  }
-  switch (locked->fields->active_envelope_maker->AddObservation(
-      observation, std::move(metadata))) {
-    case EnvelopeMaker::kOk:
-      VLOG(4) << "ShippingManager::AddObservation: OK";
-      // Set idle_ false because any thread that invokes WaitUntilIdle() after
-      // this should wait until the Observation just added has been sent.
-      locked->fields->idle = false;
-      break;
 
-    case EnvelopeMaker::kObservationTooBig:
-      return kObservationTooBig;
-
-    case EnvelopeMaker::kEnvelopeFull:
-      // This should be very rare because of the fact that we invoke
-      // RequestSendSoon() below when size() >= envelope_send_threshold_size_.
-      // This should prevent us from getting to the point that the active
-      // EnvelopeMaker is ever full.
-      RequestSendSoonLockHeld(locked->fields);
-      return kFull;
-
-    case EnvelopeMaker::kEncryptionFailed:
-      return kEncryptionFailed;
-  }
-  if (locked->fields->active_envelope_maker->size() >=
-      envelope_send_threshold_size_) {
-    // The active EnvelopeMaker is starting to get too large. Initiate
-    // a send.
+  if (locked->fields->observation_store->IsAlmostFull()) {
+    VLOG(4) << "NotifyObservationsAdded(): observation_store "
+               "IsAlmostFull.";
     RequestSendSoonLockHeld(locked->fields);
   }
 
-  size_t new_total_bytes = locked->fields->envelopes_to_send_total_bytes +
-                           locked->fields->active_envelope_maker->size();
-
-  if (new_total_bytes > total_bytes_send_threshold_) {
-    RequestSendSoonLockHeld(locked->fields);
-    if (new_total_bytes > size_params_.max_bytes_total_) {
-      // Not just the current EnvelopeMaker, but the ShippingManager in general
-      // is now temporarily full. This should be very rare. Unless there is
-      // a problem with sending Observations to the server we should never
-      // be full.
-      locked->fields->temporarily_full = true;
-    }
+  if (!locked->fields->observation_store->Empty()) {
+    // Set idle false because any thread that invokes WaitUntilIdle() after this
+    // should wait until the Observation just added has been sent.
+    locked->fields->idle = false;
+    locked->fields->add_observation_notifier.notify_all();
   }
-
-  locked->fields->add_observation_notifier.notify_all();
-  return kOk;
 }
 
 // The caller must hold a lock on mutex_.
@@ -173,24 +104,16 @@ void ShippingManager::RequestSendSoon(SendCallback send_callback) {
   auto locked = lock();
   RequestSendSoonLockHeld(locked->fields);
 
-  // If we were given a SendCallback then do one of three things...
+  // If we were given a SendCallback then do one of two things...
   if (send_callback) {
-    if (locked->fields->active_envelope_maker->size() > 0) {
-      // If the active EnvelopeMaker is not empty put the SendCallback
-      // onto the on-deck queue so that it gets invoked after the next
-      // send that includes the active EnvelopeMaker.
-      locked->fields->on_deck_send_callback_queue.push_back(send_callback);
-    } else if (locked->fields->envelopes_to_send_total_bytes > 0) {
-      // If the active EnvelopeMaker is empty but the worker thread has
-      // some EnvelopeMakers it is currently dealing with then put the
-      // SendCallback directly onto the current queue so that it gets invoked
-      // after the next send attempt.
-      locked->fields->current_send_callback_queue.push_back(send_callback);
-    } else {
-      // Otherwise the ShippingManager has no Observations so invoke the
-      // SendCallback immediately and clear expedited_send_requested.
+    if (locked->fields->observation_store->Empty() && locked->fields->idle) {
+      // If the ObservationStore is empty and the ShippingManager is idle. Then
+      // we can safely invoke the SendCallback immediately.
       locked->fields->expedited_send_requested = false;
       send_callback(true);
+    } else {
+      // Otherwise, we should put the callback into the send callback queue.
+      locked->fields->send_callback_queue.push_back(send_callback);
     }
   }
 }
@@ -209,11 +132,6 @@ void ShippingManager::ShutDown() {
     locked->fields->waiting_for_schedule_notifier.notify_all();
   }
   VLOG(4) << "ShippingManager: shut-down requested.";
-}
-
-std::unique_ptr<EnvelopeMaker> ShippingManager::TakeActiveEnvelopeMaker() {
-  auto locked = lock();
-  return TakeActiveEnvelopeMakerLockHeld(locked->fields);
 }
 
 size_t ShippingManager::num_send_attempts() {
@@ -255,17 +173,20 @@ void ShippingManager::Run() {
       return;
     }
 
-    if (locked->fields->active_envelope_maker->Empty() &&
-        locked->fields->envelopes_to_send_total_bytes == 0) {
-      // There are no Observations at all in the ShippingManager. Wait
+    if (locked->fields->observation_store->Empty()) {
+      // There are no Observations at all in the observation_store_. Wait
       // forever until notified that one arrived or shut down.
       VLOG(4) << "ShippingManager worker: waiting for an Observation to "
                  "arrive.";
+      // If we are about to leave idle, we should make sure that we invoke all
+      // of the SendCallbacks so they don't have to wait until the next time
+      // observations are added.
+      InvokeSendCallbacksLockHeld(locked->fields, true);
       locked->fields->idle = true;
       locked->fields->idle_notifier.notify_all();
       locked->fields->add_observation_notifier.wait(locked->lock, [&locked] {
         return (locked->fields->shut_down ||
-                !locked->fields->active_envelope_maker->Empty());
+                !locked->fields->observation_store->Empty());
       });
       locked->fields->idle = false;
     } else {
@@ -275,7 +196,7 @@ void ShippingManager::Run() {
       if (next_scheduled_send_time_ <= now ||
           locked->fields->expedited_send_requested) {
         VLOG(4) << "ShippingManager worker: time to send now.";
-        PrepareForSendLockHeld(locked->fields);
+        locked->fields->expedited_send_requested = false;
         locked->lock.unlock();
         SendAllEnvelopes();
         next_scheduled_send_time_ = std::chrono::system_clock::now() +
@@ -300,113 +221,76 @@ void ShippingManager::Run() {
   }
 }
 
-// A lock on mutex_ should be held by the caller.
-std::unique_ptr<EnvelopeMaker> ShippingManager::TakeActiveEnvelopeMakerLockHeld(
-    MutexProtectedFields* fields) {
-  std::unique_ptr<EnvelopeMaker> latest_envelope_maker(
-      new EnvelopeMaker(envelope_maker_params_.analyzer_public_key_pem_,
-                        envelope_maker_params_.analyzer_scheme_,
-                        envelope_maker_params_.shuffler_public_key_pem_,
-                        envelope_maker_params_.shuffler_scheme_,
-                        size_params_.max_bytes_per_observation_,
-                        size_params_.max_bytes_per_envelope_));
-  fields->active_envelope_maker.swap(latest_envelope_maker);
-  return latest_envelope_maker;
-}
-
-// A lock on mutex_ should be held by the caller.
-void ShippingManager::PrepareForSendLockHeld(MutexProtectedFields* fields) {
-  fields->expedited_send_requested = false;
-  auto latest_envelope_maker = TakeActiveEnvelopeMakerLockHeld(fields);
-  fields->envelopes_to_send_total_bytes += latest_envelope_maker->size();
-  envelopes_to_send_.emplace_front(std::move(latest_envelope_maker));
-  // Copy on_deck_send_callback_queue onto the end of
-  // current_send_callback_queue and then clear current_send_callback_queue.
-  fields->current_send_callback_queue.insert(
-      fields->current_send_callback_queue.end(),
-      fields->on_deck_send_callback_queue.begin(),
-      fields->on_deck_send_callback_queue.end());
-  fields->on_deck_send_callback_queue.clear();
-}
-
 void ShippingManager::SendAllEnvelopes() {
-  std::deque<std::unique_ptr<EnvelopeMaker>> envelopes_that_failed;
-  while (!envelopes_to_send_.empty()) {
-    SendOneEnvelope(&envelopes_that_failed);
-  }
-  bool success = envelopes_that_failed.empty();
-  envelopes_to_send_ = std::move(envelopes_that_failed);
-  size_t envelopes_to_send_total_bytes = 0;
-  for (const auto& env : envelopes_to_send_) {
-    envelopes_to_send_total_bytes += env->size();
-  }
-  VLOG(5) << "ShippingManager: envelopes_to_send_total_bytes="
-          << envelopes_to_send_total_bytes;
+  bool success = true;
+  size_t failures_without_success = 0;
+  // Loop through all envelopes in the ObservationStore.
+  while (true) {
+    auto holder = lock()->fields->observation_store->TakeNextEnvelopeHolder();
+    if (holder == nullptr) {
+      // No more envelopes in the store, we can exit the loop.
+      break;
+    }
+    auto failed_holder = SendEnvelopeToBackend(std::move(holder));
+    if (failed_holder == nullptr) {
+      // The send succeeded.
+      failures_without_success = 0;
+    } else {
+      // The send failed. Increment failures_without_success and return the
+      // failed EnvelopeHolder to the store.
+      success = false;
+      failures_without_success++;
+      lock()->fields->observation_store->ReturnEnvelopeHolder(
+          std::move(failed_holder));
+    }
 
-  std::vector<SendCallback> callbacks_to_invoke;
+    if (failures_without_success >= kMaxFailuresWithoutSuccess) {
+      VLOG(4) << "ShippingManager::SendAllEnvelopes(): failed too many times ("
+              << failures_without_success << "). Stopping uploads.";
+      break;
+    }
+  }
+
   {
     auto locked = lock();
-    locked->fields->envelopes_to_send_total_bytes =
-        envelopes_to_send_total_bytes;
-    if (envelopes_to_send_total_bytes +
-            locked->fields->active_envelope_maker->size() <
-        size_params_.max_bytes_total_) {
-      locked->fields->temporarily_full = false;
-    }
-    callbacks_to_invoke.swap(locked->fields->current_send_callback_queue);
+    InvokeSendCallbacksLockHeld(locked->fields, success);
   }
+}
+
+void ShippingManager::InvokeSendCallbacksLockHeld(MutexProtectedFields* fields,
+                                                  bool success) {
+  fields->expedited_send_requested = false;
+  std::vector<SendCallback> callbacks_to_invoke;
+  callbacks_to_invoke.swap(fields->send_callback_queue);
   for (SendCallback& callback : callbacks_to_invoke) {
     callback(success);
   }
 }
 
-void ShippingManager::SendOneEnvelope(
-    std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) {
-  std::unique_ptr<EnvelopeMaker> envelope_to_send;
-  size_t envelope_to_send_size = 0;
-  while (!envelopes_to_send_.empty() &&
-         envelope_to_send_size < size_params_.min_envelope_send_size_ &&
-         envelope_to_send_size + envelopes_to_send_.front()->size() <=
-             size_params_.max_bytes_per_envelope_) {
-    std::unique_ptr<EnvelopeMaker> next = std::move(envelopes_to_send_.front());
-    envelopes_to_send_.pop_front();
-    if (!envelope_to_send) {
-      envelope_to_send = std::move(next);
-    } else {
-      envelope_to_send->MergeOutOf(next.get());
-    }
-    envelope_to_send_size = envelope_to_send->size();
-  }
-  if (!envelope_to_send || envelope_to_send_size == 0) {
-    VLOG(3) << "ShippingManager worker: There are no Observations to send.";
-    return;
-  }
-
-  SendEnvelopeToBackend(std::move(envelope_to_send), envelopes_that_failed);
-}
-
 LegacyShippingManager::LegacyShippingManager(
-    const SizeParams& size_params, const ScheduleParams& scheduling_params,
-    const EnvelopeMakerParams& envelope_maker_params,
+    const ScheduleParams& scheduling_params,
+    ObservationStore* observation_store,
+    util::EncryptedMessageMaker* encrypt_to_shuffler,
     const SendRetryerParams send_retryer_params,
     SendRetryerInterface* send_retryer)
-    : ShippingManager(size_params, scheduling_params, envelope_maker_params),
+    : ShippingManager(scheduling_params, observation_store,
+                      encrypt_to_shuffler),
       send_retryer_params_(send_retryer_params),
       send_retryer_(send_retryer) {
   CHECK(send_retryer_);
 }
 
-void LegacyShippingManager::SendEnvelopeToBackend(
-    std::unique_ptr<EnvelopeMaker> envelope_to_send,
-    std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) {
+std::unique_ptr<EnvelopeHolder> LegacyShippingManager::SendEnvelopeToBackend(
+    std::unique_ptr<EnvelopeHolder> envelope_to_send) {
   EncryptedMessage encrypted_envelope;
-  if (!envelope_to_send->MakeEncryptedEnvelope(&encrypted_envelope)) {
+  if (!encrypt_to_shuffler_->Encrypt(envelope_to_send->GetEnvelope(),
+                                     &encrypted_envelope)) {
     // TODO(rudominer) log
     // Drop on floor.
-    return;
+    return nullptr;
   }
   VLOG(5) << "ShippingManager worker: Sending Envelope of size "
-          << envelope_to_send->size() << " bytes to legacy backend.";
+          << envelope_to_send->Size() << " bytes to legacy backend.";
   auto status = send_retryer_->SendToShuffler(
       send_retryer_params_.initial_rpc_deadline_,
       send_retryer_params_.deadline_per_send_attempt_, &cancel_handle_,
@@ -421,34 +305,37 @@ void LegacyShippingManager::SendEnvelopeToBackend(
   }
   if (status.ok()) {
     VLOG(4) << "ShippingManager::SendOneEnvelope: OK";
-    return;
+    return nullptr;
   }
 
-  VLOG(1) << "Cobalt send to Shuffler failed: (" << status.error_code() << ") "
+  VLOG(4) << "Cobalt send to Shuffler failed: (" << status.error_code() << ") "
           << status.error_message()
           << ". Observations have been re-enqueued for later.";
-  envelopes_that_failed->emplace_back(std::move(envelope_to_send));
+  return envelope_to_send;
 }
 
 ClearcutV1ShippingManager::ClearcutV1ShippingManager(
-    const SizeParams& size_params, const ScheduleParams& scheduling_params,
-    const EnvelopeMakerParams& envelope_maker_params,
+    const ScheduleParams& scheduling_params,
+    ObservationStore* observation_store,
+    util::EncryptedMessageMaker* encrypt_to_shuffler,
     std::unique_ptr<clearcut::ClearcutUploader> clearcut)
-    : ShippingManager(size_params, scheduling_params, envelope_maker_params),
+    : ShippingManager(scheduling_params, observation_store,
+                      encrypt_to_shuffler),
       clearcut_(std::move(clearcut)) {}
 
-void ClearcutV1ShippingManager::SendEnvelopeToBackend(
-    std::unique_ptr<EnvelopeMaker> envelope_to_send,
-    std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) {
+std::unique_ptr<EnvelopeHolder>
+ClearcutV1ShippingManager::SendEnvelopeToBackend(
+    std::unique_ptr<EnvelopeHolder> envelope_to_send) {
   auto log_extension = std::make_unique<LogEventExtension>();
-  if (!envelope_to_send->MakeEncryptedEnvelope(
+  if (!encrypt_to_shuffler_->Encrypt(
+          envelope_to_send->GetEnvelope(),
           log_extension->mutable_cobalt_encrypted_envelope())) {
     // TODO(rudominer) log
     // Drop on floor.
-    return;
+    return nullptr;
   }
   VLOG(5) << "ShippingManager worker: Sending Envelope of size "
-          << envelope_to_send->size() << " bytes to clearcut.";
+          << envelope_to_send->Size() << " bytes to clearcut.";
 
   clearcut::LogRequest request;
   request.set_log_source(clearcut::kFuchsiaCobaltShufflerInputDevel);
@@ -462,13 +349,13 @@ void ClearcutV1ShippingManager::SendEnvelopeToBackend(
   }
   if (status.ok()) {
     VLOG(4) << "ShippingManager::SendEnvelopeToBackend: OK";
-    return;
+    return nullptr;
   }
 
-  VLOG(1) << "Cobalt send to Shuffler failed: (" << status.error_code() << ") "
+  VLOG(4) << "Cobalt send to Shuffler failed: (" << status.error_code() << ") "
           << status.error_message()
           << ". Observations have been re-enqueued for later.";
-  envelopes_that_failed->emplace_back(std::move(envelope_to_send));
+  return envelope_to_send;
 }
 
 void ShippingManager::WaitUntilIdle(std::chrono::seconds max_wait) {

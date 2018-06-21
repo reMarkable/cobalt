@@ -13,6 +13,9 @@
 #include "config/client_config.h"
 #include "encoder/client_secret.h"
 #include "encoder/encoder.h"
+#include "encoder/memory_observation_store.h"
+#include "encoder/observation_store.h"
+#include "encoder/observation_store_dispatcher.h"
 #include "encoder/project_context.h"
 // Generated from shipping_dispatcher_test_config.yaml
 #include "encoder/shipping_dispatcher_test_config.h"
@@ -20,9 +23,11 @@
 namespace cobalt {
 namespace encoder {
 
+typedef ObservationStore::EnvelopeHolder EnvelopeHolder;
 typedef ObservationMetadata::ShufflerBackend ShufflerBackend;
 using config::ClientConfig;
 using tensorflow_statusor::StatusOr;
+using util::EncryptedMessageMaker;
 
 namespace {
 
@@ -84,53 +89,22 @@ class FakeSystemData : public SystemDataInterface {
   SystemProfile system_profile_;
 };
 
-class FakeHTTPClient : public clearcut::HTTPClient {
- public:
-  explicit FakeHTTPClient(std::set<uint32_t>* seen_event_codes)
-      : clearcut::HTTPClient(), seen_event_codes_(seen_event_codes) {}
-
-  std::future<StatusOr<clearcut::HTTPResponse>> Post(
-      clearcut::HTTPRequest request,
-      std::chrono::steady_clock::time_point _ignored) {
-    clearcut::LogRequest req;
-    req.ParseFromString(request.body);
-    for (auto event : req.log_event()) {
-      seen_event_codes_->insert(event.event_code());
-    }
-
-    clearcut::HTTPResponse response;
-    response.http_code = 200;
-    clearcut::LogResponse resp;
-    resp.SerializeToString(&response.response);
-
-    std::promise<StatusOr<clearcut::HTTPResponse>> response_promise;
-    response_promise.set_value(std::move(response));
-
-    return response_promise.get_future();
-  }
-
- private:
-  std::set<uint32_t>* seen_event_codes_;
-};
-
 class FakeShippingManager : public ShippingManager {
  public:
-  FakeShippingManager(std::chrono::seconds schedule_interval,
+  FakeShippingManager(ObservationStore* store,
+                      EncryptedMessageMaker* encrypt_to_shuffler,
+                      std::chrono::seconds schedule_interval,
                       std::chrono::seconds min_interval)
       : ShippingManager(
-            ShippingManager::SizeParams(kMaxBytesPerObservation,
-                                        kMaxBytesPerEnvelope, kMaxBytesTotal,
-                                        kMinEnvelopeSendSize),
             ShippingManager::ScheduleParams(schedule_interval, min_interval),
-            ShippingManager::EnvelopeMakerParams("", EncryptedMessage::NONE, "",
-                                                 EncryptedMessage::NONE)),
+            store, encrypt_to_shuffler),
         envelopes_sent_(0) {}
 
-  void SendEnvelopeToBackend(
-      std::unique_ptr<EnvelopeMaker> envelope_to_send,
-      std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) {
+  std::unique_ptr<EnvelopeHolder> SendEnvelopeToBackend(
+      std::unique_ptr<EnvelopeHolder> envelope_to_send) override {
     std::lock_guard<std::mutex> lock(mutex_);
     envelopes_sent_ += 1;
+    return nullptr;
   }
 
   int32_t envelopes_sent() {
@@ -148,29 +122,57 @@ class FakeShippingManager : public ShippingManager {
 class ShippingDispatcherTest : public ::testing::Test {
  public:
   ShippingDispatcherTest()
-      : shipping_dispatcher_(new ShippingDispatcher()),
+      : store_dispatcher_(new ObservationStoreDispatcher()),
+        shipping_dispatcher_(new ShippingDispatcher()),
         project_(GetTestProject()),
+        encrypt_to_shuffler_("", EncryptedMessage::NONE),
+        encrypt_to_analyzer_("", EncryptedMessage::NONE),
         encoder_(project_, ClientSecret::GenerateNewSecret(), &system_data_) {}
 
  protected:
   void Init(std::chrono::seconds schedule_interval,
             std::chrono::seconds min_interval) {
+    store_dispatcher_->Register(
+        ObservationMetadata::LEGACY_BACKEND,
+        std::make_unique<MemoryObservationStore>(
+            kMaxBytesPerObservation, kMaxBytesPerEnvelope, kMaxBytesTotal,
+            kMinEnvelopeSendSize));
     shipping_dispatcher_->Register(
         ObservationMetadata::LEGACY_BACKEND,
-        std::make_unique<FakeShippingManager>(schedule_interval, min_interval));
+        std::make_unique<FakeShippingManager>(
+            store_dispatcher_->GetStore(ObservationMetadata::LEGACY_BACKEND)
+                .ConsumeValueOrDie(),
+            &encrypt_to_shuffler_, schedule_interval, min_interval));
+
+    store_dispatcher_->Register(
+        ObservationMetadata::V1_BACKEND,
+        std::make_unique<MemoryObservationStore>(
+            kMaxBytesPerObservation, kMaxBytesPerEnvelope, kMaxBytesTotal,
+            kMinEnvelopeSendSize));
     shipping_dispatcher_->Register(
         ObservationMetadata::V1_BACKEND,
-        std::make_unique<FakeShippingManager>(schedule_interval, min_interval));
+        std::make_unique<FakeShippingManager>(
+            store_dispatcher_->GetStore(ObservationMetadata::V1_BACKEND)
+                .ConsumeValueOrDie(),
+            &encrypt_to_shuffler_, schedule_interval, min_interval));
     shipping_dispatcher_->Start();
   }
 
-  ShippingManager::Status AddObservation(size_t num_bytes, uint32_t metric_id) {
+  ObservationStore::StoreStatus AddObservation(size_t num_bytes,
+                                               uint32_t metric_id) {
     CHECK(num_bytes > kNoOpEncodingByteOverhead) << " num_bytes=" << num_bytes;
     Encoder::Result result = encoder_.EncodeString(
         metric_id, kNoOpEncodingId,
         std::string("x", num_bytes - kNoOpEncodingByteOverhead));
-    return shipping_dispatcher_->AddObservation(*result.observation,
-                                                std::move(result.metadata));
+    auto message = std::make_unique<EncryptedMessage>();
+    EXPECT_TRUE(
+        encrypt_to_analyzer_.Encrypt(*result.observation, message.get()));
+    auto status = store_dispatcher_
+                      ->AddEncryptedObservation(std::move(message),
+                                                std::move(result.metadata))
+                      .ConsumeValueOrDie();
+    shipping_dispatcher_->NotifyObservationsAdded();
+    return status;
   }
 
   FakeShippingManager* Manager(ShufflerBackend backend) {
@@ -180,8 +182,11 @@ class ShippingDispatcherTest : public ::testing::Test {
 
   FakeSystemData system_data_;
   std::set<uint32_t> seen_clearcut_event_codes_;
+  std::unique_ptr<ObservationStoreDispatcher> store_dispatcher_;
   std::unique_ptr<ShippingDispatcher> shipping_dispatcher_;
   std::shared_ptr<ProjectContext> project_;
+  EncryptedMessageMaker encrypt_to_shuffler_;
+  EncryptedMessageMaker encrypt_to_analyzer_;
   Encoder encoder_;
 };
 
@@ -192,7 +197,7 @@ TEST_F(ShippingDispatcherTest, ConstructAndDestruct) {
 TEST_F(ShippingDispatcherTest, SendObservationToDefault) {
   Init(kMaxSeconds, std::chrono::seconds::zero());
 
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40, kDefaultMetricId));
+  EXPECT_EQ(ObservationStore::kOk, AddObservation(40, kDefaultMetricId));
 
   shipping_dispatcher_->RequestSendSoon();
   shipping_dispatcher_->WaitUntilIdle(kMaxSeconds);
@@ -204,7 +209,7 @@ TEST_F(ShippingDispatcherTest, SendObservationToDefault) {
 TEST_F(ShippingDispatcherTest, SendObservationToLegacy) {
   Init(kMaxSeconds, std::chrono::seconds::zero());
 
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40, kLegacyMetricId));
+  EXPECT_EQ(ObservationStore::kOk, AddObservation(40, kLegacyMetricId));
 
   shipping_dispatcher_->RequestSendSoon();
   shipping_dispatcher_->WaitUntilIdle(kMaxSeconds);
@@ -216,7 +221,7 @@ TEST_F(ShippingDispatcherTest, SendObservationToLegacy) {
 TEST_F(ShippingDispatcherTest, SendObservationToV1Backend) {
   Init(kMaxSeconds, std::chrono::seconds::zero());
 
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40, kClearcutMetricId));
+  EXPECT_EQ(ObservationStore::kOk, AddObservation(40, kClearcutMetricId));
 
   shipping_dispatcher_->RequestSendSoon();
   shipping_dispatcher_->WaitUntilIdle(kMaxSeconds);
@@ -228,15 +233,15 @@ TEST_F(ShippingDispatcherTest, SendObservationToV1Backend) {
 TEST_F(ShippingDispatcherTest, DistributeObservationsProperly) {
   Init(kMaxSeconds, std::chrono::seconds::zero());
 
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40, kDefaultMetricId));
+  EXPECT_EQ(ObservationStore::kOk, AddObservation(40, kDefaultMetricId));
   shipping_dispatcher_->RequestSendSoon();
   shipping_dispatcher_->WaitUntilIdle(kMaxSeconds);
 
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40, kLegacyMetricId));
+  EXPECT_EQ(ObservationStore::kOk, AddObservation(40, kLegacyMetricId));
   shipping_dispatcher_->RequestSendSoon();
   shipping_dispatcher_->WaitUntilIdle(kMaxSeconds);
 
-  EXPECT_EQ(ShippingManager::kOk, AddObservation(40, kClearcutMetricId));
+  EXPECT_EQ(ObservationStore::kOk, AddObservation(40, kClearcutMetricId));
   shipping_dispatcher_->RequestSendSoon();
   shipping_dispatcher_->WaitUntilIdle(kMaxSeconds);
 

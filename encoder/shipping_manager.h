@@ -17,6 +17,7 @@
 
 #include "./logging.h"
 #include "encoder/envelope_maker.h"
+#include "encoder/observation_store.h"
 #include "encoder/send_retryer.h"
 #include "encoder/shuffler_client.h"
 #include "third_party/clearcut/uploader.h"
@@ -27,81 +28,26 @@ namespace encoder {
 using send_retryer::SendRetryerInterface;
 
 // ShippingManager is a central coordinator for collecting encoded Observations
-// and sending them to the Shuffler. Observations are accumulated in memory
-// and periodically sent in batches to the Shuffler by a background worker
-// thread on a regular schedule. ShippingManager also performs expedited
-// off-schedule sends when too much unsent Observation data has accumulated.
-// A client may also explicitly request an expedited send.
+// and sending them to the Shuffler. Observations are accumulated in the
+// ObservationStore and periodically sent in batches to the Shuffler by a
+// background worker thread on a regular schedule. ShippingManager also performs
+// expedited off-schedule sends when too much unsent Observation data has
+// accumulated.  A client may also explicitly request an expedited send.
 //
-// ShippingManager uses a SendRetryer to send Observations to the Shuffler so
-// in case a send fails it will be retried multiple times with exponential
-// back-off.
+// ShippingManager is used to upload data to a Shuffler. The unit of data sent
+// in a single request is the *Envelope*. ShippingManager will get Envelopes
+// from the ObservationStore, and attempt to send them.
 //
-// ShippingManager uses gRPC to send to the Shuffler. The unit of data sent
-// in a single gRPC request is the *Envelope*. ShippingManager will distribute
-// the collection of Observations it controls into one or more Envelopes
-// in order to try to achieve an efficient size Envelope to send.
+// Usage: Construct a ShippingManager, invoke Start() once. Whenever an
+// observation is added to the ObservationStore, call NotifyObservationsAdded()
+// which allows ShippingManager to check if it needs to send early. Optionally
+// invoke RequestSendSoon() to expedite a send operation.
 //
-// Usage: Construct a ShippingManager, invoke Start() once, and repeatedly
-// invoke AddObservation(). After Start() has been invoked calls to
-// AddObservation() are thread safe: It may be invoked concurrently
-// by multiple threads. Optionally invoke RequestSendSoon() to expedite a send
-// operation.
-//
-// Usually a single ShippingManager will be constructed for an entire
-// client device and all applications running on that device that wish to use
-// Cobalt to collect metrics will make use of this single instance.
+// Usually a single ShippingManager will be constructed for each shuffler
+// backend the client device wants to send to. All applications running on that
+// device use the same set of ShippingManagers.
 class ShippingManager {
  public:
-  // Parameters passed to the ShippingManager constructor that control its
-  // behavior with respect to the size of the data stored in memory and
-  // sent using gRPC.
-  class SizeParams {
-   public:
-    // max_bytes_per_observation: AddObservation() will return
-    // kObservationTooBig if the given Observation's serialized size is bigger
-    // than this.
-
-    // max_bytes_per_envelope: When collecting Observations into Envelopes,
-    // ShippingManager will not build an Envelope larger than this size. Since
-    // ShippingManager sends a single Envelope in a gRPC request, this value
-    // should be used to ensure that ShippingManager does not exceed the
-    // maximum gRPC message size.
-    //
-    // max_bytes_total: ShippingManager will perform an expedited send if the
-    // size of the accumulated, unsent Observation data exceeds 60% of this
-    // value. If the size of the accumulated, unsent Observation data reaches
-    // this value then ShippingManager will not accept any more Observations:
-    // AddObservation() will return kFull, until ShippingManager is able to send
-    // the accumulated Observations to the Shuffler.
-    //
-    // min_envelope_send_size: ShippingManager will attempt to combine Envelopes
-    // with sizes smaller than this value (in bytes) into Envelopes whose size
-    // exceeds this value prior to sending to the Shuffler.
-    //
-    // REQUIRED:
-    // 0 <= max_bytes_per_observation <= max_bytes_per_envelope <=
-    // max_bytes_total
-    // 0 <= min_envelope_send_size <= max_bytes_per_envelope
-    SizeParams(size_t max_bytes_per_observation, size_t max_bytes_per_envelope,
-               size_t max_bytes_total, size_t min_envelope_send_size)
-        : max_bytes_per_observation_(max_bytes_per_observation),
-          max_bytes_per_envelope_(max_bytes_per_envelope),
-          max_bytes_total_(max_bytes_total),
-          min_envelope_send_size_(min_envelope_send_size) {
-      CHECK_LE(max_bytes_per_observation_, max_bytes_per_envelope_);
-      CHECK_LE(max_bytes_per_envelope_, max_bytes_total_);
-      CHECK_LE(min_envelope_send_size_, max_bytes_per_envelope_);
-    }
-
-   private:
-    friend class ShippingManager;
-    size_t max_bytes_per_observation_;
-    size_t max_bytes_per_envelope_;
-    size_t max_bytes_total_;
-    size_t min_envelope_send_size_;
-  };
-
   // Use this constant instead of std::chrono::seconds::max() in
   // ScheduleParams below in order to effectively set the wait time to
   // infinity.
@@ -137,59 +83,19 @@ class ShippingManager {
     std::chrono::seconds min_interval_;
   };
 
-  // Parameters passed to the ShippingManager constructor that will be used
-  // to construct EnvelopeMakers. See the documentation of the
-  // EnvelopeMaker constructor.
-  class EnvelopeMakerParams {
-   public:
-    EnvelopeMakerParams(std::string analyzer_public_key_pem,
-                        EncryptedMessage::EncryptionScheme analyzer_scheme,
-                        std::string shuffler_public_key_pem,
-                        EncryptedMessage::EncryptionScheme shuffler_scheme)
-        : analyzer_public_key_pem_(analyzer_public_key_pem),
-          analyzer_scheme_(analyzer_scheme),
-          shuffler_public_key_pem_(shuffler_public_key_pem),
-          shuffler_scheme_(shuffler_scheme) {}
-
-   private:
-    friend class ShippingManager;
-    std::string analyzer_public_key_pem_;
-    EncryptedMessage::EncryptionScheme analyzer_scheme_;
-    std::string shuffler_public_key_pem_;
-    EncryptedMessage::EncryptionScheme shuffler_scheme_;
-  };
-
-  // Parameters passed to the ShippingManager constructor that will be passed
-  // to the method SendRetryer::SendToShuffler(). See the documentation of
-  // that method.
-  class SendRetryerParams {
-   public:
-    SendRetryerParams(std::chrono::seconds initial_rpc_deadline,
-                      std::chrono::seconds deadline_per_send_attempt)
-        : initial_rpc_deadline_(initial_rpc_deadline),
-          deadline_per_send_attempt_(deadline_per_send_attempt) {}
-
-   private:
-    friend class ShippingManager;
-    friend class LegacyShippingManager;
-    friend class ClearcutV1ShippingManager;
-    std::chrono::seconds initial_rpc_deadline_;
-    std::chrono::seconds deadline_per_send_attempt_;
-  };
-
   // Constructor
-  //
-  // size_params: These control the ShippingManager's behavior with respect to
-  // the size of the data stored in memory and sent using gRPC.
   //
   // scheduling_params: These control the ShippingManager's behavior with
   // respect to scheduling sends.
   //
-  // envelope_maker_params: Used when the ShippingManager needs to construct
-  // and EnvelopeMaker.
-  ShippingManager(const SizeParams& size_params,
-                  const ScheduleParams& scheduling_params,
-                  const EnvelopeMakerParams& envelope_maker_params);
+  // observation_store: The ObservationStore used for storing and retrieving
+  // observations.
+  //
+  // encrypt_to_shuffler: An util::EncryptedMessageMaker used to encrypt
+  // messages to the shuffler and the analyzer.
+  ShippingManager(const ScheduleParams& scheduling_params,
+                  ObservationStore* observation_store,
+                  util::EncryptedMessageMaker* encrypt_to_shuffler);
 
   // The destructor will stop the worker thread and wait for it to stop
   // before exiting.
@@ -199,46 +105,14 @@ class ShippingManager {
   // This method must be invoked exactly once.
   void Start();
 
-  // The status of an AddObservation() call.
-  enum Status {
-    // AddObservation() succeeded.
-    kOk = 0,
+  // Notifies the ShippingManager that an observation may have been added to the
+  // ObservationStore.
+  void NotifyObservationsAdded();
 
-    // The Observation was not added because it is too big.
-    kObservationTooBig,
-
-    // The Observation was not added to the Envelope because the Shipping
-    // manager has too large of a backlog of Observations that have not yet
-    // been sent. In the current version we use a pure in-memory cache not
-    // backed by a persistent cache and so we return this error if the in-memory
-    // backlog gets too large. In later versions we will have a persistent
-    // cache and so the threshold for returning this error will be much higher.
-    kFull,
-
-    // The ShippingManager is shutting down. No more Observations will be
-    // accepted.
-    kShutDown,
-
-    // The Observation was not added to the Envelope because the encryption
-    // failed. This should never happen.
-    kEncryptionFailed
-  };
-
-  // Returns a human-readable name for the Status.
-  static std::string StatusDebugString(Status status);
-
-  // Add |observation| and its associated |metadata| to the collection of
-  // Observations controlled by this ShippingManager. Eventually the
-  // ShippingManager's worker thread will use the |SendRetryer| to send
-  // all of the accumulated, unsent Observations.
-  Status AddObservation(const Observation& observation,
-                        std::unique_ptr<ObservationMetadata> metadata);
-
-  // Register a request with the ShippingManager for an expedited send.
-  // The ShippingManager's worker thread will use the |SendRetryer| to send
-  // all of the accumulated, unsent Observations as soon as possible but not
-  // sooner than |min_interval| seconds after the previous send operation
-  // has completed.
+  // Register a request with the ShippingManager for an expedited send. The
+  // ShippingManager's worker thread will try to send all of the accumulated,
+  // unsent Observations as soon as possible but not sooner than |min_interval|
+  // seconds after the previous send operation has completed.
   void RequestSendSoon();
 
   using SendCallback = std::function<void(bool)>;
@@ -247,19 +121,18 @@ class ShippingManager {
   // |send_callback| will be invoked with the result of the requested send
   // attempt. More precisely, send_callback will be invoked after the
   // ShippingManager has attempted to send all of the Observations that were
-  // added prior to the invocation of RequestSendSoon(). It will be invoked
-  // with true if all such Observations were succesfully sent. It will be
-  // invoked with false if some Observations were not able to be sent, but
-  // the status of any particular Observation may not be determined. This
-  // is useful mainly in tests.
+  // added to the ObservationStore. It will be invoked with true if all such
+  // Observations were succesfully sent. It will be invoked with false if some
+  // Observations were not able to be sent, but the status of any particular
+  // Observation may not be determined. This is useful mainly in tests.
   void RequestSendSoon(SendCallback send_callback);
 
-  // Blocks for |max_wait| seconds or until the worker thread has
-  // successfully sent all previously added Observations and is idle, waiting
-  // for more Observations to be added. This method is most useful if it
-  // can be arranged that there are no concurrent invocations of
-  // AddObservation() (for example in a test) because such concurrent
-  // invocations may cause the idle state to never be entered.
+  // Blocks for |max_wait| seconds or until the worker thread has successfully
+  // sent all previously added Observations and is idle, waiting for more
+  // Observations to be added. This method is most useful if it can be arranged
+  // that there are no concurrent invocations of NotifyObservationsAdded() (for
+  // example in a test) because such concurrent invocations may cause the idle
+  // state to never be entered.
   void WaitUntilIdle(std::chrono::seconds max_wait);
 
   // Blocks for |max_wait| seconds or until the worker thread is in the state
@@ -269,10 +142,6 @@ class ShippingManager {
   // (for example in a test) because such concurrent invocations might cause
   // that state to never be entered.
   void WaitUntilWorkerWaiting(std::chrono::seconds max_wait);
-
-  // Returns the active EnvelopeMaker via move leaving the active EnvelopeMaker
-  // empty. This method is most likely only useful in a test.
-  std::unique_ptr<EnvelopeMaker> TakeActiveEnvelopeMaker();
 
   // These diagnostic stats are mostly useful in a testing environment but
   // may possibly prove useful in production also.
@@ -298,38 +167,19 @@ class ShippingManager {
   void SendAllEnvelopes();
 
   // Helper method used by Run(). Does not assume mutex_ lock is held.
-  void SendOneEnvelope(
-      std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed);
-
-  virtual void SendEnvelopeToBackend(
-      std::unique_ptr<EnvelopeMaker> envelope_to_send,
-      std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed) = 0;
-
-  const SizeParams size_params_;
-
-  // When the active EnvelopeMaker surpasses this size (in bytes) we invoke
-  // RequestSendSoon(). This value is set to 0.6 * max_bytes_per_envelope_
-  // so that it is unlikely that we ever need to return kFull because the
-  // active Envelope is full.
-  const size_t envelope_send_threshold_size_;
-
-  // When the total amount of Observation data surpasses this size
-  // we invoke RequestSendSoon(). This value is set to 0.6 * max_bytes_total_
-  // so that it is unlikely that we ever need to return kFull because the
-  // the total amount of Observation data is too great.
-  const size_t total_bytes_send_threshold_;
+  virtual std::unique_ptr<ObservationStore::EnvelopeHolder>
+  SendEnvelopeToBackend(
+      std::unique_ptr<ObservationStore::EnvelopeHolder> envelope_to_send) = 0;
 
   const ScheduleParams schedule_params_;
-  const EnvelopeMakerParams envelope_maker_params_;
 
- private:
   // Variables accessed only by the worker thread. These are not
   // protected by a mutex.
   std::chrono::system_clock::time_point next_scheduled_send_time_;
 
-  std::deque<std::unique_ptr<EnvelopeMaker>> envelopes_to_send_;
-
  protected:
+  util::EncryptedMessageMaker* encrypt_to_shuffler_;
+
   send_retryer::CancelHandle cancel_handle_;  // Not protected by a mutex. Only
                                               // accessed by the worker thread.
 
@@ -348,35 +198,12 @@ class ShippingManager {
 
     bool expedited_send_requested = false;
 
-    // This is the EnvelopeMaker into which new Observations are added.
-    std::unique_ptr<EnvelopeMaker> active_envelope_maker;
-
-    // RequestSendSoon() enqueues callbacks here just in case
-    // active_envelope_maker is not empty. These callbacks will be invoked
-    // with the result of the next send attempt that includes
-    // active_envelope_maker.
-    std::vector<SendCallback> on_deck_send_callback_queue;
-
     // The queue of callbacks that will be invoked when the next send
-    // attempt completes. The worker thread moves callbacks from
-    // on_deck_send_callback_queue to this queue at the same time that
-    // it picks up the active_envelope_maker. RequestSendSoon() enqueues
-    // callbacks directly here rather than onto on_deck_send_callback_queue
-    // just in case active_envelope_maker is empty but
-    // envelopes_to_send_total_bytes != 0.
-    std::vector<SendCallback> current_send_callback_queue;
-
-    // Keeps track of the sum of the sizes of all Envelopes in
-    // |envelopes_to_send_|.
-    size_t envelopes_to_send_total_bytes = 0;
+    // attempt completes.
+    std::vector<SendCallback> send_callback_queue;
 
     // Set shut_down to true in order to stop "Run()".
     bool shut_down = false;
-
-    // Setting this to true indicates that the total size of all Observations
-    // currently stored in the ShippingManager is too large. We will stop
-    // accepting any more Observations until this is set to false again.
-    bool temporarily_full = false;
 
     // We initialize idle_ and waiting_for_schedule_ to true because initially
     // the worker thread isn't even started so WaitUntilIdle() and
@@ -390,6 +217,8 @@ class ShippingManager {
     size_t num_send_attempts = 0;
     size_t num_failed_attempts = 0;
     grpc::Status last_send_status;
+
+    ObservationStore* observation_store;
 
     std::condition_variable add_observation_notifier;
     std::condition_variable expedited_send_notifier;
@@ -427,30 +256,51 @@ class ShippingManager {
   }
 
  private:
-  // Does the work of TakeActiveEnvelopeMaker() and assumes that the
-  // fields->mutex lock is held.
-  std::unique_ptr<EnvelopeMaker> TakeActiveEnvelopeMakerLockHeld(
-      MutexProtectedFields* fields);
-
   // Does the work of RequestSendSoon() and assumes that the fields->mutex lock
   // is held.
   void RequestSendSoonLockHeld(MutexProtectedFields* fields);
 
-  // Helper method used by Run(). Assumes the fields->mutex lock is held.
-  void PrepareForSendLockHeld(MutexProtectedFields* fields);
+  // InvokeSendCallbacksLockHeld invokes all SendCallbacks in
+  // send_callback_queue, and also clears the send_callback_queue list.
+  void InvokeSendCallbacksLockHeld(MutexProtectedFields* fields, bool success);
 };
 
+// LegacyShippingManager uses a SendRetryer to send Observations to the Shuffler
+// so in case a send fails it will be retried multiple times with exponential
+// back-off.
+//
+// LegacyShippingManager uses gRPC to send to the Shuffler. The unit of data
+// sent in a single gRPC request is the *Envelope*. ShippingManager will access
+// individual Envelopes by reading from the ObservationStore.
 class LegacyShippingManager : public ShippingManager {
  public:
+  // Parameters passed to the LegacyShippingManager constructor that will be
+  // passed to the method SendRetryer::SendToShuffler(). See the documentation
+  // of that method.
+  class SendRetryerParams {
+   public:
+    SendRetryerParams(std::chrono::seconds initial_rpc_deadline,
+                      std::chrono::seconds deadline_per_send_attempt)
+        : initial_rpc_deadline_(initial_rpc_deadline),
+          deadline_per_send_attempt_(deadline_per_send_attempt) {}
+
+   private:
+    friend class ShippingManager;
+    friend class LegacyShippingManager;
+    friend class ClearcutV1ShippingManager;
+    std::chrono::seconds initial_rpc_deadline_;
+    std::chrono::seconds deadline_per_send_attempt_;
+  };
+
   // send_retryer_params: Used when the ShippingManager needs to invoke
   // SendRetryer::SendToShuffler().
   //
   // send_retryer: The instance of |SendRetryerInterface| encapsulated by
   // this ShippingManager. ShippingManager does not take ownership of
   // send_retryer which must outlive ShippingManager.
-  LegacyShippingManager(const SizeParams& size_params,
-                        const ScheduleParams& scheduling_params,
-                        const EnvelopeMakerParams& envelope_maker_params,
+  LegacyShippingManager(const ScheduleParams& scheduling_params,
+                        ObservationStore* observation_store,
+                        util::EncryptedMessageMaker* encrypt_to_shuffler,
                         const SendRetryerParams send_retryer_params,
                         SendRetryerInterface* send_retryer);
 
@@ -459,22 +309,21 @@ class LegacyShippingManager : public ShippingManager {
 
   SendRetryerInterface* send_retryer_;  // not owned
 
-  void SendEnvelopeToBackend(
-      std::unique_ptr<EnvelopeMaker> envelope_to_send,
-      std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed);
+  std::unique_ptr<ObservationStore::EnvelopeHolder> SendEnvelopeToBackend(
+      std::unique_ptr<ObservationStore::EnvelopeHolder> envelope_to_send);
 };
 
 class ClearcutV1ShippingManager : public ShippingManager {
  public:
   ClearcutV1ShippingManager(
-      const SizeParams& size_params, const ScheduleParams& scheduling_params,
-      const EnvelopeMakerParams& envelope_maker_params,
+      const ScheduleParams& scheduling_params,
+      ObservationStore* observation_store,
+      util::EncryptedMessageMaker* encrypt_to_shuffler,
       std::unique_ptr<::clearcut::ClearcutUploader> clearcut);
 
  private:
-  void SendEnvelopeToBackend(
-      std::unique_ptr<EnvelopeMaker> envelope_to_send,
-      std::deque<std::unique_ptr<EnvelopeMaker>>* envelopes_that_failed);
+  std::unique_ptr<ObservationStore::EnvelopeHolder> SendEnvelopeToBackend(
+      std::unique_ptr<ObservationStore::EnvelopeHolder> envelope_to_send);
 
   std::mutex clearcut_mutex_;
   std::unique_ptr<::clearcut::ClearcutUploader> clearcut_;

@@ -72,6 +72,12 @@ void ShippingDispatcher::Start() {
   }
 }
 
+void ShippingDispatcher::NotifyObservationsAdded() {
+  for (auto& manager : shipping_managers_) {
+    manager.second->NotifyObservationsAdded();
+  }
+}
+
 void ShippingDispatcher::RequestSendSoon() {
   for (auto& manager : shipping_managers_) {
     manager.second->RequestSendSoon();
@@ -93,31 +99,10 @@ void ShippingDispatcher::WaitUntilIdle(std::chrono::seconds max_wait) {
   }
 }
 
-ShippingManager::Status ShippingDispatcher::AddObservation(
-    const Observation& observation,
-    std::unique_ptr<ObservationMetadata> metadata) {
-  auto shipping_manager_or = manager(metadata->backend());
-  if (!shipping_manager_or.ok()) {
-    VLOG(4) << "Unable to send to unregistered backend: "
-            << metadata->backend();
-    return ShippingManager::Status::kOk;
-  }
-  ShippingManager* shipping_manager = shipping_manager_or.ConsumeValueOrDie();
-  return shipping_manager->AddObservation(
-      observation, std::make_unique<ObservationMetadata>(*metadata));
-}
-
 util::Status ShippingDispatcher::last_send_status(ShufflerBackend backend) {
   ShippingManager* m;
   CB_ASSIGN_OR_RETURN(m, manager(backend));
   return ConvertToStatus(m->last_send_status());
-}
-
-StatusOr<std::unique_ptr<EnvelopeMaker>>
-ShippingDispatcher::TakeActiveEnvelopeMaker(ShufflerBackend backend) {
-  ShippingManager* m;
-  CB_ASSIGN_OR_RETURN(m, manager(backend));
-  return m->TakeActiveEnvelopeMaker();
 }
 
 size_t ShippingDispatcher::NumSendAttempts() {

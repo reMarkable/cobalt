@@ -663,8 +663,13 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSendMulti) {
   Envelope& envelope = fake_shuffler_client_->envelope;
   ASSERT_EQ(2, envelope.batch_size());
 
+  std::map<int32_t, int32_t> metric_batch_map;
+  int32_t i = 0;
+  for (const auto& env : envelope.batch()) {
+    metric_batch_map[env.meta_data().metric_id()] = i++;
+  }
   // The first batch should contain 39 messages.
-  const ObservationBatch& batch = envelope.batch(0);
+  const ObservationBatch& batch = envelope.batch(metric_batch_map[1]);
   EXPECT_EQ(39, batch.encrypted_observation_size());
   // The metric ID should be the default value of 1.
   EXPECT_EQ(1u, batch.meta_data().metric_id());
@@ -678,7 +683,7 @@ TEST_F(TestAppTest, ProcessCommandLineEncodeAndSendMulti) {
   }
 
   // The second batch should contain 300 messages.
-  const ObservationBatch& batch2 = envelope.batch(1);
+  const ObservationBatch& batch2 = envelope.batch(metric_batch_map[2]);
   EXPECT_EQ(300, batch2.encrypted_observation_size());
   // The metric ID should be 2.
   EXPECT_EQ(2u, batch2.meta_data().metric_id());

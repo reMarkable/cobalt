@@ -30,6 +30,7 @@
 #include "config/encoding_config.h"
 #include "encoder/encoder.h"
 #include "encoder/envelope_maker.h"
+#include "encoder/memory_observation_store.h"
 #include "encoder/project_context.h"
 #include "encoder/send_retryer.h"
 #include "encoder/shuffler_client.h"
@@ -49,18 +50,22 @@ using encoder::ClientSecret;
 using encoder::Encoder;
 using encoder::EnvelopeMaker;
 using encoder::LegacyShippingManager;
+using encoder::MemoryObservationStore;
+using encoder::ObservationStore;
+using encoder::ObservationStoreDispatcher;
 using encoder::ProjectContext;
-using encoder::send_retryer::SendRetryer;
 using encoder::ShippingDispatcher;
 using encoder::ShippingManager;
 using encoder::ShufflerClient;
 using encoder::ShufflerClientInterface;
 using encoder::SystemData;
+using encoder::send_retryer::SendRetryer;
 using google::protobuf::Empty;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 using shuffler::Shuffler;
+using util::EncryptedMessageMaker;
 using util::PemUtil;
 
 // There are three modes of operation of the Cobalt TestClient program
@@ -557,11 +562,22 @@ TestApp::TestApp(
       shuffler_client_(shuffler_client),
       send_retryer_(new SendRetryer(shuffler_client_.get())),
       system_data_(std::move(system_data)),
+      encrypt_to_shuffler_(
+          new EncryptedMessageMaker(shuffler_public_key_pem, shuffler_scheme)),
+      encrypt_to_analyzer_(
+          new EncryptedMessageMaker(analyzer_public_key_pem, analyzer_scheme)),
+      store_dispatcher_(new ObservationStoreDispatcher()),
       shipping_dispatcher_(new ShippingDispatcher()),
       ostream_(ostream) {
-  auto size_params =
-      ShippingManager::SizeParams(kMaxBytesPerObservation, kMaxBytesPerEnvelope,
-                                  kMaxBytesTotal, kMinEnvelopeSendSize);
+  store_dispatcher_->Register(ObservationMetadata::LEGACY_BACKEND,
+                              std::make_unique<MemoryObservationStore>(
+                                  kMaxBytesPerObservation, kMaxBytesPerEnvelope,
+                                  kMaxBytesTotal, kMinEnvelopeSendSize));
+  store_dispatcher_->Register(ObservationMetadata::V1_BACKEND,
+                              std::make_unique<MemoryObservationStore>(
+                                  kMaxBytesPerObservation, kMaxBytesPerEnvelope,
+                                  kMaxBytesTotal, kMinEnvelopeSendSize));
+
   // By using (kMaxSeconds, 0) here we are effectively putting the
   // ShippingDispatcher in manual mode. It will never send
   // automatically and it will send immediately in response to
@@ -574,20 +590,23 @@ TestApp::TestApp(
     schedule_params = ShippingManager::ScheduleParams(std::chrono::seconds(10),
                                                       std::chrono::seconds(1));
   }
-  auto envelope_maker_params = ShippingManager::EnvelopeMakerParams(
-      analyzer_public_key_pem, analyzer_scheme, shuffler_public_key_pem,
-      shuffler_scheme);
-  auto send_retryer_params = ShippingManager::SendRetryerParams(
+  auto send_retryer_params = LegacyShippingManager::SendRetryerParams(
       kInitialRpcDeadline, kDeadlinePerSendAttempt);
   shipping_dispatcher_->Register(
       ObservationMetadata::LEGACY_BACKEND,
       std::make_unique<LegacyShippingManager>(
-          size_params, schedule_params, envelope_maker_params,
-          send_retryer_params, send_retryer_.get()));
+          schedule_params,
+          store_dispatcher_->GetStore(ObservationMetadata::LEGACY_BACKEND)
+              .ConsumeValueOrDie(),
+          encrypt_to_shuffler_.get(), send_retryer_params,
+          send_retryer_.get()));
   shipping_dispatcher_->Register(
       ObservationMetadata::V1_BACKEND,
       std::make_unique<ClearcutV1ShippingManager>(
-          size_params, schedule_params, envelope_maker_params,
+          schedule_params,
+          store_dispatcher_->GetStore(ObservationMetadata::V1_BACKEND)
+              .ConsumeValueOrDie(),
+          encrypt_to_shuffler_.get(),
           std::make_unique<clearcut::ClearcutUploader>(
               FLAGS_clearcut_endpoint,
               std::make_unique<util::clearcut::CurlHTTPClient>())));
@@ -653,15 +672,16 @@ void TestApp::SendAndQuit() {
 
 void TestApp::SendAccumulatedObservations() {
   if (skip_shuffler_) {
-    auto envelope_maker = shipping_dispatcher_->TakeActiveEnvelopeMaker(
-        ObservationMetadata::LEGACY_BACKEND);
-    if (!envelope_maker.ok()) {
-      VLOG(2) << "Unable to retrieve active envelope maker "
-              << envelope_maker.status().error_message();
+    auto observation_store_or =
+        store_dispatcher_->GetStore(ObservationMetadata::LEGACY_BACKEND);
+    if (!observation_store_or.ok()) {
+      VLOG(2) << "Unabel to retrieve LEGACY ObservationStore "
+              << observation_store_or.status().error_message();
       return;
     }
-    analyzer_client_->SendToAnalyzer(
-        envelope_maker.ConsumeValueOrDie()->envelope());
+    auto envelope_maker =
+        observation_store_or.ConsumeValueOrDie()->TakeNextEnvelopeHolder();
+    analyzer_client_->SendToAnalyzer(envelope_maker->GetEnvelope());
   } else {
     SendToShuffler();
   }
@@ -735,20 +755,33 @@ bool TestApp::EncodeAsNewClient(const std::vector<uint32_t> encoding_config_ids,
   // Add the observation to the EnvelopeMaker. For the sake of testing
   // idempotency of the AddObservation() operation, we add the same Observation
   // multiple times.
-  ShippingManager::Status status;
+  ObservationStore::StoreStatus status;
   for (size_t i = 0; i < FLAGS_num_adds_per_observation; i++) {
     uint64_t random_id;
     std::memcpy(&random_id, result.observation->random_id().data(),
                 sizeof(random_id));
     VLOG(5) << "Adding observation with random_id=" << random_id;
-    status = shipping_dispatcher_->AddObservation(
-        *result.observation, std::unique_ptr<ObservationMetadata>(
-                                 new ObservationMetadata(*result.metadata)));
+    auto message = std::make_unique<EncryptedMessage>();
+    if (!encrypt_to_analyzer_->Encrypt(*result.observation, message.get())) {
+      LOG(ERROR) << "AddObservation() unable to encrypt message. metric_id="
+                 << metric_;
+      return false;
+    }
+    auto status_or = store_dispatcher_->AddEncryptedObservation(
+        std::move(message), std::unique_ptr<ObservationMetadata>(
+                                new ObservationMetadata(*result.metadata)));
+    shipping_dispatcher_->NotifyObservationsAdded();
+    if (!status_or.ok()) {
+      LOG(ERROR) << "Unable to AddEncryptedObservation: "
+                 << status_or.status().error_message();
+      return false;
+    }
+    status = status_or.ConsumeValueOrDie();
   }
 
-  if (status != ShippingManager::kOk) {
+  if (status != ObservationStore::kOk) {
     LOG(ERROR) << "AddObservation() failed with status "
-               << ShippingManager::StatusDebugString(status)
+               << MemoryObservationStore::StatusDebugString(status)
                << ". metric_id=" << metric_;
     return false;
   }
@@ -781,12 +814,28 @@ bool TestApp::EncodeStringAsNewClient(const std::string value) {
     return false;
   }
 
+  auto message = std::make_unique<EncryptedMessage>();
+  if (!encrypt_to_analyzer_->Encrypt(*result.observation, message.get())) {
+    LOG(ERROR) << "AddObservation() unable to encrypt message. metric_id="
+               << metric_;
+    return false;
+  }
+
   // Add the observation to the ShippingDispatcher.
-  auto status = shipping_dispatcher_->AddObservation(
-      *result.observation, std::move(result.metadata));
-  if (status != ShippingManager::kOk) {
+  auto status_or = store_dispatcher_->AddEncryptedObservation(
+      std::move(message), std::unique_ptr<ObservationMetadata>(
+                              new ObservationMetadata(*result.metadata)));
+  shipping_dispatcher_->NotifyObservationsAdded();
+  if (!status_or.ok()) {
+    LOG(ERROR) << "Unable to AddEncryptedObservation: "
+               << status_or.status().error_message();
+    return false;
+  }
+
+  auto status = status_or.ConsumeValueOrDie();
+  if (status != ObservationStore::kOk) {
     LOG(ERROR) << "AddObservation() failed with status "
-               << ShippingManager::StatusDebugString(status)
+               << MemoryObservationStore::StatusDebugString(status)
                << ". metric_id=" << metric_;
     return false;
   }
@@ -818,12 +867,29 @@ bool TestApp::EncodeIntAsNewClient(int64_t value) {
                << ". value=" << value;
     return false;
   }
+
+  auto message = std::make_unique<EncryptedMessage>();
+  if (!encrypt_to_analyzer_->Encrypt(*result.observation, message.get())) {
+    LOG(ERROR) << "AddObservation() unable to encrypt message. metric_id="
+               << metric_;
+    return false;
+  }
+
   // Add the observation to the ShippingDispatcher.
-  auto status = shipping_dispatcher_->AddObservation(
-      *result.observation, std::move(result.metadata));
-  if (status != ShippingManager::kOk) {
+  auto status_or = store_dispatcher_->AddEncryptedObservation(
+      std::move(message), std::unique_ptr<ObservationMetadata>(
+                              new ObservationMetadata(*result.metadata)));
+  shipping_dispatcher_->NotifyObservationsAdded();
+  if (!status_or.ok()) {
+    LOG(ERROR) << "Unable to AddEncryptedObservation: "
+               << status_or.status().error_message();
+    return false;
+  }
+
+  auto status = status_or.ConsumeValueOrDie();
+  if (status != ObservationStore::kOk) {
     LOG(ERROR) << "AddObservation() failed with status "
-               << ShippingManager::StatusDebugString(status)
+               << MemoryObservationStore::StatusDebugString(status)
                << ". metric_id=" << metric_;
     return false;
   }
@@ -849,12 +915,29 @@ bool TestApp::EncodeIndexAsNewClient(uint32_t index) {
                << ". index=" << index;
     return false;
   }
+
+  auto message = std::make_unique<EncryptedMessage>();
+  if (!encrypt_to_analyzer_->Encrypt(*result.observation, message.get())) {
+    LOG(ERROR) << "AddObservation() unable to encrypt message. metric_id="
+               << metric_;
+    return false;
+  }
+
   // Add the observation to the ShippingDispatcher.
-  auto status = shipping_dispatcher_->AddObservation(
-      *result.observation, std::move(result.metadata));
-  if (status != ShippingManager::kOk) {
+  auto status_or = store_dispatcher_->AddEncryptedObservation(
+      std::move(message), std::unique_ptr<ObservationMetadata>(
+                              new ObservationMetadata(*result.metadata)));
+  shipping_dispatcher_->NotifyObservationsAdded();
+  if (!status_or.ok()) {
+    LOG(ERROR) << "Unable to AddEncryptedObservation: "
+               << status_or.status().error_message();
+    return false;
+  }
+
+  auto status = status_or.ConsumeValueOrDie();
+  if (status != ObservationStore::kOk) {
     LOG(ERROR) << "AddObservation() failed with status "
-               << ShippingManager::StatusDebugString(status)
+               << MemoryObservationStore::StatusDebugString(status)
                << ". metric_id=" << metric_;
     return false;
   }

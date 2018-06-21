@@ -38,6 +38,10 @@ class ShippingDispatcher {
   // be invoked exactly once.
   void Start();
 
+  // Notifies all of the ShippingManagers that an observation may have been
+  // added to their ObservationStores.
+  void NotifyObservationsAdded();
+
   // Register a request with all controlled ShippingManagers for an expedited
   // send. The underlying ShippingManager's worker thread will use its
   // |SendRetryer| to send all of the accumulated, unsent Observations as soon
@@ -62,21 +66,6 @@ class ShippingDispatcher {
   // in a test) because such concurrent invocations may cause the idle state to
   // never be entered.
   void WaitUntilIdle(std::chrono::seconds max_wait);
-
-  // Add |observation| and its associated |metadata| to one of the
-  // ShippingManagers controlled by this ShippingDispatcher. Which dispatcher is
-  // used is determined by the |backend| field in |metadata.  Eventually the
-  // underlying ShippingManager's worker thread will use its |SendRetryer| to
-  // send all of the accumulated, unsent Observations.
-  ShippingManager::Status AddObservation(
-      const Observation& observation,
-      std::unique_ptr<ObservationMetadata> metadata);
-
-  // Returns the active EnvelopeMaker for the specified |backend| via move
-  // leaving the active EnvelopeMaker empty. This method is most likely only
-  // useful in a test.
-  tensorflow_statusor::StatusOr<std::unique_ptr<EnvelopeMaker>>
-  TakeActiveEnvelopeMaker(ObservationMetadata::ShufflerBackend backend);
 
   // These diagnostic stats are mostly useful in a testing environment but
   // may possibly prove useful in production also.
