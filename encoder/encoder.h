@@ -108,7 +108,14 @@ class Encoder {
 
     // Returned by the Encode*() methods if the encoding operation failed for
     // any reason.
-    kEncodingFailed
+    kEncodingFailed,
+
+    // Returned by the Encode*() methods if the system’s build level is
+    // insufficient to report the metric.
+    //
+    // Example: Binary with build level PROD wants to report an observation for
+    // a metric annotated as only reported in DEBUG mode.
+    kInsufficientBuildLevel
   };
 
   // The output of the Encode*() methods is a triple consisting of a status
