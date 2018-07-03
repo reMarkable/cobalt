@@ -19,7 +19,7 @@ using cobalt::util::StatusCode;
 namespace {
 
 static std::set<uint32_t> seen_event_codes;
-static uint64_t next_request_wait_millis;
+static int next_request_wait_millis;
 static bool fail_next_request;
 
 class TestLogger : public ClearcutUploader {

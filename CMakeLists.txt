@@ -617,18 +617,14 @@ cobalt_make_protobuf_cpp_lib(cobalt_proto_lib
                              COBALT_PROTO_HDRS
                              false
                              encrypted_message
-                             observation
-                             clearcut_extensions)
+                             observation)
 
 # Generate the go bindings for the Cobalt proto files in the root directory.
 cobalt_protobuf_generate_go(generate_cobalt_pb_go_files
                             COBALT_PB_GO_FILES
                             false
                             encrypted_message
-                            observation
-                            clearcut_extensions)
-add_dependencies(generate_cobalt_pb_go_files
-                 generate_clearcut_pb_go_files)
+                            observation)
 
 # Analagous targets to the two above also appear in the config directory for
 # the config protos. But the variables that are generated there are not
@@ -663,6 +659,21 @@ endmacro()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/lossmin)
 
+# //third_party/clearcut is a special case. It is code that we own but
+# but we keep it under //third_party.
+add_subdirectory(third_party/clearcut)
+
+# Generate the C++ bindings for the Clearcut extension proto.
+# Also compile the generated C++ files into a static library.
+# This depends on third_party/clearcut
+set_source_files_properties(third_party/clearcut/clearcut.pb.h PROPERTIES GENERATED TRUE)
+cobalt_make_protobuf_cpp_lib(clearcut_extensions_proto_lib
+                             CLEARCUT_EXTENSIONS_PROTO_HDRS
+                             false
+                             clearcut_extensions)
+target_link_libraries(clearcut_extensions_proto_lib
+                      clearcut)
+
 # Project directories
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)
@@ -682,6 +693,5 @@ add_compile_options(-Wno-sign-compare
                     -Wno-unused-private-field)
 
 # Third-party directories that we include using the simpler add_subdirectory method
-add_subdirectory(third_party/clearcut)
 add_subdirectory(third_party/lossmin/lossmin)
 add_subdirectory(third_party/tensorflow_statusor)

@@ -14,6 +14,7 @@
 
 set_source_files_properties(${COBALT_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 set_source_files_properties(${CONFIG_PROTO_HDRS} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${CLEARCUT_EXTENSIONS_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 
 set(ENCODER_TEST_CONFIG_H "${CMAKE_CURRENT_BINARY_DIR}/encoder_test_config.h")
 generate_test_config_h(${CMAKE_CURRENT_SOURCE_DIR}/encoder_test_config.yaml
@@ -54,7 +55,7 @@ target_link_libraries(encoder
                       forculus_encrypter
                       rappor_encoder
                       shuffler_grpc_client
-                      clearcut)
+                      clearcut_extensions_proto_lib)
 add_cobalt_dependencies(encoder)
 
 add_executable(encoder_tests
