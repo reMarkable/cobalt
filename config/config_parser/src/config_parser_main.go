@@ -58,8 +58,8 @@ func main() {
 		glog.Exit("Exactly one of 'repo_url', 'config_file' and 'config_dir' must be set.")
 	}
 
-	if *configFile == "" && (*customerId >= 0 || *projectId >= 0) {
-		glog.Exit("'customer_id' and 'project_id' must be set if and only if 'config_file' is set.")
+	if *configFile == "" && *configDir == "" && (*customerId >= 0 || *projectId >= 0) {
+		glog.Exit("'customer_id' and 'project_id' must be set if and only if 'config_file' or 'config_dir' are set.")
 	}
 
 	if *configFile != "" && (*customerId < 0 || *projectId < 0) {
@@ -122,6 +122,8 @@ func main() {
 		c, err = config_parser.ReadConfigFromRepo(*repoUrl, gitTimeout)
 	} else if *configFile != "" {
 		c, err = config_parser.ReadConfigFromYaml(*configFile, uint32(*customerId), uint32(*projectId))
+	} else if *customerId >= 0 && *projectId >= 0 {
+		c, err = config_parser.ReadProjectConfigFromDir(*configDir, uint32(*customerId), uint32(*projectId))
 	} else {
 		c, err = config_parser.ReadConfigFromDir(*configDir)
 	}
