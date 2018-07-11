@@ -60,6 +60,56 @@ std::unique_ptr<ClientConfig> ClientConfig::CreateFromCobaltConfigBytes(
   return CreateFromCobaltConfig(&cobalt_config);
 }
 
+template <class Config>
+bool ClientConfig::ValidateSingleProjectConfig(
+    const ::google::protobuf::RepeatedPtrField<Config>& configs,
+    uint32_t customer_id, uint32_t project_id) {
+  for (int i = 0; i < configs.size(); i++) {
+    if (configs[i].customer_id() != customer_id ||
+        configs[i].project_id() != project_id) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+std::pair<std::unique_ptr<ClientConfig>, uint32_t>
+ClientConfig::CreateFromCobaltProjectConfigBytes(
+    const std::string& cobalt_config_bytes) {
+  uint32_t customer_id = 0;
+  uint32_t project_id = 0;
+
+  CobaltConfig cobalt_config;
+  if (!cobalt_config.ParseFromString(cobalt_config_bytes)) {
+    LOG(ERROR) << "Unable to parse a CobaltConfig from the provided bytes.";
+    return std::make_pair(nullptr, project_id);
+  }
+
+  if (cobalt_config.metric_configs_size() > 0) {
+    customer_id = cobalt_config.metric_configs()[0].customer_id();
+    project_id = cobalt_config.metric_configs()[0].project_id();
+  } else if (cobalt_config.encoding_configs_size() > 0) {
+    customer_id = cobalt_config.encoding_configs()[0].customer_id();
+    project_id = cobalt_config.encoding_configs()[0].project_id();
+  }
+
+  // Validate configs
+  if (!ValidateSingleProjectConfig<::cobalt::Metric>(
+          cobalt_config.metric_configs(), customer_id, project_id)) {
+    LOG(ERROR) << "More than one customer_id or project_id found.";
+    return std::make_pair(nullptr, project_id);
+  }
+
+  if (!ValidateSingleProjectConfig<::cobalt::EncodingConfig>(
+          cobalt_config.encoding_configs(), customer_id, project_id)) {
+    LOG(ERROR) << "More than one customer_id or project_id found.";
+    return std::make_pair(nullptr, project_id);
+  }
+
+  return std::make_pair(CreateFromCobaltConfig(&cobalt_config), project_id);
+}
+
 std::unique_ptr<ClientConfig> ClientConfig::CreateFromCobaltConfig(
     CobaltConfig* cobalt_config) {
   RegisteredEncodings registered_encodings;

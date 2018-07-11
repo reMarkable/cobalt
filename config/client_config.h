@@ -37,6 +37,24 @@ class ClientConfig {
   static std::unique_ptr<ClientConfig> CreateFromCobaltConfigBytes(
       const std::string& cobalt_config_bytes);
 
+  // Checks list of Metrics or EncodingConfigs to  make sure that |customer_id|
+  // is the only customer_id referenced and |project_id| is the only project_id
+  // referenced.
+  template <class Config>
+  static bool ValidateSingleProjectConfig(
+      const ::google::protobuf::RepeatedPtrField<Config>& configs,
+      uint32_t customer_id, uint32_t project_id);
+
+  // Constructs and returns an instance of ClientConfig by first parsing
+  // a CobaltConfig proto message with configuration only for a single project
+  // from |cobalt_config_bytes|. This should contain the bytes of the binary
+  // serialization of such a message. Then extracts the Metrics and
+  // EncodingConfigs from that. Also validates that the CobaltConfig only
+  // contains a single customer_id and project_id and returns the project_id
+  // as the second value in the pair.
+  static std::pair<std::unique_ptr<ClientConfig>, uint32_t>
+  CreateFromCobaltProjectConfigBytes(const std::string& cobalt_config_bytes);
+
   // Constructs and returns an instance of ClientConfig by swapping all of
   // the Metrics and EncodingConfigs from the given |cobalt_config|.
   static std::unique_ptr<ClientConfig> CreateFromCobaltConfig(
