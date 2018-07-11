@@ -230,6 +230,7 @@ def start_test_app(shuffler_uri='', analyzer_uri='', use_tls=False,
                    shuffler_pk_pem_file=DEFAULT_SHUFFLER_PUBLIC_KEY_PEM,
                    cobalt_config_proto_path=CONFIG_BINARY_PROTO,
                    project_id=1,
+                   automatic=False,
                    verbose_count=0, wait=True):
   cmd = [TEST_APP_PATH,
       "-shuffler_uri", shuffler_uri,
@@ -246,6 +247,8 @@ def start_test_app(shuffler_uri='', analyzer_uri='', use_tls=False,
       cmd.append(root_certs_pem_file)
   if verbose_count > 0:
     cmd.append("-v=%d"%verbose_count)
+  if automatic:
+    cmd.append("-mode=automatic")
   return execute_command(cmd, wait)
 
 def start_report_client(report_master_uri='',

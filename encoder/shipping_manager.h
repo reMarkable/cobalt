@@ -224,6 +224,9 @@ class ShippingManager {
     kEncryptionFailed
   };
 
+  // Returns a human-readable name for the Status.
+  static std::string StatusDebugString(Status status);
+
   // Add |observation| and its associated |metadata| to the collection of
   // Observations controlled by this ShippingManager. Eventually the
   // ShippingManager's worker thread will use the |SendRetryer| to send

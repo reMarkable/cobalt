@@ -50,12 +50,12 @@ using encoder::Encoder;
 using encoder::EnvelopeMaker;
 using encoder::LegacyShippingManager;
 using encoder::ProjectContext;
+using encoder::send_retryer::SendRetryer;
 using encoder::ShippingDispatcher;
 using encoder::ShippingManager;
 using encoder::ShufflerClient;
 using encoder::ShufflerClientInterface;
 using encoder::SystemData;
-using encoder::send_retryer::SendRetryer;
 using google::protobuf::Empty;
 using grpc::Channel;
 using grpc::ClientContext;
@@ -432,6 +432,11 @@ void TestApp::SendToShuffler() {
     VLOG(2) << "Sending to shuffler with deadline = " << FLAGS_deadline_seconds
             << " seconds...";
   }
+  if (mode_ == TestApp::kAutomatic) {
+    // In automatic mode, let the ShippingManager send to the Shuffler
+    // asynchronously.
+    return;
+  }
   shipping_dispatcher_->RequestSendSoon();
   shipping_dispatcher_->WaitUntilIdle(kDeadlinePerSendAttempt);
   for (auto backend : shipping_dispatcher_->RegisteredBackends()) {
@@ -528,11 +533,10 @@ std::unique_ptr<TestApp> TestApp::CreateFromFlagsOrDie(int argc, char* argv[]) {
 
   auto test_app = std::unique_ptr<TestApp>(new TestApp(
       project_context, analyzer_client, shuffler_client, std::move(system_data),
-      analyzer_public_key_pem, analyzer_encryption_scheme,
+      mode, analyzer_public_key_pem, analyzer_encryption_scheme,
       shuffler_public_key_pem, shuffler_encryption_scheme, &std::cout));
   test_app->set_metric(FLAGS_metric);
   test_app->set_skip_shuffler(FLAGS_skip_shuffler);
-  test_app->set_mode(mode);
   return test_app;
 }
 
@@ -540,13 +544,14 @@ TestApp::TestApp(
     std::shared_ptr<ProjectContext> project_context,
     std::shared_ptr<AnalyzerClientInterface> analyzer_client,
     std::shared_ptr<encoder::ShufflerClientInterface> shuffler_client,
-    std::unique_ptr<encoder::SystemData> system_data,
+    std::unique_ptr<encoder::SystemData> system_data, Mode mode,
     const std::string& analyzer_public_key_pem,
     EncryptedMessage::EncryptionScheme analyzer_scheme,
     const std::string& shuffler_public_key_pem,
     EncryptedMessage::EncryptionScheme shuffler_scheme, std::ostream* ostream)
     : customer_id_(project_context->customer_id()),
       project_id_(project_context->project_id()),
+      mode_(mode),
       project_context_(project_context),
       analyzer_client_(analyzer_client),
       shuffler_client_(shuffler_client),
@@ -563,6 +568,12 @@ TestApp::TestApp(
   // RequestSendSoon().
   auto schedule_params = ShippingManager::ScheduleParams(
       ShippingManager::kMaxSeconds, std::chrono::seconds(0));
+  if (mode_ == TestApp::kAutomatic) {
+    // In automatic mode, let the ShippingManager send to the Shuffler
+    // every 10 seconds.
+    schedule_params = ShippingManager::ScheduleParams(std::chrono::seconds(10),
+                                                      std::chrono::seconds(1));
+  }
   auto envelope_maker_params = ShippingManager::EnvelopeMakerParams(
       analyzer_public_key_pem, analyzer_scheme, shuffler_public_key_pem,
       shuffler_scheme);
@@ -598,8 +609,11 @@ void TestApp::Run() {
 }
 
 void TestApp::RunAutomatic() {
-  // TODO(rudominer) Implement automatic mode.
-  LOG(FATAL) << "automatic mode is not yet implemented.";
+  while (true) {
+    ProcessCommandLine("encode 100 www.google.com");
+    ProcessCommandLine("send");
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
 }
 
 void TestApp::SendAndQuit() {
@@ -733,7 +747,8 @@ bool TestApp::EncodeAsNewClient(const std::vector<uint32_t> encoding_config_ids,
   }
 
   if (status != ShippingManager::kOk) {
-    LOG(ERROR) << "AddObservation() failed with status " << status
+    LOG(ERROR) << "AddObservation() failed with status "
+               << ShippingManager::StatusDebugString(status)
                << ". metric_id=" << metric_;
     return false;
   }
@@ -770,7 +785,8 @@ bool TestApp::EncodeStringAsNewClient(const std::string value) {
   auto status = shipping_dispatcher_->AddObservation(
       *result.observation, std::move(result.metadata));
   if (status != ShippingManager::kOk) {
-    LOG(ERROR) << "AddObservation() failed with status " << status
+    LOG(ERROR) << "AddObservation() failed with status "
+               << ShippingManager::StatusDebugString(status)
                << ". metric_id=" << metric_;
     return false;
   }
@@ -806,7 +822,8 @@ bool TestApp::EncodeIntAsNewClient(int64_t value) {
   auto status = shipping_dispatcher_->AddObservation(
       *result.observation, std::move(result.metadata));
   if (status != ShippingManager::kOk) {
-    LOG(ERROR) << "AddObservation() failed with status " << status
+    LOG(ERROR) << "AddObservation() failed with status "
+               << ShippingManager::StatusDebugString(status)
                << ". metric_id=" << metric_;
     return false;
   }
@@ -836,7 +853,8 @@ bool TestApp::EncodeIndexAsNewClient(uint32_t index) {
   auto status = shipping_dispatcher_->AddObservation(
       *result.observation, std::move(result.metadata));
   if (status != ShippingManager::kOk) {
-    LOG(ERROR) << "AddObservation() failed with status " << status
+    LOG(ERROR) << "AddObservation() failed with status "
+               << ShippingManager::StatusDebugString(status)
                << ". metric_id=" << metric_;
     return false;
   }

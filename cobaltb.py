@@ -300,7 +300,7 @@ def _test(args):
         bigtable_instance_id = args.bigtable_instance_id
       if args.production_dir or args.cobalt_on_personal_cluster:
         # Currently thresholding in the Shuffler is disabled when we run the Shuffler in either
-        # production or devel because in both cases we deploy two Shuffler instances but the 
+        # production or devel because in both cases we deploy two Shuffler instances but the
         # Shuffler thresholding logic was not written to support that. When we run the Shuffler
         # locally on the test machine then we still use and test thresholding.
         test_args = test_args + [
@@ -432,6 +432,7 @@ def _start_test_app(args):
       root_certs_pem_file=args.shuffler_root_certs,
       shuffler_pk_pem_file=shuffler_public_key_pem,
       project_id=args.project_id,
+      automatic=args.automatic,
       # Because it makes the demo more interesting
       # we use verbose_count at least 3.
       verbose_count=max(3, _verbose_count))
@@ -1364,6 +1365,11 @@ def main():
   sub_parser = start_subparsers.add_parser('test_app',
       parents=[parent_parser], help='Start the Cobalt test client app.')
   sub_parser.set_defaults(func=_start_test_app)
+  sub_parser.add_argument('-automatic',
+      help='Causes the test_app to run in automatic mode rather than '
+      'interactive mode. It runs forever until killed sending Observations '
+      'to the Shuffler.',
+      action='store_true')
   sub_parser.add_argument('-cobalt_on_personal_cluster',
       help='Causes the test_app to run using an instance of Cobalt '
       'deployed in Google Container Engine. Otherwise local instances of the '

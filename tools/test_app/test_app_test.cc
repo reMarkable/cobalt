@@ -260,9 +260,9 @@ class TestAppTest : public ::testing::Test {
       : fake_analyzer_client_(new FakeAnalyzerClient()),
         fake_shuffler_client_(new FakeShufflerClient()),
         test_app_(GetTestProject(), fake_analyzer_client_,
-                  fake_shuffler_client_, std::unique_ptr<SystemData>(), "",
-                  EncryptedMessage::NONE, "", EncryptedMessage::NONE,
-                  &output_stream_) {}
+                  fake_shuffler_client_, std::unique_ptr<SystemData>(),
+                  TestApp::kInteractive, "", EncryptedMessage::NONE, "",
+                  EncryptedMessage::NONE, &output_stream_) {}
 
  protected:
   // Clears the contents of the TestApp's output stream and returns the
@@ -704,7 +704,11 @@ TEST_F(TestAppTest, ProcessCommandLineQuit) {
 
 // Tests the Run() method in send-once mode.
 TEST_F(TestAppTest, RunSendAndQuit) {
-  test_app_.set_mode(TestApp::kSendOnce);
+  // Reconstruct TestApp in send-once mode.
+  test_app_ = TestApp(GetTestProject(), fake_analyzer_client_,
+                      fake_shuffler_client_, std::unique_ptr<SystemData>(),
+                      TestApp::kSendOnce, "", EncryptedMessage::NONE, "",
+                      EncryptedMessage::NONE, &output_stream_);
   test_app_.set_metric(3);
   FLAGS_num_clients = 31;
   FLAGS_values = "fruit:apple:3,rating:10:4";
@@ -733,7 +737,11 @@ TEST_F(TestAppTest, RunSendAndQuit) {
 
 // Tests the Run() method in send-once mode with invalid flags.
 TEST_F(TestAppTest, RunSendAndQuitBad) {
-  test_app_.set_mode(TestApp::kSendOnce);
+  // Reconstruct TestApp in send-once mode.
+  test_app_ = TestApp(GetTestProject(), fake_analyzer_client_,
+                      fake_shuffler_client_, std::unique_ptr<SystemData>(),
+                      TestApp::kSendOnce, "", EncryptedMessage::NONE, "",
+                      EncryptedMessage::NONE, &output_stream_);
   test_app_.set_metric(3);
 
   // Misspell "fruit"

@@ -70,6 +70,25 @@ void ShippingManager::Start() {
   worker_thread_ = std::move(t);
 }
 
+std::string ShippingManager::StatusDebugString(Status status) {
+  switch (status) {
+    case kOk:
+      return "kOk";
+
+    case kObservationTooBig:
+      return "kObservationTooBig";
+
+    case kFull:
+      return "kFull";
+
+    case kShutDown:
+      return "kShutdown";
+
+    case kEncryptionFailed:
+      return "kEncryptionFailed";
+  }
+}
+
 ShippingManager::Status ShippingManager::AddObservation(
     const Observation& observation,
     std::unique_ptr<ObservationMetadata> metadata) {
@@ -83,6 +102,8 @@ ShippingManager::Status ShippingManager::AddObservation(
     // with sending Observations to the server we should never be full.
     // The dynamics of when this might happen will be different once we
     // implement local persistence of Observations.
+    LOG(WARNING) << "The ShippingManager's in-memory buffer is full. Rejecting "
+                    "an observation.";
     return kFull;
   }
   switch (locked->fields->active_envelope_maker->AddObservation(
