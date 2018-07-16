@@ -235,6 +235,7 @@ class ShippingManagerTest : public ::testing::Test {
 
   void CheckHTTPCallCount(int expected_call_count,
                           int expected_observation_count) {
+    ASSERT_NE(nullptr, http_client_);
     EXPECT_EQ(expected_call_count, http_client_->send_call_count);
     EXPECT_EQ(expected_observation_count, http_client_->observation_count);
   }
@@ -243,7 +244,7 @@ class ShippingManagerTest : public ::testing::Test {
   std::unique_ptr<FakeSendRetryer> send_retryer_;
   std::unique_ptr<ShippingManager> shipping_manager_;
   std::shared_ptr<ProjectContext> project_;
-  FakeHTTPClient* http_client_;
+  FakeHTTPClient* http_client_ = nullptr;
   Encoder encoder_;
 };
 
@@ -764,7 +765,10 @@ TEST_F(ShippingManagerTest, SendObservationToClearcut) {
   CheckCallCount(0, 0);
 }
 
-TEST_F(ShippingManagerTest, EnsureObservationsNotSentToClearcut) {
+// TODO(zmbush) This test cannot work the way this file is currently organized
+// because we only initialize one ShippingManager at a time so when we
+// use kDefaultMetricId then http_client_ is null.
+TEST_F(ShippingManagerTest, DISABLED_EnsureObservationsNotSentToClearcut) {
   // Init with a very long time for the regular schedule interval but
   // zero for the minimum interval so the test doesn't have to wait.
   Init(kMaxSeconds, std::chrono::seconds::zero(), kDefaultMetricId);
