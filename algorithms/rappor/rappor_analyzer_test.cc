@@ -24,6 +24,7 @@
 #include "algorithms/rappor/rappor_encoder.h"
 #include "algorithms/rappor/rappor_test_utils.h"
 #include "encoder/client_secret.h"
+#include "third_party/eigen/Eigen/SparseQR"
 #include "third_party/googletest/googletest/include/gtest/gtest.h"
 
 namespace cobalt {
@@ -174,18 +175,7 @@ class RapporAnalyzerTest : public ::testing::Test {
         analyzer_->ExtractEstimatedBitCountRatios(est_bit_count_ratios).ok());
   }
 
-  // Invokes the Analyze() method using the given parameters. Checks that
-  // the algorithms converges and that the result vector has the correct length.
-  // Doesn't check the result vector at all but uses LOG(ERROR) statments
-  // to print the true candidate counts and the computed estimates to the
-  // console for the sake of experimentation.
-  void DoExperimentWithAnalyze(const std::string& case_label,
-                               uint32_t num_candidates, uint32_t num_bloom_bits,
-                               uint32_t num_cohorts, uint32_t num_hashes,
-                               std::vector<int> candidate_indices,
-                               std::vector<int> true_candidate_counts) {
-    SetAnalyzer(num_candidates, num_bloom_bits, num_cohorts, num_hashes);
-
+  void AddObservationsForCandidates(const std::vector<int>& candidate_indices) {
     for (auto index : candidate_indices) {
       // Construct a new encoder with a new ClientSecret so that a random
       // cohort is selected.
@@ -198,19 +188,12 @@ class RapporAnalyzerTest : public ::testing::Test {
       encoder.Encode(value_part, &observation);
       EXPECT_TRUE(analyzer_->AddObservation(observation));
     }
+  }
 
-    std::vector<CandidateResult> results;
-    auto status = analyzer_->Analyze(&results);
-    if (!status.ok()) {
-      EXPECT_EQ(grpc::OK, status.error_code());
-      return;
-    }
-
-    if (results.size() != num_candidates) {
-      EXPECT_EQ(num_candidates, results.size());
-      return;
-    }
-
+  void PrintTrueCountsAndEstimates(
+      const std::string& case_label, uint32_t num_candidates,
+      const std::vector<CandidateResult>& results,
+      const std::vector<int>& true_candidate_counts) {
     std::vector<int> count_estimates(num_candidates);
     for (size_t i = 0; i < num_candidates; i++) {
       count_estimates[i] = static_cast<int>(round(results[i].count_estimate));
@@ -227,6 +210,165 @@ class RapporAnalyzerTest : public ::testing::Test {
       estimate_stream << x << " ";
     }
     LOG(ERROR) << "  Estimates: " << estimate_stream.str();
+  }
+
+  // Computes the least squares fit on the candidate matrix using QR,
+  // for the given rhs in |est_bit_count_ratios| and saves it to |results|
+  grpc::Status ComputeLeastSquaresFitQR(
+      const Eigen::VectorXf& est_bit_count_ratios,
+      std::vector<CandidateResult>* results) {
+    // cast from smaller to larger type for comparisons
+    const size_t num_candidates =
+        static_cast<const size_t>(analyzer_->candidate_matrix_.cols());
+    EXPECT_EQ(results->size(), num_candidates);
+    // define the QR solver and perform the QR decomposition followed by
+    // least squares solve
+    Eigen::SparseQR<Eigen::SparseMatrix<float, Eigen::ColMajor>,
+                    Eigen::COLAMDOrdering<int>>
+        qrsolver;
+
+    EXPECT_EQ(analyzer_->candidate_matrix_.rows(), est_bit_count_ratios.size());
+    EXPECT_GT(analyzer_->candidate_matrix_.rows(), 0);
+    // explicitly construct Eigen::ColMajor matrix from candidate_matrix_
+    // (the documentation for Eigen::SparseQR requires it)
+    // compute() as well as Eigen::COLAMDOrdering require compressed
+    // matrix
+    Eigen::SparseMatrix<float, Eigen::ColMajor> candidate_matrix_col_major =
+        analyzer_->candidate_matrix_;
+    candidate_matrix_col_major.makeCompressed();
+    qrsolver.compute(candidate_matrix_col_major);
+    if (qrsolver.info() != Eigen::Success) {
+      std::string message = "Eigen::SparseQR decomposition was unsuccessfull";
+      return grpc::Status(grpc::INTERNAL, message);
+    }
+    Eigen::VectorXf result_vals = qrsolver.solve(est_bit_count_ratios);
+    if (qrsolver.info() != Eigen::Success) {
+      std::string message = "Eigen::SparseQR solve was unsuccessfull";
+      return grpc::Status(grpc::INTERNAL, message);
+    }
+
+    // write to the results vector
+    EXPECT_EQ(num_candidates, results->size());
+    for (size_t i = 0; i < num_candidates; i++) {
+      results->at(i).count_estimate =
+          result_vals[i] * analyzer_->bit_counter_.num_observations();
+      results->at(i).std_error = 0;
+    }
+    return grpc::Status::OK;
+  }
+
+  // Runs a simple least squares problem for Ax = b on the candidate matrix
+  // using QR algorithm from eigen library; this is to see the results
+  // without penalty terms (note: in an overdetermined system the solution
+  // is not unique so this is more a helper testing function to cross-check
+  // the behavior of regression without penalty)
+  void RunSimpleLinearRegressionReference(
+      const std::string& case_label, uint32_t num_candidates,
+      uint32_t num_bloom_bits, uint32_t num_cohorts, uint32_t num_hashes,
+      std::vector<int> candidate_indices,
+      std::vector<int> true_candidate_counts) {
+    SetAnalyzer(num_candidates, num_bloom_bits, num_cohorts, num_hashes);
+    AddObservationsForCandidates(candidate_indices);
+
+    // set up the matrix
+    auto status = analyzer_->BuildCandidateMap();
+    if (!status.ok()) {
+      EXPECT_EQ(grpc::OK, status.error_code());
+      return;
+    }
+    // set up the right hand side of the equation
+    Eigen::VectorXf est_bit_count_ratios;
+    status = analyzer_->ExtractEstimatedBitCountRatios(&est_bit_count_ratios);
+    if (!status.ok()) {
+      EXPECT_EQ(grpc::OK, status.error_code());
+      return;
+    }
+
+    std::vector<CandidateResult> results(num_candidates);
+    status = ComputeLeastSquaresFitQR(est_bit_count_ratios, &results);
+    if (!status.ok()) {
+      EXPECT_EQ(grpc::OK, status.error_code());
+      return;
+    }
+
+    PrintTrueCountsAndEstimates(case_label, num_candidates, results,
+                                true_candidate_counts);
+  }
+
+  // Invokes the Analyze() method using the given parameters. Checks that
+  // the algorithms converges and that the result vector has the correct length.
+  // Doesn't check the result vector at all but uses LOG(ERROR) statments
+  // to print the true candidate counts and the computed estimates to the
+  // console for the sake of experimentation.
+  void DoExperimentWithAnalyze(const std::string& case_label,
+                               uint32_t num_candidates, uint32_t num_bloom_bits,
+                               uint32_t num_cohorts, uint32_t num_hashes,
+                               std::vector<int> candidate_indices,
+                               std::vector<int> true_candidate_counts) {
+    SetAnalyzer(num_candidates, num_bloom_bits, num_cohorts, num_hashes);
+    AddObservationsForCandidates(candidate_indices);
+
+    std::vector<CandidateResult> results;
+    auto status = analyzer_->Analyze(&results);
+    if (!status.ok()) {
+      EXPECT_EQ(grpc::OK, status.error_code());
+      return;
+    }
+
+    if (results.size() != num_candidates) {
+      EXPECT_EQ(num_candidates, results.size());
+      return;
+    }
+    PrintTrueCountsAndEstimates(case_label, num_candidates, results,
+                                true_candidate_counts);
+  }
+
+  // Does the same as DoExperimentWithAnalyze except it also
+  // computes the estimates for both Analyze and simple regression using QR,
+  // which is computed on exactly the same system.
+  void CompareAnalyzeToSimpleRegression(
+      const std::string& case_label, uint32_t num_candidates,
+      uint32_t num_bloom_bits, uint32_t num_cohorts, uint32_t num_hashes,
+      std::vector<int> candidate_indices,
+      std::vector<int> true_candidate_counts) {
+    SetAnalyzer(num_candidates, num_bloom_bits, num_cohorts, num_hashes);
+    AddObservationsForCandidates(candidate_indices);
+
+    // compute and print the results of Analyze()
+    std::vector<CandidateResult> results_analyze;
+    auto status = analyzer_->Analyze(&results_analyze);
+
+    if (!status.ok()) {
+      EXPECT_EQ(grpc::OK, status.error_code());
+      return;
+    }
+
+    if (results_analyze.size() != num_candidates) {
+      EXPECT_EQ(num_candidates, results_analyze.size());
+      return;
+    }
+
+    std::string print_label = case_label + " analyze ";
+    PrintTrueCountsAndEstimates(print_label, num_candidates, results_analyze,
+                                true_candidate_counts);
+
+    // compute and print the results for simple linear regression
+    Eigen::VectorXf est_bit_count_ratios;
+    status = analyzer_->ExtractEstimatedBitCountRatios(&est_bit_count_ratios);
+    if (!status.ok()) {
+      EXPECT_EQ(grpc::OK, status.error_code());
+      return;
+    }
+
+    print_label = case_label + " least squares ";
+    std::vector<CandidateResult> results_ls(num_candidates);
+    status = ComputeLeastSquaresFitQR(est_bit_count_ratios, &results_ls);
+    if (!status.ok()) {
+      EXPECT_EQ(grpc::OK, status.error_code());
+      return;
+    }
+    PrintTrueCountsAndEstimates(print_label, num_candidates, results_ls,
+                                true_candidate_counts);
   }
 
   RapporConfig config_;
@@ -511,6 +653,50 @@ TEST_F(RapporAnalyzerTest, ExperimentWithAnalyze) {
   DoExperimentWithAnalyze("p=0.1, q=0.9, several candidates", kNumCandidates,
                           kNumBloomBits, kNumCohorts, kNumHashes,
                           candidate_indices, true_candidate_counts);
+}
+
+// Comparison of Analyze and simple least squares
+// It invokes Analyze() in a few very simple cases, checks that the the
+// algorithm converges and that the result vector has the correct size. For each
+// case, it also computes the least squares solution using QR for exactly the
+// same system and prints both solutions (note that the least squares solution
+// is not always unique)
+TEST_F(RapporAnalyzerTest, CompareAnalyzeToRegression) {
+  static const uint32_t kNumCandidates = 10;
+  static const uint32_t kNumCohorts = 3;
+  static const uint32_t kNumHashes = 2;
+  static const uint32_t kNumBloomBits = 8;
+
+  std::vector<int> candidate_indices(100, 5);
+  std::vector<int> true_candidate_counts = {0, 0, 0, 0, 0, 100, 0, 0, 0, 0};
+  CompareAnalyzeToSimpleRegression("p=0, q=1, only candidate 5", kNumCandidates,
+                                   kNumBloomBits, kNumCohorts, kNumHashes,
+                                   candidate_indices, true_candidate_counts);
+
+  candidate_indices = std::vector<int>(20, 1);
+  candidate_indices.insert(candidate_indices.end(), 20, 4);
+  candidate_indices.insert(candidate_indices.end(), 60, 9);
+  true_candidate_counts = {0, 20, 0, 0, 20, 0, 0, 0, 0, 60};
+  CompareAnalyzeToSimpleRegression(
+      "p=0, q=1, several candidates", kNumCandidates, kNumBloomBits,
+      kNumCohorts, kNumHashes, candidate_indices, true_candidate_counts);
+
+  prob_0_becomes_1_ = 0.1;
+  prob_1_stays_1_ = 0.9;
+
+  candidate_indices = std::vector<int>(100, 5);
+  true_candidate_counts = {0, 0, 0, 0, 0, 100, 0, 0, 0, 0};
+  CompareAnalyzeToSimpleRegression(
+      "p=0.1, q=0.9, only candidate 5", kNumCandidates, kNumBloomBits,
+      kNumCohorts, kNumHashes, candidate_indices, true_candidate_counts);
+
+  candidate_indices = std::vector<int>(20, 1);
+  candidate_indices.insert(candidate_indices.end(), 20, 4);
+  candidate_indices.insert(candidate_indices.end(), 60, 9);
+  true_candidate_counts = {0, 20, 0, 0, 20, 0, 0, 0, 0, 60};
+  CompareAnalyzeToSimpleRegression(
+      "p=0.1, q=0.9, several candidates", kNumCandidates, kNumBloomBits,
+      kNumCohorts, kNumHashes, candidate_indices, true_candidate_counts);
 }
 
 }  // namespace rappor
