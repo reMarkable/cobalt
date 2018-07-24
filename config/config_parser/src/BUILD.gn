@@ -11,22 +11,35 @@ go_library("config") {
   non_go_deps = [ "//third_party/cobalt/config:cobalt_config_proto" ]
 }
 
-go_library("lib") {
-  name = "config_parser"
+_source_packages = ["config_parser", "config_validator", "yamlpb"]
+foreach(pkg, _source_packages) {
+  go_library(pkg) {
+    name = pkg
+    source_dir = pkg
+  }
+}
 
-  deps = [
+# This duplicates some source paths, but main needs to be relocated into a
+# package path for our go_build rules.
+go_library("main") {
+  name = "main"
+  # sources = ["config_parser_main.go"]
+  source_dir = "."
+}
+
+go_binary("bin") {
+  gopackage = "main"
+  output_name = "config_parser"
+
+  extra_dependencies = [
     "//garnet/public/go/third_party:github.com/golang/glog",
     "//garnet/public/go/third_party:github.com/golang/protobuf",
     "//garnet/public/go/third_party:github.com/go-yaml/yaml",
     ":config",
+    ":main",
   ]
-}
+  foreach(pkg, _source_packages) {
+    extra_dependencies += [ ":$pkg" ]
+  }
 
-go_binary("bin") {
-  gopackage = "config_parser"
-  output_name = "config_parser"
-
-  extra_dependencies = [
-    ":lib"
-  ]
 }
