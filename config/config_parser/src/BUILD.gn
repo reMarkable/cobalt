@@ -31,7 +31,7 @@ go_binary("bin") {
   gopackage = "main"
   output_name = "config_parser"
 
-  extra_dependencies = [
+  deps = [
     "//garnet/public/go/third_party:github.com/golang/glog",
     "//garnet/public/go/third_party:github.com/golang/protobuf",
     "//garnet/public/go/third_party:github.com/go-yaml/yaml",
@@ -39,7 +39,6 @@ go_binary("bin") {
     ":main",
   ]
   foreach(pkg, _source_packages) {
-    extra_dependencies += [ ":$pkg" ]
+    deps += [ ":$pkg" ]
   }
-
 }
