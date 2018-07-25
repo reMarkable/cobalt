@@ -136,6 +136,21 @@ class RapporAnalyzer {
     std::vector<CohortMap> candidate_cohort_maps;
   };
 
+  // MinimizerData stores the data from the lossmin minimizer after run
+  struct MinimizerData {
+    int num_epochs_run;
+
+    bool converged;
+
+    float final_loss;
+
+    float l1;
+
+    float l2;
+
+    float convergence_threshold;
+  };
+
   // Computes the column vector est_bit_count_ratios. This method should be
   // invoked after all Observations have been added via AddObservation().
   //
@@ -179,6 +194,8 @@ class RapporAnalyzer {
   // The expression (k - j) above is due to the fact that
   // candidate_map_ indexes bits from the right instead of from the left.
   Eigen::SparseMatrix<float, Eigen::RowMajor> candidate_matrix_;
+
+  MinimizerData minimizer_data_;
 };
 
 }  // namespace rappor

@@ -111,25 +111,60 @@ grpc::Status RapporAnalyzer::Analyze(
   lossmin::LinearRegressionLossFunction loss_function;
   lossmin::GradientEvaluator grad_eval(candidate_matrix_, as_label_set,
                                        &loss_function);
-  // Note(rudominer) The two "0.0" parameters below are l1 and l2 the weights
-  // given to the l1 and l2 norms of w in the loss function. In order to
-  // have behvior similar to the LASSO implementation we want to set l1 > 0.
-  // However I have found that when I set l1 > 0 then the algorithm does
-  // not converge. I don't know why.
-  lossmin::ParallelBoostingWithMomentum minimizer(0.0, 0.0, grad_eval);
+
+  // Set the parameters for the convergence algorithm.
+  // l1 and l2 must be >= 0. In order to achieve
+  // behavior similar to LASSO, we need l1 > 0. Small positive value of
+  // l2 (two or three orders of magnitude smaller than l1) may
+  // also be desirable for stability. The value of kConvergenceThreshold should
+  // be small but not too small. For single precision (float) it should
+  // probably be something between 1e-5 and 1e-7. kLossEpochs and
+  // kConvergencepochs should be small positive numbers (smaller than
+  // kMaxEpochs).
+  // TODO(bazyli) design and implement how the whole algorithm is run, including
+  // values of parameters.
+
+  // Scale the penalty terms so that they have the same interpretation for any
+  // number of bits and cohorts. This is introduced because lossmin scales the
+  // gradient of the unpenalized part of the objective by
+  // 1 / candidate_matrix_.rows() == 1 / (num_bits * num_cohorts)
+  const uint32_t num_bits = config_->num_bits();
+  const uint32_t num_cohorts = config_->num_cohorts();
+  const float l1 = 0.5f / (num_bits * num_cohorts);
+  const float l2 = 1e-3f / (num_bits * num_cohorts);
+  const float kConvergenceThreshold = 1e-6;
+  const int kLossEpochs = 5;         // how often record loss
+  const int kConvergenceEpochs = 5;  // how often check convergence
+  const int kMaxEpochs = 10000;      // maximum number of iterations
+  const bool kUseSimpleConvergenceCheck = true;
+
+  lossmin::ParallelBoostingWithMomentum minimizer(l1, l2, grad_eval);
+  minimizer.set_convergence_threshold(kConvergenceThreshold);
+  minimizer.set_use_simple_convergence_check(kUseSimpleConvergenceCheck);
   minimizer.Setup();
 
   const int num_candidates = candidate_matrix_.cols();
   // Initialize the weight vector to the constant 1/n vector.
   lossmin::Weights est_candidate_weights =
       lossmin::Weights::Constant(num_candidates, 1.0 / num_candidates);
-  std::vector<float> loss_not_used;
-  if (!minimizer.Run(10000, &est_candidate_weights, &loss_not_used)) {
+  std::vector<float> loss_history;
+  if (!minimizer.Run(kMaxEpochs, kLossEpochs, kConvergenceEpochs,
+                     &est_candidate_weights, &loss_history)) {
     std::string message =
         "ParallelBoostingWithMomentum did not converge after 10,000 epochs.";
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kAnalyzeFailure) << message;
     return grpc::Status(grpc::INTERNAL, message);
   }
+
+  // Save minimizer data afer run
+  minimizer_data_.num_epochs_run = minimizer.num_epochs_run();
+  minimizer_data_.converged = minimizer.converged();
+  if (!loss_history.empty()) {
+    minimizer_data_.final_loss = loss_history.back();
+  }
+  minimizer_data_.l1 = minimizer.l1();
+  minimizer_data_.l2 = minimizer.l2();
+  minimizer_data_.convergence_threshold = kConvergenceThreshold;
 
   results_out->resize(num_candidates);
   for (auto i = 0; i < num_candidates; i++) {
