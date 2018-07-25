@@ -14,7 +14,7 @@
 
 # Base cobalt image.  It's a Debian system with a couple of extra bits.
 
-FROM debian:stable
+FROM debian:stretch
 
 COPY libunwind.so.1 /usr/lib/
 COPY libc++.so.1 /usr/lib/
