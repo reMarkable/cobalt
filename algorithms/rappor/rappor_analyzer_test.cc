@@ -212,6 +212,127 @@ class RapporAnalyzerTest : public ::testing::Test {
     LOG(ERROR) << "  Estimates: " << estimate_stream.str();
   }
 
+  // Checks correctness of the solution stored in |results| in an explicit way.
+  // This is not an automated test but rather a tool to manually assess the
+  // minimizer quality.
+  //
+  // Assumes that *analyzer_ contains minimizer data from previous run.
+  // The problem is (as formulated in lossmin library):
+  //                        min L(beta) ==
+  // 1/(2*N) * ||X * beta - y||_2^2 + 1/2 * l2 *||beta||_2^2 + l1 *||beta||_1,
+  // with variable beta. We assume l1,l2 >= 0.
+  // In our case, X == candidate_matrix(),
+  // beta == |results| / analyzer_->bit_counter().num_observations(),
+  // y == est_bit_count_ratios (observed ratios computed by calling
+  // analyzer_->ExtractEstimatedBitCountRatios(&est_bit_count_ratios)),
+  // l1 == analyzer_->minimizer_data.l1,
+  // l2 == analyzer_->minimizer_data.l2,
+  // N == canididate_matrix.rows().
+  //
+  // Let grad denote the gradient of
+  // F(beta) = 1/(2*N) * ||X * beta - y||_2^2 + 1/2 * l2 ||beta||_2^2.
+  // Note that grad == 1/N * X^T(X * beta  - y) + beta.
+  //
+  // The KKT condition (in exact arithmetic) can be
+  // written explicitly in the following way:
+  // If beta_i > 0, then grad_i == -l1
+  // If beta_i < 0, then grad_i == l1
+  // If beta_i == 0, then  -l1 <= grad_i <= l1.
+  //
+  // A point beta is a minimizer iff the KKT condition holds for beta
+  // (this minimizer need not be unique though).
+  //
+  // We check the KKT condition up to a given accuracy:
+  // |tol_cand| is the absolute tolerance at which we measure values of beta
+  // |tol_grad| is the absolute tolerance at which we measure values of grad
+  //
+  // Thus, beta_i > 0 is replaced by beta_i > tol_cand, beta_i < 0 is replaced
+  // by beta_i < -tol_cand, grad_i == +/- l1 is replaced by
+  // grad_i <=/>= +/- l1 +/- tol_grad
+  // and similarly for the inequality check.
+  // tol_cand and tol_grad should be consistent with implementation of
+  // lossmin::LossMinimizer::ConvergenceCheck but other values can be useful
+  // for testing.
+  // TODO(bazyli) make sure these checks remain consistent with lossmin and
+  // floatig point arithmetics.
+  //
+  // The test also prints quantitative violation of KKT condition as a mean
+  // violation per coordinate.
+  void CheckSolutionCorrectness(const float tol_cand, const float tol_grad,
+                                const std::vector<CandidateResult>& results) {
+    // Populate the values from result to an Eigen::VectorXf object;
+    // (It looks like Eigen doesn't have its own iterators); this should be
+    // clear:
+    const size_t num_candidates = results.size();
+    Eigen::VectorXf candidate_estimates(num_candidates);
+    for (size_t i = 0; i < num_candidates; i++) {
+      candidate_estimates(i) = results[i].count_estimate /
+                               analyzer_->bit_counter().num_observations();
+    }
+
+    // Get the penalty paramaters
+    const float l1 = analyzer_->minimizer_data_.l1;
+    const float l2 = analyzer_->minimizer_data_.l2;
+
+    // Extract y and compute the gradient = X^T * (X * beta - y) + l2 beta
+    Eigen::VectorXf est_bit_count_ratios;
+    auto status =
+        analyzer_->ExtractEstimatedBitCountRatios(&est_bit_count_ratios);
+    if (!status.ok()) {
+      return;
+    }
+
+    EXPECT_EQ(est_bit_count_ratios.size(), candidate_matrix().rows());
+    EXPECT_EQ(candidate_estimates.size(), candidate_matrix().cols());
+    Eigen::VectorXf gradient =
+        candidate_matrix().transpose() *
+        (candidate_matrix() * candidate_estimates - est_bit_count_ratios);
+    // Scale regression part of the gradient for consistency with lossmin
+    // library
+    gradient /= candidate_matrix().rows();
+    gradient += l2 * candidate_estimates;
+
+    std::ostringstream kkt_stream;
+    LOG(ERROR) << "Analyzing the minimizer data";
+    LOG(ERROR) << "Converged? " << analyzer_->minimizer_data_.converged;
+    LOG(ERROR) << "How many epochs? "
+               << analyzer_->minimizer_data_.num_epochs_run;
+    LOG(ERROR) << "Checking solution correctness at each coordinate ...";
+    // Check the KKT condition for each coordinate
+    int num_errs = 0;
+    for (size_t i = 0; i < num_candidates; i++) {
+      float beta_i = candidate_estimates(i);
+      float grad_i = gradient(i);
+      if ((std::abs(beta_i) < tol_cand && std::abs(grad_i) > l1 + tol_grad) ||
+          (beta_i > tol_cand && std::abs(grad_i + l1) > tol_grad) ||
+          (beta_i < -tol_cand && std::abs(grad_i - l1) > tol_grad)) {
+        kkt_stream << "Solution is not a minimizer at tolerance == " << tol_grad
+                   << " because beta_k == " << beta_i
+                   << " and grad_k == " << grad_i << " at k == " << i
+                   << " while l1 == " << l1 << std::endl;
+        num_errs++;
+      }
+    }
+    LOG(ERROR) << kkt_stream.str();
+    LOG(ERROR) << "All coordinates examined. Found " << num_errs
+               << " coordinates violating optimality conditions.";
+    EXPECT_EQ(num_errs, 0);
+
+    // Report also the measure of total violation of KKT condition
+    Eigen::VectorXf kkt_violation = (candidate_estimates.array() >= tol_cand)
+                                        .select(gradient.array() + l1, 0)
+                                        .matrix();
+    kkt_violation += (candidate_estimates.array() <= -tol_cand)
+                         .select(gradient.array() - l1, 0)
+                         .matrix();
+    kkt_violation += ((abs(candidate_estimates.array()) < tol_cand)
+                          .select(abs(gradient.array()) - l1, 0)
+                          .max(0))
+                         .matrix();
+    LOG(ERROR) << "The total measure of KKT condition violation == "
+               << kkt_violation.norm() / num_candidates;
+  }
+
   // Computes the least squares fit on the candidate matrix using QR,
   // for the given rhs in |est_bit_count_ratios| and saves it to |results|
   grpc::Status ComputeLeastSquaresFitQR(
@@ -321,6 +442,8 @@ class RapporAnalyzerTest : public ::testing::Test {
     }
     PrintTrueCountsAndEstimates(case_label, num_candidates, results,
                                 true_candidate_counts);
+
+    CheckSolutionCorrectness(1e-5, 1e-5, results);
   }
 
   // Does the same as DoExperimentWithAnalyze except it also
