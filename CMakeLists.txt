@@ -14,19 +14,13 @@
 
 cmake_minimum_required (VERSION 3.0.0)
 
-# The only way we found to override the compiler is setting these variables
-# prior to the project definition.  Otherwise enable_language() sets these
-# variables and gcc will be picked up instead.  Also, new versions of cmake will
-# complain if one compiler is first set (say to gcc via enable_language), and
-# then we later switch it to (say) clang.
-set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_COMPILER "clang++")
-
 project(cobalt)
 
 include(ExternalProject)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wsign-compare -Wignored-qualifiers -std=c++14 -stdlib=libc++ -pthread -fcolor-diagnostics")
+set (CMAKE_CXX_STANDARD 14)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wsign-compare -Wignored-qualifiers -pthread")
 enable_language(C)
 enable_language(CXX)
 
@@ -34,6 +28,10 @@ enable_language(CXX)
 # logging.
 add_definitions(-DHAVE_GLOG=1)
 
+set(PROTOBUF_INCLUDE_DIR /usr/include/)
+set(PROTOBUF_LIB_DIR /usr/lib/)
+set(PROTOC protoc)
+set(GRPC_CPP_PLUGIN /usr/bin/grpc_cpp_plugin)
 # Tell the file gtest.h that we want to use the copy of gtest in
 # //third_party/googletest.
 add_definitions(-DHAVE_GOOGLETEST=1)
@@ -64,174 +62,7 @@ include_directories(${CMAKE_BINARY_DIR})
 include_directories(BEFORE SYSTEM ${DIR_SYSROOT}/include)
 
 # Build external projects
-set(EXTERNAL_PROJECT_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedef -Wno-sign-compare -Wno-deprecated-declarations -Wno-unused-private-field -Wno-ignored-qualifiers -Wno-deprecated-register -Wno-unused-function -Wno-unused-local-typedef -Wno-missing-field-initializers -Wno-enum-compare-switch -Wno-macro-redefined -Wno-implicit-function-declaration -Wno-unused-variable")
-
-# Build googletest as an external project.
-set(GTEST_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/googletest/googletest)
-set(GTEST_INCLUDE_DIR ${GTEST_INSTALL_DIR}/include)
-set(GTEST_LIB_DIR ${GTEST_INSTALL_DIR}/lib)
-ExternalProject_Add(gtest_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/googletest/googletest
-                    PREFIX      ${GTEST_INSTALL_DIR}
-                    INSTALL_DIR ${GTEST_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_INSTALL_PREFIX:PATH=${GTEST_INSTALL_DIR}
-                                -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                   )
-include_directories(BEFORE SYSTEM ${GTEST_INCLUDE_DIR})
-link_directories(${GTEST_LIB_DIR})
-
-# Build gflags as an external project.
-set(GFLAGS_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/gflags)
-set(GFLAGS_INCLUDE_DIR ${GFLAGS_INSTALL_DIR}/include)
-set(GFLAGS_LIB_DIR ${GFLAGS_INSTALL_DIR}/lib)
-ExternalProject_Add(gflags_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/gflags
-                    PREFIX      ${GFLAGS_INSTALL_DIR}
-                    INSTALL_DIR ${GFLAGS_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${GFLAGS_INSTALL_DIR}
-                   )
-include_directories(BEFORE SYSTEM ${GFLAGS_INCLUDE_DIR})
-link_directories(${GFLAGS_LIB_DIR})
-
-# Build glog as an external project.
-set(GLOG_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/glog)
-set(GLOG_INCLUDE_DIR ${GLOG_INSTALL_DIR}/include)
-set(GLOG_LIB_DIR ${GLOG_INSTALL_DIR}/lib)
-ExternalProject_Add(glog_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/glog
-                    PREFIX      ${GLOG_INSTALL_DIR}
-                    INSTALL_DIR ${GLOG_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -Dcobalt_gflags_DIR=${GFLAGS_INSTALL_DIR}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${GLOG_INSTALL_DIR}
-                    DEPENDS     gflags_external_project
-                   )
-include_directories(BEFORE SYSTEM ${GLOG_INCLUDE_DIR})
-link_directories(${GLOG_LIB_DIR})
-
-# Build boringssl as an external project.
-set(BORINGSSL_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/boringssl)
-set(BORINGSSL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/boringssl/include)
-set(CRYPTO_LIB_DIR ${BORINGSSL_INSTALL_DIR}/src/boringssl_external_project-build/crypto)
-set(SSL_LIB_DIR ${BORINGSSL_INSTALL_DIR}/src/boringssl_external_project-build/ssl)
-ExternalProject_Add(boringssl_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/boringssl
-                    PREFIX      ${BORINGSSL_INSTALL_DIR}
-                    INSTALL_DIR ${BORINGSSL_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${BORINGSSL_INSTALL_DIR}
-                    DEPENDS     gflags_external_project
-                    DEPENDS     glog_external_project
-                    DEPENDS     gtest_external_project
-                    INSTALL_COMMAND ""
-                   )
-include_directories(BEFORE SYSTEM ${BORINGSSL_INCLUDE_DIR})
-link_directories(${CRYPTO_LIB_DIR})
-link_directories(${SSL_LIB_DIR})
-
-# Build protobuf as an external project.
-set(PROTOBUF_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/protobuf)
-set(PROTOBUF_INCLUDE_DIR ${PROTOBUF_INSTALL_DIR}/include)
-set(PROTOBUF_LIB_DIR ${PROTOBUF_INSTALL_DIR}/lib)
-set(PROTOC ${PROTOBUF_INSTALL_DIR}/bin/protoc)
-ExternalProject_Add(protobuf_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/protobuf
-                    PREFIX      ${PROTOBUF_INSTALL_DIR}
-                    INSTALL_DIR ${PROTOBUF_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${PROTOBUF_INSTALL_DIR}
-                   )
-include_directories(BEFORE SYSTEM ${PROTOBUF_INCLUDE_DIR})
-link_directories(${PROTOBUF_LIB_DIR})
-# In the CMake build for protobuf we name the full protobuf library protobuf_full_cobalt.
-set(PROTOBUF_FULL_LIB_NAME protobuf_full_cobalt)
-
-# Build c-ares as an external project.
-set(CARES_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/cares)
-set(CARES_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/cares)
-set(CARES_LIB_DIR ${CARES_INSTALL_DIR}/src/CARES_external_project-build)
-ExternalProject_Add(CARES_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/cares
-                    PREFIX      ${CARES_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${CARES_INSTALL_DIR}
-                    INSTALL_COMMAND ""
-                   )
-include_directories(BEFORE SYSTEM ${CARES_INCLUDE_DIR})
-link_directories(${CARES_LIB_DIR})
-
-# Build zlib as an external project.
-set(ZLIB_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/zlib)
-set(ZLIB_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/zlib)
-set(ZLIB_LIB_DIR ${ZLIB_INSTALL_DIR}/src/ZLIB_external_project-build)
-ExternalProject_Add(ZLIB_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/zlib
-                    PREFIX      ${ZLIB_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${ZLIB_INSTALL_DIR}
-                    INSTALL_COMMAND ""
-                   )
-include_directories(BEFORE SYSTEM ${ZLIB_INCLUDE_DIR})
-link_directories(${ZLIB_LIB_DIR})
-
-# Build grpc as an external project.
-set(GRPC_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/grpc)
-set(GRPC_INCLUDE_DIR ${GRPC_INSTALL_DIR}/include)
-set(GRPC_LIB_DIR ${GRPC_INSTALL_DIR}/lib)
-set(GRPC_CPP_PLUGIN ${GRPC_INSTALL_DIR}/bin/grpc_cpp_plugin)
-ExternalProject_Add(grpc_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/grpc
-                    PREFIX      ${GRPC_INSTALL_DIR}
-                    INSTALL_DIR ${GRPC_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${GRPC_INSTALL_DIR}
-                                -DgRPC_ZLIB_PROVIDER=explicit
-                                -DZLIB_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/zlib
-                                -D_gRPC_ZLIB_LIBRARIES=z
-                                -DgRPC_ZLIB_LIB_DIR=${ZLIB_LIB_DIR}
-                                -DgRPC_CARES_PROVIDER=explicit
-                                -DCARES_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/cares
-                                -DgRPC_CARES_LIB_DIR=${CARES_LIB_DIR}
-                                -DBENCHMARK_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/benchmark
-                                -DgRPC_PROTOBUF_PROVIDER=explicit
-                                -DPROTOBUF_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/protobuf
-                                -DgRPC_PROTOBUF_PROTOC=${PROTOC}
-                                -DgRPC_PROTOBUF_PROTOC_LIB=protoc_lib
-                                -DgRPC_PROTOBUF_LIB=protobuf_lite
-                                -DgRPC_PROTOBUF_FULL_LIB=${PROTOBUF_FULL_LIB_NAME}
-                                -DgRPC_PROTOBUF_LIB_DIR=${PROTOBUF_LIB_DIR}
-                                -DgRPC_USE_PROTO_LITE=1
-                                -DgRPC_SSL_PROVIDER=explicit
-                                -DBORINGSSL_ROOT_DIR=${CMAKE_CURRENT_SOURCE_DIR}/third_party/boringssl
-                                -DgRPC_CRYPTO_LIBRARY=crypto
-                                -DgRPC_SSL_LIBRARY=ssl
-                                -DgRPC_CRYPTO_LIB_DIR=${CRYPTO_LIB_DIR}
-                                -DgRPC_SSL_LIB_DIR=${SSL_LIB_DIR}
-                                -DgRPC_GFLAGS_PROVIDER=explicit
-                                -DgRPC_GFLAGS_LIB_DIR=${GFLAGS_LIB_DIR}
-                    DEPENDS     protobuf_external_project
-                    DEPENDS     boringssl_external_project
-                   )
-include_directories(BEFORE SYSTEM ${GRPC_INCLUDE_DIR})
-link_directories(${GRPC_LIB_DIR})
-link_directories(${GRPC_INSTALL_DIR}/src/grpc_external_project-build/third_party/cares)
+set(EXTERNAL_PROJECT_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedef -Wno-sign-compare -Wno-deprecated-declarations -Wno-unused-private-field -Wno-ignored-qualifiers -Wno-unused-function -Wno-unused-local-typedefs -Wno-missing-field-initializers -Wno-unused-variable")
 
 # Build googleapis as an external project.
 set(GOOGLEAPIS_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/googleapis)
@@ -250,46 +81,9 @@ ExternalProject_Add(googleapis_external_project
                                 -DGRPC_INCLUDE_DIR=${GRPC_INCLUDE_DIR}
                                 -DPROTOBUF_LIB_DIR=${PROTOBUF_LIB_DIR}
                                 -DGRPC_CPP_PLUGIN=${GRPC_CPP_PLUGIN}
-                    DEPENDS     protobuf_external_project
-                    DEPENDS     grpc_external_project
                    )
 include_directories(BEFORE SYSTEM ${GOOGLEAPIS_INCLUDE_DIR})
 link_directories(${GOOGLEAPIS_LIB_DIR})
-
-# Build jsoncpp as an external project.
-set(JSONCPP_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/jsoncpp)
-set(JSONCPP_INCLUDE_DIR ${JSONCPP_INSTALL_DIR}/include)
-set(JSONCPP_LIB_DIR ${JSONCPP_INSTALL_DIR}/lib)
-ExternalProject_Add(jsoncpp_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/jsoncpp
-                    PREFIX      ${JSONCPP_INSTALL_DIR}
-                    INSTALL_DIR ${JSONCPP_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${JSONCPP_INSTALL_DIR}
-                   )
-include_directories(BEFORE SYSTEM ${JSONCPP_INCLUDE_DIR})
-link_directories(${JSONCPP_LIB_DIR})
-
-# Build curl as an external project.
-set(CURL_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/curl)
-ExternalProject_Add(curl_external_project
-                    SOURCE_DIR  ${CMAKE_SOURCE_DIR}/third_party/curl
-                    PREFIX      ${CURL_INSTALL_DIR}
-                    INSTALL_DIR ${CURL_INSTALL_DIR}
-                    CMAKE_ARGS  -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                                -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
-                                -DCMAKE_INSTALL_PREFIX:PATH=${CURL_INSTALL_DIR}
-                                -DOPENSSL_INCLUDE_DIR=${BORINGSSL_INCLUDE_DIR}
-                                -DZLIB_INCLUDE_DIR=${ZLIB_INCLUDE_DIR}
-                    DEPENDS     boringssl_external_project
-                    INSTALL_COMMAND ""
-                   )
-include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/third_party/curl/include)
-include_directories(BEFORE SYSTEM ${CURL_INSTALL_DIR}/src/curl_external_project-build)
-link_directories(${CURL_INSTALL_DIR}/src/curl_external_project-build)
 
 # Build google_api_cpp_client as an external project.
 set(GOOGLE_API_CPP_CLIENT_INSTALL_DIR ${CMAKE_BINARY_DIR}/third_party/google-api-cpp-client)
@@ -313,11 +107,6 @@ ExternalProject_Add(google_api_cpp_client_external_project
                                 -DHAVE_OPENSSL=1
                                 -Dgoogleapis_build_samples=OFF
                                 -Dgoogleapis_build_service_apis=ON
-                    DEPENDS     gflags_external_project
-                    DEPENDS     glog_external_project
-                    DEPENDS     gtest_external_project
-                    DEPENDS     jsoncpp_external_project
-                    DEPENDS     curl_external_project
                    )
 include_directories(${GOOGLE_API_CPP_CLIENT_INCLUDE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/third_party/google-api-cpp-client/src)
@@ -326,12 +115,6 @@ link_directories(${GOOGLE_API_CPP_CLIENT_LIB_DIR})
 
 # A target to combine all of the external projects.
 add_custom_target(build_external_projects
-                  DEPENDS gtest_external_project
-                  DEPENDS gflags_external_project
-                  DEPENDS glog_external_project
-                  DEPENDS boringssl_external_project
-                  DEPENDS protobuf_external_project
-                  DEPENDS grpc_external_project
                   DEPENDS googleapis_external_project
                   DEPENDS google_api_cpp_client_external_project)
 
@@ -432,7 +215,6 @@ macro(cobalt_make_protobuf_cpp_lib LIB_NAME HDRS_OUT USE_GRPC)
             --cpp_out=${CMAKE_BINARY_DIR}
             ${_grpc_spec}
     DEPENDS ${_protofiles}
-    DEPENDS build_external_projects
   )
   add_library(${LIB_NAME}
     ${_generated_srcs}
@@ -489,7 +271,6 @@ macro(cobalt_generate_protobuf_descriptors TARGET_NAME DESCRIPTORS_OUT)
             --include_source_info ${_protofiles}
             --descriptor_set_out ${_generated_dscrptrs}
     DEPENDS ${_protofiles}
-    DEPENDS build_external_projects
   )
   add_custom_target(${TARGET_NAME} ALL
     DEPENDS ${_generated_dscrptrs}
@@ -553,7 +334,6 @@ macro(cobalt_protobuf_generate_go TARGET_NAME SRCS_OUT USE_GRPC)
             -I ${CMAKE_SOURCE_DIR}/third_party/go/src
             --go_out=plugins=${_plugin_prefix}Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${_gen_root_dir}
     DEPENDS ${_protofiles}
-    DEPENDS build_external_projects
   )
   add_custom_target(${TARGET_NAME}
     DEPENDS ${_generated_srcs}
