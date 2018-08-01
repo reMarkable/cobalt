@@ -209,17 +209,17 @@ AnalyzerConfig::AnalyzerConfig(
       metrics_(metrics),
       report_configs_(report_configs) {}
 
-const EncodingConfig* AnalyzerConfig::EncodingConfig(
+const EncodingConfig* AnalyzerConfig::GetEncodingConfig(
     uint32_t customer_id, uint32_t project_id, uint32_t encoding_config_id) {
   return encoding_configs_->Get(customer_id, project_id, encoding_config_id);
 }
 
-const Metric* AnalyzerConfig::Metric(uint32_t customer_id, uint32_t project_id,
+const Metric* AnalyzerConfig::GetMetric(uint32_t customer_id, uint32_t project_id,
                                      uint32_t metric_id) {
   return metrics_->Get(customer_id, project_id, metric_id);
 }
 
-const ReportConfig* AnalyzerConfig::ReportConfig(uint32_t customer_id,
+const ReportConfig* AnalyzerConfig::GetReportConfig(uint32_t customer_id,
                                                  uint32_t project_id,
                                                  uint32_t report_config_id) {
   return report_configs_->Get(customer_id, project_id, report_config_id);

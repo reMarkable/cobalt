@@ -124,7 +124,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   auto analyzer_config = config_manager_->GetCurrent();
 
   // Fetch ReportConfig
-  const ReportConfig* report_config = analyzer_config->ReportConfig(
+  const ReportConfig* report_config = analyzer_config->GetReportConfig(
       report_id.customer_id(), report_id.project_id(),
       report_id.report_config_id());
   if (!report_config) {
@@ -146,7 +146,7 @@ grpc::Status ReportGenerator::GenerateReport(const ReportId& report_id) {
   }
 
   // Fetch the Metric.
-  const Metric* metric = analyzer_config->Metric(report_config->customer_id(),
+  const Metric* metric = analyzer_config->GetMetric(report_config->customer_id(),
                                                  report_config->project_id(),
                                                  report_config->metric_id());
   if (!metric) {

@@ -32,6 +32,8 @@ set(PROTOBUF_INCLUDE_DIR /usr/include/)
 set(PROTOBUF_LIB_DIR /usr/lib/)
 set(PROTOC protoc)
 set(GRPC_CPP_PLUGIN /usr/bin/grpc_cpp_plugin)
+set(BORINGSSL_INCLUDE_DIR /usr/include/boringssl)
+link_directories("/usr/lib/crypto/")
 # Tell the file gtest.h that we want to use the copy of gtest in
 # //third_party/googletest.
 add_definitions(-DHAVE_GOOGLETEST=1)
@@ -97,8 +99,6 @@ ExternalProject_Add(google_api_cpp_client_external_project
                                 -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
                                 -DCMAKE_CXX_FLAGS=${EXTERNAL_PROJECT_CMAKE_CXX_FLAGS}
                                 -DCMAKE_INSTALL_PREFIX:PATH=${GOOGLE_API_CPP_CLIENT_INSTALL_DIR}
-                                -DCURL_INCLUDE_DIRS=${CMAKE_SOURCE_DIR}/third_party/curl/include
-                                -DMORE_CURL_INCLUDE_DIRS=${CURL_INSTALL_DIR}/src/curl_external_project-build
                                 -DGFLAGS_INCLUDE_DIRS=${GFLAGS_INCLUDE_DIR}
                                 -DGLOG_INCLUDE_DIRS=${GLOG_INCLUDE_DIR}
                                 -DGTEST_INCLUDE_DIRS=${GTEST_INCLUDE_DIR}
@@ -132,7 +132,7 @@ macro(add_base_dependencies target_name)
     grpc++
     grpc
     gpr
-    ${PROTOBUF_FULL_LIB_NAME}
+    protobuf
     glog
     gflags
     cares

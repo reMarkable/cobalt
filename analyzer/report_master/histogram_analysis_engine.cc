@@ -487,7 +487,7 @@ DecoderAdapter* HistogramAnalysisEngine::GetDecoder(
     const ObservationPart& observation_part,
     std::unique_ptr<SystemProfile> profile) {
   uint32_t encoding_config_id = observation_part.encoding_config_id();
-  const EncodingConfig* encoding_config = analyzer_config_->EncodingConfig(
+  const EncodingConfig* encoding_config = analyzer_config_->GetEncodingConfig(
       report_id_.customer_id(), report_id_.project_id(), encoding_config_id);
   if (!encoding_config) {
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kGetDecoderFailure)

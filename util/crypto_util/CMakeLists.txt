@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include_directories(BEFORE PRIVATE "${CMAKE_SOURCE_DIR}/third_party/boringssl/include")
+include_directories(BEFORE PRIVATE "${BORINGSSL_INCLUDE_DIR}")
 
 add_library(cobalt_crypto base64.cc cipher.cc errors.cc hash.cc mac.cc
             random.cc)
@@ -23,5 +23,5 @@ add_cobalt_dependencies(cobalt_crypto)
 # out/gtests directory
 add_executable(cobalt_crypto_test base64_test.cc cipher_test.cc hash_test.cc
                mac_test.cc random_test.cc)
-target_link_libraries(cobalt_crypto_test cobalt_crypto)
+target_link_libraries(cobalt_crypto_test cobalt_crypto crypto ssl)
 add_cobalt_test_dependencies(cobalt_crypto_test ${DIR_GTESTS})

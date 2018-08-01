@@ -16,7 +16,6 @@ limitations under the License.
 #include "third_party/tensorflow_statusor/status_macros.h"
 #include "util/status.h"
 
-#include <google/protobuf/stubs/strutil.h>
 #include <algorithm>
 
 #include "glog/logging.h"
@@ -142,12 +141,12 @@ Status MakeErrorStream::Impl::GetStatus() {
   const std::string& stream_str = stream_.str();
   const std::string str =
       prior_message_handling_ == kAppendToPriorMessage
-          ? google::protobuf::StrCat(prior_message_, stream_str)
-          : google::protobuf::StrCat(stream_str, prior_message_);
+          ? (prior_message_ + stream_str)
+          : (stream_str + prior_message_);
   if (str.empty()) {
     return MakeError(file_, line_, code_,
-                     google::protobuf::StrCat(str, "Error without message at ",
-                                              file_, ":", line_),
+                     str + "Error without message at " +
+                                              file_ + ":" + std::to_string(line_),
                      true /* should_log */, google::ERROR /* log_severity */,
                      should_log_stack_trace_);
   } else {

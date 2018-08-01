@@ -5,6 +5,7 @@
 #include "analyzer/report_master/auth_enforcer.h"
 
 #include <string>
+#include <gflags/gflags.h>
 
 #include "glog/logging.h"
 #include "third_party/rapidjson/rapidjson/document.h"

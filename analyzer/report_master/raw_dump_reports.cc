@@ -45,7 +45,7 @@ RawDumpReportRowIterator::RawDumpReportRowIterator(
          << ")";
   std::string metric_id_string = stream.str();
   const Metric* metric =
-      analyzer_config->Metric(customer_id_, project_id_, metric_id_);
+      analyzer_config->GetMetric(customer_id_, project_id_, metric_id_);
   if (!metric) {
     LOG_STACKDRIVER_COUNT_METRIC(ERROR, kRawDumpReportError)
         << "Metric " << metric_id_string
