@@ -63,6 +63,7 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <condition_variable>
 
 #include "client/collection/observation.h"
 

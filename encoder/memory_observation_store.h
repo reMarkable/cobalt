@@ -7,6 +7,7 @@
 
 #include <deque>
 #include <memory>
+#include <mutex>
 
 #include "encoder/envelope_maker.h"
 #include "encoder/observation_store.h"

@@ -30,17 +30,17 @@ ProjectContext::ProjectContext(
       project_id_(project_id),
       client_config_(client_config) {}
 
-const Metric* ProjectContext::Metric(uint32_t id) const {
+const Metric* ProjectContext::GetMetric(uint32_t id) const {
   if (client_config_) {
-    return client_config_->Metric(customer_id_, project_id_, id);
+    return client_config_->GetMetric(customer_id_, project_id_, id);
   }
   CHECK(metric_registry_);
   return metric_registry_->Get(customer_id_, project_id_, id);
 }
 
-const EncodingConfig* ProjectContext::EncodingConfig(uint32_t id) const {
+const EncodingConfig* ProjectContext::GetEncodingConfig(uint32_t id) const {
   if (client_config_) {
-    return client_config_->EncodingConfig(customer_id_, project_id_, id);
+    return client_config_->GetEncodingConfig(customer_id_, project_id_, id);
   }
   CHECK(encoding_registry_);
   return encoding_registry_->Get(customer_id_, project_id_, id);

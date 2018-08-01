@@ -346,7 +346,7 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
   Result result;
 
   // Get the Metric.
-  const Metric* metric = project_->Metric(metric_id);
+  const Metric* metric = project_->GetMetric(metric_id);
   if (!metric) {
     // No such metric.
     LOG(ERROR) << "No such metric: (" << customer_id_ << ", " << project_id_
@@ -473,7 +473,7 @@ Encoder::Result Encoder::Encode(uint32_t metric_id, const Value& value) {
 
     // Get the EncodingConfig
     const EncodingConfig* encoding_config =
-        project_->EncodingConfig(value_part_data.encoding_config_id);
+        project_->GetEncodingConfig(value_part_data.encoding_config_id);
     if (!encoding_config) {
       // No such encoding config.
       LOG(ERROR) << "No such encoding config: (" << customer_id_ << ", "

@@ -136,12 +136,12 @@ std::unique_ptr<ClientConfig> ClientConfig::CreateFromCobaltConfig(
       std::shared_ptr<config::MetricRegistry>(metrics.first.release())));
 }
 
-const EncodingConfig* ClientConfig::EncodingConfig(
+const EncodingConfig* ClientConfig::GetEncodingConfig(
     uint32_t customer_id, uint32_t project_id, uint32_t encoding_config_id) {
   return encoding_configs_->Get(customer_id, project_id, encoding_config_id);
 }
 
-const Metric* ClientConfig::Metric(uint32_t customer_id, uint32_t project_id,
+const Metric* ClientConfig::GetMetric(uint32_t customer_id, uint32_t project_id,
                                    uint32_t metric_id) {
   return metrics_->Get(customer_id, project_id, metric_id);
 }

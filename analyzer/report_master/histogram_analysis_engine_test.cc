@@ -292,7 +292,7 @@ class HistogramAnalysisEngineTest : public ::testing::Test {
     const ReportVariable* report_variable = &(report_config->variable(0));
     EXPECT_NE(nullptr, report_variable);
 
-    const Metric* metric = analyzer_config->Metric(report_config->customer_id(),
+    const Metric* metric = analyzer_config->GetMetric(report_config->customer_id(),
                                                    report_config->project_id(),
                                                    report_config->metric_id());
     EXPECT_NE(nullptr, metric);

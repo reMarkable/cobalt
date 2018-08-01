@@ -35,6 +35,8 @@
 #include "util/crypto_util/base64.h"
 #include "util/log_based_metrics.h"
 #include "util/pem_util.h"
+#include <grpc++/support/sync_stream.h>
+#include <gflags/gflags.h>
 
 namespace cobalt {
 namespace analyzer {
@@ -633,7 +635,7 @@ grpc::Status ReportMasterService::QueryReports(
 
 grpc::Status ReportMasterService::QueryReportsInternal(
     ServerContext* context, const QueryReportsRequest* request,
-    grpc::WriterInterface<QueryReportsResponse>* writer) {
+    grpc::internal::WriterInterface<QueryReportsResponse>* writer) {
   CHECK(request);
   grpc::Status auth_status = auth_enforcer_->CheckAuthorization(
       context, request->customer_id(), request->project_id(),
@@ -646,7 +648,7 @@ grpc::Status ReportMasterService::QueryReportsInternal(
 
 grpc::Status ReportMasterService::QueryReportsNoAuth(
     const QueryReportsRequest* request,
-    grpc::WriterInterface<QueryReportsResponse>* writer) {
+    grpc::internal::WriterInterface<QueryReportsResponse>* writer) {
   CHECK(request);
   CHECK(writer);
   // The max number of ReportMetadata we send back in each QueryReportsResponse.
@@ -725,7 +727,7 @@ grpc::Status ReportMasterService::GetAndValidateReportConfig(
   auto analyzer_config = config_manager_->GetCurrent();
   // Fetch the ReportConfig from the registry.
   *report_config_out =
-      analyzer_config->ReportConfig(customer_id, project_id, report_config_id);
+      analyzer_config->GetReportConfig(customer_id, project_id, report_config_id);
   if (!*report_config_out) {
     std::ostringstream stream;
     stream << "No ReportConfig found with id=(" << customer_id << ", "

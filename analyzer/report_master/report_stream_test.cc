@@ -188,7 +188,7 @@ class ReportStreamTest : public ::testing::Test {
         EXPECT_TRUE(report_stream.good());
         EXPECT_NE(0, report_stream.tellg());
       }
-      report_stream.clear(0);
+      report_stream.clear();
       report_stream.seekg(0);
     }
   }

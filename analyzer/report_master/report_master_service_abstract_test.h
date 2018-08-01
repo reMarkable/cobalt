@@ -369,7 +369,7 @@ system_profile_field: [BOARD_NAME]
 // An implementation of grpc::Writer that keeps a copy of each object
 // written for later checking.
 class TestingQueryReportsResponseWriter
-    : public grpc::WriterInterface<QueryReportsResponse> {
+    : public grpc::internal::WriterInterface<QueryReportsResponse> {
  public:
   bool Write(const QueryReportsResponse& response,
              grpc::WriteOptions options) override {

@@ -99,7 +99,7 @@ class ReportMasterService final : public ReportMaster::Service {
   // checked when it is run.
   grpc::Status QueryReportsNoAuth(
       const QueryReportsRequest* request,
-      grpc::WriterInterface<QueryReportsResponse>* writer);
+      grpc::internal::WriterInterface<QueryReportsResponse>* writer);
 
   // If there is a ReportScheduler running and invoking StartReportNoAuth()
   // on this instance of ReportMasterService, then invoke this method to
@@ -211,7 +211,7 @@ class ReportMasterService final : public ReportMaster::Service {
   // using the network stack.
   grpc::Status QueryReportsInternal(
       grpc::ServerContext* context, const QueryReportsRequest* request,
-      grpc::WriterInterface<QueryReportsResponse>* writer);
+      grpc::internal::WriterInterface<QueryReportsResponse>* writer);
 
   // Returns the string version of a ReportId as used in the gRPC API. This
   // is exposed for use by tests.

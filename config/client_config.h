@@ -63,14 +63,14 @@ class ClientConfig {
   // Returns the EncodingConfig with the given ID triple, or nullptr if there is
   // no such EncodingConfig. The caller does not take ownership of the returned
   // pointer.
-  const EncodingConfig* EncodingConfig(uint32_t customer_id,
+  const EncodingConfig* GetEncodingConfig(uint32_t customer_id,
                                        uint32_t project_id,
                                        uint32_t encoding_config_id);
 
   // Returns the Metric with the given ID triple, or nullptr if there is
   // no such Metric. The caller does not take ownership of the returned
   // pointer.
-  const Metric* Metric(uint32_t customer_id, uint32_t project_id,
+  const Metric* GetMetric(uint32_t customer_id, uint32_t project_id,
                        uint32_t metric_id);
 
  private:

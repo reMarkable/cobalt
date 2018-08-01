@@ -34,12 +34,12 @@ class ProjectContext {
   // Returns the Metric with the given ID in the project, or nullptr if there is
   // no such Metric. The caller does not take ownership of the returned
   // pointer.
-  const Metric* Metric(uint32_t id) const;
+  const Metric* GetMetric(uint32_t id) const;
 
   // Returns the EncodingConfig with the given ID in the project, or nullptr if
   // there is no such EncodingConfig. The caller does not take ownership of the
   // returned pointer.
-  const EncodingConfig* EncodingConfig(uint32_t id) const;
+  const EncodingConfig* GetEncodingConfig(uint32_t id) const;
 
   uint32_t customer_id() const { return customer_id_; }
 
