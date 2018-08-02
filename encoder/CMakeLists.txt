@@ -61,20 +61,20 @@ target_link_libraries(encoder
                       clearcut_extensions_proto_lib)
 add_cobalt_dependencies(encoder)
 
-add_executable(encoder_tests
-               client_secret_test.cc
-               encoder_test.cc
-               ${ENCODER_TEST_CONFIG_H}
-               envelope_maker_test.cc
-               ${ENVELOPE_MAKER_TEST_CONFIG_H}
-               send_retryer_test.cc
-               shipping_manager_test.cc
-               ${SHIPPING_MANAGER_TEST_CONFIG_H}
-               shipping_dispatcher_test.cc
-               ${SHIPPING_DISPATCHER_TEST_CONFIG_H}
-               shuffler_client_test.cc system_data_test.cc)
-target_link_libraries(encoder_tests
-                      client_secret
-                      encoder)
-add_cobalt_test_dependencies(encoder_tests ${DIR_GTESTS})
-add_dependencies(encoder_tests build_config_parser)
+#add_executable(encoder_tests
+#               client_secret_test.cc
+#               encoder_test.cc
+#               ${ENCODER_TEST_CONFIG_H}
+#               envelope_maker_test.cc
+#               ${ENVELOPE_MAKER_TEST_CONFIG_H}
+#               send_retryer_test.cc
+#               shipping_manager_test.cc
+#               ${SHIPPING_MANAGER_TEST_CONFIG_H}
+#               shipping_dispatcher_test.cc
+#               ${SHIPPING_DISPATCHER_TEST_CONFIG_H}
+#               shuffler_client_test.cc system_data_test.cc)
+#target_link_libraries(encoder_tests
+#                      client_secret
+#                      encoder)
+#add_cobalt_test_dependencies(encoder_tests ${DIR_GTESTS})
+#add_dependencies(encoder_tests build_config_parser)

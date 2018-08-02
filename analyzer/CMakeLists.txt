@@ -19,5 +19,5 @@ set(REPORT_PROTO_SRCS
     "${CMAKE_BINARY_DIR}/analyzer/report_master/report_internal.pb.cc")
 
 add_subdirectory(analyzer_service)
-add_subdirectory(report_master)
-add_subdirectory(store)
+#add_subdirectory(report_master)
+#add_subdirectory(store)

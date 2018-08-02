@@ -314,53 +314,53 @@ endmacro()
 # generate_report_master_pb_go_files will be created on which other
 # targets may depend. The variable SRCS_OUT will contain the list of strings:
 # { <some-path>/report_master.pb.go }
-macro(cobalt_protobuf_generate_go TARGET_NAME SRCS_OUT USE_GRPC)
-  set(_gen_root_dir ${GO_PROTO_GEN_SRC_DIR})
-  string(REPLACE ${CMAKE_BINARY_DIR} ${GO_PROTO_GEN_SRC_DIR} _gen_full_dir ${CMAKE_CURRENT_BINARY_DIR})
-  string(COMPARE EQUAL ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR} is_root_dir)
-  if(is_root_dir)
-    # What's going on here? Some of our .proto files are in the root directory
-    # but use "package cobalt". The Go compiler and the protoc compiler don't
-    # play together well for these files. So we treat all of our top-level
-    # proto files as if they were in a directory named "cobalt" and this
-    # works well with go.
-    string(CONCAT _gen_root_dir ${GO_PROTO_GEN_SRC_DIR} "/cobalt")
-    set(_gen_full_dir ${_gen_root_dir})
-  endif()
-  set(_protofiles)
-  set(_generated_srcs)
-  set(_plugin_prefix "")
-  if(${USE_GRPC})
-    set(_plugin_prefix "grpc,")
-  endif()
-  foreach(name ${ARGN})
-      add_custom_command(
-        OUTPUT "${_gen_full_dir}/${name}.pb.go"
-        COMMAND ${PROTOC} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto"
-                -I ${CMAKE_SOURCE_DIR}
-                -I ${PROTOBUF_INCLUDE_DIR}
-                -I ${CMAKE_SOURCE_DIR}/third_party/go/src
-                --go_out=plugins=${_plugin_prefix}Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${_gen_root_dir}
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto"
-      )
-      list(APPEND _protofiles "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto")
-      list(APPEND _generated_srcs "${_gen_full_dir}/${name}.pb.go")
-      set_source_files_properties("${gen_full}/${name}.pb.go" PROPERTIES GENERATED TRUE)
-  endforeach()
-  #add_custom_command(
-  #  OUTPUT ${_generated_srcs}
-  #  COMMAND ${PROTOC} ${_protofiles}
-  #          -I ${CMAKE_SOURCE_DIR}
-  #          -I ${PROTOBUF_INCLUDE_DIR}
-  #          -I ${CMAKE_SOURCE_DIR}/third_party/go/src
-  #          --go_out=plugins=${_plugin_prefix}Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${_gen_root_dir}
-  #  DEPENDS ${_protofiles}
-  #)
-  add_custom_target(${TARGET_NAME}
-    DEPENDS ${_generated_srcs}
-  )
-  set(${SRCS_OUT} ${_generated_srcs})
-endmacro()
+#macro(cobalt_protobuf_generate_go TARGET_NAME SRCS_OUT USE_GRPC)
+#  set(_gen_root_dir ${GO_PROTO_GEN_SRC_DIR})
+#  string(REPLACE ${CMAKE_BINARY_DIR} ${GO_PROTO_GEN_SRC_DIR} _gen_full_dir ${CMAKE_CURRENT_BINARY_DIR})
+#  string(COMPARE EQUAL ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR} is_root_dir)
+#  if(is_root_dir)
+#    # What's going on here? Some of our .proto files are in the root directory
+#    # but use "package cobalt". The Go compiler and the protoc compiler don't
+#    # play together well for these files. So we treat all of our top-level
+#    # proto files as if they were in a directory named "cobalt" and this
+#    # works well with go.
+#    string(CONCAT _gen_root_dir ${GO_PROTO_GEN_SRC_DIR} "/cobalt")
+#    set(_gen_full_dir ${_gen_root_dir})
+#  endif()
+#  set(_protofiles)
+#  set(_generated_srcs)
+#  set(_plugin_prefix "")
+#  if(${USE_GRPC})
+#    set(_plugin_prefix "grpc,")
+#  endif()
+#  foreach(name ${ARGN})
+#      add_custom_command(
+#        OUTPUT "${_gen_full_dir}/${name}.pb.go"
+#        COMMAND ${PROTOC} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto"
+#                -I ${CMAKE_SOURCE_DIR}
+#                -I ${PROTOBUF_INCLUDE_DIR}
+#                -I ${CMAKE_SOURCE_DIR}/third_party/go/src
+#                --go_out=plugins=${_plugin_prefix}Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${_gen_root_dir}
+#        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto"
+#      )
+#      list(APPEND _protofiles "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto")
+#      list(APPEND _generated_srcs "${_gen_full_dir}/${name}.pb.go")
+#      set_source_files_properties("${gen_full}/${name}.pb.go" PROPERTIES GENERATED TRUE)
+#  endforeach()
+#  #add_custom_command(
+#  #  OUTPUT ${_generated_srcs}
+#  #  COMMAND ${PROTOC} ${_protofiles}
+#  #          -I ${CMAKE_SOURCE_DIR}
+#  #          -I ${PROTOBUF_INCLUDE_DIR}
+#  #          -I ${CMAKE_SOURCE_DIR}/third_party/go/src
+#  #          --go_out=plugins=${_plugin_prefix}Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${_gen_root_dir}
+#  #  DEPENDS ${_protofiles}
+#  #)
+#  add_custom_target(${TARGET_NAME}
+#    DEPENDS ${_generated_srcs}
+#  )
+#  set(${SRCS_OUT} ${_generated_srcs})
+#endmacro()
 
 set(CONFIG_PARSER_BINARY "${CMAKE_BINARY_DIR}/config/config_parser/config_parser")
 
@@ -421,32 +421,32 @@ cobalt_make_protobuf_cpp_lib(cobalt_proto_lib
                              observation)
 
 # Generate the go bindings for the Cobalt proto files in the root directory.
-cobalt_protobuf_generate_go(generate_cobalt_pb_go_files
-                            COBALT_PB_GO_FILES
-                            false
-                            encrypted_message
-                            observation)
+#cobalt_protobuf_generate_go(generate_cobalt_pb_go_files
+#                            COBALT_PB_GO_FILES
+#                            false
+#                            encrypted_message
+#                            observation)
 
 # Analagous targets to the two above also appear in the config directory for
 # the config protos. But the variables that are generated there are not
 # available in other sub-directories of the root directory. So we variables
 # here that contain the same content.
-set(CONFIG_PROTO_HDRS
-    "${CMAKE_BINARY_DIR}/config/encodings.pb.h"
-    "${CMAKE_BINARY_DIR}/config/metrics.pb.h"
-    "${CMAKE_BINARY_DIR}/config/report_configs.pb.h")
-set(CONFIG_PB_GO_FILES
-    "${GO_PROTO_GEN_SRC_DIR}/config/cobalt_config.pb.go"
-    "${GO_PROTO_GEN_SRC_DIR}/config/encodings.pb.go"
-    "${GO_PROTO_GEN_SRC_DIR}/config/metrics.pb.go"
-    "${GO_PROTO_GEN_SRC_DIR}/config/report_configs.pb.go"
-)
+#set(CONFIG_PROTO_HDRS
+#    "${CMAKE_BINARY_DIR}/config/encodings.pb.h"
+#    "${CMAKE_BINARY_DIR}/config/metrics.pb.h"
+#    "${CMAKE_BINARY_DIR}/config/report_configs.pb.h")
+#set(CONFIG_PB_GO_FILES
+#    "${GO_PROTO_GEN_SRC_DIR}/config/cobalt_config.pb.go"
+#    "${GO_PROTO_GEN_SRC_DIR}/config/encodings.pb.go"
+#    "${GO_PROTO_GEN_SRC_DIR}/config/metrics.pb.go"
+#    "${GO_PROTO_GEN_SRC_DIR}/config/report_configs.pb.go"
+#)
 
 macro(declare_proto_files_are_generated)
   set_source_files_properties(${COBALT_PROTO_HDRS} PROPERTIES GENERATED TRUE)
   set_source_files_properties(${CONFIG_PROTO_HDRS} PROPERTIES GENERATED TRUE)
-  set_source_files_properties(${COBALT_PB_GO_FILES} PROPERTIES GENERATED TRUE)
-  set_source_files_properties(${CONFIG_PB_GO_FILES} PROPERTIES GENERATED TRUE)
+  #  set_source_files_properties(${COBALT_PB_GO_FILES} PROPERTIES GENERATED TRUE)
+  #  set_source_files_properties(${CONFIG_PB_GO_FILES} PROPERTIES GENERATED TRUE)
 endmacro()
 
 macro(add_cobalt_test_dependencies target_name test_dir)
@@ -478,10 +478,10 @@ target_link_libraries(clearcut_extensions_proto_lib
 # Project directories
 add_subdirectory(algorithms)
 add_subdirectory(analyzer)
-add_subdirectory(client/collection)
+#add_subdirectory(client/collection)
 add_subdirectory(config)
 add_subdirectory(encoder)
-add_subdirectory(end_to_end_tests)
+#add_subdirectory(end_to_end_tests)
 add_subdirectory(shuffler)
 add_subdirectory(tools)
 add_subdirectory(util)

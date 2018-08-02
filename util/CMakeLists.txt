@@ -21,16 +21,16 @@ target_link_libraries(pem_util
                       cobalt_crypto)
 add_cobalt_dependencies(pem_util)
 
-add_executable(util_tests
-               datetime_util_test.cc
-               encrypted_message_util_test.cc)
-target_link_libraries(util_tests
-                      datetime_util encrypted_message_util)
-add_cobalt_test_dependencies(util_tests ${DIR_GTESTS})
+#add_executable(util_tests
+#               datetime_util_test.cc
+#               encrypted_message_util_test.cc)
+#target_link_libraries(util_tests
+#                      datetime_util encrypted_message_util)
+#add_cobalt_test_dependencies(util_tests ${DIR_GTESTS})
 
 add_subdirectory(clearcut)
 add_subdirectory(crypto_util)
-add_subdirectory(gcs)
+#add_subdirectory(gcs)
 
 add_library(status
             status.cc
