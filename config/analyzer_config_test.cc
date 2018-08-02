@@ -37,13 +37,13 @@ TEST(AnalyzerConfigTest, ValidFiles) {
   FLAGS_cobalt_report_configs_file_name = "registered_reports_valid.txt";
   config = AnalyzerConfig::CreateFromFlagsOrDie();
   // Sanity check the contents.
-  EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 3));
-  EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 4));
-  EXPECT_EQ(nullptr, config->EncodingConfig(1, 1, 5));
-  EXPECT_NE(nullptr, config->Metric(2, 1, 2));
-  EXPECT_EQ(nullptr, config->Metric(2, 1, 3));
-  EXPECT_NE(nullptr, config->ReportConfig(2, 1, 1));
-  EXPECT_EQ(nullptr, config->ReportConfig(2, 2, 1));
+  EXPECT_NE(nullptr, config->GetEncodingConfig(1, 1, 3));
+  EXPECT_NE(nullptr, config->GetEncodingConfig(1, 1, 4));
+  EXPECT_EQ(nullptr, config->GetEncodingConfig(1, 1, 5));
+  EXPECT_NE(nullptr, config->GetMetric(2, 1, 2));
+  EXPECT_EQ(nullptr, config->GetMetric(2, 1, 3));
+  EXPECT_NE(nullptr, config->GetReportConfig(2, 1, 1));
+  EXPECT_EQ(nullptr, config->GetReportConfig(2, 2, 1));
 }
 
 TEST(AnalyzerConfigTest, BadDirectoryNameDeathTest) {
@@ -110,17 +110,17 @@ TEST(AnalyzerConfigTest, ValidCobaltConfigProto) {
 
   auto config = AnalyzerConfig::CreateFromCobaltConfigProto(&cobalt_config);
 
-  EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 3));
-  EXPECT_NE(nullptr, config->EncodingConfig(1, 1, 4));
-  EXPECT_EQ(nullptr, config->EncodingConfig(1, 1, 5));
+  EXPECT_NE(nullptr, config->GetEncodingConfig(1, 1, 3));
+  EXPECT_NE(nullptr, config->GetEncodingConfig(1, 1, 4));
+  EXPECT_EQ(nullptr, config->GetEncodingConfig(1, 1, 5));
 
-  EXPECT_NE(nullptr, config->Metric(2, 1, 2));
-  EXPECT_NE(nullptr, config->Metric(2, 1, 3));
-  EXPECT_EQ(nullptr, config->Metric(2, 1, 4));
+  EXPECT_NE(nullptr, config->GetMetric(2, 1, 2));
+  EXPECT_NE(nullptr, config->GetMetric(2, 1, 3));
+  EXPECT_EQ(nullptr, config->GetMetric(2, 1, 4));
 
-  EXPECT_NE(nullptr, config->ReportConfig(1, 1, 2));
-  EXPECT_NE(nullptr, config->ReportConfig(1, 1, 3));
-  EXPECT_EQ(nullptr, config->ReportConfig(1, 1, 4));
+  EXPECT_NE(nullptr, config->GetReportConfig(1, 1, 2));
+  EXPECT_NE(nullptr, config->GetReportConfig(1, 1, 3));
+  EXPECT_EQ(nullptr, config->GetReportConfig(1, 1, 4));
 }
 
 }  // namespace config

@@ -15,7 +15,7 @@ syntax = "proto3";
 
 package cobalt;
 
-option go_package = "cobalt";
+//option go_package = "cobalt";
 
 import "encrypted_message.proto";
 

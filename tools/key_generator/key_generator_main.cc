@@ -14,6 +14,7 @@
 
 #include <iostream>
 
+#include <gflags/gflags.h>
 #include "glog/logging.h"
 #include "util/crypto_util/cipher.h"
 

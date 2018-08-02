@@ -107,7 +107,7 @@ class Registry {
   // Returns the |T| with the given ID triple, or nullptr if there is
   // no such |T|. The caller does not take ownership of the returned
   // pointer.
-  const T* const Get(uint32_t customer_id, uint32_t project_id, uint32_t id) {
+  const T* Get(uint32_t customer_id, uint32_t project_id, uint32_t id) {
     auto iterator = map_.find(MakeKey(customer_id, project_id, id));
     if (iterator == map_.end()) {
       return nullptr;

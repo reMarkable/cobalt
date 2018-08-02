@@ -1125,7 +1125,7 @@ void TestApp::Show(const std::vector<std::string>& command) {
     return;
   }
 
-  auto* metric = project_context_->Metric(metric_);
+  auto* metric = project_context_->GetMetric(metric_);
   if (!metric) {
     *ostream_ << "There is no metric with id=" << metric_ << "." << std::endl;
   } else {
@@ -1135,7 +1135,7 @@ void TestApp::Show(const std::vector<std::string>& command) {
     *ostream_ << std::endl;
   }
 
-  auto* encoding = project_context_->EncodingConfig(encoding_config_id_);
+  auto* encoding = project_context_->GetEncodingConfig(encoding_config_id_);
   if (!encoding) {
     *ostream_ << "There is no encoding config with id=" << encoding_config_id_
               << "." << std::endl;

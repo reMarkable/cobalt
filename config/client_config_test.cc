@@ -84,12 +84,12 @@ TEST(ClientConfigTest, CreateFromCobaltProjectConfigBytesValidConfig) {
   auto client_config = std::move(client_config_project_id_pair.first);
   ASSERT_NE(nullptr, client_config);
   EXPECT_EQ(1u, client_config_project_id_pair.second);
-  EXPECT_EQ(nullptr, client_config->EncodingConfig(1, 1, 41));
-  EXPECT_NE(nullptr, client_config->EncodingConfig(1, 1, 42));
-  EXPECT_NE(nullptr, client_config->EncodingConfig(1, 1, 43));
-  EXPECT_EQ(nullptr, client_config->Metric(1, 1, 41));
-  EXPECT_NE(nullptr, client_config->Metric(1, 1, 42));
-  EXPECT_NE(nullptr, client_config->Metric(1, 1, 43));
+  EXPECT_EQ(nullptr, client_config->GetEncodingConfig(1, 1, 41));
+  EXPECT_NE(nullptr, client_config->GetEncodingConfig(1, 1, 42));
+  EXPECT_NE(nullptr, client_config->GetEncodingConfig(1, 1, 43));
+  EXPECT_EQ(nullptr, client_config->GetMetric(1, 1, 41));
+  EXPECT_NE(nullptr, client_config->GetMetric(1, 1, 42));
+  EXPECT_NE(nullptr, client_config->GetMetric(1, 1, 43));
 }
 
 TEST(ClientConfigTest, CreateFromCobaltProjectConfigBytesInvalidConfig) {
@@ -117,12 +117,12 @@ TEST(ClientConfigTest, CreateFromCobaltConfigBytes) {
   auto client_config =
       ClientConfig::CreateFromCobaltConfigBytes(cobalt_config_bytes);
   ASSERT_NE(nullptr, client_config);
-  EXPECT_EQ(nullptr, client_config->EncodingConfig(41, 41, 41));
-  EXPECT_NE(nullptr, client_config->EncodingConfig(42, 42, 42));
-  EXPECT_NE(nullptr, client_config->EncodingConfig(43, 43, 43));
-  EXPECT_EQ(nullptr, client_config->Metric(41, 41, 41));
-  EXPECT_NE(nullptr, client_config->Metric(42, 42, 42));
-  EXPECT_NE(nullptr, client_config->Metric(43, 43, 43));
+  EXPECT_EQ(nullptr, client_config->GetEncodingConfig(41, 41, 41));
+  EXPECT_NE(nullptr, client_config->GetEncodingConfig(42, 42, 42));
+  EXPECT_NE(nullptr, client_config->GetEncodingConfig(43, 43, 43));
+  EXPECT_EQ(nullptr, client_config->GetMetric(41, 41, 41));
+  EXPECT_NE(nullptr, client_config->GetMetric(42, 42, 42));
+  EXPECT_NE(nullptr, client_config->GetMetric(43, 43, 43));
 }
 
 TEST(ClientConfigTest, CreateFromCobaltConfigBase64) {
@@ -138,12 +138,12 @@ TEST(ClientConfigTest, CreateFromCobaltConfigBase64) {
   auto client_config =
       ClientConfig::CreateFromCobaltConfigBase64(cobalt_config_base64);
   ASSERT_NE(nullptr, client_config);
-  EXPECT_EQ(nullptr, client_config->EncodingConfig(41, 41, 41));
-  EXPECT_NE(nullptr, client_config->EncodingConfig(42, 42, 42));
-  EXPECT_NE(nullptr, client_config->EncodingConfig(43, 43, 43));
-  EXPECT_EQ(nullptr, client_config->Metric(41, 41, 41));
-  EXPECT_NE(nullptr, client_config->Metric(42, 42, 42));
-  EXPECT_NE(nullptr, client_config->Metric(43, 43, 43));
+  EXPECT_EQ(nullptr, client_config->GetEncodingConfig(41, 41, 41));
+  EXPECT_NE(nullptr, client_config->GetEncodingConfig(42, 42, 42));
+  EXPECT_NE(nullptr, client_config->GetEncodingConfig(43, 43, 43));
+  EXPECT_EQ(nullptr, client_config->GetMetric(41, 41, 41));
+  EXPECT_NE(nullptr, client_config->GetMetric(42, 42, 42));
+  EXPECT_NE(nullptr, client_config->GetMetric(43, 43, 43));
 }
 
 }  // namespace config

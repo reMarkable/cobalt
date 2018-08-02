@@ -32,7 +32,19 @@ set(PROTOBUF_INCLUDE_DIR /usr/include/)
 set(PROTOBUF_LIB_DIR /usr/lib/)
 set(PROTOC protoc)
 set(GRPC_CPP_PLUGIN /usr/bin/grpc_cpp_plugin)
+
 set(BORINGSSL_INCLUDE_DIR /usr/include/boringssl)
+
+set(GTEST_INCLUDE_DIR /usr/include)
+set(GTEST_LIB_DIR /usr/lib)
+
+set(GFLAGS_INCLUDE_DIR /usr/include/)
+set(GFLAGS_LIB_DIR /usr/lib)
+
+set(GLOG_INSTALL_DIR /usr/include/glog)
+set(GLOG_INCLUDE_DIR /usr/include)
+set(GLOG_LIB_DIR /usr/lib)
+
 link_directories("/usr/lib/crypto/")
 # Tell the file gtest.h that we want to use the copy of gtest in
 # //third_party/googletest.
@@ -47,9 +59,9 @@ set(DIR_PERF_TESTS "${CMAKE_BINARY_DIR}/perf_tests")
 
 # Go related defines
 set(GO_PATH env GOPATH="${CMAKE_SOURCE_DIR}/third_party/go:${CMAKE_BINARY_DIR}/go-proto-gen")
-set(GO_PATH env "${GO_PATH}:${CMAKE_SOURCE_DIR}/shuffler")
-set(GO_PATH env "${GO_PATH}:${CMAKE_SOURCE_DIR}/config/config_parser")
-set(GO_PATH env "${GO_PATH}:${CMAKE_SOURCE_DIR}/tools/go")
+set(GO_PATH "${GO_PATH}:${CMAKE_SOURCE_DIR}/shuffler")
+set(GO_PATH "${GO_PATH}:${CMAKE_SOURCE_DIR}/config/config_parser")
+set(GO_PATH "${GO_PATH}:${CMAKE_SOURCE_DIR}/tools/go")
 set(GO_BIN ${GO_PATH} go)
 set(GO_TESTS "${CMAKE_BINARY_DIR}/go_tests")
 set(GO_PROTO_GEN_SRC_DIR "${CMAKE_BINARY_DIR}/go-proto-gen/src")
@@ -317,24 +329,33 @@ macro(cobalt_protobuf_generate_go TARGET_NAME SRCS_OUT USE_GRPC)
   endif()
   set(_protofiles)
   set(_generated_srcs)
-  foreach(name ${ARGN})
-      list(APPEND _protofiles "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto")
-      list(APPEND _generated_srcs "${_gen_full_dir}/${name}.pb.go")
-      set_source_files_properties("${gen_full}/${name}.pb.go" PROPERTIES GENERATED TRUE)
-  endforeach()
   set(_plugin_prefix "")
   if(${USE_GRPC})
     set(_plugin_prefix "grpc,")
   endif()
-  add_custom_command(
-    OUTPUT ${_generated_srcs}
-    COMMAND ${PROTOC} ${_protofiles}
-            -I ${CMAKE_SOURCE_DIR}
-            -I ${PROTOBUF_INCLUDE_DIR}
-            -I ${CMAKE_SOURCE_DIR}/third_party/go/src
-            --go_out=plugins=${_plugin_prefix}Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${_gen_root_dir}
-    DEPENDS ${_protofiles}
-  )
+  foreach(name ${ARGN})
+      add_custom_command(
+        OUTPUT "${_gen_full_dir}/${name}.pb.go"
+        COMMAND ${PROTOC} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto"
+                -I ${CMAKE_SOURCE_DIR}
+                -I ${PROTOBUF_INCLUDE_DIR}
+                -I ${CMAKE_SOURCE_DIR}/third_party/go/src
+                --go_out=plugins=${_plugin_prefix}Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${_gen_root_dir}
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto"
+      )
+      list(APPEND _protofiles "${CMAKE_CURRENT_SOURCE_DIR}/${name}.proto")
+      list(APPEND _generated_srcs "${_gen_full_dir}/${name}.pb.go")
+      set_source_files_properties("${gen_full}/${name}.pb.go" PROPERTIES GENERATED TRUE)
+  endforeach()
+  #add_custom_command(
+  #  OUTPUT ${_generated_srcs}
+  #  COMMAND ${PROTOC} ${_protofiles}
+  #          -I ${CMAKE_SOURCE_DIR}
+  #          -I ${PROTOBUF_INCLUDE_DIR}
+  #          -I ${CMAKE_SOURCE_DIR}/third_party/go/src
+  #          --go_out=plugins=${_plugin_prefix}Mobservation.proto=cobalt,Mencrypted_message.proto=cobalt:${_gen_root_dir}
+  #  DEPENDS ${_protofiles}
+  #)
   add_custom_target(${TARGET_NAME}
     DEPENDS ${_generated_srcs}
   )
